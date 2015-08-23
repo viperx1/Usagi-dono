@@ -21,8 +21,9 @@ Window::Window()
 
     // main window
     this->setWindowTitle("Usagi");
-    this->setFixedWidth(800);
-    this->setFixedHeight(600);
+//    this->setFixedWidth(800);
+    this->setMinimumSize(800, 600);
+//    this->setFixedHeight(600);
 
     // main layout
     layout = new QBoxLayout(QBoxLayout::TopToBottom, this);
