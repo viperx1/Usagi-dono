@@ -129,9 +129,9 @@ Window::Window()
     pageHasherSettings->addWidget(buttonstop, 0, 5, Qt::AlignLeft);
     pageHasherSettings->addWidget(buttonclear, 0, 6, Qt::AlignLeft);
     pageHasherSettings->addWidget(moveto, 2, 0, Qt::AlignRight);
-    pageHasherSettings->addWidget(renameto, 3, 0, Qt::AlignRight);
-	pageHasherSettings->addLayout(layout1, 2, 1, 1, 6);
-	pageHasherSettings->addLayout(layout2, 3, 1, 1, 6);
+//    pageHasherSettings->addWidget(renameto, 3, 0, Qt::AlignRight); // hide rename to
+    pageHasherSettings->addLayout(layout1, 2, 1, 1, 6);
+//	pageHasherSettings->addLayout(layout2, 3, 1, 1, 6); // ^^^
 	pageHasherSettings->setColumnStretch(3, 100);
 
     hasherFileState->addItem("Unknown");
