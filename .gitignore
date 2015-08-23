@@ -41,3 +41,28 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/anidbapi.o
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/ed2k.o
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/hasherthread.o
+*.o
+*.sqlite
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/object_script.usagi.Debug
+*.Debug
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/moc_anidbapi.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/moc_ed2k.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/moc_hasherthread.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/Makefile
+*.Release
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/moc_main.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/debug/moc_window.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/moc_anidbapi.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/moc_hasherthread.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/Makefile
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/moc_ed2k.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/moc_main.cpp
+build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/moc_window.cpp
+*.3-pre1
+*.exe
+*.user
+*.user
+usagi/usagi.pro.user

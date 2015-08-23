@@ -274,6 +274,8 @@ void Window::Button3Click()
 	QStringList files;
 
 	files.append(adbapi->getLastDirectory());
+    if(!files.last().isEmpty())
+    {
 	while(!files.isEmpty())
 	{
 		QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
@@ -283,7 +285,7 @@ void Window::Button3Click()
 			QFileInfo file = directory_walker.next();
 			hashesinsertrow(file, renameto->checkState());
 		}
-	}
+    }}
 	hashes->setUpdatesEnabled(1);
 }
 
