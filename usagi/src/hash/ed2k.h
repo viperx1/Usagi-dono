@@ -17,7 +17,7 @@ private:
 	MD4_CTX context2;
 	unsigned char digest1[16];
 	unsigned char digest2[16];
-	unsigned int fileSize;
+    qint64 fileSize;
 	QString fileName;
 	bool dohash;
 public:
@@ -28,13 +28,13 @@ public:
 	int ed2khash(QString);
 	std::string HexDigest();
 	QString FileName();
-	unsigned int FileSize();
+    qint64 FileSize();
 	ed2k();
 	virtual void Debug(QString msg);
 	struct ed2kfilestruct
 	{
 		QString filename;
-		int size;
+        qint64 size;
 		QString hexdigest;
 	};
 

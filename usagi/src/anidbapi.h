@@ -139,8 +139,8 @@ public:
 	/* === Api Start */
 	QString Auth();
 	QString Logout();
-	QString MylistAdd(int size, QString ed2khash, int viewed, int state, QString storage, bool edit = 0);
-	QString File(int, QString);
+    QString MylistAdd(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit = 0);
+    QString File(qint64, QString);
 	/* Api End === */
 
 	unsigned long LocalIdentify(int size, QString ed2khash);

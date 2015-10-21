@@ -63,11 +63,11 @@ int ed2k::ed2khash(QString filepath)
 	Init();
 	if(file.isOpen())
 	{
-		fileSize = file.size();
-		double a = fileSize;
-		double b = a/102400;
-		double c = ceil(b);
-		double parts = c;
+        fileSize = file.size();
+        qint64 a = fileSize;
+        qint64 b = a/102400;
+        qint64 c = ceil(b);
+        int parts = c;
 		int partsdone = 0;
 		Init();
 		do
@@ -115,7 +115,7 @@ QString ed2k::FileName()
 	return fileName;
 }
 
-unsigned int ed2k::FileSize()
+qint64 ed2k::FileSize()
 {
 	return fileSize;
 }

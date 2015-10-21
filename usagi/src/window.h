@@ -14,7 +14,7 @@
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QListView>
-#include <QtWidgets/QTreeView>
+#include <QtWidgets/QTreeWidget>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
 //#include "hasherthread.h"
@@ -41,6 +41,8 @@ private:
     // pages
     QBoxLayout *pageHasher;
     QWidget *pageHasherParent;
+    QBoxLayout *pageMylist;
+    QWidget *pageMylistParent;
     QBoxLayout *pageNotify;
     QWidget *pageNotifyParent;
     QGridLayout *pageSettings;
@@ -76,6 +78,8 @@ private:
 
 	QString lastDir;
 
+    // page mylist
+    QTreeWidget *mylistTreeWidget;
 	// page settings
 
     QLabel *labelLogin;

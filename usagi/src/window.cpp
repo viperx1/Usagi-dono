@@ -33,6 +33,8 @@ Window::Window()
     // pages
     pageHasherParent = new QWidget;
     pageHasher = new QBoxLayout(QBoxLayout::TopToBottom, pageHasherParent);
+    pageMylistParent = new QWidget;
+    pageMylist = new QBoxLayout(QBoxLayout::TopToBottom, pageMylistParent);
     pageNotifyParent = new QWidget;
     pageNotify = new QBoxLayout(QBoxLayout::TopToBottom, pageNotifyParent);
     pageSettingsParent = new QWidget;
@@ -46,6 +48,7 @@ Window::Window()
 
 	// tabs
     tabwidget->addTab(pageHasherParent, "Hasher");
+    tabwidget->addTab(pageMylistParent, "Mylist");
     tabwidget->addTab(pageNotifyParent, "Notify");
     tabwidget->addTab(pageSettingsParent, "Settings");
     tabwidget->addTab(pageLogParent, "Log");
@@ -82,6 +85,11 @@ Window::Window()
     pageHasher->addLayout(pageHasherSettings);
     pageHasher->addLayout(progress);
     pageHasher->addWidget(hasherOutput, 0, 0);
+
+    // page mylist
+    mylistTreeWidget = new QTreeWidget(this);
+    pageMylist->addWidget(mylistTreeWidget);
+    mylistTreeWidget->show();
 
     // page hasher - signals
     connect(button1, SIGNAL(clicked()), this, SLOT(Button1Click()));
