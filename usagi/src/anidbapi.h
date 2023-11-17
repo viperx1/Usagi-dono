@@ -9,8 +9,11 @@
 #include <QSqlRecord>
 #include <QSqlError>
 #include <QtWidgets/QMessageBox>
+#include <QElapsedTimer>
+//#include <QTextCodec>
 #include <bitset>
 #include "hash/ed2k.h"
+#include "Qt-AES-master/qaesencryption.h"
 
 
 /*struct status_codes_
@@ -31,10 +34,12 @@ class AniDBApi : public ed2k
 	Q_OBJECT
 private:
 	/* === Settings Start */
+    QByteArray aes_key;
+//    QAESEncryption encryption(QAESEncryption::Aes::AES_256, QAESEncryption::ECB);
 	QString username;
 	QString password;
 	QString lastdirectory;
-	/* Settings Start === */
+    /* Settings End === */
 
 	int protover; // AniDB API version = 3
 	QString client; // = usagi
@@ -55,7 +60,7 @@ private:
 
 	QString lastSentPacket;
 
-	QTextCodec *codec;
+//    QTextCodec *codec;
 	enum progress
 	{
 		pSkip = 0,
@@ -153,7 +158,7 @@ public:
     struct _waitingForReply
     {
         bool isWaiting;
-        QTime start;
+        QElapsedTimer start;
     }waitingForReply;
 
 	/* Socket End === */

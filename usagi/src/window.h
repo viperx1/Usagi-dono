@@ -32,7 +32,7 @@ private:
 	bool eventFilter(QObject *, QEvent *);
 	void closeEvent(QCloseEvent *);
     QTimer *safeclose;
-    QTime waitforlogout;
+    QElapsedTimer waitforlogout;
 	// main layout
     QBoxLayout *layout;
     QTabWidget *tabwidget;

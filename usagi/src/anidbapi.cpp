@@ -15,6 +15,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	db.setDatabaseName("usagi.sqlite");
 	QSqlQuery query;
 
+    aes_key = "8fsd789f7sd7f6sd78695g35345g34gf4";
+
 	if(db.open())
 	{
 		db.transaction();
@@ -53,7 +55,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	packetsender->setInterval(2100);
 	packetsender->start();
 
-	codec = QTextCodec::codecForName("UTF-8");
+//	codec = QTextCodec::codecForName("UTF-8");
 }
 
 AniDBApi::~AniDBApi()
@@ -338,16 +340,17 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 
 	a = QString("%1&tag=%2").arg(a).arg(tag);
     qDebug()<<__FILE__<<__LINE__<<a;
-	QByteArray bytes = codec->fromUnicode(a);
-	const char *ptr = bytes.data();
-	Socket->write(ptr);
+//    QByteArray bytes = a.toUtf8();
+//	const char *ptr = bytes.data();
+//	Socket->write(ptr);
+    Socket->write(a.toUtf8().constData());
     waitingForReply.isWaiting = true;
     waitingForReply.start.start();
 
 	lastSentPacket = a;
 
 	QSqlQuery query;
-	query.exec(QString("UPDATE `packets` SET `processed` = 1, `sendtime` = '%2' WHERE `tag` = '%1'").arg(tag).arg(QDateTime::currentDateTime().toTime_t()));
+    query.exec(QString("UPDATE `packets` SET `processed` = 1, `sendtime` = '%2' WHERE `tag` = '%1'").arg(tag).arg(QDateTime::currentDateTime().toSecsSinceEpoch()));
 
 	Recv();
 	return 1;
@@ -362,8 +365,9 @@ int AniDBApi::Recv()
 	{
 		data.resize(Socket->pendingDatagramSize());
 		Socket->readDatagram(data.data(), data.size());
-		result = codec->toUnicode(data);
-		result.toUtf8();
+//		result = codec->toUnicode(data);
+//		result.toUtf8();
+        result = QString::fromUtf8(data.data());
 		Debug("AniDBApi: Recv: " + result);
     }
 	if(result.length() > 0)

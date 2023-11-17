@@ -7,7 +7,7 @@
 
 ed2k::ed2k()
 {
-};
+}
 
 void ed2k::Init()
 {

@@ -17,7 +17,7 @@ void AniDBApi::setPassword(QString password)
 	{
 		AniDBApi::password = password;
 		QSqlQuery query;
-		QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'password', '%1');").arg(password);
+        QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'password', '%1');").arg(password);
 		query.exec(q);
 //		Debug(AniDBApi::password);
 	}

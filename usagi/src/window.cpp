@@ -44,7 +44,7 @@ Window::Window()
 	pageApiTesterParent = new QWidget;
 	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
 
-    layout->addWidget(tabwidget, 0, 0);
+    layout->addWidget(tabwidget, 0, Qt::AlignTop);
 
 	// tabs
     tabwidget->addTab(pageHasherParent, "Hasher");
@@ -81,10 +81,10 @@ Window::Window()
     progressFile = new QProgressBar;
     progressTotal = new QProgressBar;
 
-    pageHasher->addWidget(hashes, 0, 0);
+    pageHasher->addWidget(hashes, 0, Qt::AlignTop);
     pageHasher->addLayout(pageHasherSettings);
     pageHasher->addLayout(progress);
-    pageHasher->addWidget(hasherOutput, 0, 0);
+    pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
 
     // page mylist
     mylistTreeWidget = new QTreeWidget(this);
@@ -228,7 +228,8 @@ void Window::Button1Click() // add files
         adbapi->setLastDirectory(QFileInfo(files.first()).filePath());
         while(!files.isEmpty())
         {
-            QFileInfo file = files.first();
+//            QFileInfo file = files.first();
+            QFileInfo file = QFileInfo(files.first());
             files.pop_front();
             hashesinsertrow(file, renameto->checkState());
     //		delete item1, item2, item3;
@@ -267,8 +268,8 @@ void Window::Button2Click() // add directories
 			QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
 			files.pop_front();
 			while(directory_walker.hasNext())
-		    {
-				QFileInfo file = directory_walker.next();
+            {
+                QFileInfo file = QFileInfo(directory_walker.next());
 				hashesinsertrow(file, renameto->checkState());
 //				adbapi.ed2khash(file.absoluteFilePath());
 		    }
@@ -285,16 +286,17 @@ void Window::Button3Click()
 	files.append(adbapi->getLastDirectory());
     if(!files.last().isEmpty())
     {
-	while(!files.isEmpty())
-	{
-		QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
-		files.pop_front();
-		while(directory_walker.hasNext())
-		{
-			QFileInfo file = directory_walker.next();
-			hashesinsertrow(file, renameto->checkState());
-		}
-    }}
+        while(!files.isEmpty())
+        {
+            QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+            files.pop_front();
+            while(directory_walker.hasNext())
+            {
+                QFileInfo file = QFileInfo(directory_walker.next());
+                hashesinsertrow(file, renameto->checkState());
+            }
+        }
+    }
 	hashes->setUpdatesEnabled(1);
 }
 
@@ -393,8 +395,9 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 	{
 		if(hashes->item(i, 0)->text() == data.filename)
 		{
-			QColor yellow; yellow.setRgb(255, 255, 0);
-			hashes->item(i, 0)->setBackgroundColor(yellow.toRgb());
+            QColor yellow; yellow.setRgb(255, 255, 0);
+//			hashes->item(i, 0)->setBackgroundColor(yellow.toRgb());
+            hashes->item(i, 0)->setBackground(yellow.toRgb());
 			QTableWidgetItem *itemprogress = new QTableWidgetItem(QTableWidgetItem(QString("1")));
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
@@ -479,7 +482,8 @@ bool hashes_::event(QEvent *e)
 						selitems.pop_front();
 					}
 				}
-				qSort(selrows.begin(), selrows.end());
+//                qsort(selrows.begin(), selrows.end());
+                std::sort(selrows.begin(), selrows.end());
 				while(!selrows.isEmpty())
 				{
 				int item = selrows.last();
@@ -578,21 +582,21 @@ void Window::getNotifyMylistAdd(QString tag, int code)
             QColor red; red.setRgb(255, 0, 0);
             if(code == 310) // already in mylist
             {
-                hashes->item(i, 0)->setBackgroundColor(green_light.toRgb());
+                hashes->item(i, 0)->setBackground(green_light.toRgb());
                 hashes->item(i, 1)->setText("2");
                 qDebug()<<"310-2";
                 return;
             }
             if(code == 320)
             {
-                hashes->item(i, 0)->setBackgroundColor(red.toRgb());
+                hashes->item(i, 0)->setBackground(red.toRgb());
                 hashes->item(i, 1)->setText("4"); // no such file
                 qDebug()<<"320-4";
                 return;
             }
             else if(code == 311 || code == 210)
 			{
-				hashes->item(i, 0)->setBackgroundColor(green_dark.toRgb());
+                hashes->item(i, 0)->setBackground(green_dark.toRgb());
 				hashes->item(i, 1)->setText("3");
                 qDebug()<<"311/210-3";
 				if(renameto->checkState() > 0)
@@ -622,7 +626,7 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
 	QTableWidgetItem *item1 = new QTableWidgetItem(QTableWidgetItem(QString(file.fileName())));
 	QColor colorgray;
 	colorgray.setRgb(230, 230, 230);
-	item1->setBackgroundColor(colorgray.toRgb());
+    item1->setBackground(colorgray.toRgb());
 	QTableWidgetItem *item2 = new QTableWidgetItem(QTableWidgetItem(QString("0")));
 	QTableWidgetItem *item3 = new QTableWidgetItem(QTableWidgetItem(QString(file.absoluteFilePath())));
 	QTableWidgetItem *item4 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
