@@ -1,0 +1,45 @@
+name: Windows Build & Release
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-beta*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    # If you require Qt installed, add:
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.9.2' # Change to match your Qt version
+
+    - name: Build solution
+      run: msbuild Usagi.sln /p:Configuration=Release
+
+    - name: Upload build artifact (Alpha)
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+      uses: actions/upload-artifact@v4
+      with:
+        name: Usagi-dono-alpha
+        path: |
+          **/*.exe
+
+    - name: Create Release & Upload (Stable/Beta)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          **/*.exe
