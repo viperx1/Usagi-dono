@@ -14,16 +14,25 @@ This directory contains unit tests for the Usagi-dono application.
 ## Building and Running Tests
 
 ### Prerequisites
-- Qt5 development libraries
+- Qt5 or Qt6 development libraries
 - Qt Test framework
-- qmake build tool
+- CMake 3.16 or higher
 
 ### Build Instructions
 
 ```bash
+# From the repository root
+mkdir build
+cd build
+cmake ..
+cmake --build .
+
+# Or from the tests directory (standalone)
 cd tests
-qmake tests.pro
-make
+mkdir build
+cd build
+cmake ..
+cmake --build .
 ```
 
 ### Running Tests
@@ -31,7 +40,11 @@ make
 After building, run the test executable:
 
 ```bash
-./test_hash
+# From build directory
+./tests/test_hash
+
+# Or use CTest
+ctest --output-on-failure
 ```
 
 You should see output like:
@@ -52,7 +65,7 @@ To add new tests:
 
 Alternatively, create a new test file:
 1. Create a new test file (e.g., `test_newfeature.cpp`)
-2. Add the test file to `SOURCES` in `tests.pro`
+2. Add the test file to `SOURCES` in `tests/CMakeLists.txt`
 3. Rebuild and run tests
 
 ## Test Framework

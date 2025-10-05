@@ -23,3 +23,15 @@ tests/test_hash
 tests/.qmake.stash
 tests/moc_predefs.h
 tests/target_wrapper.sh
+
+# CMake build artifacts
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+Testing/
