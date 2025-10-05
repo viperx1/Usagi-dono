@@ -12,3 +12,14 @@ build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/moc_main.cpp
 build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/moc_window.cpp
 build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/release/usagi.sqlite
 build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/usagi.sqlite
+
+# Test build artifacts
+tests/Makefile
+tests/Makefile.*
+tests/*.o
+tests/moc_*.cpp
+tests/*.moc
+tests/test_hash
+tests/.qmake.stash
+tests/moc_predefs.h
+tests/target_wrapper.sh
