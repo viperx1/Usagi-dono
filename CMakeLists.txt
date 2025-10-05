@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find Qt6
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql REQUIRED)
-target_link_libraries(usagi PRIVATE Qt6::Core Qt6::Widgets)
+target_link_libraries(Usagi-dono PRIVATE Qt6::Core Qt6::Widgets)
 
 # Enable automatic MOC, UIC, and RCC
 set(CMAKE_AUTOMOC ON)
