@@ -1,5 +1,7 @@
 build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Debug/
 *.o
+*.pro.user
+*.pro.user.*
 build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/Makefile
 build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/Makefile.Debug
 build-usagi-Desktop_Qt_5_4_1_MinGW_32bit-Release/Makefile.Release
@@ -23,3 +25,15 @@ tests/test_hash
 tests/.qmake.stash
 tests/moc_predefs.h
 tests/target_wrapper.sh
+
+# CMake build artifacts
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+Testing/
