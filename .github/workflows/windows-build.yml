@@ -10,41 +10,50 @@ on:
       - 'v*.*.*-beta*'
 
 jobs:
-  build:
+  build-llvm-mingw:
     runs-on: windows-latest
+    name: Build with LLVM/Clang (MinGW-w64)
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up MSBuild
-      uses: microsoft/setup-msbuild@v2
-
-    # Debug step: List available Qt versions
-    - name: List available Qt versions with aqt
+    - name: Install LLVM/Clang and MinGW-w64
       run: |
-        pip install aqtinstall
-        python -m aqt list-qt windows desktop --arch 6.9.2
-    # If you require Qt installed, add:
-    - name: Install Qt
+        choco install llvm -y
+        choco install mingw -y
+
+    - name: Set up path for LLVM/Clang
+      run: |
+        echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
+        echo "C:\tools\mingw64\bin" >> $GITHUB_PATH
+
+    - name: Install Qt 6.9.2
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.9.2' # Change to match your Qt version
+        version: '6.9.2'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_mingw'
 
-    - name: Build solution
-      run: msbuild Usagi.sln /p:Configuration=Release
+    - name: Build with CMake and Clang
+      run: |
+        mkdir build
+        cd build
+        cmake .. -G "MinGW Makefiles" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+        cmake --build . --config Release
 
-    - name: Upload build artifact (Alpha)
+    - name: Upload build artifact (Alpha, LLVM)
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
       uses: actions/upload-artifact@v4
       with:
-        name: Usagi-dono-alpha
+        name: Usagi-dono-alpha-llvm
         path: |
-          **/*.exe
+          build/*.exe
 
-    - name: Create Release & Upload (Stable/Beta)
+    - name: Create Release & Upload (Stable/Beta, LLVM)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          **/*.exe
+          build/*.exe
