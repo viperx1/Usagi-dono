@@ -24,7 +24,7 @@ jobs:
     - name: List available Qt versions with aqt
       run: |
         pip install aqtinstall
-        python -m aqt list-qt windows desktop
+        python -m aqt list-qt windows desktop --arch 6.9.2
     # If you require Qt installed, add:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
