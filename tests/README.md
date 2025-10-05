@@ -14,7 +14,7 @@ This directory contains unit tests for the Usagi-dono application.
 ## Building and Running Tests
 
 ### Prerequisites
-- Qt5 or Qt6 development libraries
+- Qt6 development libraries (6.9.2)
 - Qt Test framework
 - CMake 3.16 or higher
 
@@ -71,5 +71,5 @@ Alternatively, create a new test file:
 ## Test Framework
 
 These tests use the Qt Test framework. For more information, see:
-https://doc.qt.io/qt-5/qtest-overview.html
+https://doc.qt.io/qt-6/qtest-overview.html
 

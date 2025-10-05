@@ -6,14 +6,8 @@ project(test_hash LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find Qt
-find_package(Qt6 COMPONENTS Core Test QUIET)
-if(Qt6_FOUND)
-    set(QT_VERSION_MAJOR 6)
-else()
-    find_package(Qt5 COMPONENTS Core Test REQUIRED)
-    set(QT_VERSION_MAJOR 5)
-endif()
+# Find Qt6
+find_package(Qt6 COMPONENTS Core Test REQUIRED)
 
 # Enable automatic MOC
 set(CMAKE_AUTOMOC ON)
@@ -39,8 +33,8 @@ add_executable(test_hash ${SOURCES} ${HEADERS})
 
 # Link Qt libraries
 target_link_libraries(test_hash
-    Qt${QT_VERSION_MAJOR}::Core
-    Qt${QT_VERSION_MAJOR}::Test
+    Qt6::Core
+    Qt6::Test
 )
 
 # Include directories
