@@ -20,6 +20,11 @@ jobs:
     - name: Set up MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    # Debug step: List available Qt versions
+    - name: List available Qt versions with aqt
+      run: |
+        pip install aqtinstall
+        python -m aqt list-qt windows desktop
     # If you require Qt installed, add:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
