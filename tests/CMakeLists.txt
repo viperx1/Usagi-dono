@@ -32,7 +32,7 @@ set(HEADERS
 add_executable(test_hash ${SOURCES} ${HEADERS})
 
 # Link Qt libraries
-target_link_libraries(test_hash
+target_link_libraries(test_hash PRIVATE
     Qt6::Core
     Qt6::Test
 )
