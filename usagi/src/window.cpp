@@ -1,6 +1,7 @@
 #include "main.h"
 #include "window.h"
 #include "hasherthread.h"
+#include "crashlog.h"
 
 HasherThread hasherThread;
 myAniDBApi *adbapi;
@@ -512,6 +513,9 @@ void Window::getNotifyLogAppend(QString str)
 	QString a;
 	a = QString("%1: %2").arg(t.toString()).arg(str);
 	logOutput->append(a);
+	
+	// Also write to persistent log file
+	CrashLog::logMessage(str);
 }
 
 void Window::getNotifyLoginChagned(QString login)
