@@ -253,7 +253,7 @@ QString CrashLog::getStackTrace()
     trace += "\nStack Trace:\n";
     for (int i = 0; i < frames; i++)
     {
-        trace += QString("  [%1] %2\n").arg(i).arg(symbols[i]);
+        trace += QString("  [%1] %2\n").arg(i).arg(QString::fromLatin1(symbols[i]));
     }
     
     free(symbols);
