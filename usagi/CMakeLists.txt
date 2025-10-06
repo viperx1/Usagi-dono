@@ -39,7 +39,7 @@ set(HEADERS
 add_executable(usagi ${SOURCES} ${HEADERS})
 
 # Link Qt libraries
-target_link_libraries(usagi
+target_link_libraries(usagi PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
