@@ -11,6 +11,11 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Use MinGW-compatible target
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
+    
+    # Override CMake's automatic linker detection to prevent use of lld-link
+    # When Clang targets MinGW, we must use GNU-style linker, not MSVC-style
+    set(CMAKE_LINKER "ld")
+    set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 endif()
 
 # Find Qt6
