@@ -24,7 +24,7 @@ jobs:
           version: '6.9.2'
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_mingw_llvm'
+          arch: 'win64_llvm_mingw'
           cache: true
 
       - name: Install CMake and Ninja
