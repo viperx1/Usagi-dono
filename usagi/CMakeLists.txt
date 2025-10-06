@@ -22,6 +22,7 @@ set(SOURCES
     src/hash/ed2k.cpp
     src/anidbapi_settings.cpp
     src/Qt-AES-master/qaesencryption.cpp
+    src/crashlog.cpp
 )
 
 # Header files
@@ -33,6 +34,7 @@ set(HEADERS
     src/hash/md4.h
     src/hash/ed2k.h
     src/Qt-AES-master/qaesencryption.h
+    src/crashlog.h
 )
 
 # Create executable
@@ -46,6 +48,11 @@ target_link_libraries(usagi PRIVATE
     Qt6::Network
     Qt6::Sql
 )
+
+# Link platform-specific libraries
+if(WIN32)
+    target_link_libraries(usagi PRIVATE dbghelp)
+endif()
 
 # Include directories
 target_include_directories(usagi PRIVATE
