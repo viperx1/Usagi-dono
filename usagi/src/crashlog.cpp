@@ -7,7 +7,6 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <dbghelp.h>
-#pragma comment(lib, "dbghelp.lib")
 #else
 #include <execinfo.h>
 #include <unistd.h>
