@@ -231,7 +231,7 @@ QString CrashLog::getStackTrace()
         {
             trace += QString("  [%1] %2 + 0x%3\n")
                 .arg(i)
-                .arg(symbol->Name)
+                .arg(QString::fromLatin1(symbol->Name))
                 .arg(displacement, 0, 16);
         }
         else
