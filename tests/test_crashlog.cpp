@@ -63,19 +63,19 @@ void TestCrashLog::testCrashLogEncoding()
     int fd = _open(logPath, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _S_IREAD | _S_IWRITE);
     QVERIFY(fd >= 0);
     
-    _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 34);
+    _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
     _write(fd, testReason, (unsigned int)strlen(testReason));
-    _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39);
-    _write(fd, "\n=== END OF CRASH LOG ===\n", 27);
+    _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
+    _write(fd, "\n=== END OF CRASH LOG ===\n", 26);
     _close(fd);
 #else
     int fd = open(logPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     QVERIFY(fd >= 0);
     
-    write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 34);
+    write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
     write(fd, testReason, strlen(testReason));
-    write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39);
-    write(fd, "\n=== END OF CRASH LOG ===\n", 27);
+    write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
+    write(fd, "\n=== END OF CRASH LOG ===\n", 26);
     close(fd);
 #endif
     
@@ -113,19 +113,19 @@ void TestCrashLog::testCrashLogNotUTF16LE()
     int fd = _open(logPath, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _S_IREAD | _S_IWRITE);
     QVERIFY(fd >= 0);
     
-    _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 34);
+    _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
     _write(fd, testReason, (unsigned int)strlen(testReason));
-    _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39);
-    _write(fd, "\n=== END OF CRASH LOG ===\n", 27);
+    _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
+    _write(fd, "\n=== END OF CRASH LOG ===\n", 26);
     _close(fd);
 #else
     int fd = open(logPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     QVERIFY(fd >= 0);
     
-    write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 34);
+    write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
     write(fd, testReason, strlen(testReason));
-    write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39);
-    write(fd, "\n=== END OF CRASH LOG ===\n", 27);
+    write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
+    write(fd, "\n=== END OF CRASH LOG ===\n", 26);
     close(fd);
 #endif
     
