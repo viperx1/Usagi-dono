@@ -89,6 +89,17 @@ The signal handlers (`signalHandler` and `windowsExceptionHandler`) are implemen
 
 This design ensures that even if the application is in a severely corrupted state when a crash occurs, the crash handler can still safely write diagnostic information including stack traces to help identify the problem.
 
+### Text Encoding
+
+To ensure crash logs are readable on all platforms, the application explicitly sets UTF-8 encoding for all text log files:
+
+- The `generateCrashLog()` function uses `QTextStream::setEncoding(QStringConverter::Utf8)` to ensure crash logs are written in UTF-8
+- The `logMessage()` function also explicitly sets UTF-8 encoding for application logs
+- On Windows, file descriptors are opened with `_O_BINARY` mode in signal handlers to prevent text mode conversions
+- This ensures that crash logs remain readable and are not corrupted by UTF-16LE encoding on Windows
+
+Without explicit UTF-8 encoding, QTextStream on Windows may default to UTF-16LE, which causes log files to appear garbled when opened with standard text editors or read as ASCII/UTF-8.
+
 ## Platform Support
 
 The crash handler supports:
