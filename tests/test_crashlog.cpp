@@ -183,6 +183,7 @@ void TestCrashLog::testDetectIncorrectUTF16LEEncoding()
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
     QTextStream stream(&file);
     stream.setEncoding(QStringConverter::Utf16LE);
+    stream.setGenerateByteOrderMark(true);
     
     QString testText = "=== CRASH LOG ===\n\nCrash Reason: Segmentation Fault (SIGSEGV)\n"
                        "Application: Usagi-dono\nVersion: 1.0.0\n";
