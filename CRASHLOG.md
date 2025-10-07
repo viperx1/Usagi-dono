@@ -16,6 +16,7 @@ The crash log functionality provides automatic crash detection and logging for t
 
 - **Detailed Crash Information**: Each crash log includes:
   - Crash reason (signal or exception type)
+  - Timestamp (when the crash occurred)
   - Application name and version
   - Stack trace (memory addresses on Windows, symbol names on Unix/Linux/macOS)
 
@@ -79,6 +80,7 @@ On Unix/Linux/macOS systems, the crash log will look like:
 === CRASH LOG ===
 
 Crash Reason: Segmentation Fault (SIGSEGV)
+Timestamp: 2025-01-15 14:30:22
 Application: Usagi-dono
 Version: 1.0.0
 
@@ -97,6 +99,7 @@ On Windows systems, the crash log will show memory addresses:
 === CRASH LOG ===
 
 Crash Reason: Access Violation
+Timestamp: 2025-01-15 14:30:22
 Application: Usagi-dono
 Version: 1.0.0
 
@@ -113,7 +116,7 @@ Stack Trace:
 
 Possible future improvements:
 - Add symbol resolution for Windows stack traces (currently shows only addresses)
-- Include more system information (memory usage, CPU info, timestamps)
+- Include more system information (memory usage, CPU info)
 - Write crash logs to timestamped files in the application data directory
 - Add a crash report dialog allowing users to submit crash reports
 - Compress old crash logs automatically
