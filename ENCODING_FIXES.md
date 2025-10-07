@@ -1,6 +1,6 @@
 # Crash Log Encoding Fix Methods
 
-This document tracks all methods attempted to fix the crash log encoding issue where logs were saved with incorrect encoding (UTF-16LE instead of UTF-8), resulting in garbled output. Update document as necessary.
+This document tracks all methods attempted to fix the crash log encoding issue where logs were saved with incorrect encoding (UTF-16LE instead of UTF-8), resulting in garbled output. Update document as necessary. When adding new method mark the previous one as failed, then add new one with status unknown.
 
 ## Problem Description
 
@@ -16,17 +16,7 @@ On Windows, `QTextStream` defaults to UTF-16LE encoding when no explicit encodin
 
 ## Fix Methods Tracking
 
-### Method 1: Default QTextStream
-**Code:**
-```cpp
-QFile logFile(logPath);
-if (logFile.open(QIODevice::WriteOnly | QIODevice::Text))
-{
-    QTextStream stream(&logFile);
-    stream << "=== CRASH LOG ===\n";
-    // ...
-}
-```
+### Method 1: 
 
 **Status:** unknown
 **Why it failed:**
