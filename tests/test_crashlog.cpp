@@ -16,6 +16,7 @@ private slots:
     void testLogMessageUtf8Encoding();
     void testCrashLogUtf8Encoding();
     void testCompleteProcessWithDataTypeConversions();
+    void testNoExtraNullBytes();
     
 private:
     QTemporaryDir* tempDir;
@@ -343,6 +344,111 @@ void TestCrashLog::testCompleteProcessWithDataTypeConversions()
     // Clean up test files
     testFile.remove();
     actualLogFile.remove();
+}
+
+void TestCrashLog::testNoExtraNullBytes()
+{
+    // This test specifically validates that crash log files don't contain extra null bytes
+    // that would cause text editors to misinterpret encoding (e.g., as UTF-16 when it's UTF-8)
+    
+    QString testReason = "Test: No Extra Nulls with Unicode 你好世界 🌟";
+    
+    // Generate a crash log
+    CrashLog::generateCrashLog(testReason);
+    
+    // Find the most recent crash log file
+    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir dir(logDir);
+    QStringList crashLogs = dir.entryList(QStringList() << "crash_*.log", QDir::Files, QDir::Time);
+    
+    QVERIFY2(!crashLogs.isEmpty(), "Crash log should be created");
+    
+    QString logPath = logDir + "/" + crashLogs.first();
+    QFile logFile(logPath);
+    
+    QVERIFY2(logFile.open(QIODevice::ReadOnly), "Should be able to open crash log file");
+    QByteArray fileBytes = logFile.readAll();
+    logFile.close();
+    
+    // Test 1: Verify the file is not empty
+    QVERIFY2(!fileBytes.isEmpty(), "Crash log file should not be empty");
+    
+    // Test 2: Check for unexpected null bytes in the middle of ASCII text
+    // In proper UTF-8, null bytes should only appear:
+    // - At the very end of the file (if any)
+    // - Never in the middle of text content
+    
+    // Count null bytes in the file
+    int nullByteCount = 0;
+    int nullBytesInContent = 0; // Null bytes before the last character
+    
+    for (int i = 0; i < fileBytes.size(); i++) {
+        if (fileBytes[i] == '\0') {
+            nullByteCount++;
+            if (i < fileBytes.size() - 1) {
+                nullBytesInContent++;
+            }
+        }
+    }
+    
+    // Test 3: There should be no null bytes in the content area
+    // (allowing for a possible trailing null at the very end)
+    QVERIFY2(nullBytesInContent == 0, 
+             QString("Found %1 unexpected null bytes in crash log content").arg(nullBytesInContent).toUtf8());
+    
+    // Test 4: Verify specific known strings have correct encoding
+    // These strings should appear in the crash log with no null bytes between characters
+    QList<QByteArray> expectedStrings = {
+        "=== CRASH LOG ===",
+        "Crash Reason:",
+        "=== END OF CRASH LOG ===",
+        "\n"  // newlines should be single bytes
+    };
+    
+    for (const QByteArray& expected : expectedStrings) {
+        int pos = fileBytes.indexOf(expected);
+        QVERIFY2(pos >= 0, 
+                 QString("Expected string '%1' should be found in crash log")
+                     .arg(QString::fromUtf8(expected)).toUtf8());
+        
+        // After finding the string, verify no null bytes immediately follow ASCII chars within it
+        // (This would indicate incorrect encoding like UTF-16)
+        for (int i = pos; i < pos + expected.length() - 1 && i < fileBytes.size() - 1; i++) {
+            if ((unsigned char)fileBytes[i] >= 0x20 && (unsigned char)fileBytes[i] <= 0x7E) {
+                // This is an ASCII printable character
+                // The next byte should NOT be null (which would indicate UTF-16LE encoding)
+                QVERIFY2(fileBytes[i + 1] != '\0',
+                        QString("Found null byte after ASCII character '%1' at position %2")
+                            .arg(QChar(fileBytes[i])).arg(i).toUtf8());
+            }
+        }
+    }
+    
+    // Test 5: Verify the file can be properly decoded as UTF-8
+    QString decodedContent = QString::fromUtf8(fileBytes);
+    QVERIFY2(!decodedContent.isEmpty(), "File should be decodable as UTF-8");
+    QVERIFY2(decodedContent.contains(testReason), 
+             "Decoded content should contain test reason with Unicode intact");
+    
+    // Test 6: Ensure the file size is reasonable for UTF-8 encoding
+    // If the file were UTF-16, it would be approximately 2x larger for ASCII text
+    // We check that the file size is consistent with UTF-8 by ensuring
+    // the decoded string length is within a reasonable range of the byte count
+    int decodedLength = decodedContent.length();
+    int byteLength = fileBytes.size();
+    
+    // For UTF-8:
+    // - ASCII chars = 1 byte each
+    // - Non-ASCII chars = 2-4 bytes each
+    // So decodedLength should be <= byteLength (and usually much closer)
+    // For UTF-16LE: decodedLength * 2 ≈ byteLength (roughly)
+    
+    QVERIFY2(decodedLength <= byteLength,
+             QString("Decoded length (%1) should be <= byte length (%2) for UTF-8")
+                 .arg(decodedLength).arg(byteLength).toUtf8());
+    
+    // Clean up
+    logFile.remove();
 }
 
 QTEST_MAIN(TestCrashLog)

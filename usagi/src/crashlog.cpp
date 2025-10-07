@@ -333,27 +333,27 @@ static void writeSafeCrashLog(const char* reason)
     // Use a simple fixed filename to avoid complex path operations
 #ifdef Q_OS_WIN
     const char* logPath = "crash.log";
-    // Use _open and _write to avoid text encoding conversions (same as stderr approach)
+    // Use _open with _O_BINARY flag to avoid text encoding conversions
     int fd = _open(logPath, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _S_IREAD | _S_IWRITE);
     if (fd >= 0)
     {
-        _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
-        _write(fd, reason, (unsigned int)strlen(reason));
-        _write(fd, "\n\nApplication: Usagi-dono\nVersion: 1.0.0\nTimestamp: ", 52);
-        _write(fd, timestamp, (unsigned int)strlen(timestamp));
-        _write(fd, "\n\n", 2);
+        safeWrite(fd, "=== CRASH LOG ===\n\nCrash Reason: ");
+        safeWrite(fd, reason);
+        safeWrite(fd, "\n\nApplication: Usagi-dono\nVersion: 1.0.0\nTimestamp: ");
+        safeWrite(fd, timestamp);
+        safeWrite(fd, "\n\n");
         
         // Write pre-formatted system information
         if (g_systemInfoInitialized && g_systemInfoBuffer[0] != '\0')
         {
-            _write(fd, g_systemInfoBuffer, (unsigned int)strlen(g_systemInfoBuffer));
-            _write(fd, "\n", 1);
+            safeWrite(fd, g_systemInfoBuffer);
+            safeWrite(fd, "\n");
         }
         
         // Add stack trace
         writeSafeStackTrace(fd);
         
-        _write(fd, "\n=== END OF CRASH LOG ===\n", 26);
+        safeWrite(fd, "\n=== END OF CRASH LOG ===\n");
         _close(fd);
         
         safeWrite(2, "Crash log saved to: crash.log\n");
