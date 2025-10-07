@@ -25,8 +25,9 @@ static void safeWrite(int fd, const char* str)
     {
         size_t len = strlen(str);
 #ifdef Q_OS_WIN
-        DWORD written;
-        WriteFile((HANDLE)_get_osfhandle(fd), str, (DWORD)len, &written, NULL);
+        // Use _write directly to avoid encoding issues with _get_osfhandle + WriteFile
+        // This ensures single-byte ASCII/UTF-8 output without UTF-16LE conversion
+        _write(fd, str, (unsigned int)len);
 #else
         write(fd, str, len);
 #endif

@@ -46,9 +46,10 @@ The handler is installed at application startup before the main window is shown,
 The signal handlers (`signalHandler` and `windowsExceptionHandler`) are implemented using only **async-signal-safe** functions to prevent secondary crashes when handling the original crash. This means:
 
 - No Qt functions (QString, QFile, etc.) are called from within signal handlers
-- Only low-level system calls (write, open, close on Unix; WriteFile, CreateFile on Windows) are used
+- Only low-level system calls (write, open, close on Unix; _write, CreateFile on Windows) are used
 - No dynamic memory allocation occurs in the signal handlers
 - String operations use only static, pre-allocated buffers
+- On Windows, `_write` is used directly to avoid text encoding conversions that could produce garbled output
 
 This design ensures that even if the application is in a severely corrupted state when a crash occurs, the crash handler can still safely write diagnostic information to help identify the problem.
 
