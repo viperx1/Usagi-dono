@@ -18,7 +18,7 @@ else()
 endif()
 
 # Find Qt6
-find_package(Qt6 COMPONENTS Core Test REQUIRED)
+find_package(Qt6 COMPONENTS Core Test Gui REQUIRED)
 
 # Enable automatic MOC
 set(CMAKE_AUTOMOC ON)
@@ -54,14 +54,25 @@ add_test(NAME test_hash COMMAND test_hash)
 # Test 2: Crash log encoding test
 set(CRASHLOG_TEST_SOURCES
     test_crashlog.cpp
+    ../usagi/src/crashlog.cpp
 )
 
-add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES})
+set(CRASHLOG_TEST_HEADERS
+    ../usagi/src/crashlog.h
+)
+
+add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
 
 target_link_libraries(test_crashlog PRIVATE
     Qt6::Core
+    Qt6::Gui
     Qt6::Test
 )
+
+# Link platform-specific libraries
+if(WIN32)
+    target_link_libraries(test_crashlog PRIVATE dbghelp)
+endif()
 
 target_include_directories(test_crashlog PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
