@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <cstdint>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -36,6 +37,85 @@ static void safeWrite(int fd, const char* str)
     }
 }
 
+// Safe function to convert a pointer address to hex string
+// Uses only async-signal-safe operations
+static void pointerToHex(void* ptr, char* buffer, size_t bufSize)
+{
+    if (!buffer || bufSize < 19) return; // Need at least "0x" + 16 hex digits + null
+    
+    buffer[0] = '0';
+    buffer[1] = 'x';
+    
+    uintptr_t addr = (uintptr_t)ptr;
+    const char hexDigits[] = "0123456789abcdef";
+    
+    // Write hex digits from most significant to least significant
+    for (int i = 15; i >= 0; i--)
+    {
+        buffer[2 + (15 - i)] = hexDigits[(addr >> (i * 4)) & 0xF];
+    }
+    buffer[18] = '\0';
+}
+
+// Safe function to write stack trace using async-signal-safe operations
+static void writeSafeStackTrace(int fd)
+{
+#ifdef Q_OS_WIN
+    // Windows: Use CaptureStackBackTrace which is safe to call from exception handlers
+    const int maxFrames = 64;
+    void* stack[maxFrames];
+    WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
+    
+    safeWrite(fd, "\nStack Trace:\n");
+    
+    char buffer[128];
+    for (WORD i = 0; i < frames; i++)
+    {
+        safeWrite(fd, "  [");
+        
+        // Convert frame number to string
+        char frameNum[16];
+        int num = i;
+        int pos = 0;
+        if (num == 0) {
+            frameNum[pos++] = '0';
+        } else {
+            char temp[16];
+            int tempPos = 0;
+            while (num > 0) {
+                temp[tempPos++] = '0' + (num % 10);
+                num /= 10;
+            }
+            // Reverse the digits
+            for (int j = tempPos - 1; j >= 0; j--) {
+                frameNum[pos++] = temp[j];
+            }
+        }
+        frameNum[pos] = '\0';
+        safeWrite(fd, frameNum);
+        safeWrite(fd, "] ");
+        
+        // Convert address to hex string
+        char addrBuf[32];
+        pointerToHex(stack[i], addrBuf, sizeof(addrBuf));
+        safeWrite(fd, addrBuf);
+        safeWrite(fd, "\n");
+    }
+#else
+    // Unix/Linux/macOS: Use backtrace and backtrace_symbols_fd
+    // backtrace_symbols_fd is async-signal-safe and writes directly to fd
+    const int maxFrames = 64;
+    void* buffer[maxFrames];
+    int frames = backtrace(buffer, maxFrames);
+    
+    safeWrite(fd, "\nStack Trace:\n");
+    
+    // backtrace_symbols_fd writes the symbols directly to the file descriptor
+    // This is async-signal-safe according to POSIX
+    backtrace_symbols_fd(buffer, frames, fd);
+#endif
+}
+
 // Safe crash log function that only uses async-signal-safe operations
 static void writeSafeCrashLog(const char* reason)
 {
@@ -57,6 +137,10 @@ static void writeSafeCrashLog(const char* reason)
         _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
         _write(fd, reason, (unsigned int)strlen(reason));
         _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
+        
+        // Add stack trace
+        writeSafeStackTrace(fd);
+        
         _write(fd, "\n=== END OF CRASH LOG ===\n", 26);
         _close(fd);
         
@@ -70,6 +154,10 @@ static void writeSafeCrashLog(const char* reason)
         safeWrite(fd, "=== CRASH LOG ===\n\nCrash Reason: ");
         safeWrite(fd, reason);
         safeWrite(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n");
+        
+        // Add stack trace
+        writeSafeStackTrace(fd);
+        
         safeWrite(fd, "\n=== END OF CRASH LOG ===\n");
         close(fd);
         
