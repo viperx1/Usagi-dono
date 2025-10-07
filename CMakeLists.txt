@@ -16,6 +16,13 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
 
+# Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
+# that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT
+# to raise SIGTRAP (Unix) or call DebugBreak() (Windows), which conflicts with
+# our SIGSEGV handler and prevents proper crash log stack trace collection.
+# By defining CRYPTOPP_DEBUG=0, we prevent it from being auto-enabled by DEBUG/_DEBUG.
+add_compile_definitions(CRYPTOPP_DEBUG=0)
+
 # When using Clang on Windows with MinGW Qt, we need to ensure proper linking
 # Clang on Windows may default to MSVC-style linking, but MinGW Qt uses GNU ABI
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")

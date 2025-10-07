@@ -17,6 +17,13 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
 
+# Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
+# that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT
+# to raise SIGTRAP (Unix) or call DebugBreak() (Windows), which conflicts with
+# our SIGSEGV handler and prevents proper crash log stack trace collection.
+# By defining CRYPTOPP_DEBUG=0, we prevent it from being auto-enabled by DEBUG/_DEBUG.
+add_compile_definitions(CRYPTOPP_DEBUG=0)
+
 # Find Qt6
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql REQUIRED)
 
