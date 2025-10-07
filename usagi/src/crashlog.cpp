@@ -54,10 +54,10 @@ static void writeSafeCrashLog(const char* reason)
     int fd = _open(logPath, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _S_IREAD | _S_IWRITE);
     if (fd >= 0)
     {
-        _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 34);
+        _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
         _write(fd, reason, (unsigned int)strlen(reason));
-        _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39);
-        _write(fd, "\n=== END OF CRASH LOG ===\n", 27);
+        _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
+        _write(fd, "\n=== END OF CRASH LOG ===\n", 26);
         _close(fd);
         
         safeWrite(2, "Crash log saved to: crash.log\n");
