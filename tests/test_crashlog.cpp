@@ -19,6 +19,12 @@
 // We need to test the crash log encoding by simulating what writeSafeCrashLog does
 // Since writeSafeCrashLog is a static function in crashlog.cpp, we'll test the 
 // file writing approach directly to verify encoding
+//
+// This test suite includes three encoding tests:
+// 1. testCrashLogEncoding() - Verifies correct UTF-8/ASCII encoding is used
+// 2. testCrashLogNotUTF16LE() - Verifies UTF-16LE is NOT used in correct implementation
+// 3. testDetectIncorrectUTF16LEEncoding() - NEW: Demonstrates what happens when
+//    UTF-16LE encoding is incorrectly used, showing how to detect encoding problems
 
 class TestCrashLog : public QObject
 {
@@ -28,6 +34,7 @@ private slots:
     void initTestCase();
     void testCrashLogEncoding();
     void testCrashLogNotUTF16LE();
+    void testDetectIncorrectUTF16LEEncoding();
     void cleanupTestCase();
 
 private:
@@ -161,6 +168,79 @@ void TestCrashLog::testCrashLogNotUTF16LE()
         QChar expectedChar = expectedStart[i];
         QCOMPARE((unsigned char)content[i], (unsigned char)expectedChar.toLatin1());
     }
+}
+
+void TestCrashLog::testDetectIncorrectUTF16LEEncoding()
+{
+    // This test demonstrates what happens when text is incorrectly encoded as UTF-16LE
+    // and then read as UTF-8. This simulates the encoding problem shown in the
+    // garbled issue description.
+    
+    QString testFilePath = tempDir->filePath("test_wrong_encoding.log");
+    QFile file(testFilePath);
+    
+    // Write some text in UTF-16LE encoding (the WRONG encoding)
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    QTextStream stream(&file);
+    stream.setEncoding(QStringConverter::Utf16LE);
+    
+    QString testText = "=== CRASH LOG ===\n\nCrash Reason: Segmentation Fault (SIGSEGV)\n"
+                       "Application: Usagi-dono\nVersion: 1.0.0\n";
+    stream << testText;
+    file.close();
+    
+    // Now read it back as raw bytes (as if reading UTF-8)
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QByteArray rawContent = file.readAll();
+    file.close();
+    
+    // Check for UTF-16LE BOM (0xFF 0xFE) - this SHOULD be present for UTF-16LE
+    QVERIFY(rawContent.size() >= 2);
+    QVERIFY(rawContent[0] == (char)0xFF && rawContent[1] == (char)0xFE);
+    
+    // When UTF-16LE is interpreted as UTF-8, each ASCII character becomes
+    // a character followed by a null byte (0x00). For example:
+    // "==" in ASCII: 0x3D 0x3D
+    // "==" in UTF-16LE: 0xFF 0xFE 0x3D 0x00 0x3D 0x00
+    // The BOM (0xFF 0xFE) comes first, then each character is followed by 0x00
+    
+    // Skip the BOM and check the encoding pattern
+    if (rawContent.size() >= 6) {
+        // After BOM, "=" should be encoded as 0x3D 0x00 in UTF-16LE
+        QCOMPARE((unsigned char)rawContent[2], (unsigned char)0x3D);
+        QCOMPARE((unsigned char)rawContent[3], (unsigned char)0x00);
+        QCOMPARE((unsigned char)rawContent[4], (unsigned char)0x3D);
+        QCOMPARE((unsigned char)rawContent[5], (unsigned char)0x00);
+    }
+    
+    // Verify that the file size is roughly double what it should be
+    // (each ASCII character takes 2 bytes in UTF-16LE, plus 2-byte BOM)
+    // Original text is around 120 chars, so UTF-16LE would be ~242 bytes (120*2 + 2 for BOM)
+    QVERIFY(rawContent.size() > 200);
+    
+    // When we try to read UTF-16LE as UTF-8, we get garbled text
+    QString garbled = QString::fromUtf8(rawContent);
+    
+    // The garbled text should NOT contain the original readable strings
+    // because UTF-16LE interpreted as UTF-8 produces garbage
+    QVERIFY(!garbled.contains("=== CRASH LOG ==="));
+    QVERIFY(!garbled.contains("Segmentation Fault"));
+    QVERIFY(!garbled.contains("Application: Usagi-dono"));
+    
+    // The garbled string will contain null bytes and special characters
+    // This is the key indicator of encoding mismatch
+    bool hasNullBytes = false;
+    for (int i = 0; i < garbled.length(); i++) {
+        if (garbled[i] == QChar(0x00)) {
+            hasNullBytes = true;
+            break;
+        }
+    }
+    // UTF-16LE read as UTF-8 may or may not preserve null bytes depending on how
+    // QString::fromUtf8 handles them, but the text will definitely be garbled
+    
+    // The most reliable check: verify the content is NOT what we expect
+    QVERIFY(garbled != testText);
 }
 
 QTEST_MAIN(TestCrashLog)

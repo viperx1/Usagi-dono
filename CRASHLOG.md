@@ -188,6 +188,20 @@ Stack Trace:
 === END OF CRASH LOG ===
 ```
 
+## Testing
+
+The crash log encoding is thoroughly tested in `tests/test_crashlog.cpp`:
+
+1. **testCrashLogEncoding()** - Verifies that crash logs are written using the correct UTF-8/ASCII encoding
+2. **testCrashLogNotUTF16LE()** - Verifies that crash logs do NOT use UTF-16LE encoding
+3. **testDetectIncorrectUTF16LEEncoding()** - Demonstrates what happens when UTF-16LE encoding is incorrectly used:
+   - Writes text in UTF-16LE format
+   - Verifies the UTF-16LE encoding characteristics (BOM, doubled file size, null bytes)
+   - Shows that UTF-16LE text read as UTF-8 produces garbled output
+   - This test serves as documentation of the encoding problem
+
+These tests ensure that crash logs remain readable across all platforms and help detect encoding issues early in development.
+
 ## Future Enhancements
 
 Possible future improvements:
