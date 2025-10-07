@@ -25,13 +25,14 @@ The crash log functionality provides automatic crash detection and logging for t
 
 ## Crash Log Location
 
-Crash logs are saved in the application's data directory:
+When a crash occurs, the crash handler writes logs in two locations:
 
-- **Windows**: `%APPDATA%/Usagi-dono/crash_YYYY-MM-DD_HH-MM-SS.log`
-- **Linux**: `~/.local/share/Usagi-dono/crash_YYYY-MM-DD_HH-MM-SS.log`
-- **macOS**: `~/Library/Application Support/Usagi-dono/crash_YYYY-MM-DD_HH-MM-SS.log`
+1. **Immediate crash log**: A simple `crash.log` file is written to the current working directory using only async-signal-safe functions. This ensures the crash can be logged even in the most severe failure scenarios.
 
-Regular application logs are saved to `usagi.log` in the same directory.
+2. **Detailed application logs**: Regular application logs (non-crash) are saved to `usagi.log` in the application's data directory:
+   - **Windows**: `%APPDATA%/Usagi-dono/usagi.log`
+   - **Linux**: `~/.local/share/Usagi-dono/usagi.log`
+   - **macOS**: `~/Library/Application Support/Usagi-dono/usagi.log`
 
 ## Implementation Details
 
@@ -41,6 +42,17 @@ The crash handler is implemented in:
 - `usagi/src/main.cpp` - Integration into application startup
 
 The handler is installed at application startup before the main window is shown, ensuring that crashes are caught throughout the application lifetime.
+
+### Async-Signal-Safety
+
+The signal handlers (`signalHandler` and `windowsExceptionHandler`) are implemented using only **async-signal-safe** functions to prevent secondary crashes when handling the original crash. This means:
+
+- No Qt functions (QString, QFile, etc.) are called from within signal handlers
+- Only low-level system calls (write, open, close on Unix; WriteFile, CreateFile on Windows) are used
+- No dynamic memory allocation occurs in the signal handlers
+- String operations use only static, pre-allocated buffers
+
+This design ensures that even if the application is in a severely corrupted state when a crash occurs, the crash handler can still safely write diagnostic information to help identify the problem.
 
 ## Platform Support
 

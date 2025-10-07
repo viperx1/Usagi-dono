@@ -3,6 +3,8 @@
 #include <QStandardPaths>
 #include <csignal>
 #include <cstdlib>
+#include <cstring>
+#include <ctime>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -10,12 +12,72 @@
 #else
 #include <execinfo.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #endif
 
-// Signal handler function
+// Safe string write function for signal handlers
+static void safeWrite(int fd, const char* str)
+{
+    if (str)
+    {
+        size_t len = strlen(str);
+#ifdef Q_OS_WIN
+        DWORD written;
+        WriteFile((HANDLE)_get_osfhandle(fd), str, (DWORD)len, &written, NULL);
+#else
+        write(fd, str, len);
+#endif
+    }
+}
+
+// Safe crash log function that only uses async-signal-safe operations
+static void writeSafeCrashLog(const char* reason)
+{
+    // Write to stderr first (this is most important)
+    safeWrite(2, "\n=== CRASH DETECTED ===\n");
+    safeWrite(2, "Reason: ");
+    safeWrite(2, reason);
+    safeWrite(2, "\nApplication: Usagi-dono\nVersion: 1.0.0\n");
+    safeWrite(2, "======================\n\n");
+    
+    // Try to write to a file as well
+    // Use a simple fixed filename to avoid complex path operations
+#ifdef Q_OS_WIN
+    const char* logPath = "crash.log";
+    HANDLE hFile = CreateFileA(logPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile != INVALID_HANDLE_VALUE)
+    {
+        DWORD written;
+        WriteFile(hFile, "=== CRASH LOG ===\n\nCrash Reason: ", 34, &written, NULL);
+        WriteFile(hFile, reason, (DWORD)strlen(reason), &written, NULL);
+        WriteFile(hFile, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39, &written, NULL);
+        WriteFile(hFile, "\n=== END OF CRASH LOG ===\n", 27, &written, NULL);
+        CloseHandle(hFile);
+        
+        safeWrite(2, "Crash log saved to: crash.log\n");
+    }
+#else
+    const char* logPath = "crash.log";
+    int fd = open(logPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd >= 0)
+    {
+        safeWrite(fd, "=== CRASH LOG ===\n\nCrash Reason: ");
+        safeWrite(fd, reason);
+        safeWrite(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n");
+        safeWrite(fd, "\n=== END OF CRASH LOG ===\n");
+        close(fd);
+        
+        safeWrite(2, "Crash log saved to: crash.log\n");
+    }
+#endif
+}
+
+// Signal handler function - MUST be async-signal-safe
 static void signalHandler(int signal)
 {
-    QString reason;
+    const char* reason;
     switch(signal)
     {
         case SIGSEGV:
@@ -36,11 +98,12 @@ static void signalHandler(int signal)
             break;
 #endif
         default:
-            reason = QString("Unknown Signal (%1)").arg(signal);
+            reason = "Unknown Signal";
             break;
     }
     
-    CrashLog::generateCrashLog(reason);
+    // Use only async-signal-safe functions
+    writeSafeCrashLog(reason);
     
     // Restore default handler and re-raise signal
     std::signal(signal, SIG_DFL);
@@ -48,10 +111,10 @@ static void signalHandler(int signal)
 }
 
 #ifdef Q_OS_WIN
-// Windows exception handler
+// Windows exception handler - should also be kept simple and safe
 static LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
 {
-    QString reason;
+    const char* reason;
     switch(exceptionInfo->ExceptionRecord->ExceptionCode)
     {
         case EXCEPTION_ACCESS_VIOLATION:
@@ -115,11 +178,12 @@ static LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
             reason = "Stack Overflow";
             break;
         default:
-            reason = QString("Unknown Exception (0x%1)").arg(exceptionInfo->ExceptionRecord->ExceptionCode, 0, 16);
+            reason = "Unknown Exception";
             break;
     }
     
-    CrashLog::generateCrashLog(reason);
+    // Use safe crash logging
+    writeSafeCrashLog(reason);
     
     return EXCEPTION_EXECUTE_HANDLER;
 }
