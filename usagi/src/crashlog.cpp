@@ -339,7 +339,7 @@ static void writeSafeCrashLog(const char* reason)
     {
         _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
         _write(fd, reason, (unsigned int)strlen(reason));
-        _write(fd, "\n\nApplication: Usagi-dono\nVersion: 1.0.0\nTimestamp: ", 53);
+        _write(fd, "\n\nApplication: Usagi-dono\nVersion: 1.0.0\nTimestamp: ", 52);
         _write(fd, timestamp, (unsigned int)strlen(timestamp));
         _write(fd, "\n\n", 2);
         
