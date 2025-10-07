@@ -52,6 +52,8 @@ To ensure that crash logs show function names from the Usagi codebase (not just 
 
 These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
 
+On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, and `SYMOPT_LOAD_LINES` flags before initializing the symbol handler. This ensures that the Windows Debug Help Library (DbgHelp) properly loads symbols from PDB files for the Usagi executable, enabling function names from the Usagi codebase to appear in crash logs alongside Qt library function names.
+
 ### Crypto++ Library Compatibility
 
 The application uses the Crypto++ encryption library which has a debug assertion system (`CRYPTOPP_ASSERT`). By default, when debug symbols are enabled, Crypto++ automatically enables `CRYPTOPP_DEBUG`, which causes `CRYPTOPP_ASSERT` to raise `SIGTRAP` on Unix-like systems or call `DebugBreak()` on Windows. This can interfere with our crash log handler.
