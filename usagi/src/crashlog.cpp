@@ -138,7 +138,13 @@ static void writeSafeStackTrace(int fd)
     
     safeWrite(fd, "\nStack Trace:\n");
     
-    char buffer[128];
+    // Initialize symbol handler for this process
+    HANDLE process = GetCurrentProcess();
+    SymInitialize(process, NULL, TRUE);
+    
+    char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+    PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
+    
     for (WORD i = 0; i < frames; i++)
     {
         safeWrite(fd, "  [");
@@ -165,12 +171,36 @@ static void writeSafeStackTrace(int fd)
         safeWrite(fd, frameNum);
         safeWrite(fd, "] ");
         
-        // Convert address to hex string
-        char addrBuf[32];
-        pointerToHex(stack[i], addrBuf, sizeof(addrBuf));
-        safeWrite(fd, addrBuf);
+        // Try to resolve symbol name
+        DWORD64 address = (DWORD64)(stack[i]);
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = MAX_SYM_NAME;
+        
+        DWORD64 displacement = 0;
+        if (SymFromAddr(process, address, &displacement, symbol))
+        {
+            // Write function name
+            safeWrite(fd, symbol->Name);
+            safeWrite(fd, " + 0x");
+            
+            // Convert displacement to hex string
+            char dispBuf[32];
+            pointerToHex((void*)displacement, dispBuf, sizeof(dispBuf));
+            // Skip "0x" prefix since we already wrote it
+            safeWrite(fd, dispBuf + 2);
+        }
+        else
+        {
+            // If symbol resolution fails, just write the address
+            char addrBuf[32];
+            pointerToHex(stack[i], addrBuf, sizeof(addrBuf));
+            safeWrite(fd, addrBuf);
+        }
+        
         safeWrite(fd, "\n");
     }
+    
+    SymCleanup(process);
 #else
     // Unix/Linux/macOS: Use backtrace and backtrace_symbols_fd
     // backtrace_symbols_fd is async-signal-safe and writes directly to fd

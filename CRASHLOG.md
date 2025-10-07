@@ -18,7 +18,7 @@ The crash log functionality provides automatic crash detection and logging for t
   - Crash reason (signal or exception type)
   - Timestamp (when the crash occurred)
   - Application name and version
-  - Stack trace (memory addresses on Windows, symbol names on Unix/Linux/macOS)
+  - Stack trace with function names and offsets (on all platforms)
 
 - **Persistent Logging**: Application logs are also written to a persistent file (`usagi.log`) for debugging purposes.
 
@@ -49,7 +49,7 @@ The signal handlers (`signalHandler` and `windowsExceptionHandler`) are implemen
 - No Qt functions (QString, QFile, etc.) are called from within signal handlers
 - Only low-level system calls (write, open, close on Unix; _write, _open, _close on Windows) are used
 - Stack traces use `backtrace()` and `backtrace_symbols_fd()` on Unix (both are async-signal-safe per POSIX)
-- Stack traces use `CaptureStackBackTrace()` on Windows (safe to call from exception handlers)
+- Stack traces use `CaptureStackBackTrace()` and `SymFromAddr()` on Windows (safe to call from exception handlers)
 - No dynamic memory allocation occurs in the signal handlers (except what backtrace_symbols_fd uses internally, which is safe)
 - String operations use only static, pre-allocated buffers
 - On Windows, `_write` is used directly (instead of `WriteFile`) to avoid text encoding conversions that could produce garbled output
@@ -59,7 +59,7 @@ This design ensures that even if the application is in a severely corrupted stat
 ## Platform Support
 
 The crash handler supports:
-- **Windows**: Catches Windows-specific exceptions using SetUnhandledExceptionFilter. Stack traces show memory addresses.
+- **Windows**: Catches Windows-specific exceptions using SetUnhandledExceptionFilter. Stack traces show function names with offsets and addresses.
 - **Linux/Unix**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS. Stack traces show symbol names and addresses.
 - **macOS**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS. Stack traces show symbol names and addresses.
 
@@ -93,7 +93,7 @@ Stack Trace:
 === END OF CRASH LOG ===
 ```
 
-On Windows systems, the crash log will show memory addresses:
+On Windows systems, the crash log will show function names with offsets:
 
 ```
 === CRASH LOG ===
@@ -104,9 +104,9 @@ Application: Usagi-dono
 Version: 1.0.0
 
 Stack Trace:
-  [0] 0x00007ff123456789
-  [1] 0x00007ff12345abcd
-  [2] 0x00007ff987654321
+  [0] MainWindow::onButtonClick + 0x000000000000001a
+  [1] QWidget::event + 0x0000000000000123
+  [2] QApplicationPrivate::notify_helper + 0x000000000000004f
 ...
 
 === END OF CRASH LOG ===
@@ -115,7 +115,6 @@ Stack Trace:
 ## Future Enhancements
 
 Possible future improvements:
-- Add symbol resolution for Windows stack traces (currently shows only addresses)
 - Include more system information (memory usage, CPU info)
 - Write crash logs to timestamped files in the application data directory
 - Add a crash report dialog allowing users to submit crash reports
