@@ -57,6 +57,76 @@ static void pointerToHex(void* ptr, char* buffer, size_t bufSize)
     buffer[18] = '\0';
 }
 
+// Safe function to format timestamp using async-signal-safe operations
+// Format: YYYY-MM-DD HH:MM:SS
+static void formatTimestamp(char* buffer, size_t bufSize)
+{
+    if (!buffer || bufSize < 20) return; // Need "YYYY-MM-DD HH:MM:SS\0"
+    
+    time_t now = time(NULL);
+    struct tm* tm_info;
+    
+#ifdef Q_OS_WIN
+    // On Windows, gmtime is not thread-safe but there's no async-signal-safe alternative
+    // We use it anyway as it's the best option available
+    tm_info = gmtime(&now);
+#else
+    // On Unix/Linux, gmtime_r is async-signal-safe
+    struct tm tm_storage;
+    tm_info = gmtime_r(&now, &tm_storage);
+#endif
+    
+    if (!tm_info) {
+        // Fallback: write "Unknown" if time functions fail
+        const char* fallback = "Unknown";
+        size_t len = 7; // strlen("Unknown")
+        for (size_t i = 0; i < len && i < bufSize - 1; i++) {
+            buffer[i] = fallback[i];
+        }
+        buffer[len] = '\0';
+        return;
+    }
+    
+    // Format: YYYY-MM-DD HH:MM:SS
+    // Year
+    int year = 1900 + tm_info->tm_year;
+    buffer[0] = '0' + (year / 1000);
+    buffer[1] = '0' + ((year / 100) % 10);
+    buffer[2] = '0' + ((year / 10) % 10);
+    buffer[3] = '0' + (year % 10);
+    buffer[4] = '-';
+    
+    // Month
+    int month = tm_info->tm_mon + 1;
+    buffer[5] = '0' + (month / 10);
+    buffer[6] = '0' + (month % 10);
+    buffer[7] = '-';
+    
+    // Day
+    int day = tm_info->tm_mday;
+    buffer[8] = '0' + (day / 10);
+    buffer[9] = '0' + (day % 10);
+    buffer[10] = ' ';
+    
+    // Hour
+    int hour = tm_info->tm_hour;
+    buffer[11] = '0' + (hour / 10);
+    buffer[12] = '0' + (hour % 10);
+    buffer[13] = ':';
+    
+    // Minute
+    int min = tm_info->tm_min;
+    buffer[14] = '0' + (min / 10);
+    buffer[15] = '0' + (min % 10);
+    buffer[16] = ':';
+    
+    // Second
+    int sec = tm_info->tm_sec;
+    buffer[17] = '0' + (sec / 10);
+    buffer[18] = '0' + (sec % 10);
+    buffer[19] = '\0';
+}
+
 // Safe function to write stack trace using async-signal-safe operations
 static void writeSafeStackTrace(int fd)
 {
@@ -119,9 +189,15 @@ static void writeSafeStackTrace(int fd)
 // Safe crash log function that only uses async-signal-safe operations
 static void writeSafeCrashLog(const char* reason)
 {
+    // Get timestamp
+    char timestamp[32];
+    formatTimestamp(timestamp, sizeof(timestamp));
+    
     // Write to stderr first (this is most important)
     safeWrite(2, "\n=== CRASH DETECTED ===\n");
-    safeWrite(2, "Reason: ");
+    safeWrite(2, "Timestamp: ");
+    safeWrite(2, timestamp);
+    safeWrite(2, "\nReason: ");
     safeWrite(2, reason);
     safeWrite(2, "\nApplication: Usagi-dono\nVersion: 1.0.0\n");
     safeWrite(2, "======================\n\n");
@@ -136,6 +212,8 @@ static void writeSafeCrashLog(const char* reason)
     {
         _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
         _write(fd, reason, (unsigned int)strlen(reason));
+        _write(fd, "\nTimestamp: ", 12);
+        _write(fd, timestamp, (unsigned int)strlen(timestamp));
         _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
         
         // Add stack trace
@@ -153,6 +231,8 @@ static void writeSafeCrashLog(const char* reason)
     {
         safeWrite(fd, "=== CRASH LOG ===\n\nCrash Reason: ");
         safeWrite(fd, reason);
+        safeWrite(fd, "\nTimestamp: ");
+        safeWrite(fd, timestamp);
         safeWrite(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n");
         
         // Add stack trace
