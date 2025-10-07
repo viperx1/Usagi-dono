@@ -36,6 +36,11 @@ static void safeWrite(int fd, const char* str)
     {
         size_t len = strlen(str);
 #ifdef Q_OS_WIN
+        // On Windows, ensure the file descriptor is in binary mode to prevent
+        // text mode conversions (which could cause UTF-16LE encoding issues)
+        // This is safe to call multiple times - it will only change the mode once
+        _setmode(fd, _O_BINARY);
+        
         // Use _write directly to avoid encoding issues with _get_osfhandle + WriteFile
         // This ensures single-byte ASCII/UTF-8 output without UTF-16LE conversion
         _write(fd, str, (unsigned int)len);
