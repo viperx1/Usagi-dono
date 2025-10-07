@@ -654,6 +654,8 @@ void CrashLog::logMessage(const QString &message)
         QTextStream stream(&logFile);
         // Explicitly set UTF-8 encoding to prevent UTF-16LE on Windows
         stream.setEncoding(QStringConverter::Utf8);
+        // Explicitly disable BOM to ensure clean UTF-8 output
+        stream.setGenerateByteOrderMark(false);
         stream << QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss") 
                << " - " << message << "\n";
         logFile.close();
@@ -893,6 +895,8 @@ void CrashLog::generateCrashLog(const QString &reason)
         QTextStream stream(&logFile);
         // Explicitly set UTF-8 encoding to prevent UTF-16LE on Windows
         stream.setEncoding(QStringConverter::Utf8);
+        // Explicitly disable BOM to ensure clean UTF-8 output
+        stream.setGenerateByteOrderMark(false);
         
         stream << "=== CRASH LOG ===\n\n";
         stream << "Crash Reason: " << reason << "\n\n";
