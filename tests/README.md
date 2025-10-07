@@ -10,6 +10,11 @@ This directory contains unit tests for the Usagi-dono application.
   - ED2K initialization test
   - ED2K basic hashing functionality
   - ED2K file hashing
+
+- **test_crashlog.cpp**: Tests for crash log encoding
+  - Verify crash log is written in ASCII/UTF-8 encoding
+  - Verify crash log is NOT written in UTF-16LE encoding
+  - Ensure crash log content is readable
   
 ## Building and Running Tests
 
@@ -42,8 +47,9 @@ After building, run the test executable:
 ```bash
 # From build directory
 ./tests/test_hash
+./tests/test_crashlog
 
-# Or use CTest
+# Or use CTest to run all tests
 ctest --output-on-failure
 ```
 

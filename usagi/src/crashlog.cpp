@@ -10,6 +10,8 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include <io.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #else
 #include <execinfo.h>
 #include <unistd.h>
@@ -48,15 +50,15 @@ static void writeSafeCrashLog(const char* reason)
     // Use a simple fixed filename to avoid complex path operations
 #ifdef Q_OS_WIN
     const char* logPath = "crash.log";
-    HANDLE hFile = CreateFileA(logPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile != INVALID_HANDLE_VALUE)
+    // Use _open and _write to avoid text encoding conversions (same as stderr approach)
+    int fd = _open(logPath, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _S_IREAD | _S_IWRITE);
+    if (fd >= 0)
     {
-        DWORD written;
-        WriteFile(hFile, "=== CRASH LOG ===\n\nCrash Reason: ", 34, &written, NULL);
-        WriteFile(hFile, reason, (DWORD)strlen(reason), &written, NULL);
-        WriteFile(hFile, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39, &written, NULL);
-        WriteFile(hFile, "\n=== END OF CRASH LOG ===\n", 27, &written, NULL);
-        CloseHandle(hFile);
+        _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 34);
+        _write(fd, reason, (unsigned int)strlen(reason));
+        _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 39);
+        _write(fd, "\n=== END OF CRASH LOG ===\n", 27);
+        _close(fd);
         
         safeWrite(2, "Crash log saved to: crash.log\n");
     }
