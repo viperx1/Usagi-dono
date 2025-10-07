@@ -2,6 +2,7 @@
 #include <QTemporaryDir>
 #include <QStandardPaths>
 #include <QDir>
+#include <QThread>
 #include "../usagi/src/crashlog.h"
 
 class TestCrashLog : public QObject
@@ -14,6 +15,7 @@ private slots:
     void testLogFilePathGeneration();
     void testLogMessageUtf8Encoding();
     void testCrashLogUtf8Encoding();
+    void testCompleteProcessWithDataTypeConversions();
     
 private:
     QTemporaryDir* tempDir;
@@ -186,6 +188,161 @@ void TestCrashLog::testCrashLogUtf8Encoding()
     
     // Clean up the test crash log
     logFile.remove();
+}
+
+void TestCrashLog::testCompleteProcessWithDataTypeConversions()
+{
+    // This test reproduces the complete crash log generation process from the usagi codebase
+    // including all datatype conversions:
+    // 1. QString (reason) → QTextStream (UTF-8)
+    // 2. QString → QByteArray (via toUtf8())
+    // 3. QByteArray → const char* (via constData())
+    
+    // Test with Unicode characters to ensure conversions work correctly
+    QString testReason = "Test: Access Violation with Symbols ÄÖÜ中文🔥";
+    
+    // Step 1: Simulate generateCrashLog with QString → QTextStream conversion
+    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir dir(logDir);
+    if (!dir.exists())
+    {
+        dir.mkpath(".");
+    }
+    
+    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss");
+    QString testLogPath = logDir + "/test_conversion_" + timestamp + ".log";
+    QFile testFile(testLogPath);
+    
+    QVERIFY2(testFile.open(QIODevice::WriteOnly), "Should be able to create test file");
+    
+    {
+        QTextStream stream(&testFile);
+        // Explicitly set UTF-8 encoding (as done in generateCrashLog)
+        stream.setEncoding(QStringConverter::Utf8);
+        stream.setGenerateByteOrderMark(false);
+        
+        // Write crash log header
+        stream << "=== CRASH LOG ===\n\n";
+        
+        // Write reason (QString → QTextStream conversion)
+        stream << "Crash Reason: " << testReason << "\n\n";
+        
+        // Simulate system info (QString → QTextStream)
+        QString systemInfo = "Application: Test\n";
+        systemInfo += "Version: 1.0.0\n";
+        systemInfo += "Qt Version: " + QString(qVersion()) + "\n";
+        stream << systemInfo;
+        
+        // Simulate stack trace (QString → QTextStream)
+        QString stackTrace = "\nStack Trace:\n";
+        stackTrace += "  [0] TestFunction + 0x123\n";
+        stackTrace += "  [1] MainFunction + 0x456\n";
+        stream << stackTrace;
+        
+        stream << "\n=== END OF CRASH LOG ===\n";
+    }
+    testFile.close();
+    
+    // Step 2: Verify file was written correctly as UTF-8
+    QVERIFY2(testFile.open(QIODevice::ReadOnly), "Should be able to open test file for reading");
+    QByteArray fileBytes = testFile.readAll();
+    testFile.close();
+    
+    // Verify no BOM markers
+    QVERIFY2(!(fileBytes.size() >= 2 && 
+               (unsigned char)fileBytes[0] == 0xFF && 
+               (unsigned char)fileBytes[1] == 0xFE), 
+             "File should NOT have UTF-16 LE BOM");
+    
+    QVERIFY2(!(fileBytes.size() >= 3 && 
+               (unsigned char)fileBytes[0] == 0xEF && 
+               (unsigned char)fileBytes[1] == 0xBB && 
+               (unsigned char)fileBytes[2] == 0xBF), 
+             "File should NOT have UTF-8 BOM");
+    
+    // Verify UTF-8 content
+    QString decodedContent = QString::fromUtf8(fileBytes);
+    QVERIFY2(decodedContent.contains(testReason), 
+             "File should contain the reason with Unicode characters intact");
+    QVERIFY2(decodedContent.contains("=== CRASH LOG ==="), 
+             "File should contain the header");
+    
+    // Step 3: Test QString → QByteArray → const char* conversion
+    // This simulates the conversion used in fprintf calls
+    QByteArray reasonBytes = testReason.toUtf8();
+    const char* reasonCStr = reasonBytes.constData();
+    
+    // Verify the C string contains valid UTF-8
+    QVERIFY2(reasonCStr != nullptr, "constData() should return valid pointer");
+    QVERIFY2(strlen(reasonCStr) > 0, "C string should not be empty");
+    
+    // Convert back to QString to verify round-trip conversion
+    QString roundTrip = QString::fromUtf8(reasonCStr);
+    QCOMPARE(roundTrip, testReason);
+    
+    // Step 4: Test the path conversion (QString → QByteArray → const char*)
+    QByteArray pathBytes = testLogPath.toUtf8();
+    const char* pathCStr = pathBytes.constData();
+    
+    QVERIFY2(pathCStr != nullptr, "Path constData() should return valid pointer");
+    QVERIFY2(strlen(pathCStr) > 0, "Path C string should not be empty");
+    
+    // Verify round-trip for path
+    QString pathRoundTrip = QString::fromUtf8(pathCStr);
+    QCOMPARE(pathRoundTrip, testLogPath);
+    
+    // Step 5: Verify file content byte-by-byte for key markers
+    // Check that '=' is encoded as single byte 0x3D (not 0x3D 0x00 as in UTF-16 LE)
+    QVERIFY2(fileBytes[0] == '=', "First character should be '=' (0x3D)");
+    if (fileBytes.size() > 1) {
+        QVERIFY2(fileBytes[1] != 0x00, "Second byte should NOT be 0x00 (would indicate UTF-16 LE)");
+    }
+    
+    // Step 6: Test the complete flow with actual generateCrashLog
+    QString fullTestReason = "Full Test: Division by Zero with 日本語 and Emojis 🎯🔧";
+    
+    // Wait a moment to ensure different timestamp
+    QThread::msleep(1100);
+    
+    CrashLog::generateCrashLog(fullTestReason);
+    
+    // Find the most recent crash log
+    dir.refresh();
+    QStringList crashLogs = dir.entryList(QStringList() << "crash_*.log", QDir::Files, QDir::Time);
+    QVERIFY2(!crashLogs.isEmpty(), "generateCrashLog should create a crash log file");
+    
+    QString actualLogPath = logDir + "/" + crashLogs.first();
+    QFile actualLogFile(actualLogPath);
+    
+    QVERIFY2(actualLogFile.open(QIODevice::ReadOnly), "Should be able to open actual crash log");
+    QByteArray actualBytes = actualLogFile.readAll();
+    actualLogFile.close();
+    
+    // Verify actual crash log has correct encoding
+    QString actualContent = QString::fromUtf8(actualBytes);
+    QVERIFY2(actualContent.contains(fullTestReason), 
+             "Actual crash log should contain the full test reason with all Unicode characters");
+    QVERIFY2(actualContent.contains("=== CRASH LOG ==="), 
+             "Actual crash log should have correct header");
+    QVERIFY2(actualContent.contains("=== END OF CRASH LOG ==="), 
+             "Actual crash log should have correct footer");
+    
+    // Verify no UTF-16 patterns in actual log
+    bool hasZeroBytePattern = false;
+    for (int i = 0; i < qMin(200, actualBytes.size() - 1); i++) {
+        if ((unsigned char)actualBytes[i] >= 0x20 && 
+            (unsigned char)actualBytes[i] <= 0x7E && 
+            actualBytes[i+1] == 0x00) {
+            hasZeroBytePattern = true;
+            break;
+        }
+    }
+    QVERIFY2(!hasZeroBytePattern, 
+             "Actual crash log should NOT have UTF-16 LE pattern");
+    
+    // Clean up test files
+    testFile.remove();
+    actualLogFile.remove();
 }
 
 QTEST_MAIN(TestCrashLog)
