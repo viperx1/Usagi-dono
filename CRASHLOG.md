@@ -95,6 +95,7 @@ To ensure crash logs are readable on all platforms, the application explicitly s
 
 - The `generateCrashLog()` function uses `QTextStream::setEncoding(QStringConverter::Utf8)` to ensure crash logs are written in UTF-8
 - The `logMessage()` function also explicitly sets UTF-8 encoding for application logs
+- Both functions call `setGenerateByteOrderMark(false)` to explicitly disable BOM generation, ensuring clean UTF-8 output without byte order marks
 - Files are opened **without** the `QIODevice::Text` flag to avoid conflicts with QTextStream's encoding. When using QTextStream with explicit encoding, the `QIODevice::Text` flag should not be used as it can interfere with the stream's encoding behavior
 - On Windows, stdout and stderr are set to binary mode early in `CrashLog::install()` to prevent any text mode conversions throughout the application's lifetime
 - On Windows, file descriptors are opened with `_O_BINARY` mode in signal handlers to prevent text mode conversions
