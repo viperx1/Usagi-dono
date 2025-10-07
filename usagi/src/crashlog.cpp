@@ -24,6 +24,11 @@
 #include <sys/stat.h>
 #endif
 
+// Pre-formatted system information buffers for async-signal-safe crash logging
+// These are populated at startup by initSystemInfoBuffers() and used by writeSafeCrashLog()
+static char g_systemInfoBuffer[4096] = {0};
+static bool g_systemInfoInitialized = false;
+
 // Safe string write function for signal handlers
 static void safeWrite(int fd, const char* str)
 {
@@ -287,9 +292,16 @@ static void writeSafeCrashLog(const char* reason)
     {
         _write(fd, "=== CRASH LOG ===\n\nCrash Reason: ", 33);
         _write(fd, reason, (unsigned int)strlen(reason));
-        _write(fd, "\nTimestamp: ", 12);
+        _write(fd, "\n\nApplication: Usagi-dono\nVersion: 1.0.0\nTimestamp: ", 53);
         _write(fd, timestamp, (unsigned int)strlen(timestamp));
-        _write(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n", 40);
+        _write(fd, "\n\n", 2);
+        
+        // Write pre-formatted system information
+        if (g_systemInfoInitialized && g_systemInfoBuffer[0] != '\0')
+        {
+            _write(fd, g_systemInfoBuffer, (unsigned int)strlen(g_systemInfoBuffer));
+            _write(fd, "\n", 1);
+        }
         
         // Add stack trace
         writeSafeStackTrace(fd);
@@ -306,9 +318,16 @@ static void writeSafeCrashLog(const char* reason)
     {
         safeWrite(fd, "=== CRASH LOG ===\n\nCrash Reason: ");
         safeWrite(fd, reason);
-        safeWrite(fd, "\nTimestamp: ");
+        safeWrite(fd, "\n\nApplication: Usagi-dono\nVersion: 1.0.0\nTimestamp: ");
         safeWrite(fd, timestamp);
-        safeWrite(fd, "\nApplication: Usagi-dono\nVersion: 1.0.0\n");
+        safeWrite(fd, "\n\n");
+        
+        // Write pre-formatted system information
+        if (g_systemInfoInitialized && g_systemInfoBuffer[0] != '\0')
+        {
+            safeWrite(fd, g_systemInfoBuffer);
+            safeWrite(fd, "\n");
+        }
         
         // Add stack trace
         writeSafeStackTrace(fd);
@@ -439,8 +458,98 @@ static LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
 }
 #endif
 
+// Initialize system information buffers at startup for async-signal-safe crash logging
+// This must be called before any crash can occur
+static void initSystemInfoBuffers()
+{
+    if (g_systemInfoInitialized) {
+        return; // Already initialized
+    }
+    
+    // Get system info using Qt functions (safe to use here, at startup)
+    QString info;
+    
+    // Software Information
+    info += "Qt Version: " + QString(qVersion()) + "\n";
+    
+    // Operating System Information
+    info += "OS: " + QSysInfo::prettyProductName() + "\n";
+    info += "Kernel Type: " + QSysInfo::kernelType() + "\n";
+    info += "Kernel Version: " + QSysInfo::kernelVersion() + "\n";
+    info += "Product Type: " + QSysInfo::productType() + "\n";
+    info += "Product Version: " + QSysInfo::productVersion() + "\n";
+    
+    // Hardware Information
+    info += "CPU Architecture: " + QSysInfo::currentCpuArchitecture() + "\n";
+    info += "Build CPU Architecture: " + QSysInfo::buildCpuArchitecture() + "\n";
+    
+#ifdef Q_OS_WIN
+    // Windows-specific: Get CPU and memory information
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    info += QString("CPU Cores: %1\n").arg(sysInfo.dwNumberOfProcessors);
+    
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    if (GlobalMemoryStatusEx(&memInfo))
+    {
+        qint64 totalPhysMem = memInfo.ullTotalPhys / (1024 * 1024); // Convert to MB
+        qint64 availPhysMem = memInfo.ullAvailPhys / (1024 * 1024);
+        info += QString("Total Physical Memory: %1 MB\n").arg(totalPhysMem);
+        info += QString("Available Physical Memory: %1 MB\n").arg(availPhysMem);
+    }
+#else
+    // Unix-like: Get CPU count
+    long numCores = sysconf(_SC_NPROCESSORS_ONLN);
+    if (numCores > 0)
+    {
+        info += QString("CPU Cores: %1\n").arg(numCores);
+    }
+    
+    // Unix-like: Get memory information (Linux-specific)
+#ifdef Q_OS_LINUX
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long pageSize = sysconf(_SC_PAGE_SIZE);
+    if (pages > 0 && pageSize > 0)
+    {
+        qint64 totalMem = (qint64)pages * pageSize / (1024 * 1024); // Convert to MB
+        info += QString("Total Physical Memory: %1 MB\n").arg(totalMem);
+    }
+#endif
+#endif
+    
+    // Display Information (if available)
+    QList<QScreen*> screens = QGuiApplication::screens();
+    if (!screens.isEmpty())
+    {
+        info += QString("\nDisplay Information:\n");
+        for (int i = 0; i < screens.size(); ++i)
+        {
+            QScreen* screen = screens[i];
+            QSize size = screen->size();
+            qreal dpi = screen->logicalDotsPerInch();
+            info += QString("  Screen %1: %2x%3 @ %4 DPI\n")
+                .arg(i + 1)
+                .arg(size.width())
+                .arg(size.height())
+                .arg(dpi, 0, 'f', 1);
+        }
+    }
+    
+    // Convert to C string and store in static buffer
+    QByteArray infoBytes = info.toUtf8();
+    size_t copyLen = qMin((size_t)infoBytes.size(), sizeof(g_systemInfoBuffer) - 1);
+    memcpy(g_systemInfoBuffer, infoBytes.constData(), copyLen);
+    g_systemInfoBuffer[copyLen] = '\0';
+    
+    g_systemInfoInitialized = true;
+}
+
 void CrashLog::install()
 {
+    // Initialize system info buffers for async-signal-safe crash logging
+    initSystemInfoBuffers();
+    
     // Install signal handlers
     std::signal(SIGSEGV, signalHandler);
     std::signal(SIGABRT, signalHandler);
