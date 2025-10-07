@@ -642,6 +642,8 @@ void CrashLog::logMessage(const QString &message)
     if (logFile.open(QIODevice::Append | QIODevice::Text))
     {
         QTextStream stream(&logFile);
+        // Explicitly set UTF-8 encoding to prevent UTF-16LE on Windows
+        stream.setEncoding(QStringConverter::Utf8);
         stream << QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss") 
                << " - " << message << "\n";
         logFile.close();
@@ -879,6 +881,8 @@ void CrashLog::generateCrashLog(const QString &reason)
     if (logFile.open(QIODevice::WriteOnly | QIODevice::Text))
     {
         QTextStream stream(&logFile);
+        // Explicitly set UTF-8 encoding to prevent UTF-16LE on Windows
+        stream.setEncoding(QStringConverter::Utf8);
         
         stream << "=== CRASH LOG ===\n\n";
         stream << "Crash Reason: " << reason << "\n\n";
