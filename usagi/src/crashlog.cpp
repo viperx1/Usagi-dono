@@ -9,6 +9,7 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <dbghelp.h>
+#include <io.h>
 #else
 #include <execinfo.h>
 #include <unistd.h>
