@@ -140,6 +140,16 @@ static void writeSafeStackTrace(int fd)
     
     // Initialize symbol handler for this process
     HANDLE process = GetCurrentProcess();
+    
+    // Configure symbol options for better symbol resolution
+    // SYMOPT_UNDNAME: Undecorate (demangle) symbol names
+    // SYMOPT_DEFERRED_LOADS: Load symbols only when needed
+    // SYMOPT_LOAD_LINES: Load line number information
+    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
+    
+    // Initialize symbol handler
+    // Use NULL for search path to let it search default locations including the executable directory
+    // TRUE to load symbols for all modules (including the main executable)
     SymInitialize(process, NULL, TRUE);
     
     char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
@@ -482,6 +492,15 @@ QString CrashLog::getStackTrace()
     void* stack[maxFrames];
     HANDLE process = GetCurrentProcess();
     
+    // Configure symbol options for better symbol resolution
+    // SYMOPT_UNDNAME: Undecorate (demangle) symbol names
+    // SYMOPT_DEFERRED_LOADS: Load symbols only when needed
+    // SYMOPT_LOAD_LINES: Load line number information
+    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
+    
+    // Initialize symbol handler
+    // Use NULL for search path to let it search default locations including the executable directory
+    // TRUE to load symbols for all modules (including the main executable)
     SymInitialize(process, NULL, TRUE);
     
     WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
