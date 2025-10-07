@@ -17,7 +17,7 @@ The crash log functionality provides automatic crash detection and logging for t
 - **Detailed Crash Information**: Each crash log includes:
   - Crash reason (signal or exception type)
   - Application name and version
-  - Note: Stack traces, Qt version, and timestamps are not included in the immediate crash log to maintain async-signal-safety, but may be added through future enhancements using separate processes or core dump analysis
+  - Stack trace (memory addresses on Windows, symbol names on Unix/Linux/macOS)
 
 - **Persistent Logging**: Application logs are also written to a persistent file (`usagi.log`) for debugging purposes.
 
@@ -47,20 +47,20 @@ The signal handlers (`signalHandler` and `windowsExceptionHandler`) are implemen
 
 - No Qt functions (QString, QFile, etc.) are called from within signal handlers
 - Only low-level system calls (write, open, close on Unix; _write, _open, _close on Windows) are used
-- No dynamic memory allocation occurs in the signal handlers
+- Stack traces use `backtrace()` and `backtrace_symbols_fd()` on Unix (both are async-signal-safe per POSIX)
+- Stack traces use `CaptureStackBackTrace()` on Windows (safe to call from exception handlers)
+- No dynamic memory allocation occurs in the signal handlers (except what backtrace_symbols_fd uses internally, which is safe)
 - String operations use only static, pre-allocated buffers
 - On Windows, `_write` is used directly (instead of `WriteFile`) to avoid text encoding conversions that could produce garbled output
 
-This design ensures that even if the application is in a severely corrupted state when a crash occurs, the crash handler can still safely write diagnostic information to help identify the problem.
+This design ensures that even if the application is in a severely corrupted state when a crash occurs, the crash handler can still safely write diagnostic information including stack traces to help identify the problem.
 
 ## Platform Support
 
 The crash handler supports:
-- **Windows**: Catches Windows-specific exceptions using SetUnhandledExceptionFilter
-- **Linux/Unix**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS
-- **macOS**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS
-
-Note: Stack traces via DbgHelp (Windows) or backtrace (Unix) are available in the codebase but not currently used in the async-signal-safe handlers to prevent secondary crashes.
+- **Windows**: Catches Windows-specific exceptions using SetUnhandledExceptionFilter. Stack traces show memory addresses.
+- **Linux/Unix**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS. Stack traces show symbol names and addresses.
+- **macOS**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS. Stack traces show symbol names and addresses.
 
 ## Usage
 
@@ -68,13 +68,13 @@ The crash handler is automatically installed when the application starts. No add
 
 1. The crash handler catches the signal/exception
 2. A crash message is immediately printed to stderr
-3. A simple crash log is written to `crash.log` in the current directory
+3. A crash log with stack trace is written to `crash.log` in the current directory
 4. The application terminates
 
 ## Future Enhancements
 
 Possible future improvements:
-- Add stack traces using a separate process or post-crash analysis tool
+- Add symbol resolution for Windows stack traces (currently shows only addresses)
 - Include more system information (memory usage, CPU info, timestamps)
 - Write crash logs to timestamped files in the application data directory
 - Add a crash report dialog allowing users to submit crash reports
