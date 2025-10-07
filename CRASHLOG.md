@@ -71,6 +71,44 @@ The crash handler is automatically installed when the application starts. No add
 3. A crash log with stack trace is written to `crash.log` in the current directory
 4. The application terminates
 
+### Example Crash Log
+
+On Unix/Linux/macOS systems, the crash log will look like:
+
+```
+=== CRASH LOG ===
+
+Crash Reason: Segmentation Fault (SIGSEGV)
+Application: Usagi-dono
+Version: 1.0.0
+
+Stack Trace:
+./usagi(+0x1234)[0x5555555551234]
+./usagi(+0x5678)[0x5555555555678]
+/lib/x86_64-linux-gnu/libc.so.6(+0x45330)[0x7f1234545330]
+...
+
+=== END OF CRASH LOG ===
+```
+
+On Windows systems, the crash log will show memory addresses:
+
+```
+=== CRASH LOG ===
+
+Crash Reason: Access Violation
+Application: Usagi-dono
+Version: 1.0.0
+
+Stack Trace:
+  [0] 0x00007ff123456789
+  [1] 0x00007ff12345abcd
+  [2] 0x00007ff987654321
+...
+
+=== END OF CRASH LOG ===
+```
+
 ## Future Enhancements
 
 Possible future improvements:
