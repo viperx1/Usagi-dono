@@ -14,7 +14,8 @@ This directory contains unit tests for the Usagi-dono application.
 - **test_crashlog.cpp**: Tests for crash log encoding
   - Verify crash log is written in ASCII/UTF-8 encoding
   - Verify crash log is NOT written in UTF-16LE encoding
-  - Detect and demonstrate incorrect UTF-16LE encoding (new test)
+  - Detect and demonstrate incorrect UTF-16LE encoding
+  - Verify QTextStream with UTF-8 encoding without QIODevice::Text flag (new test)
   - Ensure crash log content is readable
   
 ## Building and Running Tests

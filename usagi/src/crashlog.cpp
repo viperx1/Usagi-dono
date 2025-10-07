@@ -649,7 +649,7 @@ void CrashLog::logMessage(const QString &message)
     
     QString logPath = logDir + "/usagi.log";
     QFile logFile(logPath);
-    if (logFile.open(QIODevice::Append | QIODevice::Text))
+    if (logFile.open(QIODevice::Append))
     {
         QTextStream stream(&logFile);
         // Explicitly set UTF-8 encoding to prevent UTF-16LE on Windows
@@ -888,7 +888,7 @@ void CrashLog::generateCrashLog(const QString &reason)
     QString logPath = getLogFilePath();
     QFile logFile(logPath);
     
-    if (logFile.open(QIODevice::WriteOnly | QIODevice::Text))
+    if (logFile.open(QIODevice::WriteOnly))
     {
         QTextStream stream(&logFile);
         // Explicitly set UTF-8 encoding to prevent UTF-16LE on Windows
