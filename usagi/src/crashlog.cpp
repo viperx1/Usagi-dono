@@ -153,15 +153,19 @@ static void writeSafeStackTrace(int fd)
     // SYMOPT_UNDNAME: Undecorate (demangle) symbol names
     // SYMOPT_DEFERRED_LOADS: Load symbols only when needed
     // SYMOPT_LOAD_LINES: Load line number information
-    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
+    // SYMOPT_FAIL_CRITICAL_ERRORS: Don't display system error message boxes
+    // SYMOPT_NO_PROMPTS: Don't prompt for symbol search paths
+    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | 
+                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
     
-    // Get the executable directory to include in symbol search path
-    // This ensures PDB files in the executable directory are found
+    // Build comprehensive symbol search path
+    // Include: executable directory, current directory
     char exePath[MAX_PATH];
-    char searchPath[MAX_PATH * 2];
+    char currentDir[MAX_PATH];
+    char searchPath[MAX_PATH * 4];
     searchPath[0] = '\0'; // Initialize to empty string
-    BOOL hasSearchPath = FALSE;
     
+    // Get the executable directory
     DWORD pathLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
     if (pathLen > 0 && pathLen < MAX_PATH)
     {
@@ -177,20 +181,41 @@ static void writeSafeStackTrace(int fd)
         if (lastSlash)
         {
             *lastSlash = '\0'; // Null-terminate at the last slash to get directory
-            // Copy to searchPath buffer
+            // Copy executable directory to searchPath
             size_t len = strlen(exePath);
-            if (len < sizeof(searchPath))
+            if (len < sizeof(searchPath) - 1)
             {
-                memcpy(searchPath, exePath, len + 1);
-                hasSearchPath = TRUE;
+                memcpy(searchPath, exePath, len);
+                searchPath[len] = '\0';
             }
         }
     }
     
-    // Initialize symbol handler with explicit search path to executable directory
-    // This ensures that PDB files in the same directory as the executable are found
-    // TRUE to load symbols for all modules (including the main executable)
-    SymInitialize(process, hasSearchPath ? searchPath : NULL, TRUE);
+    // Add current directory to search path
+    DWORD cwdLen = GetCurrentDirectoryA(MAX_PATH, currentDir);
+    if (cwdLen > 0 && cwdLen < MAX_PATH)
+    {
+        size_t currentLen = strlen(searchPath);
+        // Add semicolon separator if we already have exe path
+        if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
+        {
+            searchPath[currentLen] = ';';
+            searchPath[currentLen + 1] = '\0';
+            currentLen++;
+        }
+        // Append current directory
+        size_t remainingSpace = sizeof(searchPath) - currentLen - 1;
+        if (cwdLen < remainingSpace)
+        {
+            memcpy(searchPath + currentLen, currentDir, cwdLen);
+            searchPath[currentLen + cwdLen] = '\0';
+        }
+    }
+    
+    // Initialize symbol handler with comprehensive search path
+    // This ensures PDB files are found in executable directory and current directory
+    // TRUE parameter loads symbols for all currently loaded modules
+    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
     
     char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
     PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
@@ -697,15 +722,19 @@ QString CrashLog::getStackTrace()
     // SYMOPT_UNDNAME: Undecorate (demangle) symbol names
     // SYMOPT_DEFERRED_LOADS: Load symbols only when needed
     // SYMOPT_LOAD_LINES: Load line number information
-    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
+    // SYMOPT_FAIL_CRITICAL_ERRORS: Don't display system error message boxes
+    // SYMOPT_NO_PROMPTS: Don't prompt for symbol search paths
+    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | 
+                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
     
-    // Get the executable directory to include in symbol search path
-    // This ensures PDB files in the executable directory are found
+    // Build comprehensive symbol search path
+    // Include: executable directory, current directory
     char exePath[MAX_PATH];
-    char searchPath[MAX_PATH * 2];
+    char currentDir[MAX_PATH];
+    char searchPath[MAX_PATH * 4];
     searchPath[0] = '\0'; // Initialize to empty string
-    BOOL hasSearchPath = FALSE;
     
+    // Get the executable directory
     DWORD pathLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
     if (pathLen > 0 && pathLen < MAX_PATH)
     {
@@ -721,20 +750,41 @@ QString CrashLog::getStackTrace()
         if (lastSlash)
         {
             *lastSlash = '\0'; // Null-terminate at the last slash to get directory
-            // Copy to searchPath buffer
+            // Copy executable directory to searchPath
             size_t len = strlen(exePath);
-            if (len < sizeof(searchPath))
+            if (len < sizeof(searchPath) - 1)
             {
-                memcpy(searchPath, exePath, len + 1);
-                hasSearchPath = TRUE;
+                memcpy(searchPath, exePath, len);
+                searchPath[len] = '\0';
             }
         }
     }
     
-    // Initialize symbol handler with explicit search path to executable directory
-    // This ensures that PDB files in the same directory as the executable are found
-    // TRUE to load symbols for all modules (including the main executable)
-    SymInitialize(process, hasSearchPath ? searchPath : NULL, TRUE);
+    // Add current directory to search path
+    DWORD cwdLen = GetCurrentDirectoryA(MAX_PATH, currentDir);
+    if (cwdLen > 0 && cwdLen < MAX_PATH)
+    {
+        size_t currentLen = strlen(searchPath);
+        // Add semicolon separator if we already have exe path
+        if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
+        {
+            searchPath[currentLen] = ';';
+            searchPath[currentLen + 1] = '\0';
+            currentLen++;
+        }
+        // Append current directory
+        size_t remainingSpace = sizeof(searchPath) - currentLen - 1;
+        if (cwdLen < remainingSpace)
+        {
+            memcpy(searchPath + currentLen, currentDir, cwdLen);
+            searchPath[currentLen + cwdLen] = '\0';
+        }
+    }
+    
+    // Initialize symbol handler with comprehensive search path
+    // This ensures PDB files are found in executable directory and current directory
+    // TRUE parameter loads symbols for all currently loaded modules
+    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
     
     WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
     
