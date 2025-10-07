@@ -19,6 +19,13 @@ The crash log functionality provides automatic crash detection and logging for t
   - Crash reason (signal or exception type)
   - Timestamp (when the crash occurred)
   - Application name and version
+  - Qt version
+  - Operating system details (name, kernel type/version, product type/version)
+  - Hardware information:
+    - CPU architecture
+    - Number of CPU cores
+    - Total and available physical memory (in MB)
+  - Display information (screen resolution and DPI for each monitor)
   - Stack trace with function names and offsets (on all platforms)
 
 - **Persistent Logging**: Application logs are also written to a persistent file (`usagi.log`) for debugging purposes.
@@ -104,9 +111,24 @@ On Unix/Linux/macOS systems, the crash log will look like:
 === CRASH LOG ===
 
 Crash Reason: Segmentation Fault (SIGSEGV)
-Timestamp: 2025-01-15 14:30:22
+
 Application: Usagi-dono
 Version: 1.0.0
+Timestamp: 2025-01-15 14:30:22
+
+Qt Version: 6.4.2
+OS: Ubuntu 24.04 LTS
+Kernel Type: linux
+Kernel Version: 6.8.0-49-generic
+Product Type: ubuntu
+Product Version: 24.04
+CPU Architecture: x86_64
+Build CPU Architecture: x86_64
+CPU Cores: 8
+Total Physical Memory: 16384 MB
+
+Display Information:
+  Screen 1: 1920x1080 @ 96.0 DPI
 
 Stack Trace:
 ./usagi(+0x1234)[0x5555555551234]
@@ -123,9 +145,26 @@ On Windows systems, the crash log will show function names with offsets:
 === CRASH LOG ===
 
 Crash Reason: Access Violation
-Timestamp: 2025-01-15 14:30:22
+
 Application: Usagi-dono
 Version: 1.0.0
+Timestamp: 2025-01-15 14:30:22
+
+Qt Version: 6.4.2
+OS: Windows 11 (10.0)
+Kernel Type: winnt
+Kernel Version: 10.0.22621
+Product Type: windows
+Product Version: 11
+CPU Architecture: x86_64
+Build CPU Architecture: x86_64
+CPU Cores: 12
+Total Physical Memory: 32768 MB
+Available Physical Memory: 16384 MB
+
+Display Information:
+  Screen 1: 2560x1440 @ 96.0 DPI
+  Screen 2: 1920x1080 @ 96.0 DPI
 
 Stack Trace:
   [0] MainWindow::onButtonClick + 0x000000000000001a
