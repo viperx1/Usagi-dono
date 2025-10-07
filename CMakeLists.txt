@@ -35,6 +35,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
+# Enable testing globally
+enable_testing()
+
 # Add subdirectories
 add_subdirectory(usagi)
 add_subdirectory(tests)
