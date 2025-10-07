@@ -298,6 +298,9 @@ static void signalHandler(int signal)
         case SIGBUS:
             reason = "Bus Error (SIGBUS)";
             break;
+        case SIGTRAP:
+            reason = "Trace/Breakpoint Trap (SIGTRAP)";
+            break;
 #endif
         default:
             reason = "Unknown Signal";
@@ -401,6 +404,7 @@ void CrashLog::install()
     
 #ifndef Q_OS_WIN
     std::signal(SIGBUS, signalHandler);
+    std::signal(SIGTRAP, signalHandler);
 #endif
 
 #ifdef Q_OS_WIN

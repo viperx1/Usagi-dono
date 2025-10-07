@@ -12,6 +12,7 @@ The crash log functionality provides automatic crash detection and logging for t
   - Floating point exceptions (SIGFPE)
   - Illegal instructions (SIGILL)
   - Bus errors (SIGBUS) on Unix-like systems
+  - Trace/breakpoint traps (SIGTRAP) on Unix-like systems
   - Windows-specific exceptions (access violations, divide by zero, etc.)
 
 - **Detailed Crash Information**: Each crash log includes:
@@ -51,6 +52,18 @@ To ensure that crash logs show function names from the Usagi codebase (not just 
 
 These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
 
+### Crypto++ Library Compatibility
+
+The application uses the Crypto++ encryption library which has a debug assertion system (`CRYPTOPP_ASSERT`). By default, when debug symbols are enabled, Crypto++ automatically enables `CRYPTOPP_DEBUG`, which causes `CRYPTOPP_ASSERT` to raise `SIGTRAP` on Unix-like systems or call `DebugBreak()` on Windows. This can interfere with our crash log handler.
+
+To prevent this interference while still maintaining debug symbols for our own crash logging:
+
+- `CRYPTOPP_DEBUG` is explicitly disabled by defining `CRYPTOPP_DEBUG=0` in CMakeLists.txt
+- A `SIGTRAP` handler is installed on Unix-like systems to catch any trap signals that may still occur
+- This ensures that our crash log handler takes precedence and can properly capture stack traces
+
+This configuration allows us to have debug symbols for meaningful crash logs without triggering Crypto++'s assertion system that could mask the real cause of crashes.
+
 ### Async-Signal-Safety
 
 The signal handlers (`signalHandler` and `windowsExceptionHandler`) are implemented using only **async-signal-safe** functions to prevent secondary crashes when handling the original crash. This means:
@@ -69,8 +82,8 @@ This design ensures that even if the application is in a severely corrupted stat
 
 The crash handler supports:
 - **Windows**: Catches Windows-specific exceptions using SetUnhandledExceptionFilter. Stack traces show function names with offsets and addresses.
-- **Linux/Unix**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS. Stack traces show symbol names and addresses.
-- **macOS**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS. Stack traces show symbol names and addresses.
+- **Linux/Unix**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS, SIGTRAP. Stack traces show symbol names and addresses.
+- **macOS**: Catches POSIX signals including SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS, SIGTRAP. Stack traces show symbol names and addresses.
 
 ## Usage
 
