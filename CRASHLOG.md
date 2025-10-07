@@ -19,6 +19,13 @@ The crash log functionality provides automatic crash detection and logging for t
   - Crash reason (signal or exception type)
   - Timestamp (when the crash occurred)
   - Application name and version
+  - Qt version
+  - Operating system details (name, kernel type/version, product type/version)
+  - Hardware information:
+    - CPU architecture
+    - Number of CPU cores
+    - Total and available physical memory (in MB)
+  - Display information (screen resolution and DPI for each monitor)
   - Stack trace with function names and offsets (on all platforms)
 
 - **Persistent Logging**: Application logs are also written to a persistent file (`usagi.log`) for debugging purposes.
@@ -52,7 +59,7 @@ To ensure that crash logs show function names from the Usagi codebase (not just 
 
 These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
 
-On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, and `SYMOPT_LOAD_LINES` flags before initializing the symbol handler. This ensures that the Windows Debug Help Library (DbgHelp) properly loads symbols from PDB files for the Usagi executable, enabling function names from the Usagi codebase to appear in crash logs alongside Qt library function names.
+On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, and `SYMOPT_LOAD_LINES` flags before initializing the symbol handler. Additionally, the symbol handler is initialized with an explicit search path that includes the executable directory, obtained using `GetModuleFileNameA()`. This ensures that the Windows Debug Help Library (DbgHelp) properly loads symbols from PDB files located in the same directory as the Usagi executable, enabling function names from the Usagi codebase to appear in crash logs alongside Qt library function names.
 
 ### Crypto++ Library Compatibility
 
@@ -104,9 +111,24 @@ On Unix/Linux/macOS systems, the crash log will look like:
 === CRASH LOG ===
 
 Crash Reason: Segmentation Fault (SIGSEGV)
-Timestamp: 2025-01-15 14:30:22
+
 Application: Usagi-dono
 Version: 1.0.0
+Timestamp: 2025-01-15 14:30:22
+
+Qt Version: 6.4.2
+OS: Ubuntu 24.04 LTS
+Kernel Type: linux
+Kernel Version: 6.8.0-49-generic
+Product Type: ubuntu
+Product Version: 24.04
+CPU Architecture: x86_64
+Build CPU Architecture: x86_64
+CPU Cores: 8
+Total Physical Memory: 16384 MB
+
+Display Information:
+  Screen 1: 1920x1080 @ 96.0 DPI
 
 Stack Trace:
 ./usagi(+0x1234)[0x5555555551234]
@@ -123,9 +145,26 @@ On Windows systems, the crash log will show function names with offsets:
 === CRASH LOG ===
 
 Crash Reason: Access Violation
-Timestamp: 2025-01-15 14:30:22
+
 Application: Usagi-dono
 Version: 1.0.0
+Timestamp: 2025-01-15 14:30:22
+
+Qt Version: 6.4.2
+OS: Windows 11 (10.0)
+Kernel Type: winnt
+Kernel Version: 10.0.22621
+Product Type: windows
+Product Version: 11
+CPU Architecture: x86_64
+Build CPU Architecture: x86_64
+CPU Cores: 12
+Total Physical Memory: 32768 MB
+Available Physical Memory: 16384 MB
+
+Display Information:
+  Screen 1: 2560x1440 @ 96.0 DPI
+  Screen 2: 1920x1080 @ 96.0 DPI
 
 Stack Trace:
   [0] MainWindow::onButtonClick + 0x000000000000001a

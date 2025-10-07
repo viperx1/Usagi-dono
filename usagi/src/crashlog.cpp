@@ -1,6 +1,9 @@
 #include "crashlog.h"
 #include <QDir>
 #include <QStandardPaths>
+#include <QSysInfo>
+#include <QScreen>
+#include <QGuiApplication>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
@@ -147,10 +150,42 @@ static void writeSafeStackTrace(int fd)
     // SYMOPT_LOAD_LINES: Load line number information
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
     
-    // Initialize symbol handler
-    // Use NULL for search path to let it search default locations including the executable directory
+    // Get the executable directory to include in symbol search path
+    // This ensures PDB files in the executable directory are found
+    char exePath[MAX_PATH];
+    char searchPath[MAX_PATH * 2];
+    searchPath[0] = '\0'; // Initialize to empty string
+    BOOL hasSearchPath = FALSE;
+    
+    DWORD pathLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    if (pathLen > 0 && pathLen < MAX_PATH)
+    {
+        // Find the last backslash to get directory
+        char* lastSlash = NULL;
+        for (DWORD i = 0; i < pathLen; i++)
+        {
+            if (exePath[i] == '\\' || exePath[i] == '/')
+            {
+                lastSlash = &exePath[i];
+            }
+        }
+        if (lastSlash)
+        {
+            *lastSlash = '\0'; // Null-terminate at the last slash to get directory
+            // Copy to searchPath buffer
+            size_t len = strlen(exePath);
+            if (len < sizeof(searchPath))
+            {
+                memcpy(searchPath, exePath, len + 1);
+                hasSearchPath = TRUE;
+            }
+        }
+    }
+    
+    // Initialize symbol handler with explicit search path to executable directory
+    // This ensures that PDB files in the same directory as the executable are found
     // TRUE to load symbols for all modules (including the main executable)
-    SymInitialize(process, NULL, TRUE);
+    SymInitialize(process, hasSearchPath ? searchPath : NULL, TRUE);
     
     char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
     PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
@@ -461,23 +496,80 @@ void CrashLog::logMessage(const QString &message)
 QString CrashLog::getSystemInfo()
 {
     QString info;
+    
+    // Application Information
     info += "Application: " + QCoreApplication::applicationName() + "\n";
     info += "Version: " + QCoreApplication::applicationVersion() + "\n";
+    info += "Timestamp: " + QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss") + "\n\n";
+    
+    // Software Information
     info += "Qt Version: " + QString(qVersion()) + "\n";
-    info += "System: ";
+    
+    // Operating System Information
+    info += "OS: " + QSysInfo::prettyProductName() + "\n";
+    info += "Kernel Type: " + QSysInfo::kernelType() + "\n";
+    info += "Kernel Version: " + QSysInfo::kernelVersion() + "\n";
+    info += "Product Type: " + QSysInfo::productType() + "\n";
+    info += "Product Version: " + QSysInfo::productVersion() + "\n";
+    
+    // Hardware Information
+    info += "CPU Architecture: " + QSysInfo::currentCpuArchitecture() + "\n";
+    info += "Build CPU Architecture: " + QSysInfo::buildCpuArchitecture() + "\n";
     
 #ifdef Q_OS_WIN
-    info += "Windows";
-#elif defined(Q_OS_LINUX)
-    info += "Linux";
-#elif defined(Q_OS_MAC)
-    info += "macOS";
+    // Windows-specific: Get CPU and memory information
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    info += QString("CPU Cores: %1\n").arg(sysInfo.dwNumberOfProcessors);
+    
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    if (GlobalMemoryStatusEx(&memInfo))
+    {
+        qint64 totalPhysMem = memInfo.ullTotalPhys / (1024 * 1024); // Convert to MB
+        qint64 availPhysMem = memInfo.ullAvailPhys / (1024 * 1024);
+        info += QString("Total Physical Memory: %1 MB\n").arg(totalPhysMem);
+        info += QString("Available Physical Memory: %1 MB\n").arg(availPhysMem);
+    }
 #else
-    info += "Unknown";
+    // Unix-like: Get CPU count
+    long numCores = sysconf(_SC_NPROCESSORS_ONLN);
+    if (numCores > 0)
+    {
+        info += QString("CPU Cores: %1\n").arg(numCores);
+    }
+    
+    // Unix-like: Get memory information (Linux-specific)
+#ifdef Q_OS_LINUX
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long pageSize = sysconf(_SC_PAGE_SIZE);
+    if (pages > 0 && pageSize > 0)
+    {
+        qint64 totalMem = (qint64)pages * pageSize / (1024 * 1024); // Convert to MB
+        info += QString("Total Physical Memory: %1 MB\n").arg(totalMem);
+    }
+#endif
 #endif
     
+    // Display Information (if available)
+    QList<QScreen*> screens = QGuiApplication::screens();
+    if (!screens.isEmpty())
+    {
+        info += QString("\nDisplay Information:\n");
+        for (int i = 0; i < screens.size(); ++i)
+        {
+            QScreen* screen = screens[i];
+            QSize size = screen->size();
+            qreal dpi = screen->logicalDotsPerInch();
+            info += QString("  Screen %1: %2x%3 @ %4 DPI\n")
+                .arg(i + 1)
+                .arg(size.width())
+                .arg(size.height())
+                .arg(dpi, 0, 'f', 1);
+        }
+    }
+    
     info += "\n";
-    info += "Timestamp: " + QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss") + "\n";
     
     return info;
 }
@@ -498,10 +590,42 @@ QString CrashLog::getStackTrace()
     // SYMOPT_LOAD_LINES: Load line number information
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
     
-    // Initialize symbol handler
-    // Use NULL for search path to let it search default locations including the executable directory
+    // Get the executable directory to include in symbol search path
+    // This ensures PDB files in the executable directory are found
+    char exePath[MAX_PATH];
+    char searchPath[MAX_PATH * 2];
+    searchPath[0] = '\0'; // Initialize to empty string
+    BOOL hasSearchPath = FALSE;
+    
+    DWORD pathLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    if (pathLen > 0 && pathLen < MAX_PATH)
+    {
+        // Find the last backslash to get directory
+        char* lastSlash = NULL;
+        for (DWORD i = 0; i < pathLen; i++)
+        {
+            if (exePath[i] == '\\' || exePath[i] == '/')
+            {
+                lastSlash = &exePath[i];
+            }
+        }
+        if (lastSlash)
+        {
+            *lastSlash = '\0'; // Null-terminate at the last slash to get directory
+            // Copy to searchPath buffer
+            size_t len = strlen(exePath);
+            if (len < sizeof(searchPath))
+            {
+                memcpy(searchPath, exePath, len + 1);
+                hasSearchPath = TRUE;
+            }
+        }
+    }
+    
+    // Initialize symbol handler with explicit search path to executable directory
+    // This ensures that PDB files in the same directory as the executable are found
     // TRUE to load symbols for all modules (including the main executable)
-    SymInitialize(process, NULL, TRUE);
+    SymInitialize(process, hasSearchPath ? searchPath : NULL, TRUE);
     
     WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
     
