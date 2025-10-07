@@ -9,6 +9,7 @@
 #include <cstring>
 #include <ctime>
 #include <cstdint>
+#include <cstdio>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -593,6 +594,15 @@ static void initSystemInfoBuffers()
 
 void CrashLog::install()
 {
+#ifdef Q_OS_WIN
+    // On Windows, set stderr and stdout to binary mode immediately to prevent
+    // text mode conversions that could cause UTF-16LE encoding issues.
+    // This must be done before any crash can occur, and before initSystemInfoBuffers()
+    // which might indirectly cause output (though it currently doesn't).
+    _setmode(_fileno(stderr), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
+    
     // Initialize system info buffers for async-signal-safe crash logging
     initSystemInfoBuffers();
     
