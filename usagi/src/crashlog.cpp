@@ -214,8 +214,24 @@ static void writeSafeStackTrace(int fd)
     
     // Initialize symbol handler with comprehensive search path
     // This ensures PDB files are found in executable directory and current directory
-    // TRUE parameter loads symbols for all currently loaded modules
-    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    // FALSE parameter: we'll manually load modules to ensure main executable is loaded
+    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, FALSE);
+    
+    // Explicitly load symbols for the main executable module
+    // This ensures the application's own PDB file is loaded for symbol resolution
+    // GetModuleHandle(NULL) gets the base address of the main executable
+    HMODULE hModule = GetModuleHandleA(NULL);
+    if (hModule)
+    {
+        char modulePath[MAX_PATH];
+        DWORD modulePathLen = GetModuleFileNameA(hModule, modulePath, MAX_PATH);
+        if (modulePathLen > 0 && modulePathLen < MAX_PATH)
+        {
+            // SymLoadModuleEx explicitly loads symbols for the specified module
+            // This is more reliable than relying on the automatic loading in SymInitialize
+            SymLoadModuleEx(process, NULL, modulePath, NULL, (DWORD64)hModule, 0, NULL, 0);
+        }
+    }
     
     char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
     PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
@@ -783,8 +799,24 @@ QString CrashLog::getStackTrace()
     
     // Initialize symbol handler with comprehensive search path
     // This ensures PDB files are found in executable directory and current directory
-    // TRUE parameter loads symbols for all currently loaded modules
-    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    // FALSE parameter: we'll manually load modules to ensure main executable is loaded
+    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, FALSE);
+    
+    // Explicitly load symbols for the main executable module
+    // This ensures the application's own PDB file is loaded for symbol resolution
+    // GetModuleHandle(NULL) gets the base address of the main executable
+    HMODULE hModule = GetModuleHandleA(NULL);
+    if (hModule)
+    {
+        char modulePath[MAX_PATH];
+        DWORD modulePathLen = GetModuleFileNameA(hModule, modulePath, MAX_PATH);
+        if (modulePathLen > 0 && modulePathLen < MAX_PATH)
+        {
+            // SymLoadModuleEx explicitly loads symbols for the specified module
+            // This is more reliable than relying on the automatic loading in SymInitialize
+            SymLoadModuleEx(process, NULL, modulePath, NULL, (DWORD64)hModule, 0, NULL, 0);
+        }
+    }
     
     WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
     
