@@ -5,14 +5,18 @@ This document tracks all methods attempted to fix the crash log encoding issue w
 ## Problem Description
 
 ### Symptoms
-When crash logs were written on Windows, they appeared garbled when opened in text editors:
-- Text appeared as Chinese/Unicode characters mixed with symbols
-- File size was approximately double what it should be
-- Opening in hex editor showed UTF-16LE encoding (0xFF 0xFE BOM, followed by bytes like 0x3D 0x00 for '=')
+When crash logs are opened in Windows Notepad, they appear garbled:
+- Text appears as Chinese/Unicode characters mixed with symbols
 - Example garbled output from issue: `㴽‽剃十⁈佌⁇㴽਽䌊慲桳删慥潳㩮匠来敭瑮瑡潩⁮慆汵⁴匨䝉䕓噇਩`
+- However, the same file displays correctly when opened in VS Code as UTF-8
+- Notepad incorrectly detects the file as UTF-16 LE encoding
 
 ### Root Cause
-On Windows, `QTextStream` defaults to UTF-16LE encoding when no explicit encoding is set. Additionally, stdout/stderr in text mode can perform conversions that corrupt binary data.
+The files are actually written correctly as UTF-8, but Windows Notepad misdetects the encoding:
+- UTF-8 files without a BOM (Byte Order Mark) can be misidentified by Notepad as UTF-16 LE
+- When Notepad reads UTF-8 bytes as if they were UTF-16 LE, every other byte is misinterpreted, causing garbled display
+- This is a limitation of Notepad's encoding detection algorithm, not an actual encoding error in the file
+- More sophisticated editors like VS Code can correctly identify UTF-8 without a BOM
 
 ## Fix Methods Tracking
 
@@ -45,28 +49,33 @@ On Windows, `QTextStream` defaults to UTF-16LE encoding when no explicit encodin
 
 **Technical Details:**
 
-The fix addresses the root cause on multiple levels:
+The fix ensures crash logs are written as clean UTF-8:
 
-- **QTextStream Level:** Without explicit encoding, QTextStream on Windows defaults to UTF-16LE (little endian) with a byte order mark (BOM: 0xFF 0xFE). This causes ASCII text like "=== CRASH LOG ===" to be written as `3D 00 3D 00 3D 00...` instead of `3D 3D 3D...`, which appears garbled when read as UTF-8.
+- **QTextStream Level:** Explicitly setting UTF-8 encoding ensures consistent UTF-8 output across all platforms. Setting `setGenerateByteOrderMark(false)` creates clean UTF-8 files without a BOM. While files without BOM may be misdetected by Notepad as UTF-16 LE, they are correct UTF-8 and will display properly in VS Code and other modern editors.
 
-- **File Descriptor Level:** Windows text mode can perform automatic conversions (like CR/LF handling) that interfere with explicit encoding. Setting binary mode ensures raw bytes are written exactly as specified.
+- **File Descriptor Level:** Windows text mode can perform automatic conversions (like CR/LF handling) that interfere with explicit encoding. Setting binary mode ensures raw UTF-8 bytes are written exactly as specified.
 
-- **Signal Handler Level:** The async-signal-safe crash logging (used during actual crashes) bypasses QTextStream entirely and uses low-level system calls with binary mode to ensure no encoding corruption occurs even in a severely damaged application state.
+- **Signal Handler Level:** The async-signal-safe crash logging (used during actual crashes) bypasses QTextStream entirely and uses low-level system calls with binary mode to ensure correct UTF-8 output even in a severely damaged application state.
 
 **Why this method works:**
-- Explicitly setting UTF-8 encoding overrides the platform default
-- Disabling BOM ensures the file starts with actual content, not encoding markers
-- Binary mode prevents any intermediate text mode conversions
+- Explicitly setting UTF-8 encoding ensures correct UTF-8 output
+- Disabling BOM creates clean UTF-8 files (though Notepad may misdetect them)
+- Binary mode prevents any intermediate conversions
 - Using QIODevice flags without Text mode avoids conflicts with QTextStream's explicit encoding
-- Low-level system calls in signal handlers guarantee no Qt-level encoding issues
+- Low-level system calls in signal handlers guarantee consistent UTF-8 output
+
+**Note on Notepad compatibility:**
+Windows Notepad may misdetect UTF-8 files without BOM as UTF-16 LE, causing garbled display. This is a limitation of Notepad's detection algorithm, not an error in the file. Users experiencing this should:
+- Use VS Code or another modern text editor that correctly detects UTF-8
+- Alternatively, the code could be modified to add a UTF-8 BOM (0xEF 0xBB 0xBF) by setting `setGenerateByteOrderMark(true)`, but this was explicitly disabled to maintain clean UTF-8 output
 
 ## Summary of Working Solution
 
-The crash log encoding issue has been resolved through a comprehensive multi-layered approach:
+The crash logs are correctly written as UTF-8 through a comprehensive multi-layered approach:
 
 **Primary Fix:**
-- All QTextStream instances now explicitly use UTF-8 encoding via `setEncoding(QStringConverter::Utf8)`
-- BOM generation is explicitly disabled via `setGenerateByteOrderMark(false)`
+- All QTextStream instances explicitly use UTF-8 encoding via `setEncoding(QStringConverter::Utf8)`
+- BOM generation is explicitly disabled via `setGenerateByteOrderMark(false)` to maintain clean UTF-8
 - Files are opened without the `QIODevice::Text` flag when using QTextStream with explicit encoding
 
 **System-Level Protection:**
@@ -78,7 +87,9 @@ The crash log encoding issue has been resolved through a comprehensive multi-lay
 - All file descriptors are opened in binary mode (`_O_BINARY` flag on Windows)
 - The `safeWrite()` function defensively sets binary mode before writing
 
-This layered approach ensures crash logs are always written in readable UTF-8 encoding, whether generated from normal application code paths (using Qt functions) or from signal handlers during actual crashes (using async-signal-safe system calls).
+This layered approach ensures crash logs are always written as correct UTF-8, whether generated from normal application code paths (using Qt functions) or from signal handlers during actual crashes (using async-signal-safe system calls).
+
+**Important Note:** While the files are correctly written as UTF-8, Windows Notepad may misdetect them as UTF-16 LE and display garbled text. This is a limitation of Notepad's encoding detection, not an error in the file. The files display correctly in VS Code and other modern text editors that properly detect UTF-8 without BOM.
 
 ## Testing
 
