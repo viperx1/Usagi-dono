@@ -1,8 +1,5 @@
 #include <QtTest/QtTest>
 #include "../usagi/src/crashlog.h"
-#include <QFile>
-#include <QTextStream>
-#include <QStringConverter>
 
 class TestCrashLog : public QObject
 {
