@@ -35,6 +35,7 @@ private slots:
     void testCrashLogEncoding();
     void testCrashLogNotUTF16LE();
     void testDetectIncorrectUTF16LEEncoding();
+    void testQTextStreamUTF8WithoutTextFlag();
     void cleanupTestCase();
 
 private:
@@ -180,6 +181,8 @@ void TestCrashLog::testDetectIncorrectUTF16LEEncoding()
     QFile file(testFilePath);
     
     // Write some text in UTF-16LE encoding (the WRONG encoding)
+    // NOTE: This intentionally uses QIODevice::Text to demonstrate the wrong approach.
+    // In production code, QIODevice::Text should NOT be used with explicit encoding.
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
     QTextStream stream(&file);
     stream.setEncoding(QStringConverter::Utf16LE);
@@ -242,6 +245,61 @@ void TestCrashLog::testDetectIncorrectUTF16LEEncoding()
     
     // The most reliable check: verify the content is NOT what we expect
     QVERIFY(garbled != testText);
+}
+
+void TestCrashLog::testQTextStreamUTF8WithoutTextFlag()
+{
+    // This test verifies the correct approach: using QTextStream with explicit UTF-8
+    // encoding WITHOUT the QIODevice::Text flag. This is the approach used in the
+    // fixed generateCrashLog() and logMessage() functions.
+    
+    QString testFilePath = tempDir->filePath("test_correct_utf8.log");
+    QFile file(testFilePath);
+    
+    // Write text using QTextStream with UTF-8 encoding, WITHOUT QIODevice::Text flag
+    // This is the CORRECT approach that prevents encoding issues
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QTextStream stream(&file);
+    stream.setEncoding(QStringConverter::Utf8);
+    
+    QString testText = "=== CRASH LOG ===\n\nCrash Reason: Segmentation Fault (SIGSEGV)\n"
+                       "Application: Usagi-dono\nVersion: 1.0.0\n";
+    stream << testText;
+    file.close();
+    
+    // Read the file back as raw bytes
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QByteArray rawContent = file.readAll();
+    file.close();
+    
+    // Verify NO UTF-16LE BOM is present
+    if (rawContent.size() >= 2) {
+        QVERIFY(!(rawContent[0] == (char)0xFF && rawContent[1] == (char)0xFE));
+    }
+    
+    // Verify the file is NOT double the expected size (would indicate UTF-16LE)
+    // Expected size is around 120 bytes for ASCII/UTF-8
+    QVERIFY(rawContent.size() < 150);
+    
+    // Verify that when read as UTF-8, the text is correct and readable
+    QString readBack = QString::fromUtf8(rawContent);
+    QCOMPARE(readBack, testText);
+    
+    // Verify all expected strings are present
+    QVERIFY(readBack.contains("=== CRASH LOG ==="));
+    QVERIFY(readBack.contains("Crash Reason: Segmentation Fault (SIGSEGV)"));
+    QVERIFY(readBack.contains("Application: Usagi-dono"));
+    QVERIFY(readBack.contains("Version: 1.0.0"));
+    
+    // Verify no null bytes in the content (which would indicate UTF-16LE)
+    bool hasNullBytes = false;
+    for (int i = 0; i < rawContent.size(); i++) {
+        if (rawContent[i] == 0x00) {
+            hasNullBytes = true;
+            break;
+        }
+    }
+    QVERIFY(!hasNullBytes);
 }
 
 QTEST_MAIN(TestCrashLog)
