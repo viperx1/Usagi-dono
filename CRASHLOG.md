@@ -42,6 +42,15 @@ The crash handler is implemented in:
 
 The handler is installed at application startup before the main window is shown, ensuring that crashes are caught throughout the application lifetime.
 
+### Debug Symbols
+
+To ensure that crash logs show function names from the Usagi codebase (not just Qt library functions), debug symbols must be enabled during compilation. The CMakeLists.txt files are configured to automatically include debug symbols:
+
+- **MSVC**: Uses `/Zi` flag for debug info and `/DEBUG` linker flag
+- **GCC/Clang**: Uses `-g` flag for debug symbols
+
+These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
+
 ### Async-Signal-Safety
 
 The signal handlers (`signalHandler` and `windowsExceptionHandler`) are implemented using only **async-signal-safe** functions to prevent secondary crashes when handling the original crash. This means:
