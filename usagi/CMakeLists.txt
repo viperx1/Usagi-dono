@@ -8,14 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Enable debug symbols for crash log stack traces
 # This allows crash logs to show function names from Usagi codebase
-if(MSVC)
-    # Add /Zi for debug info in PDB and /DEBUG:FULL for complete symbol information
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG:FULL")
-else()
-    # GCC/Clang/LLVM: Add -g for debug symbols
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-endif()
+# GCC/Clang/LLVM: Add -g for debug symbols
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 # Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
 # that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT
