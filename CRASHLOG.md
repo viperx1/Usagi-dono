@@ -63,11 +63,13 @@ To ensure that crash logs show function names from the Usagi codebase (not just 
 
 - **MSVC**: Uses `/Zi` flag for debug info in PDB and `/DEBUG:FULL` linker flag for complete symbol information
 - **GCC/Clang/LLVM on Unix/Linux**: Uses `-g` flag for debug symbols
-- **Clang/LLVM on Windows**: Uses `-g -gcodeview` flags to generate CodeView debug format (required for Windows DbgHelp API)
+- **Clang/LLVM on Windows**: Uses `-g -gcodeview` compile flags and `-Wl,--pdb=` linker flag to generate CodeView debug format and PDB file (required for Windows DbgHelp API)
 
 These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
 
-**Important**: LLVM/Clang on Windows requires the `-gcodeview` flag in addition to `-g`. Without this flag, Clang generates DWARF debug format by default, which Windows DbgHelp API cannot read properly, resulting in crash logs with only memory addresses instead of function names.
+**Important**: LLVM/Clang on Windows requires both:
+1. The `-gcodeview` compile flag in addition to `-g`. Without this, Clang generates DWARF debug format by default, which Windows DbgHelp API cannot read.
+2. The `-Wl,--pdb=` linker flag to generate a PDB file. Without this, the CodeView debug information exists but isn't accessible to the DbgHelp API at runtime, resulting in crash logs with only memory addresses instead of function names for Usagi code (though Qt and system library functions may still be resolved).
 
 On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, `SYMOPT_LOAD_LINES`, `SYMOPT_FAIL_CRITICAL_ERRORS`, `SYMOPT_NO_PROMPTS`, `SYMOPT_INCLUDE_32BIT_MODULES`, and `SYMOPT_AUTO_PUBLICS` flags before initializing the symbol handler. These additional flags:
 - Prevent error dialogs during crash handling
@@ -269,16 +271,21 @@ If crash logs show only memory addresses without function names from the Usagi c
 - **Build Configuration**: Use appropriate flags as configured in CMakeLists.txt
   - MSVC: `/Zi` (debug info) and `/DEBUG:FULL` (complete symbols)
   - GCC: `-g` (debug symbols, generates DWARF format)
-  - Clang/LLVM on Windows: `-g -gcodeview` (generates CodeView format for Windows DbgHelp)
+  - Clang/LLVM on Windows: `-g -gcodeview` (compile) and `-Wl,--pdb=` (link) to generate CodeView format PDB file
 
 ### Clang/LLVM Builds on Windows
-- **Problem**: Debug symbols were not accessible, or wrong debug format was generated
-- **Root Cause**: Clang on Windows with MinGW target generates DWARF debug format by default, but Windows DbgHelp API requires CodeView format to resolve symbols
+- **Problem**: Debug symbols were not accessible, or wrong debug format was generated. Specifically, crash logs show only memory addresses for Usagi application functions (e.g., `0x00007ff64c61fa64`), while Qt and system library functions are resolved correctly.
+- **Root Causes**: 
+  1. Clang on Windows with MinGW target generates DWARF debug format by default, but Windows DbgHelp API requires CodeView format to resolve symbols
+  2. Even with `-gcodeview`, the MinGW linker doesn't create a PDB file by default, leaving the debug information in a format that DbgHelp cannot access at runtime
 - **Solution**: 
-  - Ensure both `-g` and `-gcodeview` flags are used during compilation (already configured in CMakeLists.txt as of this fix)
+  - Ensure both `-g` and `-gcodeview` compile flags are used (already configured in CMakeLists.txt)
+  - **Also ensure** `-Wl,--pdb=` linker flag is used to generate a PDB file (added in this fix)
   - The `-gcodeview` flag instructs Clang to generate CodeView debug information instead of DWARF
+  - The `-Wl,--pdb=` flag tells the linker to create a PDB file that DbgHelp can access at runtime
   - Do not use strip tools on the executable after building
-  - **Check usagi.log** to verify symbols are detected
+  - **Check usagi.log** to verify symbols are detected and PDB is loaded
+  - After building with the fix, you should see `usagi.pdb` alongside `usagi.exe`
 - **Additional Issue**: Function names may appear **mangled** (e.g., `_ZN10QTableView11qt_metacallE...`) instead of readable names like `QTableView::qt_metacall()`. This is because Clang uses Itanium C++ ABI name mangling, which Windows DbgHelp.dll does not automatically demangle (it only demangles MSVC-style decorations).
   - **Optional**: Use the `c++filt` utility to demangle names: `c++filt _ZN10QTableView11qt_metacallE...` will output `QTableView::qt_metacall(...)`
 
