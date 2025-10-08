@@ -9,7 +9,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Enable debug symbols for crash log stack traces
 # This allows crash logs to show function names from Usagi codebase
 # GCC/Clang/LLVM: Add -g for debug symbols
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+# LLVM/Clang on Windows: Also add -gcodeview to generate CodeView format for DbgHelp API
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # LLVM/Clang on Windows with MinGW target generates DWARF by default,
+    # but Windows DbgHelp API requires CodeView format to resolve symbols
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gcodeview")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+endif()
 
 # Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
 # that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT

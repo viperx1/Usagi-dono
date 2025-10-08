@@ -62,9 +62,12 @@ The handler is installed at application startup before the main window is shown,
 To ensure that crash logs show function names from the Usagi codebase (not just Qt library functions), debug symbols must be enabled during compilation. The CMakeLists.txt files are configured to automatically include debug symbols:
 
 - **MSVC**: Uses `/Zi` flag for debug info in PDB and `/DEBUG:FULL` linker flag for complete symbol information
-- **GCC/Clang/LLVM**: Uses `-g` flag for debug symbols
+- **GCC/Clang/LLVM on Unix/Linux**: Uses `-g` flag for debug symbols
+- **Clang/LLVM on Windows**: Uses `-g -gcodeview` flags to generate CodeView debug format (required for Windows DbgHelp API)
 
 These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
+
+**Important**: LLVM/Clang on Windows requires the `-gcodeview` flag in addition to `-g`. Without this flag, Clang generates DWARF debug format by default, which Windows DbgHelp API cannot read properly, resulting in crash logs with only memory addresses instead of function names.
 
 On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, `SYMOPT_LOAD_LINES`, `SYMOPT_FAIL_CRITICAL_ERRORS`, `SYMOPT_NO_PROMPTS`, `SYMOPT_INCLUDE_32BIT_MODULES`, and `SYMOPT_AUTO_PUBLICS` flags before initializing the symbol handler. These additional flags:
 - Prevent error dialogs during crash handling
@@ -265,17 +268,29 @@ If crash logs show only memory addresses without function names from the Usagi c
   - **Check usagi.log** for symbol type and loaded PDB information
 - **Build Configuration**: Use appropriate flags as configured in CMakeLists.txt
   - MSVC: `/Zi` (debug info) and `/DEBUG:FULL` (complete symbols)
-  - GCC/Clang/LLVM: `-g` (debug symbols)
+  - GCC: `-g` (debug symbols, generates DWARF format)
+  - Clang/LLVM on Windows: `-g -gcodeview` (generates CodeView format for Windows DbgHelp)
 
-### GCC/Clang/LLVM Builds on Windows
+### Clang/LLVM Builds on Windows
+- **Problem**: Debug symbols were not accessible, or wrong debug format was generated
+- **Root Cause**: Clang on Windows with MinGW target generates DWARF debug format by default, but Windows DbgHelp API requires CodeView format to resolve symbols
+- **Solution**: 
+  - Ensure both `-g` and `-gcodeview` flags are used during compilation (already configured in CMakeLists.txt as of this fix)
+  - The `-gcodeview` flag instructs Clang to generate CodeView debug information instead of DWARF
+  - Do not use strip tools on the executable after building
+  - **Check usagi.log** to verify symbols are detected
+- **Additional Issue**: Function names may appear **mangled** (e.g., `_ZN10QTableView11qt_metacallE...`) instead of readable names like `QTableView::qt_metacall()`. This is because Clang uses Itanium C++ ABI name mangling, which Windows DbgHelp.dll does not automatically demangle (it only demangles MSVC-style decorations).
+  - **Optional**: Use the `c++filt` utility to demangle names: `c++filt _ZN10QTableView11qt_metacallE...` will output `QTableView::qt_metacall(...)`
+
+### GCC Builds on Windows
 - **Problem**: Debug symbols were stripped from the executable, or embedded symbols are not being read correctly by DbgHelp
-- **Additional Issue**: Function names may appear **mangled** (e.g., `_ZN10QTableView11qt_metacallE...`) instead of readable names like `QTableView::qt_metacall()`. This is because GCC/Clang use Itanium C++ ABI name mangling, which Windows DbgHelp.dll does not automatically demangle (it only demangles MSVC-style decorations).
+- **Note**: GCC on Windows generates DWARF debug format which may have limited support in Windows DbgHelp API
 - **Solution**: 
   - Ensure `-g` flag is used during compilation (already configured in CMakeLists.txt)
   - Do not use strip tools on the executable after building
   - **Check usagi.log** to verify symbols are detected
+- **Additional Issue**: Function names may appear **mangled** (e.g., `_ZN10QTableView11qt_metacallE...`) instead of readable names like `QTableView::qt_metacall()`. This is because GCC uses Itanium C++ ABI name mangling, which Windows DbgHelp.dll does not automatically demangle (it only demangles MSVC-style decorations).
   - **Optional**: Use the `c++filt` utility to demangle names: `c++filt _ZN10QTableView11qt_metacallE...` will output `QTableView::qt_metacall(...)`
-- **Note**: GCC/Clang use DWARF or CodeView debug format embedded in the executable. Symbol resolution depends on DbgHelp.dll support for these formats and may show mangled C++ names.
 
 ### Demangling C++ Names from GCC/Clang/LLVM Crash Logs
 If your crash log shows mangled names like `_ZN10QTableView11qt_metacallEN11QMetaObject4CallEiPPv`, you can demangle them manually:
