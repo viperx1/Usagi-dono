@@ -14,9 +14,6 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # LLVM/Clang on Windows with MinGW target generates DWARF by default,
     # but Windows DbgHelp API requires CodeView format to resolve symbols
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gcodeview")
-    # Add linker flag to generate PDB file that DbgHelp can access at runtime
-    # Without this, the CodeView debug info exists but isn't accessible to DbgHelp
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--pdb=")
 else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
@@ -44,6 +41,11 @@ set(HASH_TEST_HEADERS
 
 add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
 
+# On Windows with Clang, add linker options to generate PDB file
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_link_options(test_hash PRIVATE -fuse-ld=lld -Wl,--pdb=)
+endif()
+
 target_link_libraries(test_hash PRIVATE
     Qt6::Core
     Qt6::Test
@@ -66,6 +68,11 @@ set(CRASHLOG_TEST_HEADERS
 )
 
 add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
+
+# On Windows with Clang, add linker options to generate PDB file
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_link_options(test_crashlog PRIVATE -fuse-ld=lld -Wl,--pdb=)
+endif()
 
 target_link_libraries(test_crashlog PRIVATE
     Qt6::Core
