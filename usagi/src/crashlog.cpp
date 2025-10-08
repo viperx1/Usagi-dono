@@ -887,11 +887,15 @@ QString CrashLog::getStackTrace()
     // This ensures PDB files are found in executable directory and current directory
     // TRUE parameter: automatically enumerate and load symbols for all loaded modules
     // This allows resolving symbols from Qt libraries and other DLLs in the stack trace
-    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
     
     WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
     
     trace += "\nStack Trace:\n";
+    
+    // Track symbol resolution for diagnostics
+    int resolvedSymbols = 0;
+    
     for (WORD i = 0; i < frames; i++)
     {
         DWORD64 address = (DWORD64)(stack[i]);
@@ -908,6 +912,7 @@ QString CrashLog::getStackTrace()
                 .arg(i)
                 .arg(QString::fromLatin1(symbol->Name))
                 .arg(displacement, 0, 16);
+            resolvedSymbols++;
         }
         else
         {
@@ -915,6 +920,28 @@ QString CrashLog::getStackTrace()
                 .arg(i)
                 .arg(address, 0, 16);
         }
+    }
+    
+    // Add symbol resolution diagnostics
+    trace += QString("\nSymbol resolution: %1 of %2 frames resolved\n")
+        .arg(resolvedSymbols).arg(frames);
+    
+    if (searchPath[0] != '\0')
+    {
+        trace += QString("Symbol search path: %1\n").arg(QString::fromLatin1(searchPath));
+    }
+    
+    if (resolvedSymbols == 0 && frames > 0)
+    {
+        trace += "\nNote: No symbols resolved. This usually means:\n";
+        trace += "  - PDB file is missing (MSVC builds)\n";
+        trace += "  - Debug symbols were stripped (MinGW/GCC builds)\n";
+        trace += "  - Executable was built without debug information\n";
+        trace += "For MSVC builds: Ensure usagi.pdb is in the same directory as usagi.exe\n";
+    }
+    else if (resolvedSymbols > 0 && resolvedSymbols < frames / 2)
+    {
+        trace += "\nNote: Few symbols resolved. Check if PDB file exists alongside executable.\n";
     }
     
     SymCleanup(process);
