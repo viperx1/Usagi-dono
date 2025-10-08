@@ -41,29 +41,33 @@ jobs:
           # The Qt installation includes Clang/LLVM which supports PDB generation
           # QT_ROOT_DIR is set by install-qt-action to the Qt installation directory
           
-          # Convert Windows path to Unix-style path for bash
-          QT_BIN_DIR=$(cygpath -u "${QT_ROOT_DIR}/bin")
+          # Convert backslashes to forward slashes for consistent path handling
+          QT_ROOT_UNIX=$(echo "${QT_ROOT_DIR}" | sed 's|\\|/|g')
           
-          if [ -d "${QT_BIN_DIR}" ] && [ -f "${QT_BIN_DIR}/clang++.exe" ]; then
-            export PATH="${QT_BIN_DIR}:$PATH"
-            export CC="${QT_BIN_DIR}/clang.exe"
-            export CXX="${QT_BIN_DIR}/clang++.exe"
+          if [ -d "${QT_ROOT_UNIX}/bin" ] && [ -f "${QT_ROOT_UNIX}/bin/clang++.exe" ]; then
+            export PATH="${QT_ROOT_UNIX}/bin:$PATH"
+            export CC="${QT_ROOT_UNIX}/bin/clang.exe"
+            export CXX="${QT_ROOT_UNIX}/bin/clang++.exe"
             echo "Using Clang from Qt: ${CXX}"
-            
-            # Convert paths back to Windows format for CMake
-            CMAKE_C_COMPILER=$(cygpath -w "${CC}")
-            CMAKE_CXX_COMPILER=$(cygpath -w "${CXX}")
+            echo "Compiler check:"
+            "${CXX}" --version || echo "Failed to run clang++ --version"
             
             cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_C_COMPILER="${CMAKE_C_COMPILER}" \
-              -DCMAKE_CXX_COMPILER="${CMAKE_CXX_COMPILER}" 2>&1 | tee build_log.txt
+              -DCMAKE_C_COMPILER="${CC}" \
+              -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
           else
-            echo "Warning: Qt LLVM MinGW bin directory not found or clang++.exe not present"
+            echo "Error: Qt LLVM MinGW bin directory not found or clang++.exe not present"
             echo "QT_ROOT_DIR=${QT_ROOT_DIR}"
-            echo "Contents of Qt directory:"
-            ls -la "${QT_ROOT_DIR}" || true
-            [ -d "${QT_ROOT_DIR}/bin" ] && ls -la "${QT_ROOT_DIR}/bin" || echo "bin directory not found"
-            echo "Using default compiler"
+            echo "QT_ROOT_UNIX=${QT_ROOT_UNIX}"
+            echo "Contents of Qt root directory:"
+            ls -la "${QT_ROOT_UNIX}" 2>&1 || true
+            if [ -d "${QT_ROOT_UNIX}/bin" ]; then
+              echo "Contents of bin directory:"
+              ls -la "${QT_ROOT_UNIX}/bin" 2>&1 || true
+            else
+              echo "bin directory does not exist"
+            fi
+            echo "Build will likely fail without proper compiler"
             cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee build_log.txt
           fi
           
