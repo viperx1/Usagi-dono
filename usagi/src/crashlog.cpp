@@ -72,7 +72,7 @@ static void pointerToHex(void* ptr, char* buffer, size_t bufSize)
 }
 
 // Safe function to format timestamp using async-signal-safe operations
-// Format: YYYY-MM-DD HH:MM:SS
+// Format: YYYY-MM-DD HH:MM:SS (in local time)
 static void formatTimestamp(char* buffer, size_t bufSize)
 {
     if (!buffer || bufSize < 20) return; // Need "YYYY-MM-DD HH:MM:SS\0"
@@ -81,13 +81,14 @@ static void formatTimestamp(char* buffer, size_t bufSize)
     struct tm* tm_info;
     
 #ifdef Q_OS_WIN
-    // On Windows, gmtime is not thread-safe but there's no async-signal-safe alternative
+    // On Windows, localtime is not thread-safe but there's no async-signal-safe alternative
     // We use it anyway as it's the best option available
-    tm_info = gmtime(&now);
+    // Using localtime to show local time instead of UTC
+    tm_info = localtime(&now);
 #else
-    // On Unix/Linux, gmtime_r is async-signal-safe
+    // On Unix/Linux, localtime_r is async-signal-safe
     struct tm tm_storage;
-    tm_info = gmtime_r(&now, &tm_storage);
+    tm_info = localtime_r(&now, &tm_storage);
 #endif
     
     if (!tm_info) {
@@ -161,8 +162,11 @@ static void writeSafeStackTrace(int fd)
     // SYMOPT_LOAD_LINES: Load line number information
     // SYMOPT_FAIL_CRITICAL_ERRORS: Don't display system error message boxes
     // SYMOPT_NO_PROMPTS: Don't prompt for symbol search paths
+    // SYMOPT_INCLUDE_32BIT_MODULES: Include 32-bit modules in 64-bit process enumeration
+    // SYMOPT_AUTO_PUBLICS: Automatically search public symbols if private symbols not found
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | 
-                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
+                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS |
+                  SYMOPT_INCLUDE_32BIT_MODULES | SYMOPT_AUTO_PUBLICS);
     
     // Build comprehensive symbol search path
     // Include: executable directory, current directory
@@ -744,8 +748,11 @@ QString CrashLog::getStackTrace()
     // SYMOPT_LOAD_LINES: Load line number information
     // SYMOPT_FAIL_CRITICAL_ERRORS: Don't display system error message boxes
     // SYMOPT_NO_PROMPTS: Don't prompt for symbol search paths
+    // SYMOPT_INCLUDE_32BIT_MODULES: Include 32-bit modules in 64-bit process enumeration
+    // SYMOPT_AUTO_PUBLICS: Automatically search public symbols if private symbols not found
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | 
-                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
+                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS |
+                  SYMOPT_INCLUDE_32BIT_MODULES | SYMOPT_AUTO_PUBLICS);
     
     // Build comprehensive symbol search path
     // Include: executable directory, current directory
