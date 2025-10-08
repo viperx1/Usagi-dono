@@ -709,6 +709,9 @@ void CrashLog::install()
 #endif
 
     logMessage("Crash log handler installed successfully");
+    
+    // Log debug information about symbol resolution setup for troubleshooting
+    logSymbolResolutionInfo();
 }
 
 QString CrashLog::getLogFilePath()
@@ -1035,3 +1038,301 @@ void CrashLog::generateCrashLog(const QString &reason)
         fprintf(stderr, "======================\n\n");
     }
 }
+
+void CrashLog::logSymbolResolutionInfo()
+{
+    QString info;
+    info += "=== Symbol Resolution Debug Information ===\n";
+    
+#ifdef Q_OS_WIN
+    // Get executable path and directory
+    char exePath[MAX_PATH];
+    char exeDir[MAX_PATH];
+    char currentDir[MAX_PATH];
+    
+    DWORD pathLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    if (pathLen > 0 && pathLen < MAX_PATH)
+    {
+        info += QString("Executable path: %1\n").arg(QString::fromLatin1(exePath));
+        
+        // Extract directory path
+        char* lastSlash = NULL;
+        for (DWORD i = 0; i < pathLen; i++)
+        {
+            if (exePath[i] == '\\' || exePath[i] == '/')
+            {
+                lastSlash = &exePath[i];
+            }
+        }
+        if (lastSlash)
+        {
+            size_t dirLen = lastSlash - exePath;
+            if (dirLen < MAX_PATH)
+            {
+                memcpy(exeDir, exePath, dirLen);
+                exeDir[dirLen] = '\0';
+                info += QString("Executable directory: %1\n").arg(QString::fromLatin1(exeDir));
+            }
+        }
+    }
+    else
+    {
+        info += "Warning: Could not get executable path\n";
+    }
+    
+    // Get current working directory
+    DWORD cwdLen = GetCurrentDirectoryA(MAX_PATH, currentDir);
+    if (cwdLen > 0 && cwdLen < MAX_PATH)
+    {
+        info += QString("Current working directory: %1\n").arg(QString::fromLatin1(currentDir));
+    }
+    else
+    {
+        info += "Warning: Could not get current working directory\n";
+    }
+    
+    // Test symbol handler initialization
+    HANDLE process = GetCurrentProcess();
+    
+    // Build the same search path that will be used during crash
+    char searchPath[MAX_PATH * 4];
+    searchPath[0] = '\0';
+    
+    if (pathLen > 0 && pathLen < MAX_PATH)
+    {
+        size_t len = strlen(exePath);
+        if (len < sizeof(searchPath) - 1)
+        {
+            memcpy(searchPath, exePath, len);
+            searchPath[len] = '\0';
+        }
+        
+        // Also add directory
+        char* lastSlash = NULL;
+        for (DWORD i = 0; i < pathLen; i++)
+        {
+            if (exePath[i] == '\\' || exePath[i] == '/')
+            {
+                lastSlash = &exePath[i];
+            }
+        }
+        if (lastSlash)
+        {
+            size_t dirLen = lastSlash - exePath;
+            if (dirLen < MAX_PATH)
+            {
+                size_t currentLen = strlen(searchPath);
+                if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
+                {
+                    searchPath[currentLen] = ';';
+                    searchPath[currentLen + 1] = '\0';
+                    currentLen++;
+                }
+                size_t remainingSpace = sizeof(searchPath) - currentLen - 1;
+                if (dirLen < remainingSpace)
+                {
+                    memcpy(searchPath + currentLen, exeDir, dirLen);
+                    searchPath[currentLen + dirLen] = '\0';
+                }
+            }
+        }
+    }
+    
+    // Add current directory
+    if (cwdLen > 0 && cwdLen < MAX_PATH)
+    {
+        size_t currentLen = strlen(searchPath);
+        if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
+        {
+            searchPath[currentLen] = ';';
+            searchPath[currentLen + 1] = '\0';
+            currentLen++;
+        }
+        size_t remainingSpace = sizeof(searchPath) - currentLen - 1;
+        if (cwdLen < remainingSpace)
+        {
+            memcpy(searchPath + currentLen, currentDir, cwdLen);
+            searchPath[currentLen + cwdLen] = '\0';
+        }
+    }
+    
+    info += QString("Symbol search path: %1\n").arg(QString::fromLatin1(searchPath));
+    
+    // Configure symbol options
+    DWORD symOptions = SymGetOptions();
+    info += QString("Default symbol options: 0x%1\n").arg(symOptions, 0, 16);
+    
+    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | 
+                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS |
+                  SYMOPT_INCLUDE_32BIT_MODULES | SYMOPT_AUTO_PUBLICS);
+    
+    DWORD newSymOptions = SymGetOptions();
+    info += QString("Configured symbol options: 0x%1\n").arg(newSymOptions, 0, 16);
+    info += "Symbol option flags:\n";
+    info += QString("  SYMOPT_UNDNAME (demangle): %1\n").arg((newSymOptions & SYMOPT_UNDNAME) ? "enabled" : "disabled");
+    info += QString("  SYMOPT_DEFERRED_LOADS: %1\n").arg((newSymOptions & SYMOPT_DEFERRED_LOADS) ? "enabled" : "disabled");
+    info += QString("  SYMOPT_LOAD_LINES: %1\n").arg((newSymOptions & SYMOPT_LOAD_LINES) ? "enabled" : "disabled");
+    info += QString("  SYMOPT_FAIL_CRITICAL_ERRORS: %1\n").arg((newSymOptions & SYMOPT_FAIL_CRITICAL_ERRORS) ? "enabled" : "disabled");
+    info += QString("  SYMOPT_NO_PROMPTS: %1\n").arg((newSymOptions & SYMOPT_NO_PROMPTS) ? "enabled" : "disabled");
+    info += QString("  SYMOPT_INCLUDE_32BIT_MODULES: %1\n").arg((newSymOptions & SYMOPT_INCLUDE_32BIT_MODULES) ? "enabled" : "disabled");
+    info += QString("  SYMOPT_AUTO_PUBLICS: %1\n").arg((newSymOptions & SYMOPT_AUTO_PUBLICS) ? "enabled" : "disabled");
+    
+    // Try to initialize symbol handler
+    BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    
+    if (symInitResult)
+    {
+        info += "Symbol handler initialization: SUCCESS\n";
+        
+        // Get information about loaded modules
+        info += "Loaded modules with symbols:\n";
+        
+        // Enumerate loaded modules - we'll use a simple approach to log the main executable
+        DWORD64 baseAddress = SymGetModuleBase64(process, (DWORD64)&CrashLog::install);
+        if (baseAddress != 0)
+        {
+            IMAGEHLP_MODULE64 moduleInfo;
+            memset(&moduleInfo, 0, sizeof(moduleInfo));
+            moduleInfo.SizeOfStruct = sizeof(IMAGEHLP_MODULE64);
+            
+            if (SymGetModuleInfo64(process, baseAddress, &moduleInfo))
+            {
+                info += QString("  Main executable: %1\n").arg(QString::fromLatin1(moduleInfo.ImageName));
+                info += QString("    Base address: 0x%1\n").arg(baseAddress, 0, 16);
+                info += QString("    Symbol type: %1\n").arg(moduleInfo.SymType);
+                info += QString("    Symbol type name: ");
+                
+                switch(moduleInfo.SymType)
+                {
+                    case SymNone:
+                        info += "SymNone (No symbols available)\n";
+                        break;
+                    case SymCoff:
+                        info += "SymCoff (COFF symbols)\n";
+                        break;
+                    case SymCv:
+                        info += "SymCv (CodeView symbols)\n";
+                        break;
+                    case SymPdb:
+                        info += "SymPdb (PDB symbols)\n";
+                        break;
+                    case SymExport:
+                        info += "SymExport (Export table only)\n";
+                        break;
+                    case SymDeferred:
+                        info += "SymDeferred (Symbols not loaded yet)\n";
+                        break;
+                    case SymSym:
+                        info += "SymSym (SYM file)\n";
+                        break;
+                    case SymDia:
+                        info += "SymDia (DIA symbols)\n";
+                        break;
+                    case SymVirtual:
+                        info += "SymVirtual (Virtual module)\n";
+                        break;
+                    default:
+                        info += QString("Unknown (%1)\n").arg(moduleInfo.SymType);
+                        break;
+                }
+                
+                info += QString("    Loaded image name: %1\n").arg(QString::fromLatin1(moduleInfo.LoadedImageName));
+                info += QString("    Loaded PDB name: %1\n").arg(QString::fromLatin1(moduleInfo.LoadedPdbName));
+                
+                if (moduleInfo.SymType == SymNone || moduleInfo.SymType == SymExport)
+                {
+                    info += "    WARNING: No debug symbols loaded for main executable!\n";
+                    info += "    This means crash logs will only show memory addresses, not function names.\n";
+                    info += "    For MSVC builds: Ensure the PDB file exists alongside the executable.\n";
+                    info += "    For GCC/Clang/LLVM builds: Ensure the executable was built with -g flag.\n";
+                }
+                else if (moduleInfo.SymType == SymDeferred)
+                {
+                    info += "    Note: Symbols are marked as deferred. They will be loaded on first use.\n";
+                }
+                else
+                {
+                    info += "    Symbols appear to be loaded successfully.\n";
+                }
+                
+                // Try to resolve a symbol from our own code
+                DWORD64 testAddress = (DWORD64)&CrashLog::install;
+                char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+                PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
+                symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+                symbol->MaxNameLen = MAX_SYM_NAME;
+                
+                DWORD64 displacement = 0;
+                if (SymFromAddr(process, testAddress, &displacement, symbol))
+                {
+                    info += QString("  Test symbol resolution for CrashLog::install: SUCCESS\n");
+                    info += QString("    Resolved name: %1\n").arg(QString::fromLatin1(symbol->Name));
+                    info += QString("    Address: 0x%1\n").arg(testAddress, 0, 16);
+                    info += QString("    Displacement: +0x%1\n").arg(displacement, 0, 16);
+                }
+                else
+                {
+                    DWORD error = GetLastError();
+                    info += QString("  Test symbol resolution for CrashLog::install: FAILED\n");
+                    info += QString("    Error code: %1\n").arg(error);
+                    info += "    This indicates debug symbols are not accessible.\n";
+                }
+            }
+            else
+            {
+                info += "  Could not get module info for main executable\n";
+            }
+        }
+        else
+        {
+            info += "  Could not get base address for main executable\n";
+        }
+        
+        SymCleanup(process);
+    }
+    else
+    {
+        DWORD error = GetLastError();
+        info += QString("Symbol handler initialization: FAILED (error code: %1)\n").arg(error);
+        info += "This may prevent crash logs from showing function names.\n";
+    }
+    
+#else
+    // Unix-like systems
+    info += "Platform: Unix/Linux (using backtrace)\n";
+    info += "Symbol resolution on Unix-like systems uses backtrace_symbols().\n";
+    info += "Function names depend on:\n";
+    info += "  - Debug symbols embedded in executable (compile with -g)\n";
+    info += "  - Dynamic symbol table (not stripped)\n";
+    info += "  - External tools like addr2line for detailed resolution\n";
+    
+    // Get executable path
+    char exePath[1024];
+    ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+    if (len != -1)
+    {
+        exePath[len] = '\0';
+        info += QString("Executable path: %1\n").arg(QString::fromLatin1(exePath));
+    }
+    else
+    {
+        info += "Warning: Could not get executable path\n";
+    }
+    
+    // Get current working directory
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != NULL)
+    {
+        info += QString("Current working directory: %1\n").arg(QString::fromLatin1(cwd));
+    }
+    else
+    {
+        info += "Warning: Could not get current working directory\n";
+    }
+#endif
+    
+    info += "=== End of Symbol Resolution Debug Information ===\n";
+    
+    logMessage(info);
+}
+

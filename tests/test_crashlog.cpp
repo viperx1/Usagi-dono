@@ -18,6 +18,7 @@ private slots:
     void testCompleteProcessWithDataTypeConversions();
     void testNoExtraNullBytes();
     void testStackTraceHasFunctionNames();
+    void testSymbolResolutionLogging();
     
 private:
     QTemporaryDir* tempDir;
@@ -562,6 +563,91 @@ void TestCrashLog::testStackTraceHasFunctionNames()
         qWarning() << "This may indicate missing debug symbols or symbol resolution issues.";
         qWarning() << "However, this is not a hard failure as external libraries may lack symbols.";
     }
+}
+
+void TestCrashLog::testSymbolResolutionLogging()
+{
+    // This test verifies that CrashLog::install() logs detailed symbol resolution information
+    // to usagi.log for troubleshooting purposes
+    
+    // Get the log file path
+    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString logPath = logDir + "/usagi.log";
+    
+    // Remove existing log file to start fresh
+    QFile::remove(logPath);
+    
+    // Call install() which should log symbol resolution info
+    CrashLog::install();
+    
+    // Give it a moment to write
+    QThread::msleep(100);
+    
+    // Verify the log file exists
+    QFile logFile(logPath);
+    QVERIFY2(logFile.exists(), "usagi.log should exist after CrashLog::install()");
+    
+    // Read the log file
+    QVERIFY2(logFile.open(QIODevice::ReadOnly), "Should be able to open usagi.log");
+    QByteArray logBytes = logFile.readAll();
+    logFile.close();
+    
+    QString logContent = QString::fromUtf8(logBytes);
+    
+    // Verify basic installation message
+    QVERIFY2(logContent.contains("Crash log handler installed successfully"),
+             "Log should contain installation success message");
+    
+    // Verify symbol resolution debug information is present
+    QVERIFY2(logContent.contains("Symbol Resolution Debug Information"),
+             "Log should contain symbol resolution debug section");
+    
+#ifdef Q_OS_WIN
+    // Windows-specific checks
+    QVERIFY2(logContent.contains("Executable path:"),
+             "Log should contain executable path on Windows");
+    QVERIFY2(logContent.contains("Symbol search path:"),
+             "Log should contain symbol search path on Windows");
+    QVERIFY2(logContent.contains("Symbol handler initialization:"),
+             "Log should contain symbol handler initialization result");
+    QVERIFY2(logContent.contains("Symbol option flags:"),
+             "Log should contain symbol option flags configuration");
+    
+    // Check for specific symbol options
+    QVERIFY2(logContent.contains("SYMOPT_UNDNAME"),
+             "Log should mention SYMOPT_UNDNAME flag");
+    QVERIFY2(logContent.contains("SYMOPT_AUTO_PUBLICS"),
+             "Log should mention SYMOPT_AUTO_PUBLICS flag");
+    
+    // Check for module information
+    QVERIFY2(logContent.contains("Main executable:") || logContent.contains("Loaded modules"),
+             "Log should contain information about loaded modules");
+    
+    // The log should help diagnose symbol issues
+    // It should mention either success or give hints about problems
+    bool hasSuccessIndicator = logContent.contains("SUCCESS") || 
+                               logContent.contains("loaded successfully") ||
+                               logContent.contains("Resolved name:");
+    bool hasWarningIndicator = logContent.contains("WARNING") || 
+                              logContent.contains("FAILED") ||
+                              logContent.contains("No debug symbols");
+    
+    QVERIFY2(hasSuccessIndicator || hasWarningIndicator,
+             "Log should indicate either success or provide diagnostic warnings");
+#else
+    // Unix-like systems
+    QVERIFY2(logContent.contains("Platform: Unix/Linux") || logContent.contains("using backtrace"),
+             "Log should indicate Unix/Linux platform on non-Windows systems");
+    QVERIFY2(logContent.contains("Executable path:"),
+             "Log should contain executable path on Unix-like systems");
+    QVERIFY2(logContent.contains("Debug symbols embedded"),
+             "Log should mention debug symbols requirement");
+#endif
+    
+    // Print the log content for manual inspection during test runs
+    qDebug() << "=== Contents of usagi.log ===";
+    qDebug().noquote() << logContent;
+    qDebug() << "=== End of usagi.log ===";
 }
 
 QTEST_MAIN(TestCrashLog)
