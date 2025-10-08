@@ -14,11 +14,11 @@ public:
     static void install();
     static void logMessage(const QString &message);
     static void generateCrashLog(const QString &reason);
+    static QString getStackTrace();
     
 private:
     static QString getLogFilePath();
     static QString getSystemInfo();
-    static QString getStackTrace();
 };
 
 #endif // CRASHLOG_H

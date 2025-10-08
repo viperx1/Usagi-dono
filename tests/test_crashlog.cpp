@@ -17,6 +17,7 @@ private slots:
     void testCrashLogUtf8Encoding();
     void testCompleteProcessWithDataTypeConversions();
     void testNoExtraNullBytes();
+    void testStackTraceHasFunctionNames();
     
 private:
     QTemporaryDir* tempDir;
@@ -449,6 +450,118 @@ void TestCrashLog::testNoExtraNullBytes()
     
     // Clean up
     logFile.remove();
+}
+
+void TestCrashLog::testStackTraceHasFunctionNames()
+{
+    // This test verifies that stack traces contain function names where possible.
+    // The issue reported that some stack frames showed only addresses without function names.
+    // While we cannot guarantee ALL frames will have names (system libraries may lack debug symbols),
+    // we can verify that at least some frames have resolved function names.
+    
+    // Get a stack trace using the public API
+    QString stackTrace = CrashLog::getStackTrace();
+    
+    // Verify the stack trace is not empty
+    QVERIFY2(!stackTrace.isEmpty(), "Stack trace should not be empty");
+    
+    // Verify it contains the "Stack Trace:" header
+    QVERIFY2(stackTrace.contains("Stack Trace:"), 
+             "Stack trace should contain the header");
+    
+    // Split the stack trace into lines
+    QStringList lines = stackTrace.split('\n', Qt::SkipEmptyParts);
+    
+    // We should have at least a few stack frames
+    QVERIFY2(lines.size() > 2, 
+             QString("Stack trace should have multiple lines, found: %1").arg(lines.size()).toUtf8());
+    
+    // Count frames with function names vs just addresses
+    int framesWithNames = 0;
+    int totalFrames = 0;
+    
+    for (const QString& line : lines) {
+        // Skip the header line
+        if (line.contains("Stack Trace:")) {
+            continue;
+        }
+        
+        // Look for frame markers like "  [0]", "  [1]", etc.
+        if (line.trimmed().startsWith('[') && line.contains(']')) {
+            totalFrames++;
+            
+            // Check if this frame has a function name
+            // A frame with a function name will have text between "] " and either " + 0x" or end of line
+            // Examples:
+            //   Windows: "  [0] MainWindow::onButtonClick + 0x1a"
+            //   Unix: "  [0] ./test_crashlog(+0x1234) [0x...]"
+            //   Address only: "  [0] 0x00007ff7baa8fa64"
+            
+            // After the frame number "] ", check what follows
+            int closeBracket = line.indexOf(']');
+            if (closeBracket >= 0 && closeBracket + 2 < line.length()) {
+                QString afterBracket = line.mid(closeBracket + 2).trimmed();
+                
+                // If it starts with "0x" and contains only hex digits, it's address-only
+                bool isAddressOnly = false;
+                if (afterBracket.startsWith("0x")) {
+                    // Check if the rest (after "0x") is just hex digits
+                    QString hexPart = afterBracket.mid(2);
+                    // Remove any trailing whitespace or newlines
+                    hexPart = hexPart.trimmed();
+                    
+                    // Check if all characters are hex digits
+                    bool allHex = true;
+                    for (const QChar& c : hexPart) {
+                        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                            allHex = false;
+                            break;
+                        }
+                    }
+                    isAddressOnly = allHex && !hexPart.isEmpty();
+                }
+                
+                // If it's not address-only, it should have a function name
+                if (!isAddressOnly) {
+                    framesWithNames++;
+                }
+            }
+        }
+    }
+    
+    // Verify we found some frames
+    QVERIFY2(totalFrames > 0, 
+             QString("Should have found at least one stack frame, found: %1").arg(totalFrames).toUtf8());
+    
+    // The critical check: at least SOME frames should have function names
+    // We can't require 100% because:
+    // - System libraries may not have debug symbols
+    // - Third-party DLLs may not have debug symbols  
+    // - Some addresses may be in unmapped regions
+    // But we should have at least one frame with a name (typically from our own code or Qt)
+    QVERIFY2(framesWithNames > 0,
+             QString("At least one stack frame should have a resolved function name. "
+                     "Found %1 frames total, %2 with names.")
+                 .arg(totalFrames).arg(framesWithNames).toUtf8());
+    
+    // Print summary for debugging
+    qDebug() << "Stack trace analysis:";
+    qDebug() << "  Total frames:" << totalFrames;
+    qDebug() << "  Frames with names:" << framesWithNames;
+    qDebug() << "  Frames with addresses only:" << (totalFrames - framesWithNames);
+    
+    // Additional check: verify the percentage is reasonable
+    // If less than 20% have names, something might be wrong with symbol resolution
+    double percentWithNames = totalFrames > 0 ? (double)framesWithNames / totalFrames * 100.0 : 0.0;
+    qDebug() << "  Percentage with names:" << QString::number(percentWithNames, 'f', 1) << "%";
+    
+    // We expect at least 20% to have names in a properly configured environment
+    // This is a soft check that helps catch configuration issues
+    if (percentWithNames < 20.0 && totalFrames > 5) {
+        qWarning() << "Warning: Less than 20% of stack frames have function names.";
+        qWarning() << "This may indicate missing debug symbols or symbol resolution issues.";
+        qWarning() << "However, this is not a hard failure as external libraries may lack symbols.";
+    }
 }
 
 QTEST_MAIN(TestCrashLog)
