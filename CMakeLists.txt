@@ -7,24 +7,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Enable debug symbols for crash log stack traces
 # This allows crash logs to show function names from Usagi codebase
-if(MSVC)
-    # MSVC: Add /Zi for debug info in PDB and /DEBUG:FULL for complete symbol information
-    # /Zi: Generate complete debug information in PDB file
-    # /DEBUG:FULL: Include all symbolic debug information in the PDB (not just public symbols)
-    # This ensures crash logs show function names from Usagi codebase, not just Qt libraries
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG:FULL")
-else()
-    # GCC/Clang: Add -g for debug symbols and -gdwarf-4 for compatibility with Windows dbghelp
-    # -gdwarf-4: Use DWARF version 4 (more compatible with Windows debugging tools)
-    # -g: Include debug information
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gdwarf-4")
-    
-    # On Windows with MinGW, also ensure debug info is not stripped
-    if(WIN32)
-        # Don't strip symbols from the executable
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
-    endif()
+# GCC/Clang: Add -g for debug symbols and -gdwarf-4 for compatibility with Windows dbghelp
+# -gdwarf-4: Use DWARF version 4 (more compatible with Windows debugging tools)
+# -g: Include debug information
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gdwarf-4")
+
+# On Windows with MinGW, also ensure debug info is not stripped
+if(WIN32)
+    # Don't strip symbols from the executable
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
 endif()
 
 # Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
@@ -35,7 +26,7 @@ endif()
 add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 # When using Clang on Windows with MinGW Qt, we need to ensure proper linking
-# Clang on Windows may default to MSVC-style linking, but MinGW Qt uses GNU ABI
+# Clang on Windows may default to using lld-link, but MinGW Qt uses GNU ABI
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Use MinGW-compatible target
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")

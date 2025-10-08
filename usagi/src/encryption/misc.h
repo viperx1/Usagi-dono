@@ -10,14 +10,6 @@
 
 #if !defined(CRYPTOPP_DOXYGEN_PROCESSING)
 
-#if (CRYPTOPP_MSC_VERSION)
-# pragma warning(push)
-# pragma warning(disable: 4146 4514)
-# if (CRYPTOPP_MSC_VERSION >= 1400)
-#  pragma warning(disable: 6326)
-# endif
-#endif
-
 // Issue 340
 #if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE
 # pragma GCC diagnostic push
@@ -29,25 +21,7 @@
 #include "stdcpp.h"
 #include "smartptr.h"
 
-#ifdef _MSC_VER
-	#if _MSC_VER >= 1400
-		// VC2005 workaround: disable declarations that conflict with winnt.h
-		#define _interlockedbittestandset CRYPTOPP_DISABLED_INTRINSIC_1
-		#define _interlockedbittestandreset CRYPTOPP_DISABLED_INTRINSIC_2
-		#define _interlockedbittestandset64 CRYPTOPP_DISABLED_INTRINSIC_3
-		#define _interlockedbittestandreset64 CRYPTOPP_DISABLED_INTRINSIC_4
-		#include <intrin.h>
-		#undef _interlockedbittestandset
-		#undef _interlockedbittestandreset
-		#undef _interlockedbittestandset64
-		#undef _interlockedbittestandreset64
-		#define CRYPTOPP_FAST_ROTATE(x) 1
-	#elif _MSC_VER >= 1300
-		#define CRYPTOPP_FAST_ROTATE(x) ((x) == 32 | (x) == 64)
-	#else
-		#define CRYPTOPP_FAST_ROTATE(x) ((x) == 32)
-	#endif
-#elif (defined(__MWERKS__) && TARGET_CPU_PPC) || \
+#if (defined(__MWERKS__) && TARGET_CPU_PPC) || \
 	(defined(__GNUC__) && (defined(_ARCH_PWR2) || defined(_ARCH_PWR) || defined(_ARCH_PPC) || defined(_ARCH_PPC64) || defined(_ARCH_COM)))
 	#define CRYPTOPP_FAST_ROTATE(x) ((x) == 32)
 #elif defined(__GNUC__) && (CRYPTOPP_BOOL_X64 || CRYPTOPP_BOOL_X32 || CRYPTOPP_BOOL_X86)	// depend on GCC's peephole optimization to generate rotate instructions
@@ -173,20 +147,13 @@ struct CompileAssert
 #if CRYPTOPP_DOXYGEN_PROCESSING
 /// \brief Counts elements in an array
 /// \param arr an array of elements
-/// \details COUNTOF counts elements in an array. On Windows COUNTOF(x) is defined
-///   to <tt>_countof(x)</tt> to ensure correct results for pointers.
+/// \details COUNTOF counts elements in an array.
 /// \note COUNTOF does not produce correct results with pointers, and an array must be used.
-///   <tt>sizeof(x)/sizeof(x[0])</tt> suffers the same problem. The risk is eliminated by using
-///   <tt>_countof(x)</tt> on Windows. Windows will provide the immunity for other platforms.
+///   <tt>sizeof(x)/sizeof(x[0])</tt> suffers the same problem.
 # define COUNTOF(arr)
 #else
-// VS2005 added _countof
 #ifndef COUNTOF
-# if defined(_MSC_VER) && (_MSC_VER >= 1400)
-#  define COUNTOF(x) _countof(x)
-# else
 #  define COUNTOF(x) (sizeof(x)/sizeof(x[0]))
-# endif
 #endif // COUNTOF
 #endif // CRYPTOPP_DOXYGEN_PROCESSING
 
@@ -256,9 +223,6 @@ struct NewObject
 #else
 #if defined(CRYPTOPP_CXX11_ATOMICS)
 # define MEMORY_BARRIER() std::atomic_thread_fence(std::memory_order_acq_rel)
-#elif (_MSC_VER >= 1400)
-# pragma intrinsic(_ReadWriteBarrier)
-# define MEMORY_BARRIER() _ReadWriteBarrier()
 #elif defined(__INTEL_COMPILER)
 # define MEMORY_BARRIER() __memory_barrier()
 #elif defined(__GNUC__) || defined(__clang__)
@@ -450,17 +414,7 @@ inline void memcpy_s(void *dest, size_t sizeInBytes, const void *src, size_t cou
 	if (count > sizeInBytes)
 		throw InvalidArgument("memcpy_s: buffer overflow");
 
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(push)
-# pragma warning(disable: 4996)
-# if (CRYPTOPP_MSC_VERSION >= 1400)
-#  pragma warning(disable: 6386)
-# endif
-#endif
 	memcpy(dest, src, count);
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(pop)
-#endif
 }
 
 /// \brief Bounds checking replacement for memmove()
@@ -493,17 +447,7 @@ inline void memmove_s(void *dest, size_t sizeInBytes, const void *src, size_t co
 	if (count > sizeInBytes)
 		throw InvalidArgument("memmove_s: buffer overflow");
 
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(push)
-# pragma warning(disable: 4996)
-# if (CRYPTOPP_MSC_VERSION >= 1400)
-#  pragma warning(disable: 6386)
-# endif
-#endif
 	memmove(dest, src, count);
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(pop)
-#endif
 }
 
 #if __BORLANDC__ >= 0x620
@@ -575,11 +519,6 @@ template <class T> inline const T& STDMAX(const T& a, const T& b)
 {
 	return a < b ? b : a;
 }
-
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(push)
-# pragma warning(disable: 4389)
-#endif
 
 #if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE
 # pragma GCC diagnostic push
@@ -689,10 +628,6 @@ std::string IntToString<word64>(word64 value, unsigned int base);
 template <> CRYPTOPP_DLL
 std::string IntToString<Integer>(Integer value, unsigned int base);
 
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(pop)
-#endif
-
 #if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE
 # pragma GCC diagnostic pop
 #endif
@@ -774,18 +709,11 @@ unsigned int BitPrecision(const T &value)
 /// \note The function does not return 0 if no 1-bits are set because 0 collides with a 1-bit at the 0-th position.
 inline unsigned int TrailingZeros(word32 v)
 {
-	// GCC 4.7 and VS2012 provides tzcnt on AVX2/BMI enabled processors
-	// We don't enable for Microsoft because it requires a runtime check.
-	// http://msdn.microsoft.com/en-us/library/hh977023%28v=vs.110%29.aspx
 	CRYPTOPP_ASSERT(v != 0);
 #if defined(__BMI__)
 	return (unsigned int)_tzcnt_u32(v);
 #elif defined(__GNUC__) && (CRYPTOPP_GCC_VERSION >= 30400)
 	return (unsigned int)__builtin_ctz(v);
-#elif defined(_MSC_VER) && (_MSC_VER >= 1400)
-	unsigned long result;
-	_BitScanForward(&result, v);
-	return static_cast<unsigned int>(result);
 #else
 	// from http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightMultLookup
 	static const int MultiplyDeBruijnBitPosition[32] =
@@ -805,18 +733,11 @@ inline unsigned int TrailingZeros(word32 v)
 /// \note The function does not return 0 if no 1-bits are set because 0 collides with a 1-bit at the 0-th position.
 inline unsigned int TrailingZeros(word64 v)
 {
-	// GCC 4.7 and VS2012 provides tzcnt on AVX2/BMI enabled processors
-	// We don't enable for Microsoft because it requires a runtime check.
-	// http://msdn.microsoft.com/en-us/library/hh977023%28v=vs.110%29.aspx
 	CRYPTOPP_ASSERT(v != 0);
 #if defined(__BMI__) && defined(__x86_64__)
 	return (unsigned int)_tzcnt_u64(v);
 #elif defined(__GNUC__) && (CRYPTOPP_GCC_VERSION >= 30400)
 	return (unsigned int)__builtin_ctzll(v);
-#elif defined(_MSC_VER) && (_MSC_VER >= 1400) && (defined(_M_X64) || defined(_M_IA64))
-	unsigned long result;
-	_BitScanForward64(&result, v);
-	return static_cast<unsigned int>(result);
 #else
 	return word32(v) ? TrailingZeros(word32(v)) : 32 + TrailingZeros(word32(v>>32));
 #endif
@@ -1054,8 +975,6 @@ inline unsigned int GetAlignmentOf()
 {
 #if defined(CRYPTOPP_CXX11_ALIGNOF)
 	return alignof(T);
-#elif (_MSC_VER >= 1300)
-	return __alignof(T);
 #elif defined(__GNUC__)
 	return __alignof__(T);
 #elif defined(__SUNPRO_CC)
@@ -1234,7 +1153,7 @@ void SecureWipeBuffer(T *buf, size_t n)
 }
 
 #if !defined(CRYPTOPP_DISABLE_ASM) && \
-    (_MSC_VER >= 1400 || defined(__GNUC__)) && \
+    defined(__GNUC__) && \
     (CRYPTOPP_BOOL_X64 || CRYPTOPP_BOOL_X86)
 
 /// \brief Sets each byte of an array to 0
@@ -1245,11 +1164,7 @@ void SecureWipeBuffer(T *buf, size_t n)
 template<> inline void SecureWipeBuffer(byte *buf, size_t n)
 {
 	volatile byte *p = buf;
-#ifdef __GNUC__
 	asm volatile("rep stosb" : "+c"(n), "+D"(p) : "a"(0) : "memory");
-#else
-	__stosb(reinterpret_cast<byte *>(reinterpret_cast<size_t>(p)), 0, n);
-#endif
 }
 
 /// \brief Sets each 16-bit element of an array to 0
@@ -1260,12 +1175,10 @@ template<> inline void SecureWipeBuffer(byte *buf, size_t n)
 template<> inline void SecureWipeBuffer(word16 *buf, size_t n)
 {
 	volatile word16 *p = buf;
-#ifdef __GNUC__
 	asm volatile("rep stosw" : "+c"(n), "+D"(p) : "a"(0) : "memory");
-#else
-	__stosw(reinterpret_cast<word16 *>(reinterpret_cast<size_t>(p)), 0, n);
-#endif
 }
+
+#endif
 
 /// \brief Sets each 32-bit element of an array to 0
 /// \param buf an array of 32-bit words
@@ -1275,11 +1188,7 @@ template<> inline void SecureWipeBuffer(word16 *buf, size_t n)
 template<> inline void SecureWipeBuffer(word32 *buf, size_t n)
 {
 	volatile word32 *p = buf;
-#ifdef __GNUC__
 	asm volatile("rep stosl" : "+c"(n), "+D"(p) : "a"(0) : "memory");
-#else
-	__stosd(reinterpret_cast<unsigned long *>(reinterpret_cast<size_t>(p)), 0, n);
-#endif
 }
 
 /// \brief Sets each 64-bit element of an array to 0
@@ -1291,20 +1200,13 @@ template<> inline void SecureWipeBuffer(word64 *buf, size_t n)
 {
 #if CRYPTOPP_BOOL_X64
 	volatile word64 *p = buf;
-# ifdef __GNUC__
 	asm volatile("rep stosq" : "+c"(n), "+D"(p) : "a"(0) : "memory");
-# else
-	__stosq(const_cast<word64 *>(p), 0, n);
-# endif
 #else
 	SecureWipeBuffer(reinterpret_cast<word32 *>(buf), 2*n);
 #endif
 }
 
 #endif	// CRYPTOPP_BOOL_X64 || CRYPTOPP_BOOL_X86
-
-#if !defined(CRYPTOPP_DISABLE_ASM) && (_MSC_VER >= 1700) && defined(_M_ARM)
-template<> inline void SecureWipeBuffer(byte *buf, size_t n)
 {
 	char *p = reinterpret_cast<char*>(buf+n);
 	while (n--)
@@ -1590,101 +1492,7 @@ template <class T> inline T rotrMod(T x, unsigned int y)
 	return T((x>>(y&MASK))|(x<<(-y&MASK)));
 }
 
-#ifdef _MSC_VER
-
-/// \brief Performs a left rotate
-/// \tparam T the word type
-/// \param x the 32-bit value to rotate
-/// \param y the number of bit positions to rotate the value
-/// \details This is a Microsoft specific implementation using <tt>_lrotl</tt> provided by
-///   <stdlib.h>. The value x to be rotated is 32-bits. y must be in the range
-///   <tt>[0, sizeof(T)*8 - 1]</tt> to avoid undefined behavior.
-/// \note rotlFixed will assert in Debug builds if is outside the allowed range.
-/// \since Crypto++ 3.0
-template<> inline word32 rotlFixed<word32>(word32 x, unsigned int y)
-{
-	// Uses Microsoft <stdlib.h> call, bound to C/C++ language rules.
-	CRYPTOPP_ASSERT(y < 8*sizeof(x));
-	return y ? _lrotl(x, static_cast<byte>(y)) : x;
-}
-
-/// \brief Performs a right rotate
-/// \tparam T the word type
-/// \param x the 32-bit value to rotate
-/// \param y the number of bit positions to rotate the value
-/// \details This is a Microsoft specific implementation using <tt>_lrotr</tt> provided by
-///   <stdlib.h>. The value x to be rotated is 32-bits. y must be in the range
-///   <tt>[0, sizeof(T)*8 - 1]</tt> to avoid undefined behavior.
-/// \note rotrFixed will assert in Debug builds if is outside the allowed range.
-/// \since Crypto++ 3.0
-template<> inline word32 rotrFixed<word32>(word32 x, unsigned int y)
-{
-	// Uses Microsoft <stdlib.h> call, bound to C/C++ language rules.
-	CRYPTOPP_ASSERT(y < 8*sizeof(x));
-	return y ? _lrotr(x, static_cast<byte>(y)) : x;
-}
-
-/// \brief Performs a left rotate
-/// \tparam T the word type
-/// \param x the 32-bit value to rotate
-/// \param y the number of bit positions to rotate the value
-/// \details This is a Microsoft specific implementation using <tt>_lrotl</tt> provided by
-///   <stdlib.h>. The value x to be rotated is 32-bits. y must be in the range
-///   <tt>[0, sizeof(T)*8 - 1]</tt> to avoid undefined behavior.
-/// \note rotlVariable will assert in Debug builds if is outside the allowed range.
-/// \since Crypto++ 3.0
-template<> inline word32 rotlVariable<word32>(word32 x, unsigned int y)
-{
-	CRYPTOPP_ASSERT(y < 8*sizeof(x));
-	return _lrotl(x, static_cast<byte>(y));
-}
-
-/// \brief Performs a right rotate
-/// \tparam T the word type
-/// \param x the 32-bit value to rotate
-/// \param y the number of bit positions to rotate the value
-/// \details This is a Microsoft specific implementation using <tt>_lrotr</tt> provided by
-///   <stdlib.h>. The value x to be rotated is 32-bits. y must be in the range
-///   <tt>[0, sizeof(T)*8 - 1]</tt> to avoid undefined behavior.
-/// \note rotrVariable will assert in Debug builds if is outside the allowed range.
-/// \since Crypto++ 3.0
-template<> inline word32 rotrVariable<word32>(word32 x, unsigned int y)
-{
-	CRYPTOPP_ASSERT(y < 8*sizeof(x));
-	return _lrotr(x, static_cast<byte>(y));
-}
-
-/// \brief Performs a left rotate
-/// \tparam T the word type
-/// \param x the 32-bit value to rotate
-/// \param y the number of bit positions to rotate the value
-/// \details This is a Microsoft specific implementation using <tt>_lrotl</tt> provided by
-///   <stdlib.h>. The value x to be rotated is 32-bits. y must be in the range
-///   <tt>[0, sizeof(T)*8 - 1]</tt> to avoid undefined behavior.
-/// \since Crypto++ 3.0
-template<> inline word32 rotlMod<word32>(word32 x, unsigned int y)
-{
-	y %= 8*sizeof(x);
-	return _lrotl(x, static_cast<byte>(y));
-}
-
-/// \brief Performs a right rotate
-/// \tparam T the word type
-/// \param x the 32-bit value to rotate
-/// \param y the number of bit positions to rotate the value
-/// \details This is a Microsoft specific implementation using <tt>_lrotr</tt> provided by
-///   <stdlib.h>. The value x to be rotated is 32-bits. y must be in the range
-///   <tt>[0, sizeof(T)*8 - 1]</tt> to avoid undefined behavior.
-/// \since Crypto++ 3.0
-template<> inline word32 rotrMod<word32>(word32 x, unsigned int y)
-{
-	y %= 8*sizeof(x);
-	return _lrotr(x, static_cast<byte>(y));
-}
-
-#endif // #ifdef _MSC_VER
-
-#if (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
+#if defined(__INTEL_COMPILER)
 // Intel C++ Compiler 10.0 calls a function instead of using the rotate instruction when using these instructions
 
 /// \brief Performs a left rotate
@@ -1777,76 +1585,6 @@ template<> inline word64 rotrMod<word64>(word64 x, unsigned int y)
 	return y ? _rotr64(x, static_cast<byte>(y)) : x;
 }
 
-#endif // #if _MSC_VER >= 1310
-
-#if _MSC_VER >= 1400 && !defined(__INTEL_COMPILER)
-// Intel C++ Compiler 10.0 gives undefined externals with these
-template<> inline word16 rotlFixed<word16>(word16 x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotl16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotrFixed<word16>(word16 x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotr16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotlVariable<word16>(word16 x, unsigned int y)
-{
-	return _rotl16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotrVariable<word16>(word16 x, unsigned int y)
-{
-	return _rotr16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotlMod<word16>(word16 x, unsigned int y)
-{
-	return _rotl16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotrMod<word16>(word16 x, unsigned int y)
-{
-	return _rotr16(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotlFixed<byte>(byte x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotl8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotrFixed<byte>(byte x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotr8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotlVariable<byte>(byte x, unsigned int y)
-{
-	return _rotl8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotrVariable<byte>(byte x, unsigned int y)
-{
-	return _rotr8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotlMod<byte>(byte x, unsigned int y)
-{
-	return _rotl8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotrMod<byte>(byte x, unsigned int y)
-{
-	return _rotr8(x, static_cast<byte>(y));
-}
-
-#endif // #if _MSC_VER >= 1400
-
 #if (defined(__MWERKS__) && TARGET_CPU_PPC)
 
 template<> inline word32 rotlFixed<word32>(word32 x, unsigned int y)
@@ -1915,8 +1653,6 @@ inline word16 ByteReverse(word16 value)
 {
 #if defined(CRYPTOPP_BYTESWAP_AVAILABLE)
 	return bswap_16(value);
-#elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
-	return _byteswap_ushort(value);
 #else
 	return rotlFixed(value, 8U);
 #endif
@@ -1934,8 +1670,6 @@ inline word32 ByteReverse(word32 value)
 	return bswap_32(value);
 #elif defined(__MWERKS__) && TARGET_CPU_PPC
 	return (word32)__lwbrx(&value,0);
-#elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
-	return _byteswap_ulong(value);
 #elif CRYPTOPP_FAST_ROTATE(32) && !defined(__xlC__)
 	// 5 instructions with rotate instruction, 9 without
 	return (rotrFixed(value, 8U) & 0xff00ff00) | (rotlFixed(value, 8U) & 0x00ff00ff);
@@ -1956,8 +1690,6 @@ inline word64 ByteReverse(word64 value)
 	return value;
 #elif defined(CRYPTOPP_BYTESWAP_AVAILABLE)
 	return bswap_64(value);
-#elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
-	return _byteswap_uint64(value);
 #elif CRYPTOPP_BOOL_SLOW_WORD64
 	return (word64(ByteReverse(word32(value))) << 32) | ByteReverse(word32(value>>32));
 #else
@@ -2624,10 +2356,6 @@ inline InputIt FindIfNot(InputIt first, InputIt last, const T &value) {
 #define CRYPTOPP_BLOCKS_END(i) size_t SST() {return SS##i();} void AllocateBlocks() {m_aggregate.New(SST());} AlignedSecByteBlock m_aggregate;
 
 NAMESPACE_END
-
-#if (CRYPTOPP_MSC_VERSION)
-# pragma warning(pop)
-#endif
 
 #if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE
 # pragma GCC diagnostic pop

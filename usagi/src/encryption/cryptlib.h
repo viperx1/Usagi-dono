@@ -106,11 +106,6 @@ and getting us started on the manual.
 #include "stdcpp.h"
 #include "trap.h"
 
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(push)
-# pragma warning(disable: 4127 4189 4505 4702)
-#endif
-
 NAMESPACE_BEGIN(CryptoPP)
 
 // forward declarations
@@ -3224,9 +3219,5 @@ inline int HeaderVersion()
 } // C linkage
 
 NAMESPACE_END
-
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(pop)
-#endif
 
 #endif
