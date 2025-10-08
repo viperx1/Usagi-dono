@@ -28,7 +28,7 @@ The crash log functionality provides automatic crash detection and logging for t
   - Display information (screen resolution and DPI for each monitor)
   - Stack trace with function names and offsets (on all platforms)
 
-- **Persistent Logging**: Application logs are also written to a persistent file (`usagi.log`) for debugging purposes.
+- **Persistent Logging**: Application logs are also written to a persistent file (`usagi.log`) for debugging purposes. This includes detailed symbol resolution information logged at startup to help diagnose issues with crash log function names.
 
 ## Crash Log Location
 
@@ -40,6 +40,13 @@ When a crash occurs, the crash handler writes logs in two locations:
    - **Windows**: `%APPDATA%/Usagi-dono/usagi.log`
    - **Linux**: `~/.local/share/Usagi-dono/usagi.log`
    - **macOS**: `~/Library/Application Support/Usagi-dono/usagi.log`
+   
+   The `usagi.log` file contains:
+   - Application startup messages
+   - **Symbol resolution debug information** (paths, initialization status, symbol types, diagnostics)
+   - Other application events and errors
+   
+   **Note**: When troubleshooting crashes with missing function names, always check `usagi.log` first for symbol resolution diagnostics.
 
 ## Implementation Details
 
@@ -226,12 +233,36 @@ The stack trace test (`testStackTraceHasFunctionNames`) specifically addresses t
 
 If crash logs show only memory addresses without function names from the Usagi codebase (but Qt library functions appear), this usually indicates a symbol resolution problem:
 
+### Checking usagi.log for Diagnostics
+
+**New in this version**: The crash handler now automatically logs detailed symbol resolution information to `usagi.log` when the application starts. This log contains:
+
+- Executable path and directory
+- Current working directory
+- Symbol search paths used by the crash handler
+- Symbol handler initialization status
+- Debug symbol type and location (PDB file path or embedded symbols)
+- Test symbol resolution for application functions
+- Diagnostic messages about potential issues
+
+**Location of usagi.log**:
+- **Windows**: `%APPDATA%/Usagi-dono/usagi.log`
+- **Linux**: `~/.local/share/Usagi-dono/usagi.log`
+- **macOS**: `~/Library/Application Support/Usagi-dono/usagi.log`
+
+**When troubleshooting crashes**, always check `usagi.log` first. Look for:
+1. "Symbol handler initialization: SUCCESS" or "FAILED"
+2. "Symbol type" information (should be SymPdb, SymCv, or SymDia for MSVC; may be SymNone or SymExport if symbols are missing)
+3. Any WARNING messages about missing debug symbols
+4. The "Test symbol resolution" section showing whether application functions can be resolved
+
 ### Windows Builds
 - **Problem**: Debug symbols are missing or not accessible by the symbol handler
 - **Solution**: Ensure debug symbols are present alongside or embedded in the executable
 - **Verification**: 
   - For MSVC: Check that both `usagi.exe` and `usagi.pdb` exist in the same directory
   - For GCC/Clang/LLVM: Debug symbols should be embedded in the executable
+  - **Check usagi.log** for symbol type and loaded PDB information
 - **Build Configuration**: Use appropriate flags as configured in CMakeLists.txt
   - MSVC: `/Zi` (debug info) and `/DEBUG:FULL` (complete symbols)
   - GCC/Clang/LLVM: `-g` (debug symbols)
@@ -242,6 +273,7 @@ If crash logs show only memory addresses without function names from the Usagi c
 - **Solution**: 
   - Ensure `-g` flag is used during compilation (already configured in CMakeLists.txt)
   - Do not use strip tools on the executable after building
+  - **Check usagi.log** to verify symbols are detected
   - **Optional**: Use the `c++filt` utility to demangle names: `c++filt _ZN10QTableView11qt_metacallE...` will output `QTableView::qt_metacall(...)`
 - **Note**: GCC/Clang use DWARF or CodeView debug format embedded in the executable. Symbol resolution depends on DbgHelp.dll support for these formats and may show mangled C++ names.
 
