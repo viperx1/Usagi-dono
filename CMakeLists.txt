@@ -12,8 +12,16 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
 else()
-    # GCC/Clang: Add -g for debug symbols
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+    # GCC/Clang: Add -g for debug symbols and -gdwarf-4 for compatibility with Windows dbghelp
+    # -gdwarf-4: Use DWARF version 4 (more compatible with Windows debugging tools)
+    # -g: Include debug information
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gdwarf-4")
+    
+    # On Windows with MinGW, also ensure debug info is not stripped
+    if(WIN32)
+        # Don't strip symbols from the executable
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
+    endif()
 endif()
 
 # Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
