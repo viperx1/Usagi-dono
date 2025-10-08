@@ -34,16 +34,17 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     
     # Override CMake's automatic linker detection to prevent use of lld-link
     # CMake automatically adds -fuse-ld=lld-link for Clang on Windows, but this
-    # is incompatible with MinGW target. Remove it from all linker flag variables.
-    string(REGEX REPLACE "-fuse-ld=[^ ]+" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-fuse-ld=[^ ]+" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-fuse-ld=[^ ]+" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REGEX REPLACE "-fuse-ld=[^ ]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    # is incompatible with MinGW target. Remove lld-link but allow lld (GNU-style).
+    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     
     # Also clear cached linker flags that may contain -fuse-ld=lld-link
     set(CMAKE_EXE_LINKER_FLAGS_INIT "")
     
-    set(CMAKE_LINKER "ld")
+    # Note: We don't force a specific linker here anymore. Subdirectories can
+    # specify -fuse-ld=lld when needed for PDB generation.
     set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 endif()
 

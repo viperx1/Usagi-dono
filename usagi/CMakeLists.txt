@@ -14,9 +14,6 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # LLVM/Clang on Windows with MinGW target generates DWARF by default,
     # but Windows DbgHelp API requires CodeView format to resolve symbols
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gcodeview")
-    # Add linker flag to generate PDB file that DbgHelp can access at runtime
-    # Without this, the CodeView debug info exists but isn't accessible to DbgHelp
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--pdb=")
 else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
@@ -61,6 +58,13 @@ set(HEADERS
 
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
+
+# On Windows with Clang, add linker options to generate PDB file
+# The PDB file is required for DbgHelp to resolve symbols at runtime
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Use LLD linker which supports PDB generation for MinGW targets
+    target_link_options(usagi PRIVATE -fuse-ld=lld -Wl,--pdb=)
+endif()
 
 # Link Qt libraries
 target_link_libraries(usagi PRIVATE
