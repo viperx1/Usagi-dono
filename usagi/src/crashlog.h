@@ -19,6 +19,7 @@ public:
 private:
     static QString getLogFilePath();
     static QString getSystemInfo();
+    static void logSymbolResolutionInfo();
 };
 
 #endif // CRASHLOG_H
