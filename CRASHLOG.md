@@ -203,9 +203,27 @@ Stack Trace:
 
 ## Testing
 
-The crash log encoding is thoroughly tested in `tests/test_crashlog.cpp`:
+The crash log functionality is thoroughly tested in `tests/test_crashlog.cpp`:
 
+- **UTF-8 Encoding Tests**: Verify that log files and crash logs are written with proper UTF-8 encoding (without BOM) and not misinterpreted as UTF-16.
+- **Complete Process Tests**: Test the full crash log generation workflow including data type conversions (QString → QTextStream → file).
+- **Null Byte Tests**: Ensure crash log files don't contain extra null bytes that would cause text editors to misinterpret the encoding.
+- **Stack Trace Function Name Resolution Test**: Verify that stack traces contain function names where possible. While not all frames will have names (system libraries may lack debug symbols), this test ensures that at least some frames have resolved function names, helping catch symbol resolution issues.
 
+To run the tests:
+
+```bash
+cd build
+cmake ..
+make test_crashlog
+QT_QPA_PLATFORM=offscreen ./tests/test_crashlog
+```
+
+The stack trace test (`testStackTraceHasFunctionNames`) specifically addresses the issue where some stack frames showed only memory addresses without function names. The test:
+- Verifies at least one frame has a resolved function name
+- Reports the percentage of frames with names for diagnostics
+- Provides warnings if less than 20% have names (indicating potential configuration issues)
+- Acknowledges that external libraries without debug symbols won't have names
 
 ## Future Enhancements
 
