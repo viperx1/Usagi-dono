@@ -37,18 +37,46 @@ jobs:
       # Capture logs for configure, build, and test
       - name: Configure, build, and test
         run: |
-          # Set compiler to Clang from Qt LLVM MinGW installation
-          # The Qt installation includes Clang/LLVM which supports PDB generation
+          # Try to use Clang from Qt LLVM MinGW installation if available
           # QT_ROOT_DIR is set by install-qt-action to the Qt installation directory
-          if [ -d "${QT_ROOT_DIR}/bin" ]; then
-            export PATH="${QT_ROOT_DIR}/bin:$PATH"
-            export CC="${QT_ROOT_DIR}/bin/clang.exe"
-            export CXX="${QT_ROOT_DIR}/bin/clang++.exe"
+          # Note: Qt LLVM MinGW distributions may or may not include the compiler toolchain
+          
+          # Convert backslashes to forward slashes for consistent path handling
+          QT_ROOT_UNIX=$(echo "${QT_ROOT_DIR}" | sed 's|\\|/|g')
+          
+          # Check if Qt installation includes the LLVM MinGW compiler toolchain
+          if [ -f "${QT_ROOT_UNIX}/bin/clang++.exe" ]; then
+            # Compilers found in Qt installation - use them
+            export PATH="${QT_ROOT_UNIX}/bin:$PATH"
+            export CC="${QT_ROOT_UNIX}/bin/clang.exe"
+            export CXX="${QT_ROOT_UNIX}/bin/clang++.exe"
             echo "Using Clang from Qt: ${CXX}"
+            "${CXX}" --version || echo "Warning: Failed to run clang++ --version"
+            
+            cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER="${CC}" \
+              -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
           else
-            echo "Warning: Qt LLVM MinGW bin directory not found, using default compiler"
+            # Qt installation doesn't include compilers - let CMake auto-detect
+            echo "Note: Qt LLVM MinGW installation does not include compiler toolchain"
+            echo "CMake will auto-detect available compilers"
+            echo "QT_ROOT_DIR=${QT_ROOT_DIR}"
+            
+            # Try to find clang++ in PATH
+            if command -v clang++ &> /dev/null; then
+              CLANG_PATH=$(command -v clang++)
+              echo "Found Clang in PATH: ${CLANG_PATH}"
+              export CC="clang.exe"
+              export CXX="clang++.exe"
+              cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_C_COMPILER="${CC}" \
+                -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
+            else
+              echo "Clang not found in PATH, using default system compiler"
+              cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee build_log.txt
+            fi
           fi
-          cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="${CC}" -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
+          
           cmake --build build --config Release 2>&1 | tee -a build_log.txt
           ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
         shell: bash
