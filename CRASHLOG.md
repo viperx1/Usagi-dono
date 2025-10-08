@@ -17,7 +17,7 @@ The crash log functionality provides automatic crash detection and logging for t
 
 - **Detailed Crash Information**: Each crash log includes:
   - Crash reason (signal or exception type)
-  - Timestamp (when the crash occurred)
+  - Timestamp (when the crash occurred, in local time)
   - Application name and version
   - Qt version
   - Operating system details (name, kernel type/version, product type/version)
@@ -55,11 +55,20 @@ The handler is installed at application startup before the main window is shown,
 To ensure that crash logs show function names from the Usagi codebase (not just Qt library functions), debug symbols must be enabled during compilation. The CMakeLists.txt files are configured to automatically include debug symbols:
 
 - **MSVC**: Uses `/Zi` flag for debug info and `/DEBUG` linker flag
-- **GCC/Clang**: Uses `-g` flag for debug symbols
+- **GCC/Clang**: Uses `-g` flag for debug symbols and `-gdwarf-4` for DWARF v4 format
+- **MinGW on Windows**: Uses `-g` compiler flag and `-g` linker flag to prevent stripping
 
 These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
 
-On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, `SYMOPT_LOAD_LINES`, `SYMOPT_FAIL_CRITICAL_ERRORS`, and `SYMOPT_NO_PROMPTS` flags before initializing the symbol handler. These additional flags prevent error dialogs during crash handling and disable interactive prompts. The symbol handler is initialized with a comprehensive search path that includes both the executable directory and the current working directory, ensuring PDB files are found regardless of where the application is run from.
+On Windows with MinGW/GCC, the `-gdwarf-4` flag ensures debug symbols are generated in DWARF version 4 format, which is more compatible with Windows dbghelp.dll for symbol resolution. The linker flag `-g` prevents the linker from stripping debug symbols from the final executable.
+
+On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, `SYMOPT_LOAD_LINES`, `SYMOPT_FAIL_CRITICAL_ERRORS`, `SYMOPT_NO_PROMPTS`, `SYMOPT_INCLUDE_32BIT_MODULES`, and `SYMOPT_AUTO_PUBLICS` flags before initializing the symbol handler. These additional flags:
+- Prevent error dialogs during crash handling
+- Disable interactive prompts  
+- Include 32-bit modules in 64-bit process enumeration
+- Automatically search public symbol tables when private symbols aren't available
+
+The symbol handler is initialized with a comprehensive search path that includes both the executable directory and the current working directory, ensuring PDB files (MSVC) or DWARF symbols (MinGW) are found regardless of where the application is run from.
 
 The crash handler uses `SymInitialize` with automatic module enumeration (third parameter set to `TRUE`), which automatically loads symbols for all currently loaded modules (including the main executable, Qt libraries, and other DLLs). This ensures that stack traces show function names from both the application code and all loaded libraries.
 
