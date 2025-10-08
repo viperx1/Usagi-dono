@@ -37,7 +37,18 @@ jobs:
       # Capture logs for configure, build, and test
       - name: Configure, build, and test
         run: |
-          cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee build_log.txt
+          # Set compiler to Clang from Qt LLVM MinGW installation
+          # The Qt installation includes Clang/LLVM which supports PDB generation
+          # QT_ROOT_DIR is set by install-qt-action to the Qt installation directory
+          if [ -d "${QT_ROOT_DIR}/bin" ]; then
+            export PATH="${QT_ROOT_DIR}/bin:$PATH"
+            export CC="${QT_ROOT_DIR}/bin/clang.exe"
+            export CXX="${QT_ROOT_DIR}/bin/clang++.exe"
+            echo "Using Clang from Qt: ${CXX}"
+          else
+            echo "Warning: Qt LLVM MinGW bin directory not found, using default compiler"
+          fi
+          cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="${CC}" -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
           cmake --build build --config Release 2>&1 | tee -a build_log.txt
           ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
         shell: bash
@@ -49,13 +60,17 @@ jobs:
           name: Usagi-dono-alpha-llvm
           path: |
             build/**/*.exe
+            build/**/*.pdb
 
       - name: Create Release & Upload (Stable/Beta, LLVM)
         if: success() && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/*.exe
+            build/usagi/*.exe
+            build/usagi/*.pdb
+            build/tests/*.exe
+            build/tests/*.pdb
 
       # 👇 The magic failure handler
       - name: Create issue with build/test logs on failure

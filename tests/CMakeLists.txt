@@ -45,6 +45,10 @@ add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Explicitly specify PDB filename: <output_dir>/<executable_name>.pdb
     target_link_options(test_hash PRIVATE -fuse-ld=lld "-Wl,--pdb=$<TARGET_FILE_DIR:test_hash>/$<TARGET_FILE_BASE_NAME:test_hash>.pdb")
+elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # GCC/MinGW generates DWARF which Windows DbgHelp cannot reliably read
+    message(WARNING "Building test_hash with GCC/MinGW on Windows. Crash logs may not show function names. "
+                    "Use Clang/LLVM for full crash log functionality with PDB generation.")
 endif()
 
 target_link_libraries(test_hash PRIVATE
@@ -74,6 +78,10 @@ add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Explicitly specify PDB filename: <output_dir>/<executable_name>.pdb
     target_link_options(test_crashlog PRIVATE -fuse-ld=lld "-Wl,--pdb=$<TARGET_FILE_DIR:test_crashlog>/$<TARGET_FILE_BASE_NAME:test_crashlog>.pdb")
+elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # GCC/MinGW generates DWARF which Windows DbgHelp cannot reliably read
+    message(WARNING "Building test_crashlog with GCC/MinGW on Windows. Crash logs may not show function names. "
+                    "Use Clang/LLVM for full crash log functionality with PDB generation.")
 endif()
 
 target_link_libraries(test_crashlog PRIVATE

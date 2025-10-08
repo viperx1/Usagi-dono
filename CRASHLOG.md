@@ -65,6 +65,10 @@ To ensure that crash logs show function names from the Usagi codebase (not just 
 - **GCC/Clang/LLVM on Unix/Linux**: Uses `-g` flag for debug symbols
 - **Clang/LLVM on Windows**: Uses `-g -gcodeview` compile flags, `-fuse-ld=lld` to use the LLVM linker, and `-Wl,--pdb=<filename>` linker flag to generate CodeView debug format and PDB file (required for Windows DbgHelp API)
 
+**Important for Windows builds**: 
+- **Recommended**: Use **Clang/LLVM compiler** (e.g., from Qt's LLVM MinGW distribution) for full crash log functionality on Windows
+- **Not recommended**: GCC/MinGW on Windows cannot generate PDB files and produces DWARF debug format that Windows DbgHelp API cannot reliably read. This results in crash logs showing only memory addresses for application functions.
+
 These flags are included in both Debug and Release builds, ensuring that crash logs always contain meaningful function names and offsets. Without debug symbols, the crash log would only show memory addresses and Qt library function names, making it difficult to identify the source of crashes in the Usagi application code.
 
 **Important**: LLVM/Clang on Windows requires:
@@ -295,11 +299,13 @@ If crash logs show only memory addresses without function names from the Usagi c
 
 ### GCC Builds on Windows
 - **Problem**: Debug symbols were stripped from the executable, or embedded symbols are not being read correctly by DbgHelp
-- **Note**: GCC on Windows generates DWARF debug format which may have limited support in Windows DbgHelp API
-- **Solution**: 
+- **Important Limitation**: GCC/MinGW on Windows **cannot generate PDB files** and produces DWARF debug format, which Windows DbgHelp API cannot reliably read. This means crash logs from GCC builds on Windows will not show function names from the Usagi codebase (though Qt and system library functions may still be resolved).
+- **Recommendation**: **Use Clang/LLVM compiler on Windows** (with Qt's LLVM MinGW distribution) for full crash log functionality with PDB generation. GCC is suitable for Linux/macOS builds but not recommended for Windows if you need crash log symbol resolution.
+- **If using GCC anyway**:
   - Ensure `-g` flag is used during compilation (already configured in CMakeLists.txt)
   - Do not use strip tools on the executable after building
-  - **Check usagi.log** to verify symbols are detected
+  - **Check usagi.log** to verify symbols are detected (they likely won't be for application functions)
+  - CMake will display a warning during configuration about this limitation
 - **Additional Issue**: Function names may appear **mangled** (e.g., `_ZN10QTableView11qt_metacallE...`) instead of readable names like `QTableView::qt_metacall()`. This is because GCC uses Itanium C++ ABI name mangling, which Windows DbgHelp.dll does not automatically demangle (it only demangles MSVC-style decorations).
   - **Optional**: Use the `c++filt` utility to demangle names: `c++filt _ZN10QTableView11qt_metacallE...` will output `QTableView::qt_metacall(...)`
 
