@@ -14,8 +14,6 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # LLVM/Clang on Windows with MinGW target generates DWARF by default,
     # but Windows DbgHelp API requires CodeView format to resolve symbols
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gcodeview")
-    # Ensure linker preserves debug information
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--pdb=")
 else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
