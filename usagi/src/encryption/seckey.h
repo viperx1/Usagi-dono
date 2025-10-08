@@ -12,11 +12,6 @@
 #include "simple.h"
 #include "stdcpp.h"
 
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(push)
-# pragma warning(disable: 4189)
-#endif
-
 // Issue 340
 #if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE
 # pragma GCC diagnostic push
@@ -431,10 +426,6 @@ struct AuthenticatedSymmetricCipherDocumentation
 };
 
 NAMESPACE_END
-
-#if CRYPTOPP_MSC_VERSION
-# pragma warning(pop)
-#endif
 
 // Issue 340
 #if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE

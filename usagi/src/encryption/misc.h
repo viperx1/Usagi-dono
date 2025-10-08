@@ -1585,76 +1585,6 @@ template<> inline word64 rotrMod<word64>(word64 x, unsigned int y)
 	return y ? _rotr64(x, static_cast<byte>(y)) : x;
 }
 
-#endif // #if _MSC_VER >= 1310
-
-#if _MSC_VER >= 1400 && !defined(__INTEL_COMPILER)
-// Intel C++ Compiler 10.0 gives undefined externals with these
-template<> inline word16 rotlFixed<word16>(word16 x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotl16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotrFixed<word16>(word16 x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotr16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotlVariable<word16>(word16 x, unsigned int y)
-{
-	return _rotl16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotrVariable<word16>(word16 x, unsigned int y)
-{
-	return _rotr16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotlMod<word16>(word16 x, unsigned int y)
-{
-	return _rotl16(x, static_cast<byte>(y));
-}
-
-template<> inline word16 rotrMod<word16>(word16 x, unsigned int y)
-{
-	return _rotr16(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotlFixed<byte>(byte x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotl8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotrFixed<byte>(byte x, unsigned int y)
-{
-	// Intrinsic, not bound to C/C++ language rules.
-	return _rotr8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotlVariable<byte>(byte x, unsigned int y)
-{
-	return _rotl8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotrVariable<byte>(byte x, unsigned int y)
-{
-	return _rotr8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotlMod<byte>(byte x, unsigned int y)
-{
-	return _rotl8(x, static_cast<byte>(y));
-}
-
-template<> inline byte rotrMod<byte>(byte x, unsigned int y)
-{
-	return _rotr8(x, static_cast<byte>(y));
-}
-
-#endif // #if _MSC_VER >= 1400
-
 #if (defined(__MWERKS__) && TARGET_CPU_PPC)
 
 template<> inline word32 rotlFixed<word32>(word32 x, unsigned int y)
@@ -1723,8 +1653,6 @@ inline word16 ByteReverse(word16 value)
 {
 #if defined(CRYPTOPP_BYTESWAP_AVAILABLE)
 	return bswap_16(value);
-#elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
-	return _byteswap_ushort(value);
 #else
 	return rotlFixed(value, 8U);
 #endif
@@ -1742,8 +1670,6 @@ inline word32 ByteReverse(word32 value)
 	return bswap_32(value);
 #elif defined(__MWERKS__) && TARGET_CPU_PPC
 	return (word32)__lwbrx(&value,0);
-#elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
-	return _byteswap_ulong(value);
 #elif CRYPTOPP_FAST_ROTATE(32) && !defined(__xlC__)
 	// 5 instructions with rotate instruction, 9 without
 	return (rotrFixed(value, 8U) & 0xff00ff00) | (rotlFixed(value, 8U) & 0x00ff00ff);
@@ -1764,8 +1690,6 @@ inline word64 ByteReverse(word64 value)
 	return value;
 #elif defined(CRYPTOPP_BYTESWAP_AVAILABLE)
 	return bswap_64(value);
-#elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
-	return _byteswap_uint64(value);
 #elif CRYPTOPP_BOOL_SLOW_WORD64
 	return (word64(ByteReverse(word32(value))) << 32) | ByteReverse(word32(value>>32));
 #else
@@ -2432,10 +2356,6 @@ inline InputIt FindIfNot(InputIt first, InputIt last, const T &value) {
 #define CRYPTOPP_BLOCKS_END(i) size_t SST() {return SS##i();} void AllocateBlocks() {m_aggregate.New(SST());} AlignedSecByteBlock m_aggregate;
 
 NAMESPACE_END
-
-#if (CRYPTOPP_MSC_VERSION)
-# pragma warning(pop)
-#endif
 
 #if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE
 # pragma GCC diagnostic pop
