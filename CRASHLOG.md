@@ -239,11 +239,26 @@ If crash logs show only memory addresses without function names from the Usagi c
 
 ### MinGW/GCC Builds on Windows
 - **Problem**: Debug symbols were stripped from the executable, or DWARF symbols are not being read correctly by DbgHelp
+- **Additional Issue**: Function names may appear **mangled** (e.g., `_ZN10QTableView11qt_metacallE...`) instead of readable names like `QTableView::qt_metacall()`. This is because MinGW uses Itanium C++ ABI name mangling, which Windows DbgHelp.dll does not automatically demangle (it only demangles MSVC-style decorations).
 - **Solution**: 
   - Ensure `-g` flag is used during compilation (already configured in CMakeLists.txt)
   - Do not use strip tools on the executable after building
   - For best results on Windows, use MSVC rather than MinGW for builds that need crash log symbol resolution
+  - **Optional**: Use the `c++filt` utility to demangle names: `c++filt _ZN10QTableView11qt_metacallE...` will output `QTableView::qt_metacall(...)`
 - **Note**: MinGW uses DWARF debug format embedded in the executable, while Windows DbgHelp.dll primarily supports PDB files. Symbol resolution may be limited or show mangled C++ names.
+
+### Demangling C++ Names from MinGW Crash Logs
+If your crash log shows mangled names like `_ZN10QTableView11qt_metacallEN11QMetaObject4CallEiPPv`, you can demangle them manually:
+
+1. **Using c++filt** (included with MinGW):
+   ```bash
+   echo "_ZN10QTableView11qt_metacallEN11QMetaObject4CallEiPPv" | c++filt
+   # Output: QTableView::qt_metacall(QMetaObject::Call, int, void**)
+   ```
+
+2. **Using online demanglers**: Search for "C++ name demangler" and paste the mangled name
+
+This is only necessary for MinGW builds. MSVC builds automatically show demangled names.
 
 ### Verifying Symbol Resolution
 After building, you can verify symbol information:
