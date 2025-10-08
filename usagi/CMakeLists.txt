@@ -63,7 +63,8 @@ add_executable(usagi ${SOURCES} ${HEADERS})
 # The PDB file is required for DbgHelp to resolve symbols at runtime
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Use LLD linker which supports PDB generation for MinGW targets
-    target_link_options(usagi PRIVATE -fuse-ld=lld -Wl,--pdb=)
+    # Explicitly specify PDB filename: <output_dir>/<executable_name>.pdb
+    target_link_options(usagi PRIVATE -fuse-ld=lld "-Wl,--pdb=$<TARGET_FILE_DIR:usagi>/$<TARGET_FILE_BASE_NAME:usagi>.pdb")
 endif()
 
 # Link Qt libraries

@@ -43,7 +43,8 @@ add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
 
 # On Windows with Clang, add linker options to generate PDB file
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_link_options(test_hash PRIVATE -fuse-ld=lld -Wl,--pdb=)
+    # Explicitly specify PDB filename: <output_dir>/<executable_name>.pdb
+    target_link_options(test_hash PRIVATE -fuse-ld=lld "-Wl,--pdb=$<TARGET_FILE_DIR:test_hash>/$<TARGET_FILE_BASE_NAME:test_hash>.pdb")
 endif()
 
 target_link_libraries(test_hash PRIVATE
@@ -71,7 +72,8 @@ add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
 
 # On Windows with Clang, add linker options to generate PDB file
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_link_options(test_crashlog PRIVATE -fuse-ld=lld -Wl,--pdb=)
+    # Explicitly specify PDB filename: <output_dir>/<executable_name>.pdb
+    target_link_options(test_crashlog PRIVATE -fuse-ld=lld "-Wl,--pdb=$<TARGET_FILE_DIR:test_crashlog>/$<TARGET_FILE_BASE_NAME:test_crashlog>.pdb")
 endif()
 
 target_link_libraries(test_crashlog PRIVATE
