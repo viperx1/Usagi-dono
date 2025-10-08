@@ -226,10 +226,25 @@ static void writeSafeStackTrace(int fd)
     // This ensures PDB files are found in executable directory and current directory
     // TRUE parameter: automatically enumerate and load symbols for all loaded modules
     // This allows resolving symbols from Qt libraries and other DLLs in the stack trace
-    SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    
+    // Write symbol search path for debugging
+    if (symInitResult)
+    {
+        safeWrite(fd, "Symbol search path: ");
+        safeWrite(fd, searchPath[0] != '\0' ? searchPath : "(default)");
+        safeWrite(fd, "\n");
+    }
+    else
+    {
+        safeWrite(fd, "Warning: SymInitialize failed\n");
+    }
     
     char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
     PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
+    
+    // Track how many symbols were resolved
+    int resolvedSymbols = 0;
     
     for (WORD i = 0; i < frames; i++)
     {
@@ -274,6 +289,8 @@ static void writeSafeStackTrace(int fd)
             pointerToHex((void*)displacement, dispBuf, sizeof(dispBuf));
             // Skip "0x" prefix since we already wrote it
             safeWrite(fd, dispBuf + 2);
+            
+            resolvedSymbols++;
         }
         else
         {
@@ -284,6 +301,64 @@ static void writeSafeStackTrace(int fd)
         }
         
         safeWrite(fd, "\n");
+    }
+    
+    // Write diagnostic information about symbol resolution
+    safeWrite(fd, "\nSymbol resolution: ");
+    char resolvedCount[16];
+    char totalCount[16];
+    int rPos = 0, tPos = 0;
+    
+    // Convert resolvedSymbols to string
+    if (resolvedSymbols == 0) {
+        resolvedCount[rPos++] = '0';
+    } else {
+        char temp[16];
+        int tempPos = 0;
+        int num = resolvedSymbols;
+        while (num > 0) {
+            temp[tempPos++] = '0' + (num % 10);
+            num /= 10;
+        }
+        for (int j = tempPos - 1; j >= 0; j--) {
+            resolvedCount[rPos++] = temp[j];
+        }
+    }
+    resolvedCount[rPos] = '\0';
+    
+    // Convert frames to string
+    if (frames == 0) {
+        totalCount[tPos++] = '0';
+    } else {
+        char temp[16];
+        int tempPos = 0;
+        int num = frames;
+        while (num > 0) {
+            temp[tempPos++] = '0' + (num % 10);
+            num /= 10;
+        }
+        for (int j = tempPos - 1; j >= 0; j--) {
+            totalCount[tPos++] = temp[j];
+        }
+    }
+    totalCount[tPos] = '\0';
+    
+    safeWrite(fd, resolvedCount);
+    safeWrite(fd, " of ");
+    safeWrite(fd, totalCount);
+    safeWrite(fd, " frames resolved\n");
+    
+    // Add note if few symbols were resolved
+    if (resolvedSymbols == 0 && frames > 0)
+    {
+        safeWrite(fd, "Note: No symbols resolved. This usually means:\n");
+        safeWrite(fd, "  - PDB file is missing (MSVC builds)\n");
+        safeWrite(fd, "  - Debug symbols were stripped (MinGW/GCC builds)\n");
+        safeWrite(fd, "  - Executable was built without debug information\n");
+    }
+    else if (resolvedSymbols > 0 && resolvedSymbols < frames / 2)
+    {
+        safeWrite(fd, "Note: Few symbols resolved. Check if PDB file exists alongside executable.\n");
     }
     
     SymCleanup(process);

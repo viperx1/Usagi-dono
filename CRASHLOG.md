@@ -227,7 +227,42 @@ The stack trace test (`testStackTraceHasFunctionNames`) specifically addresses t
 - Provides warnings if less than 20% have names (indicating potential configuration issues)
 - Acknowledges that external libraries without debug symbols won't have names
 
-## Future Enhancements
+## Troubleshooting Missing Function Names
+
+If crash logs show only memory addresses without function names from the Usagi codebase (but Qt library functions appear), this usually indicates a symbol resolution problem:
+
+### MSVC Builds
+- **Problem**: PDB file is missing or not in the symbol search path
+- **Solution**: Ensure the `.pdb` file generated during compilation is in the same directory as the executable
+- **Verification**: After building, check that both `usagi.exe` and `usagi.pdb` exist in the same directory
+- **Build Configuration**: Use `/Zi` (debug info) and `/DEBUG:FULL` (complete symbols) as configured in CMakeLists.txt
+
+### MinGW/GCC Builds on Windows
+- **Problem**: Debug symbols were stripped from the executable, or DWARF symbols are not being read correctly by DbgHelp
+- **Solution**: 
+  - Ensure `-g` flag is used during compilation (already configured in CMakeLists.txt)
+  - Do not use strip tools on the executable after building
+  - For best results on Windows, use MSVC rather than MinGW for builds that need crash log symbol resolution
+- **Note**: MinGW uses DWARF debug format embedded in the executable, while Windows DbgHelp.dll primarily supports PDB files. Symbol resolution may be limited or show mangled C++ names.
+
+### Verifying Symbol Resolution
+After building, you can verify symbol information:
+- **MSVC**: Check that the PDB file exists alongside the executable
+- **MinGW**: Use `nm usagi.exe | grep "function_name"` to verify symbols are present
+- The crash log will now include diagnostic information showing how many symbols were resolved
+
+### Example Diagnostic Output
+The crash log now includes symbol resolution statistics:
+```
+Symbol search path: C:\path\to\executable;C:\current\directory
+...
+[stack trace]
+...
+Symbol resolution: 15 of 30 frames resolved
+Note: Few symbols resolved. Check if PDB file exists alongside executable.
+```
+
+If no symbols are resolved, the crash log will indicate possible causes.
 
 Possible future improvements:
 - Include more system information (memory usage, CPU info)
