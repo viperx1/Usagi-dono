@@ -62,9 +62,9 @@ add_executable(usagi ${SOURCES} ${HEADERS})
 # On Windows with Clang, add linker options to generate PDB file
 # The PDB file is required for DbgHelp to resolve symbols at runtime
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Use LLD linker which supports PDB generation for MinGW targets
-    # Explicitly specify PDB filename: <output_dir>/<executable_name>.pdb
-    target_link_options(usagi PRIVATE -fuse-ld=lld "-Wl,--pdb=$<TARGET_FILE_DIR:usagi>/$<TARGET_FILE_BASE_NAME:usagi>.pdb")
+    # LLD linker is already set globally in root CMakeLists.txt via -fuse-ld=lld
+    # Just specify PDB filename: <output_dir>/<executable_name>.pdb
+    target_link_options(usagi PRIVATE "-Wl,--pdb=$<TARGET_FILE_DIR:usagi>/$<TARGET_FILE_BASE_NAME:usagi>.pdb")
 elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # GCC/MinGW on Windows generates DWARF debug format in the executable
     # Windows DbgHelp API has limited support for DWARF and cannot reliably resolve symbols

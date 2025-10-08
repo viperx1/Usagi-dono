@@ -2,63 +2,97 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Usagi-dono VERSION 1.0.0 LANGUAGES CXX)
 
+# ==========================================================
+# 🧠 COMPILER CONFIGURATION
+# ==========================================================
+
+# Use modern enough C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Enable debug symbols for crash log stack traces
-# This allows crash logs to show function names from Usagi codebase
-# GCC/Clang: Add -g for debug symbols and -gdwarf-4 for compatibility with Windows dbghelp
-# -gdwarf-4: Use DWARF version 4 (more compatible with Windows debugging tools)
-# -g: Include debug information
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gdwarf-4")
+# ==========================================================
+# 🧩 DEBUG SYMBOLS & CRASH TRACE SUPPORT
+# ==========================================================
 
-# On Windows with MinGW, also ensure debug info is not stripped
-if(WIN32)
-    # Don't strip symbols from the executable
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
+# Ensure we're not building a "Release" that strips everything
+# You can override this via: cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
-# Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
-# that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT
-# to raise SIGTRAP (Unix) or call DebugBreak() (Windows), which conflicts with
-# our SIGSEGV handler and prevents proper crash log stack trace collection.
-# By defining CRYPTOPP_DEBUG=0, we prevent it from being auto-enabled by DEBUG/_DEBUG.
+# Generate full DWARF debug symbols with macros
+# -g3         : full debug info (includes macros)
+# -gdwarf-4   : DWARF v4 for Windows compatibility
+# -O0         : disable optimizations for accurate stack traces
+# -fno-omit-frame-pointer : keep frame pointers for reliable call stacks
+set(DEBUG_FLAGS "-g3 -gdwarf-4 -O0 -fno-omit-frame-pointer")
+
+# Apply globally
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DEBUG_FLAGS}")
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${DEBUG_FLAGS}")
+
+# ==========================================================
+# 🪄 WINDOWS / MINGW / LLVM SPECIAL CASES
+# ==========================================================
+
+if(WIN32)
+    # Ensure debug info isn't stripped
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(STATUS "Configuring for Clang with MinGW target")
+
+        # Force target to MinGW ABI (so it links against Qt MinGW libs)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
+
+        # Use the LLD linker with GNU-style interface (not lld-link)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+
+        # Ensure debug info is emitted in a way Windows GDB/LLDB can read
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcodeview") # optional: generates CodeView info too
+    endif()
+endif()
+
+# ==========================================================
+# 🧬 DEFINES
+# ==========================================================
+
+# Disable Crypto++ debug traps (we handle crashes ourselves)
 add_compile_definitions(CRYPTOPP_DEBUG=0)
 
-# When using Clang on Windows with MinGW Qt, we need to ensure proper linking
-# Clang on Windows may default to using lld-link, but MinGW Qt uses GNU ABI
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Use MinGW-compatible target
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
-    
-    # Override CMake's automatic linker detection to prevent use of lld-link
-    # CMake automatically adds -fuse-ld=lld-link for Clang on Windows, but this
-    # is incompatible with MinGW target. Remove lld-link but allow lld (GNU-style).
-    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REGEX REPLACE "-fuse-ld=lld-link" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    
-    # Also clear cached linker flags that may contain -fuse-ld=lld-link
-    set(CMAKE_EXE_LINKER_FLAGS_INIT "")
-    
-    # Note: We don't force a specific linker here anymore. Subdirectories can
-    # specify -fuse-ld=lld when needed for PDB generation.
-    set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
-endif()
+# ==========================================================
+# ⚙️ QT SETUP
+# ==========================================================
 
-# Find Qt6
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql REQUIRED)
 
-# Enable automatic MOC, UIC, and RCC
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-# Enable testing globally
+# ==========================================================
+# 🧪 TESTING
+# ==========================================================
 enable_testing()
 
-# Add subdirectories
+# ==========================================================
+# 📁 PROJECT STRUCTURE
+# ==========================================================
 add_subdirectory(usagi)
 add_subdirectory(tests)
+
+# ==========================================================
+# 💾 POST-BUILD: Optional symbol separation
+# ==========================================================
+# You can uncomment this block if you want to generate `.debug` symbol files
+# after building. Works on LLVM-MinGW.
+#
+# add_custom_command(TARGET usagi POST_BUILD
+#     COMMAND ${CMAKE_OBJCOPY} --only-keep-debug $<TARGET_FILE:usagi> $<TARGET_FILE:usagi>.debug
+#     COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:usagi>
+#     COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=$<TARGET_FILE:usagi>.debug $<TARGET_FILE:usagi>
+#     COMMENT "Split debug symbols to separate file for crash symbolization"
+# )
