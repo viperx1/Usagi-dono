@@ -61,7 +61,7 @@ These flags are included in both Debug and Release builds, ensuring that crash l
 
 On Windows, the crash handler is configured to use `SymSetOptions` with `SYMOPT_UNDNAME`, `SYMOPT_DEFERRED_LOADS`, `SYMOPT_LOAD_LINES`, `SYMOPT_FAIL_CRITICAL_ERRORS`, and `SYMOPT_NO_PROMPTS` flags before initializing the symbol handler. These additional flags prevent error dialogs during crash handling and disable interactive prompts. The symbol handler is initialized with a comprehensive search path that includes both the executable directory and the current working directory, ensuring PDB files are found regardless of where the application is run from.
 
-To ensure reliable symbol resolution for the application's own functions, the crash handler explicitly loads the main executable module using `SymLoadModuleEx` after initializing the symbol handler. This is more reliable than relying on the automatic module loading in `SymInitialize`, especially in crash scenarios where the symbol loading may fail silently. This configuration ensures that the Windows Debug Help Library (DbgHelp) properly loads symbols from PDB files, enabling function names from the Usagi codebase to appear in crash logs alongside Qt library function names.
+The crash handler uses `SymInitialize` with automatic module enumeration (third parameter set to `TRUE`), which automatically loads symbols for all currently loaded modules (including the main executable, Qt libraries, and other DLLs). This ensures that stack traces show function names from both the application code and all loaded libraries.
 
 ### Crypto++ Library Compatibility
 
