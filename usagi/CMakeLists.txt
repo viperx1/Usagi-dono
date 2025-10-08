@@ -9,14 +9,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Enable debug symbols for crash log stack traces
 # This allows crash logs to show function names from Usagi codebase
 if(MSVC)
-    # MSVC: Add /Zi for debug info in PDB and /DEBUG:FULL for complete symbol information
-    # /Zi: Generate complete debug information in PDB file
-    # /DEBUG:FULL: Include all symbolic debug information in the PDB (not just public symbols)
-    # This ensures crash logs show function names from Usagi codebase, not just Qt libraries
+    # Add /Zi for debug info in PDB and /DEBUG:FULL for complete symbol information
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG:FULL")
 else()
-    # GCC/Clang: Add -g for debug symbols
+    # GCC/Clang/LLVM: Add -g for debug symbols
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
 

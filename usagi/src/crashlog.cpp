@@ -169,17 +169,26 @@ static void writeSafeStackTrace(int fd)
                   SYMOPT_INCLUDE_32BIT_MODULES | SYMOPT_AUTO_PUBLICS);
     
     // Build comprehensive symbol search path
-    // Include: executable directory, current directory
+    // Include: executable path, executable directory, current directory
     char exePath[MAX_PATH];
+    char exeDir[MAX_PATH];
     char currentDir[MAX_PATH];
     char searchPath[MAX_PATH * 4];
     searchPath[0] = '\0'; // Initialize to empty string
     
-    // Get the executable directory
+    // Get the full executable path
     DWORD pathLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
     if (pathLen > 0 && pathLen < MAX_PATH)
     {
-        // Find the last backslash to get directory
+        // Copy full executable path to searchPath (includes filename)
+        size_t len = strlen(exePath);
+        if (len < sizeof(searchPath) - 1)
+        {
+            memcpy(searchPath, exePath, len);
+            searchPath[len] = '\0';
+        }
+        
+        // Also get the directory by finding the last backslash
         char* lastSlash = NULL;
         for (DWORD i = 0; i < pathLen; i++)
         {
@@ -190,13 +199,27 @@ static void writeSafeStackTrace(int fd)
         }
         if (lastSlash)
         {
-            *lastSlash = '\0'; // Null-terminate at the last slash to get directory
-            // Copy executable directory to searchPath
-            size_t len = strlen(exePath);
-            if (len < sizeof(searchPath) - 1)
+            // Copy directory path to exeDir
+            size_t dirLen = lastSlash - exePath;
+            if (dirLen < MAX_PATH)
             {
-                memcpy(searchPath, exePath, len);
-                searchPath[len] = '\0';
+                memcpy(exeDir, exePath, dirLen);
+                exeDir[dirLen] = '\0';
+                
+                // Append directory to search path
+                size_t currentLen = strlen(searchPath);
+                if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
+                {
+                    searchPath[currentLen] = ';';
+                    searchPath[currentLen + 1] = '\0';
+                    currentLen++;
+                }
+                size_t remainingSpace = sizeof(searchPath) - currentLen - 1;
+                if (dirLen < remainingSpace)
+                {
+                    memcpy(searchPath + currentLen, exeDir, dirLen);
+                    searchPath[currentLen + dirLen] = '\0';
+                }
             }
         }
     }
@@ -206,7 +229,7 @@ static void writeSafeStackTrace(int fd)
     if (cwdLen > 0 && cwdLen < MAX_PATH)
     {
         size_t currentLen = strlen(searchPath);
-        // Add semicolon separator if we already have exe path
+        // Add semicolon separator if we already have paths
         if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
         {
             searchPath[currentLen] = ';';
@@ -223,7 +246,7 @@ static void writeSafeStackTrace(int fd)
     }
     
     // Initialize symbol handler with comprehensive search path
-    // This ensures PDB files are found in executable directory and current directory
+    // This ensures debug symbols are found whether in PDB files or embedded in executable
     // TRUE parameter: automatically enumerate and load symbols for all loaded modules
     // This allows resolving symbols from Qt libraries and other DLLs in the stack trace
     BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
@@ -352,13 +375,12 @@ static void writeSafeStackTrace(int fd)
     if (resolvedSymbols == 0 && frames > 0)
     {
         safeWrite(fd, "Note: No symbols resolved. This usually means:\n");
-        safeWrite(fd, "  - PDB file is missing (MSVC builds)\n");
-        safeWrite(fd, "  - Debug symbols were stripped (MinGW/GCC builds)\n");
+        safeWrite(fd, "  - Debug symbols are missing or not embedded in executable\n");
         safeWrite(fd, "  - Executable was built without debug information\n");
     }
     else if (resolvedSymbols > 0 && resolvedSymbols < frames / 2)
     {
-        safeWrite(fd, "Note: Few symbols resolved. Check if PDB file exists alongside executable.\n");
+        safeWrite(fd, "Note: Few symbols resolved. Check if debug symbols exist alongside executable.\n");
     }
     
     SymCleanup(process);
@@ -830,17 +852,26 @@ QString CrashLog::getStackTrace()
                   SYMOPT_INCLUDE_32BIT_MODULES | SYMOPT_AUTO_PUBLICS);
     
     // Build comprehensive symbol search path
-    // Include: executable directory, current directory
+    // Include: executable path, executable directory, current directory
     char exePath[MAX_PATH];
+    char exeDir[MAX_PATH];
     char currentDir[MAX_PATH];
     char searchPath[MAX_PATH * 4];
     searchPath[0] = '\0'; // Initialize to empty string
     
-    // Get the executable directory
+    // Get the full executable path
     DWORD pathLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
     if (pathLen > 0 && pathLen < MAX_PATH)
     {
-        // Find the last backslash to get directory
+        // Copy full executable path to searchPath (includes filename)
+        size_t len = strlen(exePath);
+        if (len < sizeof(searchPath) - 1)
+        {
+            memcpy(searchPath, exePath, len);
+            searchPath[len] = '\0';
+        }
+        
+        // Also get the directory by finding the last backslash
         char* lastSlash = NULL;
         for (DWORD i = 0; i < pathLen; i++)
         {
@@ -851,13 +882,27 @@ QString CrashLog::getStackTrace()
         }
         if (lastSlash)
         {
-            *lastSlash = '\0'; // Null-terminate at the last slash to get directory
-            // Copy executable directory to searchPath
-            size_t len = strlen(exePath);
-            if (len < sizeof(searchPath) - 1)
+            // Copy directory path to exeDir
+            size_t dirLen = lastSlash - exePath;
+            if (dirLen < MAX_PATH)
             {
-                memcpy(searchPath, exePath, len);
-                searchPath[len] = '\0';
+                memcpy(exeDir, exePath, dirLen);
+                exeDir[dirLen] = '\0';
+                
+                // Append directory to search path
+                size_t currentLen = strlen(searchPath);
+                if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
+                {
+                    searchPath[currentLen] = ';';
+                    searchPath[currentLen + 1] = '\0';
+                    currentLen++;
+                }
+                size_t remainingSpace = sizeof(searchPath) - currentLen - 1;
+                if (dirLen < remainingSpace)
+                {
+                    memcpy(searchPath + currentLen, exeDir, dirLen);
+                    searchPath[currentLen + dirLen] = '\0';
+                }
             }
         }
     }
@@ -867,7 +912,7 @@ QString CrashLog::getStackTrace()
     if (cwdLen > 0 && cwdLen < MAX_PATH)
     {
         size_t currentLen = strlen(searchPath);
-        // Add semicolon separator if we already have exe path
+        // Add semicolon separator if we already have paths
         if (currentLen > 0 && currentLen < sizeof(searchPath) - 2)
         {
             searchPath[currentLen] = ';';
@@ -884,7 +929,7 @@ QString CrashLog::getStackTrace()
     }
     
     // Initialize symbol handler with comprehensive search path
-    // This ensures PDB files are found in executable directory and current directory
+    // This ensures debug symbols are found whether in PDB files or embedded in executable
     // TRUE parameter: automatically enumerate and load symbols for all loaded modules
     // This allows resolving symbols from Qt libraries and other DLLs in the stack trace
     BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
@@ -934,14 +979,12 @@ QString CrashLog::getStackTrace()
     if (resolvedSymbols == 0 && frames > 0)
     {
         trace += "\nNote: No symbols resolved. This usually means:\n";
-        trace += "  - PDB file is missing (MSVC builds)\n";
-        trace += "  - Debug symbols were stripped (MinGW/GCC builds)\n";
+        trace += "  - Debug symbols are missing or not embedded in executable\n";
         trace += "  - Executable was built without debug information\n";
-        trace += "For MSVC builds: Ensure usagi.pdb is in the same directory as usagi.exe\n";
     }
     else if (resolvedSymbols > 0 && resolvedSymbols < frames / 2)
     {
-        trace += "\nNote: Few symbols resolved. Check if PDB file exists alongside executable.\n";
+        trace += "\nNote: Few symbols resolved. Check if debug symbols exist alongside executable.\n";
     }
     
     SymCleanup(process);
