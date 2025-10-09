@@ -5,6 +5,9 @@ project(Usagi-dono VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
 set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
 
+set(CMAKE_CXX_LINK_EXECUTABLE
+    "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+
 # ==========================================================
 # 🧠 COMPILER CONFIGURATION
 # ==========================================================
