@@ -138,6 +138,20 @@ if(WIN32)
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     
+    # Clean up Qt target interface link options
+    # Qt6 imported targets might have MSVC-style linker flags in their INTERFACE_LINK_OPTIONS
+    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
+        if(TARGET ${qt_target})
+            get_target_property(qt_link_options ${qt_target} INTERFACE_LINK_OPTIONS)
+            if(qt_link_options)
+                # Remove -fuse-ld=lld-link from Qt's interface link options
+                list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld-link$")
+                list(FILTER qt_link_options EXCLUDE REGEX "^/subsystem:")
+                set_target_properties(${qt_target} PROPERTIES INTERFACE_LINK_OPTIONS "${qt_link_options}")
+            endif()
+        endif()
+    endforeach()
+    
     message(STATUS "Post-Qt CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
 endif()
 

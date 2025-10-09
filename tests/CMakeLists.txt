@@ -43,10 +43,10 @@ target_include_directories(test_hash PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force GNU-style linking for LLVM MinGW on Windows
+# Force console subsystem for LLVM MinGW on Windows
+# Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
 if(WIN32)
     target_link_options(test_hash PRIVATE
-        "-fuse-ld=lld"
         "-Wl,--subsystem,console"
     )
 endif()
@@ -75,9 +75,9 @@ target_link_libraries(test_crashlog PRIVATE
 if(WIN32)
     target_link_libraries(test_crashlog PRIVATE dbghelp)
     
-    # Force GNU-style linking for LLVM MinGW
+    # Force console subsystem for LLVM MinGW
+    # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
     target_link_options(test_crashlog PRIVATE
-        "-fuse-ld=lld"
         "-Wl,--subsystem,console"
     )
 endif()

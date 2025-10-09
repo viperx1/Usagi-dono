@@ -65,10 +65,9 @@ target_link_libraries(usagi PRIVATE
 if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
     
-    # Force GNU-style linking for LLVM MinGW by explicitly setting target link options
-    # This overrides any MSVC-style flags that Qt might have added
+    # Force console subsystem for LLVM MinGW
+    # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
     target_link_options(usagi PRIVATE
-        "-fuse-ld=lld"  # Use LLD with GNU-style interface
         "-Wl,--subsystem,console"  # GNU-style subsystem flag instead of MSVC /subsystem:console
     )
 endif()
