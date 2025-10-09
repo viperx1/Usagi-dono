@@ -27,11 +27,18 @@ jobs:
           arch: 'win64_llvm_mingw'
           cache: true
 
+      - name: Cache LLVM-MinGW
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: C:\llvm-mingw
+          key: llvm-mingw-20251007
+
       - name: Download LLVM-MinGW
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
           Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20251007/llvm-mingw-20251007-ucrt-x86_64.zip" -OutFile "C:\llvm-mingw.zip"
           Expand-Archive -Path "C:\llvm-mingw.zip" -DestinationPath "C:\llvm-mingw"
-        shell: powershell
 
       - name: Add LLVM-MinGW to PATH
         run: |
