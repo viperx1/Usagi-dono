@@ -122,6 +122,11 @@ jobs:
         run: |
           ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
 
+      - name: List linked DLLs
+        run: |
+          ldd build/usagi/usagi.exe || ntldd -R build/usagi/usagi.exe 2>&1 | tee -a build_log.txt
+
+
       # 📦 Upload artifact
       - name: Upload build artifact (Alpha, LLVM)
         if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
