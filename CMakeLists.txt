@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Usagi-dono VERSION 1.0.0 LANGUAGES CXX)
 
+set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
+set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
+
 # ==========================================================
 # 🧠 COMPILER CONFIGURATION
 # ==========================================================
