@@ -1,4 +1,5 @@
 name: Windows Build & Release (Qt 6.9.2 LLVM MinGW)
+# log every step to separate file and export them to issue on failure
 
 on:
   push:
