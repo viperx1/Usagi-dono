@@ -11,8 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Using DWARF debug format for all platforms
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
-# Find Qt6
-find_package(Qt6 COMPONENTS Core Test Gui REQUIRED)
+# Note: Qt6 is already found in the root CMakeLists.txt, no need to find it again
 
 # Enable automatic MOC
 set(CMAKE_AUTOMOC ON)
