@@ -118,10 +118,7 @@ endif()
 # Disable Crypto++ debug traps (we handle crashes ourselves)
 add_compile_definitions(CRYPTOPP_DEBUG=0)
 
-# Force old (pre-C++11) ABI for compatibility with older MinGW runtimes
-# This prevents "procedure entry point not found" errors for std::__cxx11 symbols
-# on systems that don't have C++11 ABI support in their runtime libraries
-add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
+# add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0) # we are not making it compatible with older MinGW runtime libraries, therefore this line is not permitted
 
 # ==========================================================
 # ⚙️ QT SETUP
