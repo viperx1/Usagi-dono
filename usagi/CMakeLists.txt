@@ -2,26 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Enable debug symbols for crash log stack traces
-# This allows crash logs to show function names from Usagi codebase
-# Using DWARF debug format for all platforms
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-
-# Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
-# that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT
-# to raise SIGTRAP (Unix) or call DebugBreak() (Windows), which conflicts with
-# our SIGSEGV handler and prevents proper crash log stack trace collection.
-# By defining CRYPTOPP_DEBUG=0, we prevent it from being auto-enabled by DEBUG/_DEBUG.
-add_compile_definitions(CRYPTOPP_DEBUG=0)
-
 # Note: Qt6 is already found in the root CMakeLists.txt, no need to find it again
-
-# Enable automatic MOC
-set(CMAKE_AUTOMOC ON)
 
 # Source files
 set(SOURCES
