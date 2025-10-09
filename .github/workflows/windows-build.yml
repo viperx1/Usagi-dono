@@ -28,10 +28,11 @@ jobs:
           cache: true
 
       - name: Download LLVM-MinGW
+        shell: powershell
         run: |
-          curl -L -o llvm-mingw.zip https://github.com/mstorsjo/llvm-mingw/releases/download/20230804/llvm-mingw-20230804-ucrt-x86_64.zip
-          powershell -Command "Expand-Archive llvm-mingw.zip -DestinationPath C:/llvm-mingw"
-        shell: bash
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20230804/llvm-mingw-20230804-ucrt-x86_64.zip" -OutFile "C:\llvm-mingw.zip"
+          Expand-Archive -Path "C:\llvm-mingw.zip" -DestinationPath "C:\llvm-mingw"
+
 
       - name: Setup LLVM-MinGW environment
         run: |
