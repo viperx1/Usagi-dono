@@ -37,67 +37,9 @@ jobs:
       # Capture logs for configure, build, and test
       - name: Configure, build, and test
         run: |
-          # Redirect all output to build_log.txt using exec
-          # This ensures the log file is created even if the script fails early
-          exec > >(tee -a build_log.txt) 2>&1
-          
-          # This project requires LLVM MinGW Clang compiler
-          # Try to use Clang from Qt LLVM MinGW installation first
-          
-          # Convert backslashes to forward slashes for consistent path handling
-          QT_ROOT_UNIX=$(echo "${QT_ROOT_DIR}" | sed 's|\\|/|g')
-          
-          # Check if Qt installation includes the LLVM MinGW compiler toolchain
-          if [ -f "${QT_ROOT_UNIX}/bin/clang++.exe" ]; then
-            # LLVM MinGW compilers found in Qt installation - use them
-            export PATH="${QT_ROOT_UNIX}/bin:$PATH"
-            export CC="${QT_ROOT_UNIX}/bin/clang.exe"
-            export CXX="${QT_ROOT_UNIX}/bin/clang++.exe"
-            echo "✓ Using LLVM MinGW Clang from Qt: ${CXX}"
-            "${CXX}" --version
-            
-            cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_C_COMPILER="${CC}" \
-              -DCMAKE_CXX_COMPILER="${CXX}"
-          else
-            # Qt installation doesn't include compilers
-            echo "⚠ Qt LLVM MinGW installation does not include compiler toolchain"
-            echo "This project requires LLVM MinGW Clang compiler"
-            
-            # Check for LLVM MinGW in standard installation paths
-            LLVM_MINGW_PATHS=(
-              "C:/Qt/Tools/llvm-mingw/bin/clang++.exe"
-              "${QT_ROOT_UNIX}/../Tools/llvm-mingw/bin/clang++.exe"
-            )
-            
-            FOUND_LLVM_MINGW=false
-            for LLVM_PATH in "${LLVM_MINGW_PATHS[@]}"; do
-              if [ -f "$LLVM_PATH" ]; then
-                LLVM_DIR=$(dirname "$LLVM_PATH")
-                export PATH="${LLVM_DIR}:$PATH"
-                export CC="${LLVM_DIR}/clang.exe"
-                export CXX="${LLVM_DIR}/clang++.exe"
-                echo "✓ Found LLVM MinGW at: ${LLVM_DIR}"
-                "${CXX}" --version
-                FOUND_LLVM_MINGW=true
-                break
-              fi
-            done
-            
-            if [ "$FOUND_LLVM_MINGW" = false ]; then
-              echo "❌ ERROR: LLVM MinGW Clang compiler not found!"
-              echo "This project requires LLVM MinGW Clang (not MSVC or clang-cl)"
-              echo "Please ensure Qt is installed with LLVM MinGW toolchain"
-              exit 1
-            fi
-            
-            cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_C_COMPILER="${CC}" \
-              -DCMAKE_CXX_COMPILER="${CXX}"
-          fi
-          
-          cmake --build build --config Release
-          ctest --output-on-failure --test-dir build
+          cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee build_log.txt
+          cmake --build build --config Release 2>&1 | tee -a build_log.txt
+          ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
         shell: bash
 
       - name: Upload build artifact (Alpha, LLVM)
@@ -113,8 +55,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/usagi/*.exe
-            build/tests/*.exe
+            build/*.exe
 
       # 👇 The magic failure handler
       - name: Create issue with build/test logs on failure
@@ -127,12 +68,7 @@ jobs:
           echo "" >> issue_body.md
           echo "### Logs (truncated to last 500 lines)" >> issue_body.md
           echo '```' >> issue_body.md
-          if [ -f build_log.txt ]; then
-            tail -n 500 build_log.txt >> issue_body.md
-          else
-            echo "⚠ build_log.txt not found - the build process failed very early" >> issue_body.md
-            echo "Check the GitHub Actions logs for details" >> issue_body.md
-          fi
+          tail -n 500 build_log.txt >> issue_body.md
           echo '```' >> issue_body.md
           echo "" >> issue_body.md
           echo "[View full logs here](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> issue_body.md
