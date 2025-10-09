@@ -124,11 +124,15 @@ or in English:
 The procedure entry point _ZNSt7__cxx11... could not be located in usagi.exe
 ```
 
-**Cause**: This indicates a C++ ABI mismatch between the compiled application and your system's MinGW runtime libraries.
+**Cause**: This error indicates that the application was built with C++11 ABI but the required MinGW runtime libraries (libstdc++ and libgcc) are not found on your system.
 
-**Solution**: The project is already configured to use the old (pre-C++11) ABI for maximum compatibility. If you're building from source, ensure you're using the latest version of CMakeLists.txt which includes the `_GLIBCXX_USE_CXX11_ABI=0` flag.
+**Solution**: The project is configured to statically link the C++ standard library and GCC runtime, which means the application should run without requiring MinGW DLLs on your system. If you're building from source:
 
-**For developers**: The `_GLIBCXX_USE_CXX11_ABI=0` compiler definition in CMakeLists.txt ensures that the application uses the old ABI, which is compatible with older MinGW runtime libraries that don't have C++11 ABI support.
+1. Ensure you're using LLVM MinGW toolchain (not standard GCC MinGW)
+2. The CMakeLists.txt includes `-static-libstdc++ -static-libgcc` flags that embed the runtime into the executable
+3. Rebuild with the latest version from this repository
+
+**For developers**: The application uses modern C++11 ABI but statically links the runtime libraries to avoid dependency issues on end-user systems.
 
 ### CMake picks wrong compiler on Windows
 

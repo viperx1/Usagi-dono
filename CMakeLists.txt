@@ -90,6 +90,12 @@ if(WIN32)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
     set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
     
+    # Static link libstdc++ and libgcc to avoid runtime DLL dependencies
+    # This prevents "procedure entry point not found" errors on systems without matching MinGW runtime
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+    
     # Clean up any MSVC-style linker flags if CMake incorrectly detected compiler mode
     # This should not normally happen with proper LLVM MinGW, but we handle it defensively
     string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
