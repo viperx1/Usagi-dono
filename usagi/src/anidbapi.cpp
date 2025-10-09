@@ -1,3 +1,4 @@
+// API definition available at https://wiki.anidb.net/UDP_API_Definition
 #include "anidbapi.h"
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
