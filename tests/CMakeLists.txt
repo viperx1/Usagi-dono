@@ -8,15 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Enable debug symbols for crash log stack traces
 # This allows crash logs to show function names from Usagi codebase
-# GCC/Clang/LLVM: Add -g for debug symbols
-# LLVM/Clang on Windows: Also add -gcodeview to generate CodeView format for DbgHelp API
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # LLVM/Clang on Windows with MinGW target generates DWARF by default,
-    # but Windows DbgHelp API requires CodeView format to resolve symbols
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gcodeview")
-else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-endif()
+# Using DWARF debug format for all platforms
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 # Find Qt6
 find_package(Qt6 COMPONENTS Core Test Gui REQUIRED)
@@ -41,17 +34,6 @@ set(HASH_TEST_HEADERS
 
 add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
 
-# On Windows with Clang, add linker options to generate PDB file
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # LLD linker is already set globally in root CMakeLists.txt via -fuse-ld=lld
-    # Just specify PDB filename: <output_dir>/<executable_name>.pdb
-    target_link_options(test_hash PRIVATE "-Wl,--pdb=$<TARGET_FILE_DIR:test_hash>/$<TARGET_FILE_BASE_NAME:test_hash>.pdb")
-elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # GCC/MinGW generates DWARF which Windows DbgHelp cannot reliably read
-    message(WARNING "Building test_hash with GCC/MinGW on Windows. Crash logs may not show function names. "
-                    "Use Clang/LLVM for full crash log functionality with PDB generation.")
-endif()
-
 target_link_libraries(test_hash PRIVATE
     Qt6::Core
     Qt6::Test
@@ -74,17 +56,6 @@ set(CRASHLOG_TEST_HEADERS
 )
 
 add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
-
-# On Windows with Clang, add linker options to generate PDB file
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # LLD linker is already set globally in root CMakeLists.txt via -fuse-ld=lld
-    # Just specify PDB filename: <output_dir>/<executable_name>.pdb
-    target_link_options(test_crashlog PRIVATE "-Wl,--pdb=$<TARGET_FILE_DIR:test_crashlog>/$<TARGET_FILE_BASE_NAME:test_crashlog>.pdb")
-elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # GCC/MinGW generates DWARF which Windows DbgHelp cannot reliably read
-    message(WARNING "Building test_crashlog with GCC/MinGW on Windows. Crash logs may not show function names. "
-                    "Use Clang/LLVM for full crash log functionality with PDB generation.")
-endif()
 
 target_link_libraries(test_crashlog PRIVATE
     Qt6::Core

@@ -8,15 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Enable debug symbols for crash log stack traces
 # This allows crash logs to show function names from Usagi codebase
-# GCC/Clang/LLVM: Add -g for debug symbols
-# LLVM/Clang on Windows: Also add -gcodeview to generate CodeView format for DbgHelp API
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # LLVM/Clang on Windows with MinGW target generates DWARF by default,
-    # but Windows DbgHelp API requires CodeView format to resolve symbols
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -gcodeview")
-else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-endif()
+# Using DWARF debug format for all platforms
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 # Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
 # that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT
@@ -58,22 +51,6 @@ set(HEADERS
 
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
-
-# On Windows with Clang, add linker options to generate PDB file
-# The PDB file is required for DbgHelp to resolve symbols at runtime
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # LLD linker is already set globally in root CMakeLists.txt via -fuse-ld=lld
-    # Just specify PDB filename: <output_dir>/<executable_name>.pdb
-    target_link_options(usagi PRIVATE "-Wl,--pdb=$<TARGET_FILE_DIR:usagi>/$<TARGET_FILE_BASE_NAME:usagi>.pdb")
-elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # GCC/MinGW on Windows generates DWARF debug format in the executable
-    # Windows DbgHelp API has limited support for DWARF and cannot reliably resolve symbols
-    # For proper crash log function names on Windows, use Clang with -gcodeview and LLD linker
-    message(WARNING "Building with GCC/MinGW on Windows. Crash logs may not show function names "
-                    "from the Usagi codebase because GCC generates DWARF debug format which "
-                    "Windows DbgHelp API cannot reliably read. For full crash log functionality, "
-                    "use Clang/LLVM compiler which can generate PDB files with CodeView debug format.")
-endif()
 
 # Link Qt libraries
 target_link_libraries(usagi PRIVATE
