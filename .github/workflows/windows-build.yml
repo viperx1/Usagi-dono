@@ -2,12 +2,8 @@ name: Windows Build & Release (Qt 6.9.2 LLVM MinGW)
 
 on:
   push:
-    branches:
-      - master
-      - dev
-    tags:
-      - 'v*.*.*'
-      - 'v*.*.*-beta*'
+    branches: [ master, dev ]
+    tags: [ 'v*.*.*', 'v*.*.*-beta*' ]
 
 permissions:
   contents: read
@@ -34,36 +30,30 @@ jobs:
       - name: Install CMake and Ninja
         uses: lukka/get-cmake@latest
 
-      # Capture logs for configure, build, and test
-      - name: Configure, build, and test
+      - name: Locate LLVM MinGW compiler
+        id: locate-clang
+        shell: bash
         run: |
-          # Find the LLVM MinGW compiler from Qt installation
-          # Try multiple possible locations
-          
           echo "Debug: QT_ROOT_DIR=$QT_ROOT_DIR"
           echo "Debug: IQTA_TOOLS=$IQTA_TOOLS"
           echo "Debug: PATH=$PATH"
-          
+
           CLANG_PATH=""
           CLANGXX_PATH=""
-          
-          # Strategy 1: Check if clang is already in PATH (install-qt-action might add it)
+
           if command -v clang.exe &>/dev/null; then
             CLANG_PATH=$(command -v clang.exe)
             CLANGXX_PATH=$(command -v clang++.exe)
             echo "Found clang in PATH: $CLANG_PATH"
           fi
-          
-          # Strategy 2: Check QT_ROOT_DIR/bin (direct Qt installation)
+
           if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ] && [ -f "$QT_ROOT_DIR/bin/clang.exe" ]; then
             CLANG_PATH="$QT_ROOT_DIR/bin/clang.exe"
             CLANGXX_PATH="$QT_ROOT_DIR/bin/clang++.exe"
             echo "Found clang in QT_ROOT_DIR/bin: $CLANG_PATH"
           fi
-          
-          # Strategy 3: Check Tools directory relative to QT_ROOT_DIR
+
           if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ]; then
-            # Qt installation structure: Qt/6.9.2/llvm-mingw_64 -> Qt/Tools/llvm-mingw*/bin
             QT_BASE=$(dirname $(dirname "$QT_ROOT_DIR"))
             QT_TOOLS="$QT_BASE/Tools"
             if [ -d "$QT_TOOLS" ]; then
@@ -75,9 +65,8 @@ jobs:
               fi
             fi
           fi
-          
-          # Strategy 4: Use IQTA_TOOLS environment variable
-          if [ -z "$CLANG_PATH" ] && [ -n "$IQTA_TOOLS" ] && [ -d "$IQTA_TOOLS" ]; then
+
+          if [ -z "$CLANG_PATH" ] && [ -n "$IQTA_TOOLS" ]; then
             QT_LLVM_MINGW=$(find "$IQTA_TOOLS" -type d -name "llvm-mingw*" 2>/dev/null | head -n 1)
             if [ -n "$QT_LLVM_MINGW" ] && [ -f "$QT_LLVM_MINGW/bin/clang.exe" ]; then
               CLANG_PATH="$QT_LLVM_MINGW/bin/clang.exe"
@@ -85,11 +74,9 @@ jobs:
               echo "Found clang via IQTA_TOOLS: $CLANG_PATH"
             fi
           fi
-          
-          # Strategy 5: Search entire Qt installation directory
+
           if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ]; then
             QT_BASE=$(dirname $(dirname "$QT_ROOT_DIR"))
-            echo "Searching for clang.exe in Qt installation: $QT_BASE"
             FOUND_CLANG=$(find "$QT_BASE" -type f -name "clang.exe" 2>/dev/null | head -n 1)
             if [ -n "$FOUND_CLANG" ]; then
               CLANG_PATH="$FOUND_CLANG"
@@ -98,56 +85,58 @@ jobs:
               echo "Found clang via recursive search: $CLANG_PATH"
             fi
           fi
-          
+
           if [ -z "$CLANG_PATH" ]; then
             echo "Error: Cannot find LLVM MinGW compiler"
-            echo "Attempted search paths:"
-            echo "  - PATH environment variable"
-            echo "  - QT_ROOT_DIR/bin"
-            echo "  - Qt Tools directory"
-            echo "  - IQTA_TOOLS directory"
-            echo "  - Recursive search in Qt installation"
             exit 1
           fi
-          
-          echo "Clang path: $CLANG_PATH"
-          echo "Clang++ path: $CLANGXX_PATH"
-          
-          # Verify compilers exist
-          if [ ! -f "$CLANG_PATH" ] || [ ! -f "$CLANGXX_PATH" ]; then
-            echo "Error: Clang compilers not found at expected paths"
-            echo "CLANG_PATH exists: $([ -f "$CLANG_PATH" ] && echo yes || echo no)"
-            echo "CLANGXX_PATH exists: $([ -f "$CLANGXX_PATH" ] && echo yes || echo no)"
-            exit 1
-          fi
-          
-          # Configure with LLVM MinGW Clang compiler
-          cmake -G "Ninja" -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER="$CLANG_PATH" \
-            -DCMAKE_CXX_COMPILER="$CLANGXX_PATH" \
-            2>&1 | tee build_log.txt
-          
-          cmake --build build --config Release 2>&1 | tee -a build_log.txt
-          ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
-        shell: bash
 
+          echo "clang-path=$CLANG_PATH" >> $GITHUB_OUTPUT
+          echo "clangxx-path=$CLANGXX_PATH" >> $GITHUB_OUTPUT
+
+      # 🧠 Configure step (force GNU frontend, prevent MSVC fallback)
+      - name: Configure (CMake)
+        shell: bash
+        run: |
+          cmake -S . -B build -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER="${{ steps.locate-clang.outputs.clang-path }}" \
+            -DCMAKE_CXX_COMPILER="${{ steps.locate-clang.outputs.clangxx-path }}" \
+            -DCMAKE_C_COMPILER_TARGET=x86_64-w64-mingw32 \
+            -DCMAKE_CXX_COMPILER_TARGET=x86_64-w64-mingw32 \
+            -DCMAKE_C_COMPILER_FRONTEND_VARIANT=GNU \
+            -DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=GNU \
+            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
+            2>&1 | tee build_log.txt
+
+      # 🔨 Build step
+      - name: Build (Ninja)
+        shell: bash
+        run: |
+          cmake --build build --config Release 2>&1 | tee -a build_log.txt
+
+      # 🧪 Test step
+      - name: Test (CTest)
+        shell: bash
+        run: |
+          ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
+
+      # 📦 Upload artifact
       - name: Upload build artifact (Alpha, LLVM)
         if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
         uses: actions/upload-artifact@v4
         with:
           name: Usagi-dono-alpha-llvm
-          path: |
-            build/**/*.exe
+          path: build/**/*.exe
 
       - name: Create Release & Upload (Stable/Beta, LLVM)
         if: success() && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/*.exe
+          files: build/*.exe
 
-      # 👇 The magic failure handler
+      # 🚨 Automatic issue on failure
       - name: Create issue with build/test logs on failure
         if: failure()
         run: |
