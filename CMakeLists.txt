@@ -67,6 +67,11 @@ if(WIN32)
     
     message(STATUS "Configuring for LLVM MinGW Clang on Windows")
 
+    # Force CMake to treat Clang as GNU-compatible, not MSVC-compatible
+    # This prevents CMake from using MSVC-style flags like -fuse-ld=lld-link
+    set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
+    set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
+
     # Ensure debug info isn't stripped
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
 

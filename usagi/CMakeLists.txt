@@ -64,6 +64,13 @@ target_link_libraries(usagi PRIVATE
 # Link platform-specific libraries
 if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
+    
+    # Force GNU-style linking for LLVM MinGW by explicitly setting target link options
+    # This overrides any MSVC-style flags that Qt might have added
+    target_link_options(usagi PRIVATE
+        "-fuse-ld=lld"  # Use LLD with GNU-style interface
+        "-Wl,--subsystem,console"  # GNU-style subsystem flag instead of MSVC /subsystem:console
+    )
 endif()
 
 # Include directories
