@@ -1,4 +1,5 @@
 name: Windows Build & Release (Qt 6.9.2 LLVM MinGW)
+# log every step to separate file and export them to issue on failure
 
 on:
   push:
@@ -48,27 +49,39 @@ jobs:
       - name: Configure (CMake)
         shell: bash
         run: |
+          echo "=== Starting CMake Configuration ===" | tee configure.log
           cmake -S . -B build -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER="clang.exe" \
             -DCMAKE_CXX_COMPILER="clang++.exe" \
-            -DCMAKE_C_COMPILER_TARGET=x86_64-w64-mingw32 \
-            -DCMAKE_CXX_COMPILER_TARGET=x86_64-w64-mingw32 \
-            -DCMAKE_C_COMPILER_FRONTEND_VARIANT=GNU \
-            -DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=GNU \
-            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
-            2>&1 | tee build_log.txt
+            2>&1 | tee -a configure.log
+          echo "=== CMake Configuration Complete ===" | tee -a configure.log
 
       - name: Build
-        run: cmake --build build --config Release 2>&1 | tee -a build_log.txt
         shell: bash
+        run: |
+          echo "=== Starting Build ===" | tee build.log
+          cmake --build build --config Release 2>&1 | tee -a build.log
+          echo "=== Build Complete ===" | tee -a build.log
 
       - name: Run tests
-        run: ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
         shell: bash
+        run: |
+          echo "=== Starting Tests ===" | tee test.log
+          ctest --output-on-failure --test-dir build 2>&1 | tee -a test.log
+          echo "=== Tests Complete ===" | tee -a test.log
 
+      - name: Upload log files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            configure.log
+            build.log
+            test.log
+          retention-days: 30
 
       - name: Upload build artifact (Alpha, LLVM)
         if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
@@ -94,18 +107,35 @@ jobs:
           echo "**Branch/Tag:** ${{ github.ref }}" >> issue_body.md
           echo "**Commit:** ${{ github.sha }}" >> issue_body.md
           echo "" >> issue_body.md
-          echo "### Configure log" >> issue_body.md
-          echo '```' >> issue_body.md
-          tail -n 200 build/configure_log.txt >> issue_body.md
-          echo '```' >> issue_body.md
-          echo "### Build log" >> issue_body.md
-          echo '```' >> issue_body.md
-          tail -n 200 build/build_log.txt >> issue_body.md
-          echo '```' >> issue_body.md
-          echo "### Test log" >> issue_body.md
-          echo '```' >> issue_body.md
-          tail -n 200 build/test_log.txt >> issue_body.md
-          echo '```' >> issue_body.md
+          
+          # Add configure log if it exists
+          if [ -f configure.log ]; then
+            echo "### Configure Log" >> issue_body.md
+            echo '```' >> issue_body.md
+            tail -n 100 configure.log >> issue_body.md
+            echo '```' >> issue_body.md
+            echo "" >> issue_body.md
+          fi
+          
+          # Add build log if it exists
+          if [ -f build.log ]; then
+            echo "### Build Log" >> issue_body.md
+            echo '```' >> issue_body.md
+            tail -n 100 build.log >> issue_body.md
+            echo '```' >> issue_body.md
+            echo "" >> issue_body.md
+          fi
+          
+          # Add test log if it exists
+          if [ -f test.log ]; then
+            echo "### Test Log" >> issue_body.md
+            echo '```' >> issue_body.md
+            tail -n 100 test.log >> issue_body.md
+            echo '```' >> issue_body.md
+            echo "" >> issue_body.md
+          fi
+          
+          echo "📎 Full logs are available in the workflow artifacts." >> issue_body.md
 
           gh issue create \
             --title "🚨 Build failed: ${{ github.workflow }} on ${{ github.ref }}" \
