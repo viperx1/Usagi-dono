@@ -116,7 +116,7 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 # ⚙️ QT SETUP
 # ==========================================================
 
-find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql REQUIRED)
+find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -144,9 +144,10 @@ if(WIN32)
         if(TARGET ${qt_target})
             get_target_property(qt_link_options ${qt_target} INTERFACE_LINK_OPTIONS)
             if(qt_link_options)
-                # Remove -fuse-ld=lld-link from Qt's interface link options
+                # Remove -fuse-ld=lld-link and MSVC-style subsystem flags from Qt's interface link options
                 list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld-link$")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/subsystem:")
+                list(FILTER qt_link_options EXCLUDE REGEX "lld-link")
                 set_target_properties(${qt_target} PROPERTIES INTERFACE_LINK_OPTIONS "${qt_link_options}")
             endif()
         endif()
