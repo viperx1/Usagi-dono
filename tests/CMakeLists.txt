@@ -2,7 +2,19 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi_tests LANGUAGES CXX)
 
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Enable debug symbols for crash log stack traces
+# This allows crash logs to show function names from Usagi codebase
+# Using DWARF debug format for all platforms
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+
 # Note: Qt6 is already found in the root CMakeLists.txt, no need to find it again
+
+# Enable automatic MOC
+set(CMAKE_AUTOMOC ON)
 
 # Enable testing
 enable_testing()
