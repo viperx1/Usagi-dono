@@ -37,44 +37,59 @@ jobs:
       # Capture logs for configure, build, and test
       - name: Configure, build, and test
         run: |
-          # Try to use Clang from Qt LLVM MinGW installation if available
-          # QT_ROOT_DIR is set by install-qt-action to the Qt installation directory
-          # Note: Qt LLVM MinGW distributions may or may not include the compiler toolchain
+          # This project requires LLVM MinGW Clang compiler
+          # Try to use Clang from Qt LLVM MinGW installation first
           
           # Convert backslashes to forward slashes for consistent path handling
           QT_ROOT_UNIX=$(echo "${QT_ROOT_DIR}" | sed 's|\\|/|g')
           
           # Check if Qt installation includes the LLVM MinGW compiler toolchain
           if [ -f "${QT_ROOT_UNIX}/bin/clang++.exe" ]; then
-            # Compilers found in Qt installation - use them
+            # LLVM MinGW compilers found in Qt installation - use them
             export PATH="${QT_ROOT_UNIX}/bin:$PATH"
             export CC="${QT_ROOT_UNIX}/bin/clang.exe"
             export CXX="${QT_ROOT_UNIX}/bin/clang++.exe"
-            echo "Using Clang from Qt: ${CXX}"
-            "${CXX}" --version || echo "Warning: Failed to run clang++ --version"
+            echo "✓ Using LLVM MinGW Clang from Qt: ${CXX}"
+            "${CXX}" --version
             
             cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_C_COMPILER="${CC}" \
               -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
           else
-            # Qt installation doesn't include compilers - let CMake auto-detect
-            echo "Note: Qt LLVM MinGW installation does not include compiler toolchain"
-            echo "CMake will auto-detect available compilers"
-            echo "QT_ROOT_DIR=${QT_ROOT_DIR}"
+            # Qt installation doesn't include compilers
+            echo "⚠ Qt LLVM MinGW installation does not include compiler toolchain"
+            echo "This project requires LLVM MinGW Clang compiler"
             
-            # Try to find clang++ in PATH
-            if command -v clang++ &> /dev/null; then
-              CLANG_PATH=$(command -v clang++)
-              echo "Found Clang in PATH: ${CLANG_PATH}"
-              export CC="clang.exe"
-              export CXX="clang++.exe"
-              cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_C_COMPILER="${CC}" \
-                -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
-            else
-              echo "Clang not found in PATH, using default system compiler"
-              cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee build_log.txt
+            # Check for LLVM MinGW in standard installation paths
+            LLVM_MINGW_PATHS=(
+              "C:/Qt/Tools/llvm-mingw/bin/clang++.exe"
+              "${QT_ROOT_UNIX}/../Tools/llvm-mingw/bin/clang++.exe"
+            )
+            
+            FOUND_LLVM_MINGW=false
+            for LLVM_PATH in "${LLVM_MINGW_PATHS[@]}"; do
+              if [ -f "$LLVM_PATH" ]; then
+                LLVM_DIR=$(dirname "$LLVM_PATH")
+                export PATH="${LLVM_DIR}:$PATH"
+                export CC="${LLVM_DIR}/clang.exe"
+                export CXX="${LLVM_DIR}/clang++.exe"
+                echo "✓ Found LLVM MinGW at: ${LLVM_DIR}"
+                "${CXX}" --version
+                FOUND_LLVM_MINGW=true
+                break
+              fi
+            done
+            
+            if [ "$FOUND_LLVM_MINGW" = false ]; then
+              echo "❌ ERROR: LLVM MinGW Clang compiler not found!"
+              echo "This project requires LLVM MinGW Clang (not MSVC or clang-cl)"
+              echo "Please ensure Qt is installed with LLVM MinGW toolchain"
+              exit 1
             fi
+            
+            cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER="${CC}" \
+              -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
           fi
           
           cmake --build build --config Release 2>&1 | tee -a build_log.txt

@@ -36,43 +36,68 @@ set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${DEBUG_FLAGS}")
 # ==========================================================
 
 if(WIN32)
+    # This project is designed for Windows with LLVM MinGW only
+    # We do not support MSVC, GCC, or MSVC-compatible clang-cl
+    
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR 
+            "This project requires LLVM MinGW Clang compiler on Windows.\n"
+            "Current compiler: ${CMAKE_CXX_COMPILER_ID}\n"
+            "Please install Qt with LLVM MinGW toolchain and configure CMake to use it.\n"
+            "See BUILD.md for instructions.")
+    endif()
+
+    # Verify this is LLVM MinGW (not MSVC-compatible clang-cl)
+    # LLVM MinGW Clang accepts --target=x86_64-w64-mingw32 flag
+    execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} --target=x86_64-w64-mingw32 --version
+        RESULT_VARIABLE MINGW_CHECK_RESULT
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    
+    if(NOT MINGW_CHECK_RESULT EQUAL 0)
+        message(FATAL_ERROR
+            "This project requires LLVM MinGW Clang (not clang-cl or MSVC-compatible Clang).\n"
+            "The detected Clang compiler does not support MinGW target.\n"
+            "Compiler: ${CMAKE_CXX_COMPILER}\n"
+            "Please install Qt with LLVM MinGW toolchain.\n"
+            "See BUILD.md for instructions.")
+    endif()
+    
+    message(STATUS "Configuring for LLVM MinGW Clang on Windows")
+
     # Ensure debug info isn't stripped
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
 
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        message(STATUS "Configuring for Clang with MinGW target")
+    # Force target to MinGW ABI (required to link against Qt MinGW libraries)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
 
-        # Force target to MinGW ABI (so it links against Qt MinGW libs)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
-
-        # Use the LLD linker with GNU-style interface (not lld-link)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
-        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
-        
-        # Remove any MSVC-style linker flags that might have been added by CMake's Clang detection
-        # This is necessary when using system LLVM on Windows with MinGW target
-        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
-        
-        # Remove problematic MSVC-style flags that CMake might add
-        string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-        string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-        string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-        string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-        
-        # Override the link rule template to use GNU-style linking
-        # CMake's Clang detection on Windows sets MSVC-style link rules, but we need GNU-style
-        # This ensures -nostartfiles/-nostdlib and other MSVC flags don't get added
-        set(CMAKE_CXX_LINK_EXECUTABLE
-            "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
-        set(CMAKE_CXX_CREATE_SHARED_LIBRARY
-            "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
-        
-        message(STATUS "Initial CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
-    endif()
+    # Use the LLD linker with GNU-style interface (not lld-link)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+    
+    # Clean up any MSVC-style linker flags if CMake incorrectly detected compiler mode
+    # This should not normally happen with proper LLVM MinGW, but we handle it defensively
+    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+    
+    # Remove problematic MSVC-style flags if present
+    string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+    string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+    string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+    string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+    
+    # Override link rule templates to ensure GNU-style linking for LLVM MinGW
+    set(CMAKE_CXX_LINK_EXECUTABLE
+        "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+    set(CMAKE_CXX_CREATE_SHARED_LIBRARY
+        "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
+    
+    message(STATUS "CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
 endif()
 
 # ==========================================================
@@ -93,25 +118,22 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 # ==========================================================
-# 🔧 POST-QT LINKER FLAGS CLEANUP (Windows + Clang only)
+# 🔧 POST-QT LINKER FLAGS CLEANUP (LLVM MinGW only)
 # ==========================================================
-# Qt's CMake configuration or CMake's platform detection may add MSVC-style
-# linker flags when it detects Clang on Windows. We need to remove these
-# since we're using MinGW target with GNU-style linking.
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Remove MSVC-style -fuse-ld=lld-link flag if present
+# Qt's CMake configuration may add unexpected flags. Clean them up to ensure
+# we maintain GNU-style linking for LLVM MinGW.
+if(WIN32)
+    # Remove MSVC-style flags if Qt's CMake config added them
     string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
     string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
     
-    # Remove problematic MSVC-style flags that might be added by Qt or CMake
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     
-    message(STATUS "Cleaned up linker flags after Qt find_package")
-    message(STATUS "CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
+    message(STATUS "Post-Qt CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
 endif()
 
 # ==========================================================
