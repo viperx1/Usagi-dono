@@ -38,13 +38,13 @@ jobs:
         id: locate-clang
         shell: bash
         run: |
-          QT_BIN="/d/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/bin"
-          if [ -f "$QT_BIN/clang.exe" ]; then
-            echo "clang-path=$QT_BIN/clang.exe" >> $GITHUB_OUTPUT
-            echo "clangxx-path=$QT_BIN/clang++.exe" >> $GITHUB_OUTPUT
+          LLVM_MINGW_DIR=$(find "D:/a/Usagi-dono/Qt/6.9.2/Tools" -type d -name "llvm-mingw*" | head -n 1)
+          if [ -f "$LLVM_MINGW_DIR/bin/clang.exe" ]; then
+          echo "clang-path=$LLVM_MINGW_DIR/bin/clang.exe" >> $GITHUB_OUTPUT
+          echo "clangxx-path=$LLVM_MINGW_DIR/bin/clang++.exe" >> $GITHUB_OUTPUT
           else
-            echo "Error: clang not found in $QT_BIN"
-            exit 1
+          echo "Error: clang not found in $LLVM_MINGW_DIR"
+          exit 1
           fi
 
       - name: Configure (CMake)
