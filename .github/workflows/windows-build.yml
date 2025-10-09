@@ -45,6 +45,10 @@ jobs:
           echo "C:\llvm-mingw\bin" >> $GITHUB_PATH
         shell: powershell
 
+      - name: Create build directory
+        shell: bash
+        run: mkdir -p build
+
       - name: Configure (CMake)
         shell: bash
         run: |
@@ -96,15 +100,27 @@ jobs:
           echo "" >> issue_body.md
           echo "### Configure log" >> issue_body.md
           echo '```' >> issue_body.md
-          tail -n 200 build/configure_log.txt >> issue_body.md
+          if [ -f build/configure_log.txt ]; then
+            tail -n 200 build/configure_log.txt >> issue_body.md
+          else
+            echo "Log file not available" >> issue_body.md
+          fi
           echo '```' >> issue_body.md
           echo "### Build log" >> issue_body.md
           echo '```' >> issue_body.md
-          tail -n 200 build/build_log.txt >> issue_body.md
+          if [ -f build/build_log.txt ]; then
+            tail -n 200 build/build_log.txt >> issue_body.md
+          else
+            echo "Log file not available" >> issue_body.md
+          fi
           echo '```' >> issue_body.md
           echo "### Test log" >> issue_body.md
           echo '```' >> issue_body.md
-          tail -n 200 build/test_log.txt >> issue_body.md
+          if [ -f build/test_log.txt ]; then
+            tail -n 200 build/test_log.txt >> issue_body.md
+          else
+            echo "Log file not available" >> issue_body.md
+          fi
           echo '```' >> issue_body.md
 
           gh issue create \
