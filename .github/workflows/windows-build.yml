@@ -38,17 +38,75 @@ jobs:
       - name: Configure, build, and test
         run: |
           # Find the LLVM MinGW compiler from Qt installation
-          # The compiler is typically in the Qt installation bin directory
-          if [ -n "$QT_ROOT_DIR" ] && [ -f "$QT_ROOT_DIR/bin/clang.exe" ]; then
+          # Try multiple possible locations
+          
+          echo "Debug: QT_ROOT_DIR=$QT_ROOT_DIR"
+          echo "Debug: IQTA_TOOLS=$IQTA_TOOLS"
+          echo "Debug: PATH=$PATH"
+          
+          CLANG_PATH=""
+          CLANGXX_PATH=""
+          
+          # Strategy 1: Check if clang is already in PATH (install-qt-action might add it)
+          if command -v clang.exe &>/dev/null; then
+            CLANG_PATH=$(command -v clang.exe)
+            CLANGXX_PATH=$(command -v clang++.exe)
+            echo "Found clang in PATH: $CLANG_PATH"
+          fi
+          
+          # Strategy 2: Check QT_ROOT_DIR/bin (direct Qt installation)
+          if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ] && [ -f "$QT_ROOT_DIR/bin/clang.exe" ]; then
             CLANG_PATH="$QT_ROOT_DIR/bin/clang.exe"
             CLANGXX_PATH="$QT_ROOT_DIR/bin/clang++.exe"
-          elif [ -n "$IQTA_TOOLS" ]; then
-            # Fallback: search in IQTA_TOOLS directory
+            echo "Found clang in QT_ROOT_DIR/bin: $CLANG_PATH"
+          fi
+          
+          # Strategy 3: Check Tools directory relative to QT_ROOT_DIR
+          if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ]; then
+            # Qt installation structure: Qt/6.9.2/llvm-mingw_64 -> Qt/Tools/llvm-mingw*/bin
+            QT_BASE=$(dirname $(dirname "$QT_ROOT_DIR"))
+            QT_TOOLS="$QT_BASE/Tools"
+            if [ -d "$QT_TOOLS" ]; then
+              QT_LLVM_MINGW=$(find "$QT_TOOLS" -type d -name "llvm-mingw*" 2>/dev/null | head -n 1)
+              if [ -n "$QT_LLVM_MINGW" ] && [ -f "$QT_LLVM_MINGW/bin/clang.exe" ]; then
+                CLANG_PATH="$QT_LLVM_MINGW/bin/clang.exe"
+                CLANGXX_PATH="$QT_LLVM_MINGW/bin/clang++.exe"
+                echo "Found clang in Tools directory: $CLANG_PATH"
+              fi
+            fi
+          fi
+          
+          # Strategy 4: Use IQTA_TOOLS environment variable
+          if [ -z "$CLANG_PATH" ] && [ -n "$IQTA_TOOLS" ] && [ -d "$IQTA_TOOLS" ]; then
             QT_LLVM_MINGW=$(find "$IQTA_TOOLS" -type d -name "llvm-mingw*" 2>/dev/null | head -n 1)
-            CLANG_PATH="$QT_LLVM_MINGW/bin/clang.exe"
-            CLANGXX_PATH="$QT_LLVM_MINGW/bin/clang++.exe"
-          else
+            if [ -n "$QT_LLVM_MINGW" ] && [ -f "$QT_LLVM_MINGW/bin/clang.exe" ]; then
+              CLANG_PATH="$QT_LLVM_MINGW/bin/clang.exe"
+              CLANGXX_PATH="$QT_LLVM_MINGW/bin/clang++.exe"
+              echo "Found clang via IQTA_TOOLS: $CLANG_PATH"
+            fi
+          fi
+          
+          # Strategy 5: Search entire Qt installation directory
+          if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ]; then
+            QT_BASE=$(dirname $(dirname "$QT_ROOT_DIR"))
+            echo "Searching for clang.exe in Qt installation: $QT_BASE"
+            FOUND_CLANG=$(find "$QT_BASE" -type f -name "clang.exe" 2>/dev/null | head -n 1)
+            if [ -n "$FOUND_CLANG" ]; then
+              CLANG_PATH="$FOUND_CLANG"
+              CLANG_DIR=$(dirname "$FOUND_CLANG")
+              CLANGXX_PATH="$CLANG_DIR/clang++.exe"
+              echo "Found clang via recursive search: $CLANG_PATH"
+            fi
+          fi
+          
+          if [ -z "$CLANG_PATH" ]; then
             echo "Error: Cannot find LLVM MinGW compiler"
+            echo "Attempted search paths:"
+            echo "  - PATH environment variable"
+            echo "  - QT_ROOT_DIR/bin"
+            echo "  - Qt Tools directory"
+            echo "  - IQTA_TOOLS directory"
+            echo "  - Recursive search in Qt installation"
             exit 1
           fi
           
@@ -58,6 +116,8 @@ jobs:
           # Verify compilers exist
           if [ ! -f "$CLANG_PATH" ] || [ ! -f "$CLANGXX_PATH" ]; then
             echo "Error: Clang compilers not found at expected paths"
+            echo "CLANG_PATH exists: $([ -f "$CLANG_PATH" ] && echo yes || echo no)"
+            echo "CLANGXX_PATH exists: $([ -f "$CLANGXX_PATH" ] && echo yes || echo no)"
             exit 1
           fi
           
@@ -98,7 +158,11 @@ jobs:
           echo "" >> issue_body.md
           echo "### Logs (truncated to last 500 lines)" >> issue_body.md
           echo '```' >> issue_body.md
-          tail -n 500 build_log.txt >> issue_body.md
+          if [ -f build_log.txt ]; then
+            tail -n 500 build_log.txt >> issue_body.md
+          else
+            echo "Build log file not found. Build may have failed before log file creation." >> issue_body.md
+          fi
           echo '```' >> issue_body.md
           echo "" >> issue_body.md
           echo "[View full logs here](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> issue_body.md
