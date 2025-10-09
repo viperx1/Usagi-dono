@@ -138,16 +138,29 @@ if(WIN32)
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     
-    # Clean up Qt target interface link options
-    # Qt6 imported targets might have MSVC-style linker flags in their INTERFACE_LINK_OPTIONS
+    # Clean up Qt target interface options
+    # Qt6 imported targets might have MSVC-style flags in their INTERFACE_LINK_OPTIONS and INTERFACE_COMPILE_OPTIONS
     foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
         if(TARGET ${qt_target})
+            # Clean up compile options (removes -Xclang --dependent-lib=msvcrt, -D_DLL, -D_MT)
+            get_target_property(qt_compile_options ${qt_target} INTERFACE_COMPILE_OPTIONS)
+            if(qt_compile_options)
+                list(FILTER qt_compile_options EXCLUDE REGEX "dependent-lib")
+                list(FILTER qt_compile_options EXCLUDE REGEX "^-D_DLL$")
+                list(FILTER qt_compile_options EXCLUDE REGEX "^-D_MT$")
+                set_target_properties(${qt_target} PROPERTIES INTERFACE_COMPILE_OPTIONS "${qt_compile_options}")
+            endif()
+            
+            # Clean up link options (removes -fuse-ld=lld-link and MSVC-style subsystem flags)
             get_target_property(qt_link_options ${qt_target} INTERFACE_LINK_OPTIONS)
             if(qt_link_options)
                 # Remove -fuse-ld=lld-link and MSVC-style subsystem flags from Qt's interface link options
                 list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld-link$")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/subsystem:")
                 list(FILTER qt_link_options EXCLUDE REGEX "lld-link")
+                list(FILTER qt_link_options EXCLUDE REGEX "^-Xlinker$")
+                list(FILTER qt_link_options EXCLUDE REGEX "^/INCREMENTAL")
+                list(FILTER qt_link_options EXCLUDE REGEX "^/DEBUG")
                 set_target_properties(${qt_target} PROPERTIES INTERFACE_LINK_OPTIONS "${qt_link_options}")
             endif()
         endif()
