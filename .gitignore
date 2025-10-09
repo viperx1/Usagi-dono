@@ -37,3 +37,7 @@ Makefile
 *.cmake
 !CMakeLists.txt
 Testing/
+
+# GitHub Actions workflow artifacts
+build_log.txt
+issue_body.md

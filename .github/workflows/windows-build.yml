@@ -37,6 +37,10 @@ jobs:
       # Capture logs for configure, build, and test
       - name: Configure, build, and test
         run: |
+          # Redirect all output to build_log.txt using exec
+          # This ensures the log file is created even if the script fails early
+          exec > >(tee -a build_log.txt) 2>&1
+          
           # This project requires LLVM MinGW Clang compiler
           # Try to use Clang from Qt LLVM MinGW installation first
           
@@ -54,7 +58,7 @@ jobs:
             
             cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_C_COMPILER="${CC}" \
-              -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
+              -DCMAKE_CXX_COMPILER="${CXX}"
           else
             # Qt installation doesn't include compilers
             echo "⚠ Qt LLVM MinGW installation does not include compiler toolchain"
@@ -89,11 +93,11 @@ jobs:
             
             cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_C_COMPILER="${CC}" \
-              -DCMAKE_CXX_COMPILER="${CXX}" 2>&1 | tee build_log.txt
+              -DCMAKE_CXX_COMPILER="${CXX}"
           fi
           
-          cmake --build build --config Release 2>&1 | tee -a build_log.txt
-          ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
+          cmake --build build --config Release
+          ctest --output-on-failure --test-dir build
         shell: bash
 
       - name: Upload build artifact (Alpha, LLVM)
@@ -126,7 +130,12 @@ jobs:
           echo "" >> issue_body.md
           echo "### Logs (truncated to last 500 lines)" >> issue_body.md
           echo '```' >> issue_body.md
-          tail -n 500 build_log.txt >> issue_body.md
+          if [ -f build_log.txt ]; then
+            tail -n 500 build_log.txt >> issue_body.md
+          else
+            echo "⚠ build_log.txt not found - the build process failed very early" >> issue_body.md
+            echo "Check the GitHub Actions logs for details" >> issue_body.md
+          fi
           echo '```' >> issue_body.md
           echo "" >> issue_body.md
           echo "[View full logs here](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> issue_body.md
