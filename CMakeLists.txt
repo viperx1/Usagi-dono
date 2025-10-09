@@ -47,9 +47,16 @@ if(WIN32)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
 
         # Use the LLD linker with GNU-style interface (not lld-link)
+        # Important: Set these AFTER any find_package or other commands that might modify them
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
         set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+        
+        # Remove any MSVC-style linker flags that might have been added by CMake's Clang detection
+        # This is necessary when using system LLVM on Windows with MinGW target
+        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
     endif()
 endif()
 
@@ -69,6 +76,22 @@ find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql REQUIRED)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
+
+# ==========================================================
+# 🔧 POST-QT LINKER FLAGS CLEANUP (Windows + Clang only)
+# ==========================================================
+# Qt's CMake configuration or CMake's platform detection may add MSVC-style
+# linker flags when it detects Clang on Windows. We need to remove these
+# since we're using MinGW target with GNU-style linking.
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Remove MSVC-style -fuse-ld=lld-link flag if present
+    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+    
+    message(STATUS "Cleaned up linker flags after Qt find_package")
+    message(STATUS "CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
+endif()
 
 # ==========================================================
 # 🧪 TESTING
