@@ -47,7 +47,6 @@ if(WIN32)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
 
         # Use the LLD linker with GNU-style interface (not lld-link)
-        # Important: Set these AFTER any find_package or other commands that might modify them
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
         set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
@@ -59,11 +58,20 @@ if(WIN32)
         string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
         
         # Remove problematic MSVC-style flags that CMake might add
-        # -nostartfiles and -nostdlib prevent linking standard libraries
         string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
         string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
         string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
         string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+        
+        # Override the link rule template to use GNU-style linking
+        # CMake's Clang detection on Windows sets MSVC-style link rules, but we need GNU-style
+        # This ensures -nostartfiles/-nostdlib and other MSVC flags don't get added
+        set(CMAKE_CXX_LINK_EXECUTABLE
+            "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+        set(CMAKE_CXX_CREATE_SHARED_LIBRARY
+            "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
+        
+        message(STATUS "Initial CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
     endif()
 endif()
 
