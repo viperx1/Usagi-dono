@@ -30,7 +30,7 @@ jobs:
       - name: Download LLVM-MinGW
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20230804/llvm-mingw-20230804-ucrt-x86_64.zip" -OutFile "C:\llvm-mingw.zip"
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20251007/llvm-mingw-20251007-ucrt-x86_64.zip" -OutFile "C:\llvm-mingw.zip"
           Expand-Archive -Path "C:\llvm-mingw.zip" -DestinationPath "C:\llvm-mingw"
 
 
