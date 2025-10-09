@@ -113,6 +113,27 @@ See `.github/workflows/windows-build.yml` for details.
 
 ## Troubleshooting
 
+### Application fails to start with "procedure entry point not found" error
+
+If you see an error like:
+```
+Nie znaleziono punktu wejścia procedury _ZNSt7__cxx1118basic_stringstreamlcSt11char_traitslcESalcEEC1Ev w bibliotece usagi.exe
+```
+or in English:
+```
+The procedure entry point _ZNSt7__cxx11... could not be located in usagi.exe
+```
+
+**Cause**: This error indicates that the application was built with C++11 ABI but the required MinGW runtime libraries (libstdc++ and libgcc) are not found on your system.
+
+**Solution**: The project is configured to statically link the C++ standard library and GCC runtime, which means the application should run without requiring MinGW DLLs on your system. If you're building from source:
+
+1. Ensure you're using LLVM MinGW toolchain (not standard GCC MinGW)
+2. The CMakeLists.txt includes `-static-libstdc++ -static-libgcc` flags that embed the runtime into the executable
+3. Rebuild with the latest version from this repository
+
+**For developers**: The application uses modern C++11 ABI but statically links the runtime libraries to avoid dependency issues on end-user systems.
+
 ### CMake picks wrong compiler on Windows
 
 If CMake automatically detects GCC instead of Clang:
