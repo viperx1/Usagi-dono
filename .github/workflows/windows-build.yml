@@ -2,8 +2,12 @@ name: Windows Build & Release (Qt 6.9.2 LLVM MinGW)
 
 on:
   push:
-    branches: [ master, dev ]
-    tags: [ 'v*.*.*', 'v*.*.*-beta*' ]
+    branches:
+      - master
+      - dev
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-beta*'
 
 permissions:
   contents: read
@@ -30,138 +34,83 @@ jobs:
       - name: Install CMake and Ninja
         uses: lukka/get-cmake@latest
 
-      - name: Locate LLVM MinGW compiler
+      - name: Locate LLVM MinGW Clang
         id: locate-clang
         shell: bash
         run: |
-          echo "Debug: QT_ROOT_DIR=$QT_ROOT_DIR"
-          echo "Debug: IQTA_TOOLS=$IQTA_TOOLS"
-          echo "Debug: PATH=$PATH"
-
-          CLANG_PATH=""
-          CLANGXX_PATH=""
-
-          if command -v clang.exe &>/dev/null; then
-            CLANG_PATH=$(command -v clang.exe)
-            CLANGXX_PATH=$(command -v clang++.exe)
-            echo "Found clang in PATH: $CLANG_PATH"
-          fi
-
-          if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ] && [ -f "$QT_ROOT_DIR/bin/clang.exe" ]; then
-            CLANG_PATH="$QT_ROOT_DIR/bin/clang.exe"
-            CLANGXX_PATH="$QT_ROOT_DIR/bin/clang++.exe"
-            echo "Found clang in QT_ROOT_DIR/bin: $CLANG_PATH"
-          fi
-
-          if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ]; then
-            QT_BASE=$(dirname $(dirname "$QT_ROOT_DIR"))
-            QT_TOOLS="$QT_BASE/Tools"
-            if [ -d "$QT_TOOLS" ]; then
-              QT_LLVM_MINGW=$(find "$QT_TOOLS" -type d -name "llvm-mingw*" 2>/dev/null | head -n 1)
-              if [ -n "$QT_LLVM_MINGW" ] && [ -f "$QT_LLVM_MINGW/bin/clang.exe" ]; then
-                CLANG_PATH="$QT_LLVM_MINGW/bin/clang.exe"
-                CLANGXX_PATH="$QT_LLVM_MINGW/bin/clang++.exe"
-                echo "Found clang in Tools directory: $CLANG_PATH"
-              fi
-            fi
-          fi
-
-          if [ -z "$CLANG_PATH" ] && [ -n "$IQTA_TOOLS" ]; then
-            QT_LLVM_MINGW=$(find "$IQTA_TOOLS" -type d -name "llvm-mingw*" 2>/dev/null | head -n 1)
-            if [ -n "$QT_LLVM_MINGW" ] && [ -f "$QT_LLVM_MINGW/bin/clang.exe" ]; then
-              CLANG_PATH="$QT_LLVM_MINGW/bin/clang.exe"
-              CLANGXX_PATH="$QT_LLVM_MINGW/bin/clang++.exe"
-              echo "Found clang via IQTA_TOOLS: $CLANG_PATH"
-            fi
-          fi
-
-          if [ -z "$CLANG_PATH" ] && [ -n "$QT_ROOT_DIR" ]; then
-            QT_BASE=$(dirname $(dirname "$QT_ROOT_DIR"))
-            FOUND_CLANG=$(find "$QT_BASE" -type f -name "clang.exe" 2>/dev/null | head -n 1)
-            if [ -n "$FOUND_CLANG" ]; then
-              CLANG_PATH="$FOUND_CLANG"
-              CLANG_DIR=$(dirname "$FOUND_CLANG")
-              CLANGXX_PATH="$CLANG_DIR/clang++.exe"
-              echo "Found clang via recursive search: $CLANG_PATH"
-            fi
-          fi
-
-          if [ -z "$CLANG_PATH" ]; then
-            echo "Error: Cannot find LLVM MinGW compiler"
+          QT_BIN="/d/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/bin"
+          if [ -f "$QT_BIN/clang.exe" ]; then
+            echo "clang-path=$QT_BIN/clang.exe" >> $GITHUB_OUTPUT
+            echo "clangxx-path=$QT_BIN/clang++.exe" >> $GITHUB_OUTPUT
+          else
+            echo "Error: clang not found in $QT_BIN"
             exit 1
           fi
 
-          echo "clang-path=$CLANG_PATH" >> $GITHUB_OUTPUT
-          echo "clangxx-path=$CLANGXX_PATH" >> $GITHUB_OUTPUT
-
-      # 🧠 Configure step (force GNU frontend, prevent MSVC fallback)
       - name: Configure (CMake)
         shell: bash
         run: |
+          export PATH="$PATH:/d/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/bin"
+
           cmake -S . -B build -G "Ninja" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER="${{ steps.locate-clang.outputs.clang-path }}" \
-          -DCMAKE_CXX_COMPILER="${{ steps.locate-clang.outputs.clangxx-path }}" \
-          -DCMAKE_C_COMPILER_TARGET=x86_64-w64-mingw32 \
-          -DCMAKE_CXX_COMPILER_TARGET=x86_64-w64-mingw32 \
-          -DCMAKE_C_COMPILER_FRONTEND_VARIANT=GNU \
-          -DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=GNU \
-          -DCMAKE_CXX_FLAGS="--target=x86_64-w64-mingw32 -stdlib=libc++" \
-          -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld -stdlib=libc++" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld -stdlib=libc++" \
-          -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
-          2>&1 | tee build_log.txt
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER="${{ steps.locate-clang.outputs.clang-path }}" \
+            -DCMAKE_CXX_COMPILER="${{ steps.locate-clang.outputs.clangxx-path }}" \
+            -DCMAKE_C_COMPILER_TARGET=x86_64-w64-mingw32 \
+            -DCMAKE_CXX_COMPILER_TARGET=x86_64-w64-mingw32 \
+            -DCMAKE_C_COMPILER_FRONTEND_VARIANT=GNU \
+            -DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=GNU \
+            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
+            -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
+            2>&1 | tee build/configure_log.txt
 
-      # 🔨 Build step
-      - name: Build (Ninja)
+      - name: Build
         shell: bash
         run: |
-          cmake --build build --config Release 2>&1 | tee -a build_log.txt
+          cmake --build build --config Release 2>&1 | tee build/build_log.txt
 
-      # 🧪 Test step
-      - name: Test (CTest)
+      - name: Run Tests
         shell: bash
         run: |
-          ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
+          ctest --output-on-failure --test-dir build 2>&1 | tee build/test_log.txt
 
-      - name: List linked DLLs
-        run: |
-          ldd build/usagi/usagi.exe || ntldd -R build/usagi/usagi.exe 2>&1 | tee -a build_log.txt
-
-
-      # 📦 Upload artifact
       - name: Upload build artifact (Alpha, LLVM)
         if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
         uses: actions/upload-artifact@v4
         with:
           name: Usagi-dono-alpha-llvm
-          path: build/**/*.exe
+          path: |
+            build/**/*.exe
 
       - name: Create Release & Upload (Stable/Beta, LLVM)
         if: success() && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/*.exe
+          files: |
+            build/*.exe
 
-      # 🚨 Automatic issue on failure
-      - name: Create issue with build/test logs on failure
+      - name: Create issue with logs on failure
         if: failure()
+        shell: bash
         run: |
           echo "🚨 **Build failed for workflow:** ${{ github.workflow }}" > issue_body.md
           echo "" >> issue_body.md
           echo "**Branch/Tag:** ${{ github.ref }}" >> issue_body.md
           echo "**Commit:** ${{ github.sha }}" >> issue_body.md
           echo "" >> issue_body.md
-          echo "### Logs (truncated to last 500 lines)" >> issue_body.md
+          echo "### Configure log" >> issue_body.md
           echo '```' >> issue_body.md
-          if [ -f build_log.txt ]; then
-            tail -n 500 build_log.txt >> issue_body.md
-          else
-            echo "Build log file not found. Build may have failed before log file creation." >> issue_body.md
-          fi
+          tail -n 200 build/configure_log.txt >> issue_body.md
           echo '```' >> issue_body.md
-          echo "" >> issue_body.md
-          echo "[View full logs here](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> issue_body.md
+          echo "### Build log" >> issue_body.md
+          echo '```' >> issue_body.md
+          tail -n 200 build/build_log.txt >> issue_body.md
+          echo '```' >> issue_body.md
+          echo "### Test log" >> issue_body.md
+          echo '```' >> issue_body.md
+          tail -n 200 build/test_log.txt >> issue_body.md
+          echo '```' >> issue_body.md
 
           gh issue create \
             --title "🚨 Build failed: ${{ github.workflow }} on ${{ github.ref }}" \
@@ -169,4 +118,3 @@ jobs:
             --label ci-failure,bug
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
