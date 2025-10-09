@@ -37,7 +37,22 @@ jobs:
       # Capture logs for configure, build, and test
       - name: Configure, build, and test
         run: |
-          cmake -G "Ninja" -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee build_log.txt
+          # Find the LLVM MinGW compiler from Qt installation
+          QT_LLVM_MINGW=$(find "$IQTA_TOOLS" -type d -name "llvm-mingw*" | head -n 1)
+          CLANG_PATH="$QT_LLVM_MINGW/bin/clang.exe"
+          CLANGXX_PATH="$QT_LLVM_MINGW/bin/clang++.exe"
+          
+          echo "Qt LLVM MinGW path: $QT_LLVM_MINGW"
+          echo "Clang path: $CLANG_PATH"
+          echo "Clang++ path: $CLANGXX_PATH"
+          
+          # Configure with LLVM MinGW Clang compiler
+          cmake -G "Ninja" -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER="$CLANG_PATH" \
+            -DCMAKE_CXX_COMPILER="$CLANGXX_PATH" \
+            2>&1 | tee build_log.txt
+          
           cmake --build build --config Release 2>&1 | tee -a build_log.txt
           ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
         shell: bash
