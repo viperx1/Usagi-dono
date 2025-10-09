@@ -59,14 +59,14 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
-            2>&1 | tee build_log.txt
+            2>&1 | tee build/configure_log.txt
 
       - name: Build
-        run: cmake --build build --config Release 2>&1 | tee -a build_log.txt
+        run: cmake --build build --config Release 2>&1 | tee build/build_log.txt
         shell: bash
 
       - name: Run tests
-        run: ctest --output-on-failure --test-dir build 2>&1 | tee -a build_log.txt
+        run: ctest --output-on-failure --test-dir build 2>&1 | tee build/test_log.txt
         shell: bash
 
 
