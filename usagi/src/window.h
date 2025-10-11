@@ -2,6 +2,7 @@
 #define WINDOW_H
 #include <QtGui>
 #include <QtAlgorithms>
+#include <QRegularExpression>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QTextEdit>

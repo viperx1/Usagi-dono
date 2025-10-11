@@ -870,22 +870,22 @@ int Window::parseMylistXML(const QString &content)
 	db.transaction();
 	
 	// Simple XML parsing - look for mylist entries
-	QRegExp rx("<mylist\\s+([^>]+)>");
-	int pos = 0;
+	QRegularExpression rx("<mylist\\s+([^>]+)>");
+	QRegularExpressionMatchIterator matchIterator = rx.globalMatch(content);
 	
-	while((pos = rx.indexIn(content, pos)) != -1)
+	while(matchIterator.hasNext())
 	{
-		QString attributes = rx.cap(1);
-		pos += rx.matchedLength();
+		QRegularExpressionMatch match = matchIterator.next();
+		QString attributes = match.captured(1);
 		
 		// Extract attributes
 		QMap<QString, QString> attrs;
-		QRegExp attrRx("(\\w+)=\"([^\"]*)\"");
-		int attrPos = 0;
-		while((attrPos = attrRx.indexIn(attributes, attrPos)) != -1)
+		QRegularExpression attrRx("(\\w+)=\"([^\"]*)\"");
+		QRegularExpressionMatchIterator attrIterator = attrRx.globalMatch(attributes);
+		while(attrIterator.hasNext())
 		{
-			attrs[attrRx.cap(1)] = attrRx.cap(2);
-			attrPos += attrRx.matchedLength();
+			QRegularExpressionMatch attrMatch = attrIterator.next();
+			attrs[attrMatch.captured(1)] = attrMatch.captured(2);
 		}
 		
 		// Insert into database
