@@ -182,6 +182,37 @@ MYLISTSTATS
 
 **Returns**: Total entries, watched count, file sizes, etc.
 
+### 6. Command Name Validation Test
+
+#### testCommandNamesAreValid()
+Validates that all command names used in `anidbapi.cpp` match the official AniDB UDP API Definition to prevent typos like the MYLISTSTAT bug.
+
+**Test Flow**:
+1. Maintains a list of all valid API commands from https://wiki.anidb.net/UDP_API_Definition
+2. Calls each implemented API function (Auth, MylistAdd, File, Mylist, etc.)
+3. Extracts the command name from each generated command string
+4. Verifies each command name exists in the valid API command list
+5. Reports any invalid command names with descriptive error messages
+
+**Valid Commands List** (from API definition):
+- Session Management: AUTH, LOGOUT, ENCRYPT, ENCODING, PING, VERSION, UPTIME
+- Data Commands: FILE, ANIME, ANIMEDESC, EPISODE, GROUP, GROUPSTATUS, PRODUCER, CHARACTER, CREATOR, CALENDAR, REVIEW, MYLIST, MYLISTSTATS, MYLISTADD, MYLISTDEL, MYLISTMOD, MYLISTEXPORT, MYLISTIMPORT, VOTE, RANDOMRECOMMENDATION, NOTIFICATION, NOTIFYLIST, NOTIFYADD, NOTIFYMOD, NOTIFYDEL, NOTIFYGET, NOTIFYACK, SENDMSG, USER
+
+**Commands Validated**:
+- AUTH
+- MYLISTADD  
+- FILE
+- MYLIST
+- MYLISTSTATS (previously had typo: MYLISTSTAT)
+
+**Failure Example**:
+If code contains `QString("MYLISTSTAT ")` instead of `QString("MYLISTSTATS ")`, test will fail with:
+```
+FAIL! Command 'MYLISTSTAT' is not in valid API command list - this was the typo bug!
+```
+
+**Purpose**: Catches command name typos at test time rather than runtime (598 UNKNOWN COMMAND errors).
+
 ## Running the Tests
 
 ### Build and Run
@@ -214,8 +245,9 @@ PASS   : TestAniDBApiCommands::testFileCommandFormat()
 PASS   : TestAniDBApiCommands::testFileCommandMasks()
 PASS   : TestAniDBApiCommands::testMylistCommandWithLid()
 PASS   : TestAniDBApiCommands::testMylistStatCommandFormat()
+PASS   : TestAniDBApiCommands::testCommandNamesAreValid()
 PASS   : TestAniDBApiCommands::cleanupTestCase()
-Totals: 11 passed, 0 failed, 0 skipped, 0 blacklisted, Xms
+Totals: 12 passed, 0 failed, 0 skipped, 0 blacklisted, Xms
 ********* Finished testing of TestAniDBApiCommands *********
 ```
 
@@ -231,6 +263,8 @@ Totals: 11 passed, 0 failed, 0 skipped, 0 blacklisted, Xms
 | FILE | Query file info | size, ed2k, fmask, amask | - | ✅ |
 | MYLIST | Query mylist entry | lid | - | ✅ |
 | MYLISTSTATS | Get mylist stats | - | - | ✅ |
+
+**Note**: All command names are validated against the official AniDB API definition in `testCommandNamesAreValid()` to prevent typos.
 
 ### Implementation Files
 

@@ -42,6 +42,9 @@ private slots:
     // MYLIST command tests
     void testMylistCommandWithLid();
     void testMylistStatCommandFormat();
+    
+    // Command name validation test
+    void testCommandNamesAreValid();
 
 private:
     AniDBApi* api;
@@ -49,6 +52,7 @@ private:
     
     QString getLastPacketCommand();
     void clearPackets();
+    QStringList getValidApiCommands();
 };
 
 // Helper function to get the last command inserted into packets table
@@ -69,6 +73,51 @@ void TestAniDBApiCommands::clearPackets()
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
     query.exec("DELETE FROM `packets`");
+}
+
+// Helper function to get the list of valid AniDB API commands
+// Based on https://wiki.anidb.net/UDP_API_Definition
+QStringList TestAniDBApiCommands::getValidApiCommands()
+{
+    return QStringList() 
+        // Session Management Commands
+        << "AUTH"
+        << "LOGOUT"
+        << "ENCRYPT"
+        << "ENCODING"
+        << "PING"
+        << "VERSION"
+        << "UPTIME"
+        // Data Commands
+        << "FILE"
+        << "ANIME"
+        << "ANIMEDESC"
+        << "EPISODE"
+        << "GROUP"
+        << "GROUPSTATUS"
+        << "PRODUCER"
+        << "CHARACTER"
+        << "CREATOR"
+        << "CALENDAR"
+        << "REVIEW"
+        << "MYLIST"
+        << "MYLISTSTATS"
+        << "MYLISTADD"
+        << "MYLISTDEL"
+        << "MYLISTMOD"
+        << "MYLISTEXPORT"
+        << "MYLISTIMPORT"
+        << "VOTE"
+        << "RANDOMRECOMMENDATION"
+        << "NOTIFICATION"
+        << "NOTIFYLIST"
+        << "NOTIFYADD"
+        << "NOTIFYMOD"
+        << "NOTIFYDEL"
+        << "NOTIFYGET"
+        << "NOTIFYACK"
+        << "SENDMSG"
+        << "USER";
 }
 
 void TestAniDBApiCommands::initTestCase()
@@ -323,6 +372,88 @@ void TestAniDBApiCommands::testMylistStatCommandFormat()
     
     // Verify command is MYLISTSTATS
     QVERIFY(msg.startsWith("MYLISTSTATS"));
+}
+
+void TestAniDBApiCommands::testCommandNamesAreValid()
+{
+    // This test validates all command names used in anidbapi.cpp against
+    // the official AniDB UDP API Definition to prevent typos like MYLISTSTAT
+    // Reference: https://wiki.anidb.net/UDP_API_Definition
+    
+    QStringList validCommands = getValidApiCommands();
+    
+    // Test each implemented command
+    QStringList commandsToTest;
+    
+    // AUTH command
+    api->Auth();
+    QString authCmd = getLastPacketCommand();
+    QVERIFY(!authCmd.isEmpty());
+    QString authCmdName = authCmd.split(' ').first().split('&').first();
+    if (authCmdName.contains('=')) {
+        authCmdName = authCmdName.split('=').first();
+    }
+    commandsToTest << authCmdName;
+    QVERIFY2(validCommands.contains(authCmdName), 
+             QString("Command '%1' is not in valid API command list").arg(authCmdName).toLatin1());
+    clearPackets();
+    
+    // LOGOUT command - skip as it requires socket connection
+    // The command name is verified in testLogoutCommandFormat()
+    
+    // MYLISTADD command
+    api->MylistAdd(734003200, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", 0, 1, "", false);
+    QString mylistaddCmd = getLastPacketCommand();
+    QVERIFY(!mylistaddCmd.isEmpty());
+    QString mylistaddCmdName = mylistaddCmd.split(' ').first();
+    if (mylistaddCmdName.contains('=')) {
+        mylistaddCmdName = mylistaddCmdName.split('=').first();
+    }
+    commandsToTest << mylistaddCmdName;
+    QVERIFY2(validCommands.contains(mylistaddCmdName),
+             QString("Command '%1' is not in valid API command list").arg(mylistaddCmdName).toLatin1());
+    clearPackets();
+    
+    // FILE command
+    api->File(734003200, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
+    QString fileCmd = getLastPacketCommand();
+    QVERIFY(!fileCmd.isEmpty());
+    QString fileCmdName = fileCmd.split(' ').first();
+    if (fileCmdName.contains('=')) {
+        fileCmdName = fileCmdName.split('=').first();
+    }
+    commandsToTest << fileCmdName;
+    QVERIFY2(validCommands.contains(fileCmdName),
+             QString("Command '%1' is not in valid API command list").arg(fileCmdName).toLatin1());
+    clearPackets();
+    
+    // MYLIST command
+    api->Mylist(12345);
+    QString mylistCmd = getLastPacketCommand();
+    QVERIFY(!mylistCmd.isEmpty());
+    QString mylistCmdName = mylistCmd.split(' ').first();
+    if (mylistCmdName.contains('=')) {
+        mylistCmdName = mylistCmdName.split('=').first();
+    }
+    commandsToTest << mylistCmdName;
+    QVERIFY2(validCommands.contains(mylistCmdName),
+             QString("Command '%1' is not in valid API command list").arg(mylistCmdName).toLatin1());
+    clearPackets();
+    
+    // MYLISTSTATS command
+    api->Mylist(-1);
+    QString myliststatsCmd = getLastPacketCommand();
+    QVERIFY(!myliststatsCmd.isEmpty());
+    QString myliststatsCmdName = myliststatsCmd.split(' ').first();
+    if (myliststatsCmdName.contains('=')) {
+        myliststatsCmdName = myliststatsCmdName.split('=').first();
+    }
+    commandsToTest << myliststatsCmdName;
+    QVERIFY2(validCommands.contains(myliststatsCmdName),
+             QString("Command '%1' is not in valid API command list - this was the typo bug!").arg(myliststatsCmdName).toLatin1());
+    
+    // Report what commands were tested
+    qDebug() << "Validated commands against API definition:" << commandsToTest;
 }
 
 QTEST_MAIN(TestAniDBApiCommands)
