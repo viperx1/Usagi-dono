@@ -123,6 +123,8 @@ public slots:
     void getNotifyLoggedOut(QString, int);
     void safeClose();
     void loadMylistFromDatabase();
+    void fetchMylistStatsFromAPI();
+    void importMylistFromFile();
 signals:
 	void hashFiles(QStringList);
 	void notifyStopHasher();
@@ -130,6 +132,8 @@ public:
 	// page hasher
     hashes_ *hashes;
 	void hashesinsertrow(QFileInfo, Qt::CheckState);
+	int parseMylistXML(const QString &content);
+	int parseMylistCSV(const QString &content);
     Window();
 	~Window();
 };
