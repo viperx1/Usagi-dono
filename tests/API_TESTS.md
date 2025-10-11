@@ -10,17 +10,15 @@ This document describes the test suite for validating AniDB API command format i
 
 **Framework**: Qt Test
 
-**Dependencies**: Qt6::Core, Qt6::Test
+**Dependencies**: Qt6::Core, Qt6::Test, Qt6::Network, Qt6::Sql, Qt6::Widgets
 
 ## Purpose
 
-These tests validate **command format integrity only**. They do NOT test:
-- Network communication
-- Authentication/session management
-- Response parsing
-- Database operations
-- Rate limiting
-- Error handling
+These tests validate that the actual API functions in `anidbapi.cpp` generate correctly formatted commands. The tests:
+- Instantiate `AniDBApi` with test credentials
+- Call actual API functions (Auth(), MylistAdd(), File(), Mylist())
+- Query the database `packets` table to retrieve generated commands
+- Validate command format matches AniDB API specification
 
 The tests ensure that command strings are constructed with the correct syntax, parameters, and encoding before being sent to the AniDB API.
 
@@ -29,10 +27,16 @@ The tests ensure that command strings are constructed with the correct syntax, p
 ### 1. AUTH Command Tests
 
 #### testAuthCommandFormat()
-Validates the AUTH command format:
+Calls `AniDBApi::Auth()` and validates the generated command format:
 ```
 AUTH user=<str>&pass=<str>&protover=<int4>&client=<str>&clientver=<int4>&enc=<str>
 ```
+
+**Test Flow**:
+1. Creates AniDBApi instance with test username/password
+2. Calls `api->Auth()`
+3. Queries database for inserted command
+4. Verifies format and parameter values
 
 **Verifies**:
 - Command starts with "AUTH "
@@ -42,19 +46,13 @@ AUTH user=<str>&pass=<str>&protover=<int4>&client=<str>&clientver=<int4>&enc=<st
 
 **Example valid command**:
 ```
-AUTH user=testuser&pass=testpass&protover=3&client=usagi&clientver=1&enc=utf8
+AUTH user=testuser&pass=testpass&protover=3&client=usagitest&clientver=1&enc=utf8
 ```
-
-#### testAuthCommandParameterEncoding()
-Documents behavior with special characters in credentials. In production, special characters should be URL-encoded:
-- Spaces: `%20`
-- Ampersands: `%26`
-- Equal signs: `%3D`
 
 ### 2. LOGOUT Command Tests
 
 #### testLogoutCommandFormat()
-Validates the LOGOUT command format:
+Documents the LOGOUT command format (Logout() calls Send() directly, requiring socket):
 ```
 LOGOUT
 ```
@@ -66,10 +64,15 @@ LOGOUT
 ### 3. MYLISTADD Command Tests
 
 #### testMylistAddBasicFormat()
-Validates basic MYLISTADD command with required parameters:
+Calls `AniDBApi::MylistAdd()` with required parameters and validates format:
 ```
 MYLISTADD size=<int8>&ed2k=<str>&state=<int2>
 ```
+
+**Test Flow**:
+1. Calls `api->MylistAdd(734003200, "a1b2c3...", 0, 1, "", false)`
+2. Retrieves command from database
+3. Validates format
 
 **Verifies**:
 - Command starts with "MYLISTADD "
@@ -83,21 +86,22 @@ MYLISTADD size=734003200&ed2k=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4&state=1
 ```
 
 #### testMylistAddWithOptionalParameters()
-Validates MYLISTADD with optional parameters:
+Calls `AniDBApi::MylistAdd()` with optional parameters:
 ```
 MYLISTADD size=<int8>&ed2k=<str>&viewed=<int2>&storage=<str>&state=<int2>
 ```
 
-**Optional parameters**:
-- `viewed`: 0 or 1 (note: implementation subtracts 1 from input value)
+**Optional parameters tested**:
+- `viewed`: 0 or 1 (note: function implementation subtracts 1 from input)
 - `storage`: Free-form text (e.g., "HDD", "External Drive")
 
 **Verifies**:
 - Optional parameters are only added when provided
 - Correct parameter formatting
+- Viewed parameter is decremented correctly
 
 #### testMylistAddWithEditFlag()
-Validates MYLISTADD with edit flag for updating existing entries:
+Calls `AniDBApi::MylistAdd()` with edit=true flag:
 ```
 MYLISTADD size=<int8>&ed2k=<str>&edit=1&state=<int2>
 ```
@@ -106,16 +110,18 @@ MYLISTADD size=<int8>&ed2k=<str>&edit=1&state=<int2>
 - Edit flag format: `&edit=1`
 - Used when updating existing mylist entries (response code 310)
 
-#### testMylistAddParameterOrder()
-Verifies that parameters can be in any order (API accepts flexible ordering).
-
 ### 4. FILE Command Tests
 
 #### testFileCommandFormat()
-Validates FILE command format:
+Calls `AniDBApi::File()` and validates generated command:
 ```
 FILE size=<int8>&ed2k=<str>&fmask=<hexstr>&amask=<hexstr>
 ```
+
+**Test Flow**:
+1. Calls `api->File(734003200, "a1b2c3...")`
+2. Retrieves command from database
+3. Validates all required parameters present
 
 **Verifies**:
 - Command starts with "FILE "
@@ -128,7 +134,7 @@ FILE size=734003200&ed2k=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4&fmask=7ff8fef8&amask=f
 ```
 
 #### testFileCommandMasks()
-Validates fmask and amask encoding:
+Validates fmask and amask encoding from actual `File()` function:
 - **Length**: Exactly 8 characters
 - **Format**: Lowercase hexadecimal
 - **Padding**: Leading zeros when necessary
@@ -137,19 +143,20 @@ Validates fmask and amask encoding:
 - `fmask`: File information mask (which file fields to return)
 - `amask`: Anime information mask (which anime fields to return)
 
-**Example masks**:
-```cpp
-unsigned int fmask = 0x7FF8FEF8;  // Returns most file information
-unsigned int amask = 0xF0F0F0F0;  // Returns anime metadata
-```
+**Verification**: Uses regex to extract and validate hex format
 
 ### 5. MYLIST Command Tests
 
 #### testMylistCommandWithLid()
-Validates MYLIST query by lid (mylist entry ID):
+Calls `AniDBApi::Mylist()` with a lid and validates:
 ```
 MYLIST lid=<int4>
 ```
+
+**Test Flow**:
+1. Calls `api->Mylist(12345)`
+2. Retrieves command from database
+3. Validates lid parameter
 
 **Verifies**:
 - Command starts with "MYLIST "
@@ -164,7 +171,7 @@ MYLIST lid=12345
 **Note**: Should NOT be used for bulk queries (violates API guidelines).
 
 #### testMylistStatCommandFormat()
-Validates MYLISTSTAT command:
+Calls `AniDBApi::Mylist()` with lid=-1 to trigger MYLISTSTAT:
 ```
 MYLISTSTAT
 ```
@@ -174,24 +181,6 @@ MYLISTSTAT
 - No parameters required
 
 **Returns**: Total entries, watched count, file sizes, etc.
-
-### 6. General Format Tests
-
-#### testParameterSeparators()
-Validates parameter separator format:
-- Parameters separated by `&` character
-- No spaces around separators (` &` or `& ` is invalid)
-
-#### testSpecialCharacterEncoding()
-Documents behavior with special characters:
-- Spaces in storage parameter
-- Ampersands in values (breaks parameter parsing)
-
-**Important**: Production code should URL-encode special characters:
-```
-"External HDD" → "External%20HDD"
-"HDD&SSD"      → "HDD%26SSD"
-```
 
 ## Running the Tests
 
@@ -217,20 +206,16 @@ ctest -R test_anidbapi -V
 Config: Using QtTest library 6.x.x
 PASS   : TestAniDBApiCommands::initTestCase()
 PASS   : TestAniDBApiCommands::testAuthCommandFormat()
-PASS   : TestAniDBApiCommands::testAuthCommandParameterEncoding()
 PASS   : TestAniDBApiCommands::testLogoutCommandFormat()
 PASS   : TestAniDBApiCommands::testMylistAddBasicFormat()
 PASS   : TestAniDBApiCommands::testMylistAddWithOptionalParameters()
 PASS   : TestAniDBApiCommands::testMylistAddWithEditFlag()
-PASS   : TestAniDBApiCommands::testMylistAddParameterOrder()
 PASS   : TestAniDBApiCommands::testFileCommandFormat()
 PASS   : TestAniDBApiCommands::testFileCommandMasks()
 PASS   : TestAniDBApiCommands::testMylistCommandWithLid()
 PASS   : TestAniDBApiCommands::testMylistStatCommandFormat()
-PASS   : TestAniDBApiCommands::testParameterSeparators()
-PASS   : TestAniDBApiCommands::testSpecialCharacterEncoding()
 PASS   : TestAniDBApiCommands::cleanupTestCase()
-Totals: 15 passed, 0 failed, 0 skipped, 0 blacklisted, Xms
+Totals: 11 passed, 0 failed, 0 skipped, 0 blacklisted, Xms
 ********* Finished testing of TestAniDBApiCommands *********
 ```
 
@@ -238,14 +223,14 @@ Totals: 15 passed, 0 failed, 0 skipped, 0 blacklisted, Xms
 
 ### Implemented and Tested Commands
 
-| Command | Purpose | Required Parameters | Optional Parameters |
-|---------|---------|-------------------|-------------------|
-| AUTH | Authenticate | user, pass, protover, client, clientver, enc | - |
-| LOGOUT | End session | - | - |
-| MYLISTADD | Add file to mylist | size, ed2k, state | viewed, storage, edit |
-| FILE | Query file info | size, ed2k, fmask, amask | - |
-| MYLIST | Query mylist entry | lid | - |
-| MYLISTSTAT | Get mylist stats | - | - |
+| Command | Purpose | Required Parameters | Optional Parameters | Tested |
+|---------|---------|-------------------|-------------------|--------|
+| AUTH | Authenticate | user, pass, protover, client, clientver, enc | - | ✅ |
+| LOGOUT | End session | - | - | ✅ |
+| MYLISTADD | Add file to mylist | size, ed2k, state | viewed, storage, edit | ✅ |
+| FILE | Query file info | size, ed2k, fmask, amask | - | ✅ |
+| MYLIST | Query mylist entry | lid | - | ✅ |
+| MYLISTSTAT | Get mylist stats | - | - | ✅ |
 
 ### Implementation Files
 
@@ -258,6 +243,44 @@ Command implementations are in:
   - `AniDBApi::File()` (line ~352)
   - `AniDBApi::Mylist()` (line ~373)
 
+## Test Architecture
+
+### How Tests Work
+
+1. **Setup** (`initTestCase()`):
+   - Creates `AniDBApi` instance with test client name/version
+   - Sets test username and password
+   - Initializes database connection
+
+2. **Test Execution**:
+   - Calls actual API function (e.g., `api->MylistAdd(...)`)
+   - Function inserts command into `packets` database table
+   - Test queries database to retrieve command: `SELECT str FROM packets WHERE processed = 0`
+   - Validates command format, parameters, and values
+
+3. **Cleanup** (`cleanup()`):
+   - Clears `packets` table between tests
+   - Ensures test isolation
+
+4. **Teardown** (`cleanupTestCase()`):
+   - Deletes `AniDBApi` instance
+
+### Database Schema
+
+Tests rely on the `packets` table schema:
+```sql
+CREATE TABLE packets (
+    tag INTEGER PRIMARY KEY,
+    str TEXT,
+    processed BOOL DEFAULT 0,
+    sendtime INTEGER,
+    got_reply BOOL DEFAULT 0,
+    reply TEXT
+);
+```
+
+Commands are stored in the `str` column before being sent to the API.
+
 ## Compliance with AniDB API Guidelines
 
 These tests help ensure compliance with:
@@ -267,6 +290,24 @@ These tests help ensure compliance with:
 3. **Command Structure**: Proper command names and parameter names
 4. **Data Types**: Correct numeric and string formatting
 5. **Hex Encoding**: Proper fmask/amask format
+
+## What Tests Validate
+
+✅ **Actual Function Output**: Tests call real `AniDBApi` methods  
+✅ **Database Integration**: Verifies commands are inserted correctly  
+✅ **Command Format**: Validates syntax matches API specification  
+✅ **Required Parameters**: Ensures all mandatory fields present  
+✅ **Optional Parameters**: Tests conditional parameter inclusion  
+✅ **Data Types**: Verifies correct formatting (hex, integers, strings)  
+✅ **Parameter Encoding**: Checks separators and structure  
+
+## What Tests Do NOT Validate
+
+❌ **Network Communication**: No actual UDP packets sent  
+❌ **Authentication**: No real login/session management  
+❌ **Response Parsing**: Commands are tested, not responses  
+❌ **Rate Limiting**: Timer/queue behavior not tested  
+❌ **Error Handling**: Focus is on successful command generation  
 
 ## Future Enhancements
 
