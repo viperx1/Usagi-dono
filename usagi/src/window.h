@@ -122,6 +122,7 @@ public slots:
 	void getNotifyMylistAdd(QString, int);
     void getNotifyLoggedIn(QString, int);
     void getNotifyLoggedOut(QString, int);
+    void getNotifyMylistStat(QString);
     void safeClose();
     void loadMylistFromDatabase();
     void fetchMylistStatsFromAPI();

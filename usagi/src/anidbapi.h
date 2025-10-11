@@ -187,6 +187,7 @@ signals:
 	void notifyMylistAdd(QString, int);
     void notifyLoggedIn(QString, int);
     void notifyLoggedOut(QString, int);
+    void notifyMylistStat(QString);
 };
 
 #endif // ANIDBAPI_H

@@ -226,7 +226,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Response format: entries|watched|size|viewed size|viewed%|watched%|episodes watched
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"MYLISTSTAT:"<<token2.first();
+		QString statsData = token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"MYLISTSTAT:"<<statsData;
+		emit notifyMylistStat(statsData);
 	}
 	else if(ReplyID == "310"){ // 310 FILE ALREADY IN MYLIST
 		// resend with tag and &edit=1

@@ -139,6 +139,7 @@ Window::Window()
     connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
     connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
 	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
+	connect(adbapi, SIGNAL(notifyMylistStat(QString)), this, SLOT(getNotifyMylistStat(QString)));
 	connect(markwatched, SIGNAL(stateChanged(int)), this, SLOT(markwatchedStateChanged(int)));
 
     // page hasher - hashes
@@ -655,6 +656,46 @@ void Window::getNotifyLoggedOut(QString tag, int code)
 {
     qDebug()<<__FILE__<<__LINE__<<"getNotifyLoggedOut";
     loginbutton->setText(QString("Login - logged out with tag %1 and code %2").arg(tag).arg(code));
+}
+
+void Window::getNotifyMylistStat(QString statsData)
+{
+	qDebug()<<__FILE__<<__LINE__<<"getNotifyMylistStat"<<statsData;
+	
+	// Parse the MYLISTSTAT response: entries|watched|size|viewed size|viewed%|watched%|episodes watched
+	QStringList parts = statsData.split("|");
+	
+	if(parts.size() >= 7)
+	{
+		QString entries = parts[0];
+		QString watched = parts[1];
+		QString size = parts[2];
+		QString viewedSize = parts[3];
+		QString viewedPercent = parts[4];
+		QString watchedPercent = parts[5];
+		QString episodesWatched = parts[6];
+		
+		// Format sizes to human-readable format (bytes to MB/GB)
+		bool ok;
+		qint64 sizeBytes = size.toLongLong(&ok);
+		qint64 viewedSizeBytes = viewedSize.toLongLong(&ok);
+		
+		QString sizeFormatted = QString::number(sizeBytes / (1024.0 * 1024.0 * 1024.0), 'f', 2) + " GB";
+		QString viewedSizeFormatted = QString::number(viewedSizeBytes / (1024.0 * 1024.0 * 1024.0), 'f', 2) + " GB";
+		
+		logOutput->append("=== MyList Statistics ===");
+		logOutput->append(QString("Total Entries: %1").arg(entries));
+		logOutput->append(QString("Watched Entries: %1 (%2%)").arg(watched).arg(watchedPercent));
+		logOutput->append(QString("Total Size: %1 (%2 bytes)").arg(sizeFormatted).arg(size));
+		logOutput->append(QString("Viewed Size: %1 (%2 bytes)").arg(viewedSizeFormatted).arg(viewedSize));
+		logOutput->append(QString("Viewed Percentage: %1%").arg(viewedPercent));
+		logOutput->append(QString("Episodes Watched: %1").arg(episodesWatched));
+		logOutput->append("========================");
+	}
+	else
+	{
+		logOutput->append(QString("MyList Statistics received: %1").arg(statsData));
+	}
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
