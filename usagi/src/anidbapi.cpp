@@ -8,9 +8,19 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	clientver = clientver_; //1;
 	enc = "utf8";
 	host = QHostInfo::fromName("api.anidb.net");
-	anidbaddr.setAddress(host.addresses().first().toIPv4Address());
+	if(!host.addresses().isEmpty())
+	{
+		anidbaddr.setAddress(host.addresses().first().toIPv4Address());
+	}
+	else
+	{
+		// Fallback to a default IP or leave uninitialized
+		// DNS resolution failed, socket operations will be skipped
+		qDebug()<<__FILE__<<__LINE__<<"DNS resolution for api.anidb.net failed";
+	}
 	anidbport = 9000;
 	loggedin = 0;
+	Socket = nullptr;
 
 	db = QSqlDatabase::addDatabase("QSQLITE");
 	db.setDatabaseName("usagi.sqlite");
@@ -66,6 +76,11 @@ AniDBApi::~AniDBApi()
 
 int AniDBApi::CreateSocket()
 {
+	if(Socket != nullptr)
+	{
+		Debug("AniDBApi: Socket already created");
+		return 1;
+	}
  	Socket = new QUdpSocket;
  	if(!Socket->bind(QHostAddress::Any, 3962))
  	{
@@ -399,6 +414,11 @@ QString AniDBApi::GetSID()
 
 int AniDBApi::Send(QString str, QString msgtype, QString tag)
 {
+	if(Socket == nullptr)
+	{
+		qDebug()<<__FILE__<<__LINE__<<"Socket not initialized, cannot send";
+		return 0;
+	}
 	QString a;
 	if(SID.length() > 0)
 	{
@@ -426,6 +446,10 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 
 int AniDBApi::Recv()
 {
+	if(Socket == nullptr)
+	{
+		return 0;
+	}
 	QByteArray data;
 //    Socket->waitForReadyRead(10000);
 	QString result;
@@ -448,7 +472,10 @@ int AniDBApi::Recv()
 
 void AniDBApi::Debug(QString msg)
 {
-	QMessageBox(QMessageBox::NoIcon, "", msg).exec();
+	// Use qDebug instead of QMessageBox for non-blocking output
+	// QMessageBox blocks and is not suitable for automated tests
+	qDebug() << "AniDBApi:" << msg;
+	// QMessageBox(QMessageBox::NoIcon, "", msg).exec();
 }
 
 
