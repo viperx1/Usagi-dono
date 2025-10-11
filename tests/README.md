@@ -27,6 +27,7 @@ This directory contains unit tests for the Usagi-dono application.
   - FILE command format with fmask/amask hex encoding
   - MYLIST command format with lid parameter
   - MYLISTSTATS command format
+  - Command name validation against official API definition (prevents typos)
   - Tests actual implementation in usagi/src/anidbapi.cpp
   
 ## Building and Running Tests
