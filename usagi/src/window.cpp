@@ -685,9 +685,9 @@ void Window::loadMylistFromDatabase()
 					"LEFT JOIN episode e ON m.eid = e.eid "
 					"ORDER BY a.nameromaji, m.eid";
 	
-	QSqlQuery q(query, db);
+	QSqlQuery q(db);
 	
-	if(!q.exec())
+	if(!q.exec(query))
 	{
 		logOutput->append("Error loading mylist: " + q.lastError().text());
 		return;
