@@ -384,7 +384,7 @@ QString AniDBApi::Mylist(int lid)
 	else
 	{
 		// Query all mylist entries - we'll need to do this iteratively or use MYLISTSTAT first
-		msg = QString("MYLISTSTAT");
+		msg = QString("MYLISTSTAT ");
 	}
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
