@@ -41,8 +41,8 @@ QString Mylist(int lid = -1);  // Query mylist entry by ID
 
 **Added Response Handlers:**
 - Code 221: MYLIST - Parse and store mylist entry in database
-- Code 222: MYLIST - MULTIPLE ENTRIES FOUND
-- Code 223: MYLISTSTATS - Parse mylist statistics
+- Code 222: MYLISTSTATS - Parse mylist statistics
+- Code 223: WISHLIST - Parse wishlist response
 - Code 312: NO SUCH MYLIST ENTRY
 
 **Implementation Details:**

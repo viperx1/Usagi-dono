@@ -22,7 +22,7 @@ This document describes how to test the new mylist import functionality added to
 - Message "Fetching mylist statistics from API..." appears in log
 - MYLISTSTATS command is sent to AniDB UDP API
 - Informational message about using import feature appears
-- Response code 223 should be received with statistics
+- Response code 222 should be received with statistics
 
 **Pass Criteria:**
 - No crashes or errors
