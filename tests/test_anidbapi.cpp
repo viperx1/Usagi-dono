@@ -372,6 +372,11 @@ void TestAniDBApiCommands::testMylistStatCommandFormat()
     
     // Verify command is MYLISTSTATS
     QVERIFY(msg.startsWith("MYLISTSTATS"));
+    
+    // Verify command does not have trailing space (issue fix)
+    // The command should be exactly "MYLISTSTATS" without trailing space
+    // to prevent AniDB server from returning error 222 instead of 223
+    QCOMPARE(msg, QString("MYLISTSTATS"));
 }
 
 void TestAniDBApiCommands::testCommandNamesAreValid()
