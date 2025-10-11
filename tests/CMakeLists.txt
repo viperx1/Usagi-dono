@@ -86,3 +86,24 @@ target_include_directories(test_crashlog PRIVATE
 )
 
 add_test(NAME test_crashlog COMMAND test_crashlog)
+
+# Test 3: AniDB API command format tests
+set(ANIDBAPI_TEST_SOURCES
+    test_anidbapi.cpp
+)
+
+add_executable(test_anidbapi ${ANIDBAPI_TEST_SOURCES})
+
+target_link_libraries(test_anidbapi PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_anidbapi PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_anidbapi COMMAND test_anidbapi)

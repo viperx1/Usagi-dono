@@ -17,6 +17,16 @@ This directory contains unit tests for the Usagi-dono application.
   - Detect and demonstrate incorrect UTF-16LE encoding
   - Verify QTextStream with UTF-8 encoding without QIODevice::Text flag (new test)
   - Ensure crash log content is readable
+
+- **test_anidbapi.cpp**: Tests for AniDB API command format integrity
+  - AUTH command format validation (user, pass, protover, client, clientver, enc)
+  - LOGOUT command format validation
+  - MYLISTADD command format with required and optional parameters
+  - FILE command format with fmask/amask hex encoding
+  - MYLIST command format with lid parameter
+  - MYLISTSTAT command format
+  - Parameter separator validation
+  - Special character encoding behavior documentation
   
 ## Building and Running Tests
 
@@ -50,9 +60,13 @@ After building, run the test executable:
 # From build directory
 ./tests/test_hash
 ./tests/test_crashlog
+./tests/test_anidbapi
 
 # Or use CTest to run all tests
 ctest --output-on-failure
+
+# Run a specific test
+ctest -R test_anidbapi --output-on-failure
 ```
 
 You should see output like:
