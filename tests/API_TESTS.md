@@ -171,13 +171,13 @@ MYLIST lid=12345
 **Note**: Should NOT be used for bulk queries (violates API guidelines).
 
 #### testMylistStatCommandFormat()
-Calls `AniDBApi::Mylist()` with lid=-1 to trigger MYLISTSTAT:
+Calls `AniDBApi::Mylist()` with lid=-1 to trigger MYLISTSTATS:
 ```
-MYLISTSTAT
+MYLISTSTATS
 ```
 
 **Verifies**:
-- Command is exactly "MYLISTSTAT " (with trailing space)
+- Command is exactly "MYLISTSTATS " (with trailing space)
 - No parameters required
 
 **Returns**: Total entries, watched count, file sizes, etc.
@@ -230,7 +230,7 @@ Totals: 11 passed, 0 failed, 0 skipped, 0 blacklisted, Xms
 | MYLISTADD | Add file to mylist | size, ed2k, state | viewed, storage, edit | ✅ |
 | FILE | Query file info | size, ed2k, fmask, amask | - | ✅ |
 | MYLIST | Query mylist entry | lid | - | ✅ |
-| MYLISTSTAT | Get mylist stats | - | - | ✅ |
+| MYLISTSTATS | Get mylist stats | - | - | ✅ |
 
 ### Implementation Files
 

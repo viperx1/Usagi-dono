@@ -97,7 +97,7 @@ These aspects are integration/functional concerns tested separately.
 | MYLISTADD | ✅ | size, ed2k, state, viewed (opt), storage (opt), edit (opt) |
 | FILE | ✅ | size, ed2k, fmask, amask |
 | MYLIST | ✅ | lid |
-| MYLISTSTAT | ✅ | (no parameters) |
+| MYLISTSTATS | ✅ | (no parameters) |
 
 ## How to Run Tests
 

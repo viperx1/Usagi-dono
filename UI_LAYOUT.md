@@ -53,7 +53,7 @@
 - Columns: Name, Episode, State, Viewed, Storage, LID
 
 ### 2. Fetch MyList Stats from API (NEW)
-- Sends MYLISTSTAT command to AniDB UDP API
+- Sends MYLISTSTATS command to AniDB UDP API
 - Returns statistics:
   - Total entries
   - Watched count
@@ -78,7 +78,7 @@
 ### Initial Setup (First Time Users)
 ```
 1. Click [Fetch MyList Stats from API]
-   → Log shows: "MYLISTSTAT command sent"
+   → Log shows: "MYLISTSTATS command sent"
    → Log shows: "To get actual entries, export from anidb.net..."
 
 2. Open browser → https://anidb.net
@@ -142,10 +142,10 @@
 ### Fetch Stats
 ```
 [2024-10-11 02:15:23] Fetching mylist statistics from API...
-[2024-10-11 02:15:23] MYLISTSTAT command sent. Note: To get actual mylist entries, 
+[2024-10-11 02:15:23] MYLISTSTATS command sent. Note: To get actual mylist entries, 
                       use 'Import MyList from File' with an export from 
                       https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export
-[2024-10-11 02:15:25] MYLISTSTAT: 245|180|1234567890|987654321|80|73|2150
+[2024-10-11 02:15:25] MYLISTSTATS: 245|180|1234567890|987654321|80|73|2150
 ```
 
 ### Import Success

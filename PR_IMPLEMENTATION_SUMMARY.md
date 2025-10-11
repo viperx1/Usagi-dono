@@ -17,7 +17,7 @@ Added comprehensive mylist import functionality with three components:
 
 ### 1. Fetch MyList Stats (UDP API)
 - New button: "Fetch MyList Stats from API"
-- Sends MYLISTSTAT command to AniDB
+- Sends MYLISTSTATS command to AniDB
 - Returns statistics: entries count, watched count, file sizes
 - Provides instructions for full import
 
@@ -60,9 +60,9 @@ UI_LAYOUT.md                    254 lines   (UI documentation)
 ```cpp
 void Window::fetchMylistStatsFromAPI()
 {
-    // Sends MYLISTSTAT command via existing UDP API infrastructure
+    // Sends MYLISTSTATS command via existing UDP API infrastructure
     logOutput->append("Fetching mylist statistics from API...");
-    adbapi->Mylist(-1);  // -1 triggers MYLISTSTAT
+    adbapi->Mylist(-1);  // -1 triggers MYLISTSTATS
     logOutput->append("Instructions: Export from anidb.net...");
 }
 ```
@@ -248,7 +248,7 @@ The implementation follows all AniDB API guidelines:
 | Rate Limiting (2s) | Uses existing packetsender timer | ✅ |
 | No Bulk Queries | Import from file, not API iteration | ✅ |
 | Efficient Updates | Single transaction per import | ✅ |
-| Stats Command | MYLISTSTAT for overview | ✅ |
+| Stats Command | MYLISTSTATS for overview | ✅ |
 | HTTP API Support | Manual export (no credentials) | ✅ |
 
 ## Code Quality

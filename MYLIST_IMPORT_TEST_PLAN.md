@@ -10,7 +10,7 @@ This document describes how to test the new mylist import functionality added to
 
 ## Test Case 1: Fetch MyList Stats from API
 
-**Objective:** Verify MYLISTSTAT command works correctly
+**Objective:** Verify MYLISTSTATS command works correctly
 
 **Steps:**
 1. Open Usagi-dono
@@ -20,7 +20,7 @@ This document describes how to test the new mylist import functionality added to
 
 **Expected Results:**
 - Message "Fetching mylist statistics from API..." appears in log
-- MYLISTSTAT command is sent to AniDB UDP API
+- MYLISTSTATS command is sent to AniDB UDP API
 - Informational message about using import feature appears
 - Response code 223 should be received with statistics
 

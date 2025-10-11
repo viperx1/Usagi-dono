@@ -10,7 +10,7 @@
 **Problem:** Users reported that "Load MyList from Database" returns 0 results because the database was empty. The mylist data was only being populated when users hashed files (via FILE command), so new users or users who haven't hashed files yet had empty databases.
 
 **Solution Implemented:**
-1. Added **"Fetch MyList Stats from API"** button that calls MYLISTSTAT to get statistics
+1. Added **"Fetch MyList Stats from API"** button that calls MYLISTSTATS to get statistics
 2. Added **"Import MyList from File"** button to import complete mylist from AniDB export files
 3. Implemented parsers for both XML and CSV/TXT export formats from AniDB
 4. Added comprehensive documentation in MYLIST_IMPORT_GUIDE.md
@@ -42,7 +42,7 @@ QString Mylist(int lid = -1);  // Query mylist entry by ID
 **Added Response Handlers:**
 - Code 221: MYLIST - Parse and store mylist entry in database
 - Code 222: MYLIST - MULTIPLE ENTRIES FOUND
-- Code 223: MYLISTSTAT - Parse mylist statistics
+- Code 223: MYLISTSTATS - Parse mylist statistics
 - Code 312: NO SUCH MYLIST ENTRY
 
 **Implementation Details:**
@@ -121,7 +121,7 @@ Created test database with sample data and verified:
 
 ### API Features
 1. ✅ MYLIST command implementation
-2. ✅ MYLISTSTAT support
+2. ✅ MYLISTSTATS support
 3. ✅ Response handlers (221, 222, 223, 312)
 4. ✅ Database storage
 5. ✅ Rate limiting compliance

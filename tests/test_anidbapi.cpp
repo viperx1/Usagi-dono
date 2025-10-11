@@ -312,7 +312,7 @@ void TestAniDBApiCommands::testMylistCommandWithLid()
 
 void TestAniDBApiCommands::testMylistStatCommandFormat()
 {
-    // Call Mylist() with no lid (or lid <= 0) to get MYLISTSTAT
+    // Call Mylist() with no lid (or lid <= 0) to get MYLISTSTATS
     api->Mylist(-1);
     
     // Get the command that was inserted
@@ -321,8 +321,8 @@ void TestAniDBApiCommands::testMylistStatCommandFormat()
     // Verify command is not empty
     QVERIFY(!msg.isEmpty());
     
-    // Verify command is MYLISTSTAT
-    QVERIFY(msg.startsWith("MYLISTSTAT"));
+    // Verify command is MYLISTSTATS
+    QVERIFY(msg.startsWith("MYLISTSTATS"));
 }
 
 QTEST_MAIN(TestAniDBApiCommands)

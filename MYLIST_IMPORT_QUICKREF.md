@@ -18,7 +18,7 @@ Three new features in the MyList tab:
 - Now works properly when database has data
 
 ### 2. Fetch MyList Stats from API (NEW)
-- Sends MYLISTSTAT command via UDP API
+- Sends MYLISTSTATS command via UDP API
 - Gets statistics: total entries, watched count, file sizes
 - Complies with AniDB API rate limiting rules
 - Provides instructions for importing full data
@@ -52,7 +52,7 @@ See MYLIST_IMPORT_GUIDE.md for complete instructions
 ### Files Modified
 - `usagi/src/window.h` - Added method declarations
 - `usagi/src/window.cpp` - Added implementation:
-  - `fetchMylistStatsFromAPI()` - Calls MYLISTSTAT
+  - `fetchMylistStatsFromAPI()` - Calls MYLISTSTATS
   - `importMylistFromFile()` - File import dialog
   - `parseMylistXML()` - XML format parser
   - `parseMylistCSV()` - CSV format parser
@@ -76,7 +76,7 @@ The solution follows AniDB API guidelines:
 ✅ **Rate Limiting**: Uses existing 2-second delay mechanism
 ✅ **No Bulk Queries**: Doesn't iterate through lids
 ✅ **Efficient**: Import from file, no repeated API calls
-✅ **Stats Command**: MYLISTSTAT for statistics only
+✅ **Stats Command**: MYLISTSTATS for statistics only
 ✅ **HTTP API Support**: Via manual export (no credentials in app)
 
 ## Data Format
@@ -178,7 +178,7 @@ Possible improvements:
 This implementation solves the original issue by:
 - ✅ Fixing "load mylist returns 0 results" problem
 - ✅ Adding support for AniDB data dumps (XML, CSV)
-- ✅ Providing MYLISTSTAT API fetch option
+- ✅ Providing MYLISTSTATS API fetch option
 - ✅ Maintaining API compliance
 - ✅ Preventing SQL injection
 - ✅ Supporting multiple import formats
