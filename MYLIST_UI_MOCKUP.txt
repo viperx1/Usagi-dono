@@ -1,0 +1,40 @@
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
+║                                    USAGI - MyList Tab                                             ║
+╠═══════════════════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                                   ║
+║  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐ ║
+║  │ Anime                    │ Episode                   │ State  │ Viewed │ Storage           │ ║
+║  ├─────────────────────────────────────────────────────────────────────────────────────────────┤ ║
+║  │ ▼ Cowboy Bebop           │                           │        │        │                   │ ║
+║  │   │                      │ Episode 101 - Asteroid... │ HDD    │ Yes    │ /anime/CB/ep01.mkv│ ║
+║  │   │                      │ Episode 102 - Stray Dog...│ HDD    │ No     │ /anime/CB/ep02.mkv│ ║
+║  │ ▼ Serial Experiments...  │                           │        │        │                   │ ║
+║  │   │                      │ Episode 201 - Layer 01... │ HDD    │ Yes    │ /anime/Lain/ep...  │ ║
+║  │ ▼ Neon Genesis Evange... │                           │        │        │                   │ ║
+║  │   │                      │ Episode 301 - Angel At... │ HDD    │ Yes    │ /anime/NGE/ep01.mkv│ ║
+║  │   │                      │ Episode 302 - The Beast...│ HDD    │ Yes    │ /anime/NGE/ep02.mkv│ ║
+║  │   │                      │ Episode 303 - A transfer  │ HDD    │ No     │ /anime/NGE/ep03.mkv│ ║
+║  └─────────────────────────────────────────────────────────────────────────────────────────────┘ ║
+║                                                                                                   ║
+║  [ Load MyList from Database ]                                                                   ║
+║                                                                                                   ║
+╚═══════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+Features:
+  • Hierarchical tree view: Anime titles as parents, episodes as children
+  • Expand/collapse anime to show/hide episodes (▼ = expanded, ▶ = collapsed)
+  • Sortable columns: Click column headers to sort
+  • Alternating row colors for better readability
+  • Real-time data: Shows current state from local database
+  • Episode names: Displayed when available in database
+  • State indicators: HDD, CD/DVD, Deleted, Unknown
+  • Viewed status: Yes/No for each episode
+  • Storage paths: Full file location for easy access
+
+How it works:
+  1. Click "Load MyList from Database" button
+  2. Application queries local SQLite database
+  3. Data is organized by anime → episodes
+  4. Tree widget displays hierarchical structure
+  5. No API calls needed for display (follows AniDB guidelines)
+  6. Data was collected via FILE/MYLISTADD commands during hashing
