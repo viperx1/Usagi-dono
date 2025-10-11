@@ -89,7 +89,26 @@ Window::Window()
 
     // page mylist
     mylistTreeWidget = new QTreeWidget(this);
+    mylistTreeWidget->setColumnCount(6);
+    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "State" << "Viewed" << "Storage" << "Mylist ID");
+    mylistTreeWidget->setColumnWidth(0, 300);
+    mylistTreeWidget->setColumnWidth(1, 150);
+    mylistTreeWidget->setColumnWidth(2, 100);
+    mylistTreeWidget->setColumnWidth(3, 80);
+    mylistTreeWidget->setColumnWidth(4, 200);
+    mylistTreeWidget->setColumnWidth(5, 80);
+    mylistTreeWidget->setAlternatingRowColors(true);
+    mylistTreeWidget->setSortingEnabled(true);
+    mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pageMylist->addWidget(mylistTreeWidget);
+    
+    // Add refresh button for mylist
+    QPushButton *mylistRefreshButton = new QPushButton("Load MyList from Database");
+    pageMylist->addWidget(mylistRefreshButton);
+    connect(mylistRefreshButton, &QPushButton::clicked, [this]() {
+        loadMylistFromDatabase();
+    });
+    
     mylistTreeWidget->show();
 
     // page hasher - signals
@@ -650,4 +669,110 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
 	hashes->setItem(hashes->rowCount()-1, 7, item8);
 	hashes->setItem(hashes->rowCount()-1, 8, item9);
 //	hashes->setItem(hashes->rowCount()-1, 9, item10);
+}
+
+void Window::loadMylistFromDatabase()
+{
+	mylistTreeWidget->clear();
+	
+	// Query the database for mylist entries joined with anime and episode data
+	QSqlDatabase db = QSqlDatabase::database();
+	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
+					"a.nameromaji, a.nameenglish, a.eptotal, "
+					"e.name as episode_name "
+					"FROM mylist m "
+					"LEFT JOIN anime a ON m.aid = a.aid "
+					"LEFT JOIN episode e ON m.eid = e.eid "
+					"ORDER BY a.nameromaji, m.eid";
+	
+	QSqlQuery q(query, db);
+	
+	if(!q.exec())
+	{
+		logOutput->append("Error loading mylist: " + q.lastError().text());
+		return;
+	}
+	
+	QMap<int, QTreeWidgetItem*> animeItems; // aid -> tree item
+	int totalEntries = 0;
+	
+	while(q.next())
+	{
+		int lid = q.value(0).toInt();
+		int aid = q.value(1).toInt();
+		int eid = q.value(2).toInt();
+		int state = q.value(3).toInt();
+		int viewed = q.value(4).toInt();
+		QString storage = q.value(5).toString();
+		QString animeName = q.value(6).toString();
+		QString animeNameEnglish = q.value(7).toString();
+		int epTotal = q.value(8).toInt();
+		QString episodeName = q.value(9).toString();
+		
+		// Use English name if romaji is empty
+		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
+		{
+			animeName = animeNameEnglish;
+		}
+		
+		// If anime name is still empty, use aid
+		if(animeName.isEmpty())
+		{
+			animeName = QString("Anime #%1").arg(aid);
+		}
+		
+		// Get or create the anime parent item
+		QTreeWidgetItem *animeItem;
+		if(animeItems.contains(aid))
+		{
+			animeItem = animeItems[aid];
+		}
+		else
+		{
+			animeItem = new QTreeWidgetItem(mylistTreeWidget);
+			animeItem->setText(0, animeName);
+			animeItem->setData(0, Qt::UserRole, aid); // Store aid
+			animeItems[aid] = animeItem;
+			mylistTreeWidget->addTopLevelItem(animeItem);
+		}
+		
+		// Create episode item as child of anime
+		QTreeWidgetItem *episodeItem = new QTreeWidgetItem(animeItem);
+		episodeItem->setText(0, ""); // Empty for episode child
+		
+		// Build episode display string
+		QString episodeDisplay = QString("Episode %1").arg(eid);
+		if(!episodeName.isEmpty())
+		{
+			episodeDisplay += QString(" - %1").arg(episodeName);
+		}
+		episodeItem->setText(1, episodeDisplay);
+		
+		// State: 0=unknown, 1=on hdd, 2=on cd, 3=deleted
+		QString stateStr;
+		switch(state)
+		{
+			case 0: stateStr = "Unknown"; break;
+			case 1: stateStr = "HDD"; break;
+			case 2: stateStr = "CD/DVD"; break;
+			case 3: stateStr = "Deleted"; break;
+			default: stateStr = QString::number(state); break;
+		}
+		episodeItem->setText(2, stateStr);
+		
+		// Viewed: 0=no, 1=yes
+		episodeItem->setText(3, viewed ? "Yes" : "No");
+		episodeItem->setText(4, storage);
+		episodeItem->setText(5, QString::number(lid));
+		
+		episodeItem->setData(0, Qt::UserRole, eid); // Store eid
+		episodeItem->setData(0, Qt::UserRole + 1, lid); // Store lid
+		
+		totalEntries++;
+	}
+	
+	// Expand all anime items
+	mylistTreeWidget->expandAll();
+	
+	logOutput->append(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
 }

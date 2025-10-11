@@ -145,6 +145,7 @@ public:
 	QString Auth();
 	QString Logout();
     QString MylistAdd(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit = 0);
+    QString Mylist(int lid = -1);
     QString File(qint64, QString);
 	/* Api End === */
 
