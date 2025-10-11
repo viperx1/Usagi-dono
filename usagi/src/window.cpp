@@ -675,12 +675,14 @@ void Window::loadMylistFromDatabase()
 {
 	mylistTreeWidget->clear();
 	
-	// Query the database for mylist entries joined with anime data
+	// Query the database for mylist entries joined with anime and episode data
 	QSqlDatabase db = QSqlDatabase::database();
 	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
-					"a.nameromaji, a.nameenglish, a.eptotal "
+					"a.nameromaji, a.nameenglish, a.eptotal, "
+					"e.name as episode_name "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
+					"LEFT JOIN episode e ON m.eid = e.eid "
 					"ORDER BY a.nameromaji, m.eid";
 	
 	QSqlQuery q(query, db);
@@ -705,6 +707,7 @@ void Window::loadMylistFromDatabase()
 		QString animeName = q.value(6).toString();
 		QString animeNameEnglish = q.value(7).toString();
 		int epTotal = q.value(8).toInt();
+		QString episodeName = q.value(9).toString();
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -736,7 +739,14 @@ void Window::loadMylistFromDatabase()
 		// Create episode item as child of anime
 		QTreeWidgetItem *episodeItem = new QTreeWidgetItem(animeItem);
 		episodeItem->setText(0, ""); // Empty for episode child
-		episodeItem->setText(1, QString("Episode %1").arg(eid));
+		
+		// Build episode display string
+		QString episodeDisplay = QString("Episode %1").arg(eid);
+		if(!episodeName.isEmpty())
+		{
+			episodeDisplay += QString(" - %1").arg(episodeName);
+		}
+		episodeItem->setText(1, episodeDisplay);
 		
 		// State: 0=unknown, 1=on hdd, 2=on cd, 3=deleted
 		QString stateStr;
