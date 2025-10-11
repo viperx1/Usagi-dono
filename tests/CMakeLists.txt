@@ -86,3 +86,45 @@ target_include_directories(test_crashlog PRIVATE
 )
 
 add_test(NAME test_crashlog COMMAND test_crashlog)
+
+# Test 3: AniDB API command format tests
+set(ANIDBAPI_TEST_SOURCES
+    test_anidbapi.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+)
+
+set(ANIDBAPI_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+)
+
+add_executable(test_anidbapi ${ANIDBAPI_TEST_SOURCES} ${ANIDBAPI_TEST_HEADERS})
+
+target_compile_definitions(test_anidbapi PRIVATE CRYPTOPP_DEBUG=0)
+
+target_link_libraries(test_anidbapi PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+)
+
+target_include_directories(test_anidbapi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_anidbapi PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_anidbapi COMMAND test_anidbapi)
