@@ -279,7 +279,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	}
     else
     {
-        qDebug()<<__FILE__<<__LINE__<<"ParseMessage - not supported ReplyID";
+        qDebug()<<__FILE__<<__LINE__<<"ParseMessage - not supported ReplyID ("<<ReplyID<<")";
     }
     waitingForReply.isWaiting = false;
 	return ReplyID;
