@@ -222,11 +222,11 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// This shouldn't happen with proper lid queries, log it
 		qDebug()<<__FILE__<<__LINE__<<"MYLIST - MULTIPLE ENTRIES FOUND";
 	}
-	else if(ReplyID == "223"){ // 223 MYLISTSTAT
+	else if(ReplyID == "223"){ // 223 MYLISTSTATS
 		// Response format: entries|watched|size|viewed size|viewed%|watched%|episodes watched
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"MYLISTSTAT:"<<token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"MYLISTSTATS:"<<token2.first();
 	}
 	else if(ReplyID == "310"){ // 310 FILE ALREADY IN MYLIST
 		// resend with tag and &edit=1
@@ -398,8 +398,8 @@ QString AniDBApi::Mylist(int lid)
 	}
 	else
 	{
-		// Query all mylist entries - we'll need to do this iteratively or use MYLISTSTAT first
-		msg = QString("MYLISTSTAT ");
+		// Query all mylist entries - we'll need to do this iteratively or use MYLISTSTATS first
+		msg = QString("MYLISTSTATS ");
 	}
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;

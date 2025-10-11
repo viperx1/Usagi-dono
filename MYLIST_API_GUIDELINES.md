@@ -22,7 +22,7 @@ The AniDB API provides several commands for mylist interaction:
    - Used to query individual mylist entries
    - **Important**: Should NOT be used for bulk queries
 
-3. **MYLISTSTAT** - Get mylist statistics
+3. **MYLISTSTATS** - Get mylist statistics
    - Returns: total entries, watched count, file sizes, etc.
    - Current implementation: ✅ Added response handler (223)
    - Useful for displaying summary information
@@ -50,7 +50,7 @@ The AniDB API provides several commands for mylist interaction:
    - This violates API guidelines and will get you banned
    - Instead, rely on FILE command data collection
 
-4. **Use MYLISTSTAT for summary info**
+4. **Use MYLISTSTATS for summary info**
    - Can be called occasionally to show overview
    - Much more efficient than querying individual entries
 
@@ -62,11 +62,11 @@ The implementation follows AniDB API guidelines:
 - ✅ MyList data collection via FILE command
 - ✅ MYLISTADD for adding files
 - ✅ MYLIST for individual queries when needed
-- ✅ MYLISTSTAT handler for statistics
+- ✅ MYLISTSTATS handler for statistics
 
 ### Future Enhancements (Optional)
 
 If needed, could add:
-- Button to call MYLISTSTAT and show summary
+- Button to call MYLISTSTATS and show summary
 - Context menu to query individual anime/episode via MYLIST
 - But these are not necessary for the core feature

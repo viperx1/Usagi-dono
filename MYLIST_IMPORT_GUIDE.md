@@ -12,7 +12,7 @@ This application now supports importing your complete mylist from AniDB through 
 This method uses the AniDB UDP API to fetch mylist statistics:
 
 1. Click the **"Fetch MyList Stats from API"** button in the MyList tab
-2. The application will send a MYLISTSTAT command to AniDB
+2. The application will send a MYLISTSTATS command to AniDB
 3. Statistics will be returned (total entries, watched count, etc.)
 4. Note: This only provides statistics, not the actual mylist entries
 

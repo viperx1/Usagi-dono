@@ -67,7 +67,7 @@ CREATE TABLE episode(
    - Response handler stores data in mylist table
    - Used sparingly to avoid API abuse
 
-2. **MYLISTSTAT** (Code: 223)
+2. **MYLISTSTATS** (Code: 223)
    - Get mylist statistics
    - Returns: total entries, watched count, etc.
    - Useful for overview information
@@ -180,7 +180,7 @@ Following AniDB UDP API guidelines (https://wiki.anidb.net/UDP_API_Definition):
    - Filter by viewed status
    - Filter by state
 
-4. **MYLISTSTAT Integration**
+4. **MYLISTSTATS Integration**
    - Show statistics at top of mylist tab
    - Display: total entries, watched %, disk usage
 

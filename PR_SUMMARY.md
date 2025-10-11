@@ -80,7 +80,7 @@ Implemented a complete mylist feature with:
 
 ### API Integration
 ✅ MYLIST command (query individual entries)
-✅ MYLISTSTAT command (get statistics)
+✅ MYLISTSTATS command (get statistics)
 ✅ Response handlers (221, 222, 223, 312)
 ✅ Database storage
 ✅ Rate limiting (2-second delay)
@@ -200,7 +200,7 @@ Display in Tree Widget
 These are NOT required but could be added later if desired:
 - Context menu actions (play file, mark watched, etc.)
 - Search/filter functionality
-- MYLISTSTAT statistics display at top of tab
+- MYLISTSTATS statistics display at top of tab
 - Auto-refresh when files are added to mylist
 - Anime/episode data parsing from FILE responses
 

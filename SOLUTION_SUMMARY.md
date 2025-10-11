@@ -16,9 +16,9 @@ The "Load MyList from Database" button was working correctly, but it returned 0 
 Added three-part solution to address all aspects of the issue:
 
 ### 1. Fetch MyList Stats from UDP API
-- **What:** New button that sends MYLISTSTAT command
+- **What:** New button that sends MYLISTSTATS command
 - **Why:** Provides users with overview of their mylist (count, watched, sizes)
-- **How:** Calls existing `Mylist(-1)` function which sends MYLISTSTAT
+- **How:** Calls existing `Mylist(-1)` function which sends MYLISTSTATS
 - **Compliance:** Follows AniDB UDP API rate limiting rules
 
 ### 2. Import MyList from File (Primary Solution)
@@ -60,7 +60,7 @@ QPushButton *mylistImportButton = new QPushButton("Import MyList from File");
 
 // Added implementation
 void Window::fetchMylistStatsFromAPI() {
-    // Sends MYLISTSTAT command via UDP API
+    // Sends MYLISTSTATS command via UDP API
 }
 
 void Window::importMylistFromFile() {
@@ -126,7 +126,7 @@ The solution follows AniDB API guidelines:
 | Rate Limiting | Uses existing 2.1s delay | ✅ |
 | No Bulk Queries | Import from file, no iteration | ✅ |
 | Efficient Updates | Single transaction per import | ✅ |
-| Stats Command | MYLISTSTAT for overview | ✅ |
+| Stats Command | MYLISTSTATS for overview | ✅ |
 | HTTP API Support | Via manual export | ✅ |
 
 ## Testing Strategy

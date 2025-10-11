@@ -792,10 +792,10 @@ void Window::loadMylistFromDatabase()
 
 void Window::fetchMylistStatsFromAPI()
 {
-	// Call MYLISTSTAT command to get mylist statistics
+	// Call MYLISTSTATS command to get mylist statistics
 	logOutput->append("Fetching mylist statistics from API...");
-	adbapi->Mylist(-1);  // -1 triggers MYLISTSTAT
-	logOutput->append("MYLISTSTAT command sent. Note: To get actual mylist entries, use 'Import MyList from File' with an export from https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export");
+	adbapi->Mylist(-1);  // -1 triggers MYLISTSTATS
+	logOutput->append("MYLISTSTATS command sent. Note: To get actual mylist entries, use 'Import MyList from File' with an export from https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export");
 }
 
 void Window::importMylistFromFile()
