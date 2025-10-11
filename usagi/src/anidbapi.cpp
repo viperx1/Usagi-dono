@@ -268,9 +268,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Auth();
 		Send(ReplyToMsg, "", Tag);
 	}
-    else if(ReplyID == "555"){ // 506 BANNED - {str reason}
+    else if(ReplyID == "555"){ // 555 BANNED - {str reason}
         banned = true;
     }
+	else if(ReplyID == "598"){ // 598 UNKNOWN COMMAND
+		// This typically means the command was malformed or not recognized
+		qDebug()<<__FILE__<<__LINE__<<"UNKNOWN COMMAND - check request format";
+	}
 	else if(ReplyID == "601"){ // 601 ANIDB OUT OF SERVICE - TRY AGAIN LATER
 	}
     else
@@ -483,10 +487,8 @@ int AniDBApi::SendPacket()
                     Auth();
                     return 0;
                 }
-                QString newmsg;
-                newmsg = QString("%1&tag=%2").arg(str).arg(tag);
-                Send(newmsg,"", tag);
-                qDebug()<<__FILE__<<__LINE__<<newmsg;
+                Send(str,"", tag);
+                qDebug()<<__FILE__<<__LINE__<<str;
             }
         }
     }
