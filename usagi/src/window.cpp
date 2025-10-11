@@ -891,6 +891,10 @@ int Window::parseMylistXML(const QString &content)
 		// Insert into database
 		if(attrs.contains("lid") && attrs.contains("fid"))
 		{
+			// Escape single quotes in storage field to prevent SQL injection
+			QString escapedStorage = attrs.value("storage", "");
+			escapedStorage.replace("'", "''");
+			
 			QString q = QString("INSERT OR REPLACE INTO `mylist` "
 				"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
 				"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
@@ -900,8 +904,8 @@ int Window::parseMylistXML(const QString &content)
 				.arg(attrs.value("aid", "0"))
 				.arg(attrs.value("gid", "0"))
 				.arg(attrs.value("state", "0"))
-				.arg(attrs.value("viewdate", "0").isEmpty() ? "0" : "1")  // viewed = has viewdate
-				.arg(attrs.value("storage", ""));
+				.arg((attrs.value("viewdate", "").isEmpty() || attrs.value("viewdate", "") == "0") ? "0" : "1")  // viewed = has non-zero viewdate
+				.arg(escapedStorage);
 			
 			QSqlQuery query(db);
 			if(query.exec(q))
@@ -957,6 +961,10 @@ int Window::parseMylistCSV(const QString &content)
 		if(lid.isEmpty() || fid.isEmpty())
 			continue;
 		
+		// Escape single quotes in storage field to prevent SQL injection
+		QString escapedStorage = storage;
+		escapedStorage.replace("'", "''");
+		
 		// Insert into database
 		QString q = QString("INSERT OR REPLACE INTO `mylist` "
 			"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
@@ -968,7 +976,7 @@ int Window::parseMylistCSV(const QString &content)
 			.arg(gid)
 			.arg(state)
 			.arg(viewdate.isEmpty() || viewdate == "0" ? "0" : "1")
-			.arg(storage);
+			.arg(escapedStorage);
 		
 		QSqlQuery query(db);
 		if(query.exec(q))

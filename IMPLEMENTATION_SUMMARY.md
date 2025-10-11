@@ -3,6 +3,24 @@
 ## Problem Statement
 > Add mylist feature. Focus on properly displaying the list and obtaining data from api while following api guidelines provided by anidb developers.
 
+## Recent Updates (2024-10-11)
+
+### Issue: Load MyList Returns 0 Results
+
+**Problem:** Users reported that "Load MyList from Database" returns 0 results because the database was empty. The mylist data was only being populated when users hashed files (via FILE command), so new users or users who haven't hashed files yet had empty databases.
+
+**Solution Implemented:**
+1. Added **"Fetch MyList Stats from API"** button that calls MYLISTSTAT to get statistics
+2. Added **"Import MyList from File"** button to import complete mylist from AniDB export files
+3. Implemented parsers for both XML and CSV/TXT export formats from AniDB
+4. Added comprehensive documentation in MYLIST_IMPORT_GUIDE.md
+
+**How to Use:**
+- Users can now export their mylist from https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export
+- Import the export file (XML, CSV, or TXT format) using the new "Import MyList from File" button
+- The data is properly parsed and stored in the local database
+- After import, "Load MyList from Database" will display all imported entries
+
 ## Solution Overview
 
 The mylist feature has been successfully implemented with a focus on:
