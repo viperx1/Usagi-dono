@@ -62,12 +62,12 @@ CREATE TABLE episode(
 
 #### Commands Implemented
 
-1. **MYLIST** (Code: 221, 222, 312)
+1. **MYLIST** (Code: 221, 223, 312)
    - Query individual mylist entries by lid
    - Response handler stores data in mylist table
    - Used sparingly to avoid API abuse
 
-2. **MYLISTSTATS** (Code: 223)
+2. **MYLISTSTATS** (Code: 222)
    - Get mylist statistics
    - Returns: total entries, watched count, etc.
    - Useful for overview information

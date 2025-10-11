@@ -24,7 +24,7 @@ The AniDB API provides several commands for mylist interaction:
 
 3. **MYLISTSTATS** - Get mylist statistics
    - Returns: total entries, watched count, file sizes, etc.
-   - Current implementation: ✅ Added response handler (223)
+   - Current implementation: ✅ Added response handler (222)
    - Useful for displaying summary information
 
 4. **FILE** - Query file information (RECOMMENDED for mylist updates)
