@@ -122,6 +122,7 @@ public slots:
     void getNotifyLoggedIn(QString, int);
     void getNotifyLoggedOut(QString, int);
     void safeClose();
+    void loadMylistFromDatabase();
 signals:
 	void hashFiles(QStringList);
 	void notifyStopHasher();

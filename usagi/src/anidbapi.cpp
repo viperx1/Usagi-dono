@@ -177,6 +177,42 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			token2.pop_front();
 		}*/
 	}
+	else if(ReplyID == "221"){ // 221 MYLIST
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		token2 = token2.first().split("|");
+		// Parse mylist entry: lid|fid|eid|aid|gid|date|state|viewdate|storage|source|other|filestate
+		if(token2.size() >= 12)
+		{
+			QString q = QString("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13')")
+						.arg(QString(token2.at(0)).replace("'", "''"))
+						.arg(QString(token2.at(1)).replace("'", "''"))
+						.arg(QString(token2.at(2)).replace("'", "''"))
+						.arg(QString(token2.at(3)).replace("'", "''"))
+						.arg(QString(token2.at(4)).replace("'", "''"))
+						.arg(QString(token2.at(5)).replace("'", "''"))
+						.arg(QString(token2.at(6)).replace("'", "''"))
+						.arg(token2.size() > 7 ? QString(token2.at(7)).replace("'", "''") : "0")
+						.arg(token2.size() > 8 ? QString(token2.at(8)).replace("'", "''") : "0")
+						.arg(token2.size() > 9 ? QString(token2.at(9)).replace("'", "''") : "")
+						.arg(token2.size() > 10 ? QString(token2.at(10)).replace("'", "''") : "")
+						.arg(token2.size() > 11 ? QString(token2.at(11)).replace("'", "''") : "")
+						.arg(token2.size() > 12 ? QString(token2.at(12)).replace("'", "''") : "0");
+			QSqlQuery query(db);
+			query.exec(q);
+			qDebug()<<query.lastError().text();
+		}
+	}
+	else if(ReplyID == "222"){ // 222 MYLIST - MULTIPLE ENTRIES FOUND
+		// This shouldn't happen with proper lid queries, log it
+		qDebug()<<__FILE__<<__LINE__<<"MYLIST - MULTIPLE ENTRIES FOUND";
+	}
+	else if(ReplyID == "223"){ // 223 MYLISTSTAT
+		// Response format: entries|watched|size|viewed size|viewed%|watched%|episodes watched
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		qDebug()<<__FILE__<<__LINE__<<"MYLISTSTAT:"<<token2.first();
+	}
 	else if(ReplyID == "310"){ // 310 FILE ALREADY IN MYLIST
 		// resend with tag and &edit=1
 		QString q;
@@ -194,6 +230,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	}
 	else if(ReplyID == "311"){ // 311 MYLIST ENTRY EDITED
 		notifyMylistAdd(Tag, 311);
+	}
+	else if(ReplyID == "312"){ // 312 NO SUCH MYLIST ENTRY
+		qDebug()<<__FILE__<<__LINE__<<"NO SUCH MYLIST ENTRY";
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
         QString q;
@@ -324,6 +363,28 @@ QString AniDBApi::File(qint64 size, QString ed2k)
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(q);
 //	Send(a, "", "zzz");
+	return GetTag(msg);
+}
+
+QString AniDBApi::Mylist(int lid)
+{
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	QString msg;
+	if(lid > 0)
+	{
+		msg = QString("MYLIST lid=%1").arg(lid);
+	}
+	else
+	{
+		// Query all mylist entries - we'll need to do this iteratively or use MYLISTSTAT first
+		msg = QString("MYLISTSTAT");
+	}
+	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query;
+	query.exec(q);
 	return GetTag(msg);
 }
 
