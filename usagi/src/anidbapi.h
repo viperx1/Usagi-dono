@@ -59,6 +59,10 @@ private:
 	QSqlDatabase db;
 
 	QString lastSentPacket;
+	
+	// Anime titles download and management
+	QNetworkAccessManager *networkManager;
+	QDateTime lastAnimeTitlesUpdate;
 
 //    QTextCodec *codec;
 	enum progress
@@ -172,6 +176,12 @@ public:
 	void setPassword(QString);
 	void setLastDirectory(QString);
     /* Settings End === */
+	
+	/* === Anime Titles Start */
+	void downloadAnimeTitles();
+	bool shouldUpdateAnimeTitles();
+	void parseAndStoreAnimeTitles(const QByteArray &data);
+	/* Anime Titles End === */
 
 	QString GetSID();
     QString GetTag(QString);
@@ -183,6 +193,8 @@ public:
 public slots:
 	int SendPacket();
 	int Recv();
+private slots:
+	void onAnimeTitlesDownloaded(QNetworkReply *reply);
 signals:
 	void notifyMylistAdd(QString, int);
     void notifyLoggedIn(QString, int);
