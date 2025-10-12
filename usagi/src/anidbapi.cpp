@@ -38,6 +38,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
         query.exec("CREATE TABLE IF NOT EXISTS `file`(`fid` INTEGER PRIMARY KEY, `aid` INTEGER, `eid` INTEGER, `gid` INTEGER, `lid` INTEGER, `othereps` TEXT, `isdepr` INTEGER, `state` INTEGER, `size` BIGINT, `ed2k` TEXT, `md5` TEXT, `sha1` TEXT, `crc` TEXT, `quality` TEXT, `source` TEXT, `codec_audio` TEXT, `bitrate_audio` INTEGER, `codec_video` TEXT, `bitrate_video` INTEGER, `resolution` TEXT, `filetype` TEXT, `lang_dub` TEXT, `lang_sub` TEXT, `length` INTEGER, `description` TEXT, `airdate` INTEGER, `filename` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER);");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
+		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
 		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `settings`(`id` INTEGER PRIMARY KEY, `name` TEXT UNIQUE, `value` TEXT);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
@@ -59,13 +60,27 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		{
 			lastdirectory = query.value(1).toString();
 		}
+		if(query.value(0).toString() == "last_anime_titles_update")
+		{
+			lastAnimeTitlesUpdate = QDateTime::fromSecsSinceEpoch(query.value(1).toLongLong());
+		}
 	}
+
+	// Initialize network manager for anime titles download
+	networkManager = new QNetworkAccessManager(this);
+	connect(networkManager, &QNetworkAccessManager::finished, this, &AniDBApi::onAnimeTitlesDownloaded);
 
 	packetsender = new QTimer();
 	connect(packetsender, SIGNAL(timeout()), this, SLOT(SendPacket()));
 
 	packetsender->setInterval(2100);
 	packetsender->start();
+
+	// Check and download anime titles if needed (automatically on startup)
+	if(shouldUpdateAnimeTitles())
+	{
+		downloadAnimeTitles();
+	}
 
 //	codec = QTextCodec::codecForName("UTF-8");
 }
@@ -581,4 +596,152 @@ QString AniDBApi::GetTag(QString str)
 	query.exec(q);
 	query.next();
 	return (query.isValid())?query.value(0).toString():"0";
+}
+
+// Anime Titles Download Implementation
+
+bool AniDBApi::shouldUpdateAnimeTitles()
+{
+	// Check if we should download anime titles
+	// Download if: never downloaded before OR last update was more than 24 hours ago
+	if(!lastAnimeTitlesUpdate.isValid())
+	{
+		return true;
+	}
+	
+	qint64 secondsSinceLastUpdate = lastAnimeTitlesUpdate.secsTo(QDateTime::currentDateTime());
+	return secondsSinceLastUpdate > 86400; // 86400 seconds = 24 hours
+}
+
+void AniDBApi::downloadAnimeTitles()
+{
+	Debug("Downloading anime titles from AniDB...");
+	
+	QNetworkRequest request(QUrl("http://anidb.net/api/anime-titles.dat.gz"));
+	request.setHeader(QNetworkRequest::UserAgentHeader, QString("Usagi/%1").arg(clientver));
+	
+	networkManager->get(request);
+}
+
+void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
+{
+	if(reply->error() != QNetworkReply::NoError)
+	{
+		Debug(QString("Failed to download anime titles: %1").arg(reply->errorString()));
+		reply->deleteLater();
+		return;
+	}
+	
+	QByteArray compressedData = reply->readAll();
+	reply->deleteLater();
+	
+	Debug(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()));
+	
+	// The file is in gzip format, which uses deflate compression
+	// We need to decompress it properly
+	QByteArray decompressedData;
+	
+	// Check if it's gzip format (starts with 0x1f 0x8b)
+	if(compressedData.size() >= 2 && 
+	   (unsigned char)compressedData[0] == 0x1f && 
+	   (unsigned char)compressedData[1] == 0x8b)
+	{
+		// It's gzip format - skip the gzip header and decompress
+		// Gzip header is at least 10 bytes
+		if(compressedData.size() > 10)
+		{
+			// Find the end of the gzip header
+			// For simplicity, we'll skip the first 10 bytes (minimum header size)
+			// and use qUncompress on the raw deflate data
+			// However, qUncompress expects zlib format, not raw deflate
+			// So we'll need a different approach
+			
+			// Try using QByteArray with a workaround: prepend zlib header
+			QByteArray zlibData;
+			zlibData.append((char)0x78); // CMF: deflate, 32K window
+			zlibData.append((char)0x9C); // FLG: default compression
+			
+			// Skip gzip header (10 bytes minimum) and footer (8 bytes)
+			// The actual deflate data is between them
+			int dataStart = 10;
+			int dataEnd = compressedData.size() - 8;
+			zlibData.append(compressedData.mid(dataStart, dataEnd - dataStart));
+			
+			decompressedData = qUncompress(zlibData);
+		}
+	}
+	else
+	{
+		// Try direct decompression
+		decompressedData = qUncompress(compressedData);
+	}
+	
+	if(decompressedData.isEmpty())
+	{
+		Debug("Failed to decompress anime titles data. Will retry on next startup.");
+		return;
+	}
+	
+	Debug(QString("Decompressed to %1 bytes").arg(decompressedData.size()));
+	
+	parseAndStoreAnimeTitles(decompressedData);
+	
+	// Update last download timestamp
+	lastAnimeTitlesUpdate = QDateTime::currentDateTime();
+	QSqlQuery query(db);
+	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'last_anime_titles_update', '%1');")
+				.arg(lastAnimeTitlesUpdate.toSecsSinceEpoch());
+	query.exec(q);
+	
+	Debug(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()));
+}
+
+void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
+{
+	if(data.isEmpty())
+	{
+		Debug("No data to parse for anime titles");
+		return;
+	}
+	
+	QString content = QString::fromUtf8(data);
+	QStringList lines = content.split('\n', QString::SkipEmptyParts);
+	
+	db.transaction();
+	
+	// Clear old titles
+	QSqlQuery query(db);
+	query.exec("DELETE FROM `anime_titles`");
+	
+	int count = 0;
+	for(const QString &line : lines)
+	{
+		// Skip comments and empty lines
+		if(line.startsWith('#') || line.trimmed().isEmpty())
+		{
+			continue;
+		}
+		
+		// Format: aid|type|language|title
+		QStringList parts = line.split('|');
+		if(parts.size() >= 4)
+		{
+			QString aid = parts[0].trimmed();
+			QString type = parts[1].trimmed();
+			QString language = parts[2].trimmed();
+			QString title = parts[3].trimmed();
+			
+			// Escape single quotes for SQL
+			title = title.replace("'", "''");
+			language = language.replace("'", "''");
+			
+			QString q = QString("INSERT OR IGNORE INTO `anime_titles` (`aid`, `type`, `language`, `title`) VALUES ('%1', '%2', '%3', '%4')")
+						.arg(aid).arg(type).arg(language).arg(title);
+			query.exec(q);
+			count++;
+		}
+	}
+	
+	db.commit();
+	Debug(QString("Parsed and stored %1 anime titles").arg(count));
 }
