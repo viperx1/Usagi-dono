@@ -22,7 +22,15 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	loggedin = 0;
 	Socket = nullptr;
 
-	db = QSqlDatabase::addDatabase("QSQLITE");
+	// Check if default database connection already exists (e.g., in tests)
+	if(QSqlDatabase::contains(QSqlDatabase::defaultConnection))
+	{
+		db = QSqlDatabase::database();
+	}
+	else
+	{
+		db = QSqlDatabase::addDatabase("QSQLITE");
+	}
 	db.setDatabaseName("usagi.sqlite");
 	QSqlQuery query;
 
@@ -625,6 +633,15 @@ void AniDBApi::downloadAnimeTitles()
 
 void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 {
+	// Check if this reply is for the anime titles download
+	QUrl requestUrl = reply->request().url();
+	if(requestUrl.toString() != "http://anidb.net/api/anime-titles.dat.gz")
+	{
+		// This reply is for a different request, ignore it
+		reply->deleteLater();
+		return;
+	}
+	
 	if(reply->error() != QNetworkReply::NoError)
 	{
 		Debug(QString("Failed to download anime titles: %1").arg(reply->errorString()));
