@@ -50,7 +50,7 @@ if(WIN32)
     )
 endif()
 
-add_test(NAME test_hash COMMAND test_hash)
+add_test(NAME test_hash COMMAND test_hash -v2)
 
 # Test 2: Crash log encoding test
 set(CRASHLOG_TEST_SOURCES
@@ -85,7 +85,7 @@ target_include_directories(test_crashlog PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-add_test(NAME test_crashlog COMMAND test_crashlog)
+add_test(NAME test_crashlog COMMAND test_crashlog -v2)
 
 # Test 3: AniDB API command format tests
 set(ANIDBAPI_TEST_SOURCES
@@ -127,7 +127,7 @@ if(WIN32)
     )
 endif()
 
-add_test(NAME test_anidbapi COMMAND test_anidbapi)
+add_test(NAME test_anidbapi COMMAND test_anidbapi -v2)
 
 # Test 4: Anime titles import tests
 set(ANIME_TITLES_TEST_SOURCES
@@ -169,5 +169,5 @@ if(WIN32)
     )
 endif()
 
-add_test(NAME test_anime_titles COMMAND test_anime_titles)
+add_test(NAME test_anime_titles COMMAND test_anime_titles -v2)
 

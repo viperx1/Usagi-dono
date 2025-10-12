@@ -70,7 +70,7 @@ jobs:
         shell: bash
 
       - name: Run tests
-        run: ctest --output-on-failure --test-dir build 2>&1 | tee build/test_log.txt
+        run: ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
         shell: bash
 
 
