@@ -625,6 +625,15 @@ void AniDBApi::downloadAnimeTitles()
 
 void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 {
+	// Check if this reply is for the anime titles download
+	QUrl requestUrl = reply->request().url();
+	if(requestUrl.toString() != "http://anidb.net/api/anime-titles.dat.gz")
+	{
+		// This reply is for a different request, ignore it
+		reply->deleteLater();
+		return;
+	}
+	
 	if(reply->error() != QNetworkReply::NoError)
 	{
 		Debug(QString("Failed to download anime titles: %1").arg(reply->errorString()));
