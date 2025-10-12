@@ -705,7 +705,7 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 	}
 	
 	QString content = QString::fromUtf8(data);
-	QStringList lines = content.split('\n', QString::SkipEmptyParts);
+	QStringList lines = content.split('\n', Qt::SkipEmptyParts);
 	
 	db.transaction();
 	
