@@ -22,7 +22,15 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	loggedin = 0;
 	Socket = nullptr;
 
-	db = QSqlDatabase::addDatabase("QSQLITE");
+	// Check if default database connection already exists (e.g., in tests)
+	if(QSqlDatabase::contains(QSqlDatabase::defaultConnection))
+	{
+		db = QSqlDatabase::database();
+	}
+	else
+	{
+		db = QSqlDatabase::addDatabase("QSQLITE");
+	}
 	db.setDatabaseName("usagi.sqlite");
 	QSqlQuery query;
 
