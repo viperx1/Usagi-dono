@@ -3,9 +3,6 @@
 #include <QtGui>
 #include <QtAlgorithms>
 #include <QRegularExpression>
-#include <QDesktopServices>
-#include <QInputDialog>
-#include <QUrl>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QTextEdit>
@@ -84,6 +81,7 @@ private:
 
     // page mylist
     QTreeWidget *mylistTreeWidget;
+    QLabel *mylistStatusLabel;
 	// page settings
 
     QLabel *labelLogin;
@@ -127,9 +125,6 @@ public slots:
     void getNotifyLoggedOut(QString, int);
     void safeClose();
     void loadMylistFromDatabase();
-    void fetchMylistStatsFromAPI();
-    void downloadMylistExport();
-    void importMylistFromFile();
 signals:
 	void hashFiles(QStringList);
 	void notifyStopHasher();

@@ -102,30 +102,11 @@ Window::Window()
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pageMylist->addWidget(mylistTreeWidget);
     
-    // Add buttons for mylist
-    QHBoxLayout *mylistButtons = new QHBoxLayout();
-    QPushButton *mylistRefreshButton = new QPushButton("Load MyList from Database");
-    QPushButton *mylistFetchButton = new QPushButton("Fetch MyList Stats from API");
-    QPushButton *mylistDownloadButton = new QPushButton("Download MyList from AniDB");
-    QPushButton *mylistImportButton = new QPushButton("Import MyList from File");
-    mylistButtons->addWidget(mylistRefreshButton);
-    mylistButtons->addWidget(mylistFetchButton);
-    mylistButtons->addWidget(mylistDownloadButton);
-    mylistButtons->addWidget(mylistImportButton);
-    pageMylist->addLayout(mylistButtons);
-    
-    connect(mylistRefreshButton, &QPushButton::clicked, [this]() {
-        loadMylistFromDatabase();
-    });
-    connect(mylistFetchButton, &QPushButton::clicked, [this]() {
-        fetchMylistStatsFromAPI();
-    });
-    connect(mylistDownloadButton, &QPushButton::clicked, [this]() {
-        downloadMylistExport();
-    });
-    connect(mylistImportButton, &QPushButton::clicked, [this]() {
-        importMylistFromFile();
-    });
+    // Add progress status label
+    mylistStatusLabel = new QLabel("MyList Status: Ready");
+    mylistStatusLabel->setAlignment(Qt::AlignCenter);
+    mylistStatusLabel->setStyleSheet("padding: 5px; background-color: #f0f0f0;");
+    pageMylist->addWidget(mylistStatusLabel);
     
     mylistTreeWidget->show();
 
@@ -250,6 +231,13 @@ Window::Window()
 
 
     adbapi->CreateSocket();
+    
+    // Automatically load mylist on startup
+    QTimer::singleShot(1000, this, [this]() {
+        mylistStatusLabel->setText("MyList Status: Loading from database...");
+        loadMylistFromDatabase();
+        mylistStatusLabel->setText("MyList Status: Ready");
+    });
 }
 
 Window::~Window()
@@ -793,112 +781,7 @@ void Window::loadMylistFromDatabase()
 	mylistTreeWidget->expandAll();
 	
 	logOutput->append(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
-}
-
-void Window::fetchMylistStatsFromAPI()
-{
-	// Call MYLISTSTATS command to get mylist statistics
-	logOutput->append("Fetching mylist statistics from API...");
-	adbapi->Mylist(-1);  // -1 triggers MYLISTSTATS
-	logOutput->append("MYLISTSTATS command sent. Note: To get actual mylist entries, use 'Import MyList from File' with an export from https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export");
-}
-
-void Window::downloadMylistExport()
-{
-	// Show dialog to select export template
-	QStringList templates;
-	templates << "csv-adborg (Recommended)" 
-	          << "xml (Full structured data)"
-	          << "csv (Standard comma-separated)"
-	          << "json (JSON format)"
-	          << "anidb (AniDB default)";
-	
-	bool ok;
-	QString selectedTemplate = QInputDialog::getItem(this, 
-		tr("Select MyList Export Template"),
-		tr("Choose the template format for export:\n\n"
-		   "Note: You will be directed to AniDB's export page.\n"
-		   "After downloading, use 'Import MyList from File' to load it."),
-		templates, 0, false, &ok);
-	
-	if(!ok || selectedTemplate.isEmpty())
-		return;
-	
-	// Extract template name (remove description)
-	QString templateName = selectedTemplate.split(" ").first();
-	
-	// Build URL with template parameter
-	QString exportUrl = QString("https://anidb.net/user/export?template=%1&list=mylist").arg(templateName);
-	
-	// Log the action
-	logOutput->append(QString("Opening AniDB export page with template: %1").arg(templateName));
-	logOutput->append("After downloading, use 'Import MyList from File' button to import the data.");
-	
-	// Open URL in default browser
-	QDesktopServices::openUrl(QUrl(exportUrl));
-}
-
-void Window::importMylistFromFile()
-{
-	// Open file dialog to select mylist export file
-	QString fileName = QFileDialog::getOpenFileName(this,
-		tr("Import MyList Export"), lastDir,
-		tr("MyList Files (*.xml *.txt *.csv);;All Files (*)"));
-	
-	if(fileName.isEmpty())
-		return;
-	
-	QFileInfo fileInfo(fileName);
-	lastDir = fileInfo.absolutePath();
-	
-	// Read the file
-	QFile file(fileName);
-	if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
-	{
-		logOutput->append("Error: Cannot open file " + fileName);
-		return;
-	}
-	
-	QTextStream in(&file);
-	QString content = in.readAll();
-	file.close();
-	
-	// Parse based on file extension
-	QString ext = fileInfo.suffix().toLower();
-	int importedCount = 0;
-	
-	if(ext == "xml")
-	{
-		// Parse XML format from AniDB mylist export
-		importedCount = parseMylistXML(content);
-	}
-	else if(ext == "txt" || ext == "csv")
-	{
-		// Parse CSV/TXT format
-		importedCount = parseMylistCSV(content);
-	}
-	else
-	{
-		// Try to auto-detect format
-		if(content.trimmed().startsWith("<?xml") || content.contains("<mylist"))
-		{
-			importedCount = parseMylistXML(content);
-		}
-		else
-		{
-			importedCount = parseMylistCSV(content);
-		}
-	}
-	
-	if(importedCount > 0)
-	{
-		logOutput->append(QString("Successfully imported %1 mylist entries").arg(importedCount));
-		loadMylistFromDatabase();  // Refresh the display
-	}
-	else
-	{
-		logOutput->append("No entries imported. Please check the file format.");
-	}
+	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
 }
 
 int Window::parseMylistXML(const QString &content)
