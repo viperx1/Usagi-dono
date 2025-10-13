@@ -612,12 +612,18 @@ bool AniDBApi::shouldUpdateAnimeTitles()
 {
 	// Check if we should download anime titles
 	// Download if: never downloaded before OR last update was more than 24 hours ago
-	if(!lastAnimeTitlesUpdate.isValid())
+	// Read from database to ensure we have the most up-to-date timestamp
+	QSqlQuery query(db);
+	query.exec("SELECT `value` FROM `settings` WHERE `name` = 'last_anime_titles_update'");
+	
+	if(!query.next())
 	{
+		// Never downloaded before
 		return true;
 	}
 	
-	qint64 secondsSinceLastUpdate = lastAnimeTitlesUpdate.secsTo(QDateTime::currentDateTime());
+	QDateTime lastUpdate = QDateTime::fromSecsSinceEpoch(query.value(0).toLongLong());
+	qint64 secondsSinceLastUpdate = lastUpdate.secsTo(QDateTime::currentDateTime());
 	return secondsSinceLastUpdate > 86400; // 86400 seconds = 24 hours
 }
 
