@@ -114,6 +114,7 @@ target_link_libraries(test_anidbapi PRIVATE
     Qt6::Network
     Qt6::Sql
     Qt6::Widgets
+    z
 )
 
 target_include_directories(test_anidbapi PRIVATE
@@ -156,6 +157,7 @@ target_link_libraries(test_anime_titles PRIVATE
     Qt6::Network
     Qt6::Sql
     Qt6::Widgets
+    z
 )
 
 target_include_directories(test_anime_titles PRIVATE

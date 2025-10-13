@@ -12,6 +12,7 @@
 #include <QElapsedTimer>
 //#include <QTextCodec>
 #include <bitset>
+#include <zlib.h>
 #include "hash/ed2k.h"
 #include "Qt-AES-master/qaesencryption.h"
 

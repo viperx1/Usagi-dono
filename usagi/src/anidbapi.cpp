@@ -661,7 +661,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	Debug(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()));
 	
 	// The file is in gzip format, which uses deflate compression
-	// We need to decompress it properly
+	// We need to decompress it properly using zlib
 	QByteArray decompressedData;
 	
 	// Check if it's gzip format (starts with 0x1f 0x8b)
@@ -669,33 +669,53 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	   (unsigned char)compressedData[0] == 0x1f && 
 	   (unsigned char)compressedData[1] == 0x8b)
 	{
-		// It's gzip format - skip the gzip header and decompress
-		// Gzip header is at least 10 bytes
-		if(compressedData.size() > 10)
+		// It's gzip format - use zlib to decompress
+		// Initialize zlib stream
+		z_stream stream;
+		stream.zalloc = Z_NULL;
+		stream.zfree = Z_NULL;
+		stream.opaque = Z_NULL;
+		stream.avail_in = compressedData.size();
+		stream.next_in = (unsigned char*)compressedData.data();
+		
+		// Initialize for gzip decompression
+		// windowBits = 15 (default) + 16 (gzip format) = 31
+		int ret = inflateInit2(&stream, 15 + 16);
+		if(ret != Z_OK)
 		{
-			// Find the end of the gzip header
-			// For simplicity, we'll skip the first 10 bytes (minimum header size)
-			// and use qUncompress on the raw deflate data
-			// However, qUncompress expects zlib format, not raw deflate
-			// So we'll need a different approach
-			
-			// Try using QByteArray with a workaround: prepend zlib header
-			QByteArray zlibData;
-			zlibData.append((char)0x78); // CMF: deflate, 32K window
-			zlibData.append((char)0x9C); // FLG: default compression
-			
-			// Skip gzip header (10 bytes minimum) and footer (8 bytes)
-			// The actual deflate data is between them
-			int dataStart = 10;
-			int dataEnd = compressedData.size() - 8;
-			zlibData.append(compressedData.mid(dataStart, dataEnd - dataStart));
-			
-			decompressedData = qUncompress(zlibData);
+			Debug(QString("Failed to initialize gzip decompression: %1").arg(ret));
+			return;
 		}
+		
+		// Allocate output buffer - start with 4MB which should handle most anime titles files
+		const int CHUNK = 4 * 1024 * 1024;
+		unsigned char* out = new unsigned char[CHUNK];
+		
+		// Decompress
+		do {
+			stream.avail_out = CHUNK;
+			stream.next_out = out;
+			
+			ret = inflate(&stream, Z_NO_FLUSH);
+			if(ret == Z_STREAM_ERROR || ret == Z_NEED_DICT || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
+			{
+				Debug(QString("Gzip decompression failed: %1").arg(ret));
+				delete[] out;
+				inflateEnd(&stream);
+				return;
+			}
+			
+			int have = CHUNK - stream.avail_out;
+			decompressedData.append((char*)out, have);
+		} while(ret != Z_STREAM_END);
+		
+		// Clean up
+		delete[] out;
+		inflateEnd(&stream);
 	}
 	else
 	{
-		// Try direct decompression
+		// Try direct decompression with qUncompress (for zlib format)
 		decompressedData = qUncompress(compressedData);
 	}
 	
