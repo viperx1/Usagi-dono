@@ -58,6 +58,7 @@ target_link_libraries(usagi PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
+    z
 )
 
 # Link platform-specific libraries
