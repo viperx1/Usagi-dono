@@ -940,6 +940,10 @@ int Window::parseMylistCSV(const QString &content)
 		if(line.isEmpty())
 			continue;
 		
+		// Skip comment lines
+		if(line.startsWith("#"))
+			continue;
+		
 		// Process header line to detect format
 		if(firstLine)
 		{
@@ -947,7 +951,7 @@ int Window::parseMylistCSV(const QString &content)
 			QString lowerLine = line.toLower();
 			
 			// Check if this is a header line
-			if(lowerLine.contains("lid") || lowerLine.contains("aid") || line.startsWith("#"))
+			if(lowerLine.contains("lid") || lowerLine.contains("aid"))
 			{
 				hasHeader = true;
 				
