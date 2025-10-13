@@ -52,10 +52,22 @@ To import your complete mylist with all entries:
 ```
 
 ### CSV/TXT Format
+
+The application now supports multiple CSV template formats:
+
+#### Standard MYLISTEXPORT Format
 ```
 lid,fid,eid,aid,gid,date,state,viewdate,storage,source,other,filestate
 123456,789012,345678,901234,567890,1234567890,1,1234567890,/path/to/file,...
 ```
+
+#### csv-adborg Template Format
+```
+aid,eid,gid,lid,status,viewdate,anime_name,episode_name
+901234,345678,567890,123456,1,1234567890,Test Anime,Episode 1
+```
+
+The parser automatically detects which format is being used by reading the header row and mapping columns by name. This means you can use any AniDB MYLISTEXPORT template that includes the required fields (lid, aid).
 
 ## Data Fields
 

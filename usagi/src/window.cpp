@@ -922,13 +922,17 @@ int Window::parseMylistXML(const QString &content)
 int Window::parseMylistCSV(const QString &content)
 {
 	// Parse CSV/TXT format mylist export
-	// Expected format: lid,fid,eid,aid,gid,date,state,viewdate,storage,...
+	// Supports multiple formats:
+	// - Standard: lid,fid,eid,aid,gid,date,state,viewdate,storage,...
+	// - csv-adborg: aid,eid,gid,lid,status,viewdate,anime_name,episode_name,...
 	int count = 0;
 	QSqlDatabase db = QSqlDatabase::database();
 	db.transaction();
 	
 	QStringList lines = content.split('\n');
 	bool firstLine = true;
+	QMap<QString, int> columnMap;
+	bool hasHeader = false;
 	
 	for(int i = 0; i < lines.size(); i++)
 	{
@@ -936,30 +940,81 @@ int Window::parseMylistCSV(const QString &content)
 		if(line.isEmpty())
 			continue;
 		
-		// Skip header line
+		// Process header line to detect format
 		if(firstLine)
 		{
 			firstLine = false;
-			if(line.toLower().contains("lid") || line.startsWith("#"))
+			QString lowerLine = line.toLower();
+			
+			// Check if this is a header line
+			if(lowerLine.contains("lid") || lowerLine.contains("aid") || line.startsWith("#"))
+			{
+				hasHeader = true;
+				
+				// Parse header to build column map
+				QStringList headers = line.split(',');
+				for(int col = 0; col < headers.size(); col++)
+				{
+					QString header = headers[col].trimmed().toLower();
+					columnMap[header] = col;
+				}
 				continue;
+			}
 		}
 		
 		QStringList fields = line.split(',');
-		if(fields.size() < 8)
-			continue;  // Need at least 8 fields
 		
-		// Parse fields
-		QString lid = fields[0].trimmed();
-		QString fid = fields[1].trimmed();
-		QString eid = fields[2].trimmed();
-		QString aid = fields[3].trimmed();
-		QString gid = fields[4].trimmed();
-		QString state = fields[6].trimmed();
-		QString viewdate = fields[7].trimmed();
-		QString storage = fields.size() > 8 ? fields[8].trimmed() : "";
+		// Parse fields based on detected format
+		QString lid, fid, eid, aid, gid, state, viewdate, storage;
 		
-		if(lid.isEmpty() || fid.isEmpty())
+		if(hasHeader && !columnMap.isEmpty())
+		{
+			// Header-based parsing (supports csv-adborg and other templates)
+			lid = columnMap.contains("lid") && fields.size() > columnMap["lid"] 
+				? fields[columnMap["lid"]].trimmed() : "";
+			fid = columnMap.contains("fid") && fields.size() > columnMap["fid"] 
+				? fields[columnMap["fid"]].trimmed() : "";
+			eid = columnMap.contains("eid") && fields.size() > columnMap["eid"] 
+				? fields[columnMap["eid"]].trimmed() : "";
+			aid = columnMap.contains("aid") && fields.size() > columnMap["aid"] 
+				? fields[columnMap["aid"]].trimmed() : "";
+			gid = columnMap.contains("gid") && fields.size() > columnMap["gid"] 
+				? fields[columnMap["gid"]].trimmed() : "";
+			
+			// State can be "state" or "status"
+			if(columnMap.contains("state") && fields.size() > columnMap["state"])
+				state = fields[columnMap["state"]].trimmed();
+			else if(columnMap.contains("status") && fields.size() > columnMap["status"])
+				state = fields[columnMap["status"]].trimmed();
+			
+			viewdate = columnMap.contains("viewdate") && fields.size() > columnMap["viewdate"] 
+				? fields[columnMap["viewdate"]].trimmed() : "";
+			storage = columnMap.contains("storage") && fields.size() > columnMap["storage"] 
+				? fields[columnMap["storage"]].trimmed() : "";
+		}
+		else
+		{
+			// Position-based parsing (standard format without header)
+			if(fields.size() < 8)
+				continue;  // Need at least 8 fields
+			
+			lid = fields[0].trimmed();
+			fid = fields[1].trimmed();
+			eid = fields[2].trimmed();
+			aid = fields[3].trimmed();
+			gid = fields[4].trimmed();
+			state = fields[6].trimmed();
+			viewdate = fields[7].trimmed();
+			storage = fields.size() > 8 ? fields[8].trimmed() : "";
+		}
+		
+		// Validate required fields
+		if(lid.isEmpty() || aid.isEmpty())
 			continue;
+		
+		// fid is optional for csv-adborg template
+		if(fid.isEmpty())
+			fid = "0";
 		
 		// Escape single quotes in storage field to prevent SQL injection
 		QString escapedStorage = storage;
@@ -971,10 +1026,10 @@ int Window::parseMylistCSV(const QString &content)
 			"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
 			.arg(lid)
 			.arg(fid)
-			.arg(eid)
+			.arg(eid.isEmpty() ? "0" : eid)
 			.arg(aid)
-			.arg(gid)
-			.arg(state)
+			.arg(gid.isEmpty() ? "0" : gid)
+			.arg(state.isEmpty() ? "0" : state)
 			.arg(viewdate.isEmpty() || viewdate == "0" ? "0" : "1")
 			.arg(escapedStorage);
 		
