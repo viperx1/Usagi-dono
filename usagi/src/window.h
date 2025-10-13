@@ -3,6 +3,9 @@
 #include <QtGui>
 #include <QtAlgorithms>
 #include <QRegularExpression>
+#include <QDesktopServices>
+#include <QInputDialog>
+#include <QUrl>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QTextEdit>
@@ -125,6 +128,7 @@ public slots:
     void safeClose();
     void loadMylistFromDatabase();
     void fetchMylistStatsFromAPI();
+    void downloadMylistExport();
     void importMylistFromFile();
 signals:
 	void hashFiles(QStringList);

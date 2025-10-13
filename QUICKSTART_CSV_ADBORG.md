@@ -1,6 +1,29 @@
-# Quick Start: Using csv-adborg Template
+# Quick Start: Using MyList Import
 
-## For End Users
+## Easiest Method: Download from AniDB (NEW)
+
+### Step 1: Download Your MyList
+
+1. Open **Usagi-dono** application
+2. Navigate to the **"MyList"** tab
+3. Click **"Download MyList from AniDB"** button
+4. Select **"csv-adborg (Recommended)"** from the dropdown
+5. Your browser opens to AniDB's export page
+6. Log in to AniDB (if not already)
+7. Click **"Export"** button
+8. Save the downloaded file
+
+### Step 2: Import the File
+
+1. Return to **Usagi-dono**
+2. Click **"Import MyList from File"** button
+3. Select the file you just downloaded
+4. Wait for import to complete
+5. Success! Your MyList is now loaded
+
+## Alternative: Manual Export from AniDB
+
+If you prefer to download the export manually:
 
 ### Step 1: Export from AniDB with csv-adborg Template
 

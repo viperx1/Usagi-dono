@@ -16,7 +16,32 @@ This method uses the AniDB UDP API to fetch mylist statistics:
 3. Statistics will be returned (total entries, watched count, etc.)
 4. Note: This only provides statistics, not the actual mylist entries
 
-## Method 2: Import from Export File (Recommended)
+## Method 2: Download MyList from AniDB (NEW - Easiest)
+
+The quickest way to import your complete mylist:
+
+### Step 1: Download from AniDB
+1. Open Usagi-dono application
+2. Go to the **MyList** tab
+3. Click **"Download MyList from AniDB"** button
+4. Select your preferred template format:
+   - **csv-adborg (Recommended)** - Optimized format, works with all features
+   - **xml** - Full structured data
+   - **csv** - Standard format
+   - **json** - JSON format
+   - **anidb** - AniDB default
+5. Your browser will open to AniDB's export page
+6. Log in to AniDB if needed
+7. Click **"Export"** to download the file
+
+### Step 2: Import the Downloaded File
+1. Return to Usagi-dono
+2. Click **"Import MyList from File"**
+3. Select the file you just downloaded
+4. The application will automatically detect the format and import the data
+5. After import, your mylist will display automatically
+
+## Method 3: Import from Export File (Manual Download)
 
 To import your complete mylist with all entries:
 

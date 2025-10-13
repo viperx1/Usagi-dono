@@ -106,9 +106,11 @@ Window::Window()
     QHBoxLayout *mylistButtons = new QHBoxLayout();
     QPushButton *mylistRefreshButton = new QPushButton("Load MyList from Database");
     QPushButton *mylistFetchButton = new QPushButton("Fetch MyList Stats from API");
+    QPushButton *mylistDownloadButton = new QPushButton("Download MyList from AniDB");
     QPushButton *mylistImportButton = new QPushButton("Import MyList from File");
     mylistButtons->addWidget(mylistRefreshButton);
     mylistButtons->addWidget(mylistFetchButton);
+    mylistButtons->addWidget(mylistDownloadButton);
     mylistButtons->addWidget(mylistImportButton);
     pageMylist->addLayout(mylistButtons);
     
@@ -117,6 +119,9 @@ Window::Window()
     });
     connect(mylistFetchButton, &QPushButton::clicked, [this]() {
         fetchMylistStatsFromAPI();
+    });
+    connect(mylistDownloadButton, &QPushButton::clicked, [this]() {
+        downloadMylistExport();
     });
     connect(mylistImportButton, &QPushButton::clicked, [this]() {
         importMylistFromFile();
@@ -796,6 +801,41 @@ void Window::fetchMylistStatsFromAPI()
 	logOutput->append("Fetching mylist statistics from API...");
 	adbapi->Mylist(-1);  // -1 triggers MYLISTSTATS
 	logOutput->append("MYLISTSTATS command sent. Note: To get actual mylist entries, use 'Import MyList from File' with an export from https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export");
+}
+
+void Window::downloadMylistExport()
+{
+	// Show dialog to select export template
+	QStringList templates;
+	templates << "csv-adborg (Recommended)" 
+	          << "xml (Full structured data)"
+	          << "csv (Standard comma-separated)"
+	          << "json (JSON format)"
+	          << "anidb (AniDB default)";
+	
+	bool ok;
+	QString selectedTemplate = QInputDialog::getItem(this, 
+		tr("Select MyList Export Template"),
+		tr("Choose the template format for export:\n\n"
+		   "Note: You will be directed to AniDB's export page.\n"
+		   "After downloading, use 'Import MyList from File' to load it."),
+		templates, 0, false, &ok);
+	
+	if(!ok || selectedTemplate.isEmpty())
+		return;
+	
+	// Extract template name (remove description)
+	QString templateName = selectedTemplate.split(" ").first();
+	
+	// Build URL with template parameter
+	QString exportUrl = QString("https://anidb.net/user/export?template=%1&list=mylist").arg(templateName);
+	
+	// Log the action
+	logOutput->append(QString("Opening AniDB export page with template: %1").arg(templateName));
+	logOutput->append("After downloading, use 'Import MyList from File' button to import the data.");
+	
+	// Open URL in default browser
+	QDesktopServices::openUrl(QUrl(exportUrl));
 }
 
 void Window::importMylistFromFile()
