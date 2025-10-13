@@ -1,0 +1,23 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+3442|41305|1|OVA|||25|14.09.2005 00:00|6.77|17|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+3442|41305|374|182867|240741493|c9d3be9499d83c4a8449ffaa9c71970e|4c765de013ce11506109ef058f748c46|a1e7b86978197d23cbb35e1ee98ce0fd65e5f73c|c58d2776|1524|10|very high|720x400|H264/AVC|(HE-)AAC|english|japanese|1|5|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+374|14321|KickAssAnime|KAA|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|500
+291|Fantasy World|0|600
+12|Future|0|600
+269|Game|0|600
+263|Gunfights|0|200
+171|Military|0|300
+272|RPG|0|600
+8|Sci-Fi|0|400
+173|Swordplay|0|400
+235|Tragedy|0|200
+84|Violence|0|300
+
+

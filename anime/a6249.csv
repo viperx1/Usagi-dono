@@ -1,0 +1,30 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+6249|104260|1|Complete Movie|||115|01.08.2009 00:00|9.05|16|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+6249|104260|7091|719998|2165118744|f06772ef43f4126f4d40aa28bb12a87d|60ebb23539077dd1badfdb31c8c34a7d|ee7ddc50c1c4be8ec7f069e4975aa6660b3eb258|9b12bbfa|6796|10|very high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+7091|53016|Frostii|Frostii|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|300
+22|Asia|0|400
+17|Comedy|0|400
+535|Countryside|0|400
+289|Earth|0|400
+291|Fantasy World|0|400
+498|Furo Scene|0|200
+23|Japan|0|400
+20|Martial Arts|0|200
+78|Mina|0|600
+275|New|0|600
+458|Nosebleed|0|200
+249|Proxy Battles|0|100
+198|Romance|0|300
+8|Sci-Fi|0|600
+235|Tragedy|0|200
+84|Violence|0|300
+130|Virtual Reality|0|400
+
+

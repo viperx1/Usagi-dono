@@ -1,0 +1,24 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+22|Asia|0|400
+160|Conspiracy|0|100
+289|Earth|0|600
+279|Europe|0|200
+116|France|0|200
+263|Gunfights|0|600
+171|Military|0|400
+275|New|0|600
+233|Plot Continuity|0|500
+484|Politics|0|300
+18|Super Power|0|300
+172|Thriller|0|200
+235|Tragedy|0|200
+295|Underworld|0|500
+
+

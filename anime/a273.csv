@@ -1,0 +1,18 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+273|15007|1|Complete Movie|||100|15.12.2001 00:00|5.66|6|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+273|15007|670|589387|1347853796|e84c25767d6918b0fd15870e6a8a3854|c5b66a53d8c1e23830f48ae0cb6dcfb8|a237246af67b1056a0218b1be08e0b79e64c8f60|d40a21d9|5992|10|high|640x360|XviD|(HE-)AAC|english|japanese|1|1|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+670|8466|Anime-Supreme|a-S|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+167|Demons|0|400
+15|Fantasy|0|400
+209|Parallel Universe|0|400
+5|Shounen|0|400
+18|Super Power|0|400
+
+

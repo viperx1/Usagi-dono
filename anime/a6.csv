@@ -1,0 +1,21 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+6|3994|1|TV Special|||25|07.04.2000 00:00|6.17|10|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+6|3994|34|31257|210319360|5851039dfd67e52a49eba47ad99212d0|cc127bc8813cd4ab417b5aff8c96ad8f|bcce094e84eff0157b1d8bb0f179a52473d0b21f|12245d63|1501|10|very high|640x480|XviD|AC3|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+34|2699|anime.fin|anime_fin|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+221|Elf|0|300
+12|Future|0|600
+329|Genetic Modification|0|600
+274|Novel|0|600
+198|Romance|0|400
+8|Sci-Fi|0|400
+129|Shipboard|0|600
+19|Space|0|600
+
+

@@ -1,0 +1,35 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+7883|120956|1|Walking Party||Walking Par†y|25|27.11.2010 00:00|8.55|7|0|3
+7883|120957|2|Wired Prisoner||Wired Prisφner|25|25.12.2010 00:00|7.37|8|0|3
+7883|120958|3|The Worldend Pallbearer||The ωorldend Pallbearer|25|22.01.2011 00:00|7.14|7|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+7883|120956|10021|865083|376439979|9c1220501ba29ad77a9cf7beae7eb430|0a3950ed47b400868d2b3801edaadb5e|29a6e7115f2b598c70340b0494097c700ba4cead|29937dbf|1601|10|very high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+7883|120957|10021|880623|297509071|21fed9f285d86f4998d56e86c45f5072|fbadd960d9e2bc0c496298de2132e7f7|3570ba56829df11c97268360f8a47afb58a20752|52021fc1|1587|10|very high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+7883|120958|10021|902032|527974476|fa0d9e31b15d194bc8016d8cc2bc6acd|905d06635befc22617a09fdf26a7a369|4602d20b42848fc71ac212e68b2ce3d4a231c1b1|b4f8b2bc|1504|10|high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+10021|60588|Fnolli|Fnolli|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|200
+306|Adventure|0|200
+22|Asia|0|200
+160|Conspiracy|0|500
+200|Dragon|0|200
+289|Earth|0|200
+15|Fantasy|0|300
+291|Fantasy World|0|400
+497|Friendship|0|300
+23|Japan|0|200
+175|Magic|0|300
+482|Magic Circles|0|200
+275|New|0|600
+233|Plot Continuity|0|600
+21|School Life|0|100
+8|Sci-Fi|0|300
+79|Seinen|0|600
+295|Underworld|0|200
+130|Virtual Reality|0|400
+
+

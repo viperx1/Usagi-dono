@@ -1,0 +1,26 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+7221|111713|1|Complete Movie|||165|06.02.2010 00:00|9.12|24|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+7221|111713|7854|838056|3844880645|964fdeea0bc0bdb533acf3090daa8964|0edc4e0f1afcf6411f0a7e122afcb961|52114f9a91d3160cee19e38d1a45dce5b130ba22|3e0d82ae|9708|10|high|1920x1080|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+7854|53336|Mazui|Mazui|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+184|Alien|0|400
+252|Angst|0|500
+22|Asia|0|400
+471|Christmas|0|400
+242|Clubs|0|600
+289|Earth|0|400
+239|High School|0|100
+23|Japan|0|400
+274|Novel|0|600
+209|Parallel Universe|0|400
+11|Present|0|400
+21|School Life|0|600
+79|Seinen|0|600
+163|Time Travel|0|600
+
+

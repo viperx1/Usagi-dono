@@ -1,0 +1,31 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4782|66027|1|My Name Is Ogiue and I Hate Otaku||オタクが嫌いな荻上です|25|22.12.2006 00:00|6.54|24|0|3
+4782|66043|2|I Am from the Planet Otaku||私はオタク星人|25|23.02.2007 00:00|6.83|20|0|3
+4782|66767|3|Then I`ll Undress You!||じゃあ, 脱がしてあげるッ!|25|25.04.2007 00:00|6.61|20|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4782|66027|2812|285332|178315802|671efc4f1d6ac7ded82e1798af0281da|3bb74f3635ac5d089e42135881e40e99|697c27b7b251c2031b0269dd4ea055a381bc7390|4d6ba027|1431|10|very high|704x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|3|mkv
+4782|66043|2812|305087|186775621|be76654b236640a53ba6fdc084227c66|40d00853817144c2596224947b4cd046|8360f95ee79073bbecaf0c3d2fab52b74c712923|1dc770b7|1431|10|very high|704x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|3|mkv
+4782|66767|2812|334786|178615486|0028c712ec427d91ec4aaa20f6a590aa|3c6d33df634b8d8ff95ddd2ace5d28a3|56a8de8457ce227e952415a820a3fbc49b1404bb|46337636|1431|10|very high|704x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+2812|20200|gg|gg|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+22|Asia|0|600
+242|Clubs|0|600
+240|College|0|600
+17|Comedy|0|400
+330|Coming of Age|0|200
+470|Cosplay|0|200
+289|Earth|0|600
+23|Japan|0|600
+273|Manga|0|600
+151|Parody|0|300
+11|Present|0|600
+21|School Life|0|600
+79|Seinen|0|600
+277|Shounen Ai|0|100
+220|Stereotypes|0|500
+
+

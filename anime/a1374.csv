@@ -1,0 +1,40 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1374|24686|1|Volume 01|||30|25.11.2004 00:00|6.19|17|0|2
+1374|24689|2|Volume 02|||30|25.02.2005 00:00|7.05|8|0|2
+1374|24687|3|Volume 03|||30|25.05.2005 00:00|5.96|8|0|2
+1374|24688|4|Volume 04|||30|24.02.2006 00:00|4.22|8|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1374|24686|95|84753|294901760|60369f9a4e807abcb57cae3b28c088c3|bdabc0dad9e4400b4275bf073150591c|c832782210119252b9abfb938fec33b6883b21e4|58882745|1817|10|very high|704x396|XviD|MP3 VBR|english|japanese|1|1|2|avi
+1374|24689|95|133579|294836224|0760d153d8397082605bc1d9f7736a8a|60e88ee13f93ae0cee5fbb8c04d2011a|2f656e705e2c533f0009906d0fe104ff96bfe912|6bccd3bb|1818|10|high|704x396|XviD|MP3 VBR|english|japanese|1|1|2|avi
+1374|24687|95|153664|293642240|df573397fe7268a880c0e6a0d66ed662|6e0192459271a0788b58f6a2862d7021|49dab7573a2367d6a41e92e0bfe2a82504cebfac|854ffff3|1768|10|high|704x396|XviD|MP3 VBR|english|japanese|1|1|2|avi
+1374|24688|95|224539|294490112|610aae5c6abd44a783fa9df95f506ec7|6ac5a947cfaddd9a7017c0c92a2e35cb|c1b724942449212bc12d997b2986f08ee630216a|4bfa25cc|1690|10|very high|704x396|XviD|MP3 CBR|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+95|9345|Aoi-Anime|AOI|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+306|Adventure|0|600
+486|Calling Your Attacks|0|200
+167|Demons|0|200
+15|Fantasy|0|600
+291|Fantasy World|0|600
+269|Game|0|400
+266|High Fantasy|0|400
+175|Magic|0|600
+482|Magic Circles|0|300
+20|Martial Arts|0|400
+171|Military|0|400
+233|Plot Continuity|0|600
+198|Romance|0|300
+272|RPG|0|400
+488|Spellcasting|0|200
+516|Summoning|0|200
+18|Super Power|0|400
+173|Swordplay|0|600
+163|Time Travel|0|400
+84|Violence|0|200
+467|War|0|400
+
+

@@ -1,0 +1,30 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|500
+194|Bakumatsu - Meiji Period|0|600
+265|Dark Fantasy|0|200
+167|Demons|0|200
+412|Edo Period|0|400
+15|Fantasy|0|400
+322|Feudal Warfare|0|400
+263|Gunfights|0|400
+25|Historical|0|500
+23|Japan|0|600
+175|Magic|0|200
+20|Martial Arts|0|100
+171|Military|0|400
+10|Past|0|600
+198|Romance|0|100
+28|Samurai|0|400
+79|Seinen|0|600
+173|Swordplay|0|500
+235|Tragedy|0|400
+84|Violence|0|400
+467|War|0|400
+
+

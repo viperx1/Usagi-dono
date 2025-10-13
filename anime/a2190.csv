@@ -1,0 +1,32 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+2190|37541|1|Complete Movie|||90|04.12.2004 00:00|8.41|4|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+2190|37541|2515|174310|733989224|a92943e541e8127aa45850609228313f|189df0a7608869b16205118bafd17dea|410125fd1443f4af57c50eccf2aedf4e8e496da9|ac381df3|5214|10|very high|768x432|XviD|MP3 VBR|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+2515|13691|Bakakozou &amp; Saizen|Bakakozou-Saizen|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+306|Adventure|0|400
+126|Alternative History|0|600
+252|Angst|0|200
+17|Comedy|0|100
+167|Demons|0|100
+508|Desert|0|600
+161|Detective|0|200
+282|Ecchi|0|100
+263|Gunfights|0|100
+154|Horror|0|300
+195|Korea|0|600
+175|Magic|0|400
+273|Manga|0|600
+533|Revenge|0|200
+198|Romance|0|100
+5|Shounen|0|600
+374|Skimpy Clothing|0|300
+173|Swordplay|0|200
+244|Twisted|0|200
+84|Violence|0|300
+
+

@@ -1,0 +1,17 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+7969|122381|1|OVA|||15|07.08.2003 00:00|3.66|4|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+7969|122381|118|27038|160344064|7aed4397af78001751134723de318812|4611df9bcc3f3ae30f4b2bb4faed5a78|587fd31e11462285f2aee43a42f4d01501f43a6b|a86558f7|931|10|high|640x480|XviD|MP3 CBR|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+118|56908|Solar Fansubs|Solar|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+252|Angst|0|300
+256|Art|0|200
+236|Daily Life|0|200
+225|Music|0|100
+8|Sci-Fi|0|200
+
+

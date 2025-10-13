@@ -1,0 +1,49 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+117|2427|1|Fooly Cooly||フリクリ|25|26.04.2000 00:00|6.78|69|0|2
+117|2431|2|Firestarter||ファイスタ|25|21.06.2000 00:00|7.07|61|0|2
+117|2430|3|Marquis de Carabas||マルラバ|25|23.08.2000 00:00|7.93|59|0|2
+117|2429|4|Full Swing||フリキリ|25|25.10.2000 00:00|7.37|54|0|2
+117|2428|5|Brittle Bullet||ブラブレ|25|21.12.2000 00:00|7.81|55|0|2
+117|2432|6|FLCLimax||フリクラ|35|16.03.2001 00:00|8.55|54|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+117|2427|41|27025|368923368|6903469f558d8ad799c06b22c96e0617|e252fd187c656f5aef1078a5051e6ffc|a45a4ba2d341359a2ab19d466851fbc8557793a6|abe499b6|1479|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|4105|2|ogm
+117|2431|41|27030|364239438|c054248601d6e60a887d2034565bfe37|a74a85f164d83b74a93526a4b12c5b62|ab73c451a93e2d14e9ad85b282c0f957dc0479d2|1e7f7d54|1410|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|4101|2|ogm
+117|2430|41|27185|365491524|346bca14d24f86ccd3726d94d9f09091|9001b3d017143241d5b53964637cc41a|992c2928c7d778c0b68565a6bc9e6ca0d5a3a700|2ae54c63|1407|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|4101|2|ogm
+117|2429|41|27228|367740268|5fc88ee347d7f4ded88a279145f115ac|639486726d8c99d6099acdd620104611|a6bf7ec5e0ec4f0fd17f848fb982db1935d4e4a8|2a2ab157|1496|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|4101|2|ogm
+117|2428|41|27164|324516733|e82d0c3d569897b1215bc1a97338981d|d70baa1aa1fd6edd848c7da87afb49b5|f7a0798915bd5f0b708232263e8bfb1fbe046683|52460d09|1418|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|ogm
+117|2432|41|27165|410868324|2b77296909f7a54344f09e6e4885f37d|d04a83d4b7cb7511181dd3eaba86473d|1b9bf855577a1d047effe9f15582d1806dbbf3d0|7c8ea3e0|1856|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+41|1890|Zhentarim DivX|zx|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+184|Alien|0|200
+127|Alternative Present|0|600
+119|Android|0|400
+22|Asia|0|600
+137|Baseball|0|100
+504|Breaking the Fourth Wall|0|200
+511|Bullet Time|0|200
+17|Comedy|0|600
+330|Coming of Age|0|600
+245|Delinquents|0|200
+289|Earth|0|600
+282|Ecchi|0|200
+237|Elementary School|0|200
+472|General Lack of Common Sense|0|300
+23|Japan|0|600
+13|Mecha|0|400
+275|New|0|600
+283|Pantsu|0|300
+151|Parody|0|400
+11|Present|0|600
+198|Romance|0|400
+21|School Life|0|200
+8|Sci-Fi|0|400
+79|Seinen|0|600
+153|Slapstick|0|600
+244|Twisted|0|400
+
+

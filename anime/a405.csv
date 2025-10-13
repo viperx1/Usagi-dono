@@ -1,0 +1,27 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+405|4720|1|The Curse of the Contrary Jewel||シャンプー豹変! 反転宝珠の禍|30|21.10.1993 00:00|6.50|13|0|2
+405|4719|2|Tendo Family Christmas Scramble||天道家すくらんぶるクリスマス|25|07.12.1993 00:00|5.72|12|0|2
+405|4718|3|Akane vs Ranma||あかねVSらんま お母さんの味は私が守る!|25|18.02.1994 00:00|7.18|11|0|2
+405|4717|4|Stormy Weather Comes to School! Growing Up With Miss Hinako||学園に吹く嵐! アダルトチェンジひな子先生|25|21.04.1994 00:00|7.94|12|0|2
+405|4716|5|The One to Carry On (Part 1)||道を継ぐ者・前編|25|17.06.1994 00:00|5.45|10|0|2
+405|4726|6|The One to Carry On (Part 2)||道を継ぐ者・後編|25|19.08.1994 00:00|5.70|10|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+405|4720|291|38133|366535840|dbff061f9fb65e4cf33a8477eb94bdd7|5ad283381a3cf111b9fb3e230f86b6aa|bf59014f9a6e08a59423ab5511f86ec01fa799a1|03343d24|1714|10|very high|640x480|XviD|(HE-)AAC|english|japanese|1|1|2|mkv
+405|4719|291|38132|368619184|53a04338380072396f84eb1628b961c6|6918ea42dc653076135c999ecc0f355c|a5d5fcfe8c417ccdf5bf5fe2d28eb110f00a7693|9a49b1fc|1691|10|very high|640x480|XviD|(HE-)AAC|english|japanese|1|1|2|mkv
+405|4718|291|38134|374857652|1f190ae35c64c7ce8c10ae2b9692f586|cd6c3aa2190686f0525120569bcc2ecc|acf8cee346b2181530b864bb4fade3986f94ca2b|f808626a|1625|10|very high|640x480|XviD|(HE-)AAC|english|japanese|1|1|2|mkv
+405|4717|291|38135|359743161|1ba23ac444d603279caf848f94fa9909|47c6fbaf325a263f6df7b1c97e089819|5312076bfc16b625424805f0416229f94a87d08f|d8dc60d5|1683|10|very high|640x480|XviD|(HE-)AAC|english|japanese|1|1|2|mkv
+405|4716|291|38246|368534679|2e9ff4b0ca9a6acb93c651db997e4062|8a36fd715c43ea4dca4f8f01e48ebb02|bd480bd319557a17c3b25c5ab8be255dcb1144c4|238c4369|1710|10|very high|640x480|XviD|(HE-)AAC|english|japanese|1|1|2|mkv
+405|4726|291|38247|368277736|8cd258ade4ce331bd8c4e7ecbfabf863|d729691977547ec0ea2d5f88d26f5ce2|9b44daf933a4930f8c444f858516021e01a34fbf|4ecb7abe|1748|10|very high|640x480|XviD|(HE-)AAC|english|japanese|1|1|2|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+291|3752|Anime-Xtreme|aX|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+471|Christmas|0|200
+17|Comedy|0|400
+20|Martial Arts|0|400
+198|Romance|0|400
+
+

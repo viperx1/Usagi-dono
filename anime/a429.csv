@@ -1,0 +1,24 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+429|6470|2|Part 1 of 2|||60|03.08.1996 00:00|2.61|1|0|3
+429|6471|3|Part 2 of 2|||45|03.08.1996 00:00|4.06|1|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+429|6470|670|37699|730911455|5cc3326f4d38b8cbfaf7815dc09c2ad4|0f9c3049a4a317eef9c420f170e35b06|3175b3eacd6c5014117406f92bd263525c18e1a4|e9908f99|3489|10|very high|720x480|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|3|ogm
+429|6471|670|37700|723305616|473735c2b7a31715f753ccfd5bf4f963|14e0e05fa8bdf30669aad9ac8811f6c9|c2f2437eaeecd5aae62e44378b8598550c2a0bd7|a5110e9b|2342|10|very high|720x480|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|3|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+670|3649|Anime-Supreme|a-S|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+170|Angel|0|200
+22|Asia|0|600
+289|Earth|0|600
+15|Fantasy|0|200
+23|Japan|0|600
+273|Manga|0|600
+198|Romance|0|100
+173|Swordplay|0|100
+84|Violence|0|300
+
+

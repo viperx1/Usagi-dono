@@ -1,0 +1,43 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+172|1677|1|Unearthly Kyoto||妖の都|30|21.07.1988 00:00|4.28|7|0|2
+172|1679|2|A Banquette of Marionettes||繰の宴|30|21.10.1988 00:00|3.86|7|0|2
+172|1678|3|Fragile Armor||脆き鎧|30|21.12.1988 00:00|3.02|5|0|2
+172|1680|4|Frozen Time||凍る刻|30|21.04.1989 00:00|6.81|5|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+172|1677|34|7432|360290304|c5050809a9566209fda24bfda17f074c|efea731d901e6bd64dfafcaf0c394e90|37e2ddb952310bcfa6304ccf92508160a9bea3bb|fc018e5e|1614|10|high|640x480|XviD|AC3|english|japanese|0|1|2|avi
+172|1679|34|7460|358684672|fef6016e5c639dafdf6b939a47fb355a|33967385db1d2c438c891a3e2f0a30e2|4e9a6c22863661a4ef328c1f6e5c275d268b22e4|a04b3e36|1759|10|high|640x480|XviD|AC3|english|japanese|0|1|2|avi
+172|1678|34|7485|357103616|235f3d98fe6d2344aeac3ec3dfba25d1|f1a87ed4bf863d6f81a5df25451333a3|298b9271ea399e68aafceb22437e4a6b38e0ff2b|c724d1c5|1662|10|high|640x480|XviD|AC3|english|japanese|0|1|2|avi
+172|1680|34|7486|360140800|f7e1b57f9160cc95c38ca1e3f69c405c|a225f67444f59d80cde194275fbb00af|ef9cc440d369f33e6d16259b821f31ef63fe883b|590fda83|1796|10|high|640x480|XviD|AC3|english|japanese|0|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+34|1157|anime.fin|anime_fin|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+127|Alternative Present|0|300
+252|Angst|0|400
+22|Asia|0|400
+177|Cops|0|100
+265|Dark Fantasy|0|400
+167|Demons|0|400
+161|Detective|0|300
+289|Earth|0|400
+15|Fantasy|0|400
+291|Fantasy World|0|400
+154|Horror|0|400
+23|Japan|0|400
+230|Love Polygon|0|200
+175|Magic|0|400
+275|New|0|600
+281|Parasite|0|200
+487|Parental Abandonment|0|300
+233|Plot Continuity|0|400
+11|Present|0|300
+198|Romance|0|300
+21|School Life|0|300
+235|Tragedy|0|400
+158|Vampire|0|400
+84|Violence|0|200
+
+

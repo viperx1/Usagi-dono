@@ -1,0 +1,57 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1002|11680|1|Fratello (Siblings)||兄 妹 - fratello -|25|09.10.2003 00:00|5.18|21|0|3
+1002|11704|2|Orione (Orion)||天体観測 - orione -|25|16.10.2003 00:00|5.23|15|0|3
+1002|12176|3|Ragazzo (Boy)||少 年 - ragazzo -|25|30.10.2003 00:00|5.97|11|0|3
+1002|12781|4|Bambola (Doll)||人 形 - bambola -|25|13.11.2003 00:00|7.28|10|0|3
+1002|12888|5|Promessa (Promise)||約 束 - promessa -|25|20.11.2003 00:00|6.13|10|0|3
+1002|12987|6|Gelato (Frozen)||報 酬 - gelato -|25|27.11.2003 00:00|5.03|9|0|3
+1002|13006|7|Protezione (Protection)||守 護 - protezione -|25|04.12.2003 00:00|5.09|9|0|3
+1002|13102|8|Il Principe del Regno della Pasta (The Prince of the Kingdom of Pasta)||御伽噺 - Il Principe del regno della pasta -|25|18.12.2003 00:00|5.74|8|0|3
+1002|13356|9|Lycoris Radiata Herb (Be Struck Off Herb)||彼岸花 - Lycoris radiata Herb -|25|15.01.2004 00:00|6.56|7|0|3
+1002|14158|10|Amare (To Love)||熱病 - amare -|25|29.01.2004 00:00|7.37|8|0|3
+1002|14595|11|Febbre Alta (High Fever)||恋慕 - febbre alta -|25|05.02.2004 00:00|7.55|9|0|3
+1002|14996|12|Simbiosi (Symbiosis)||共生 - simbiosi -|25|12.02.2004 00:00|5.52|7|0|3
+1002|15136|13|Stella Cadente (Falling Star)||流星 - stella cadente -|25|19.02.2004 00:00|6.56|10|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1002|11680|670|160863|243528833|0a080e741fc8bc57e0a65a075f497a66|be189a77f4fdeef0539df04d0973a67e|0f354dab617fc10038f4e1bf3c79c8fe5dbd0421|f62f0bc2|1393|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|11704|670|160861|244334093|b453d66d60fc7ea7b95b777839bb88bb|99d7c3dddb84e41e35e741a76b18415e|b9d50265b0a9caebe2d920a0dd62ba720c7876be|cb7af77a|1391|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|12176|670|160864|243651411|ff1ffd5b42600f031e7fb43a04f724cc|0cd05731039e4b4ce5748941372ac7c6|d607e65be981e20b6ddfa5cc3fb3f776955ea243|5890ebcd|1393|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|12781|670|160865|243064707|cea189444c6359559acf8b455554b4a7|e4511ceab2c4074b15244f915041e610|171ad5facd07853d1ed6d851513c6d3078c899b1|a050075d|1392|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|12888|670|160862|243096603|702c587837ac1d24ae0be7db5473b4b1|2c5de83b11a6166265e43c8f66f19820|d1dedaa47738c9c8ae3f0cdde769cc2dcd24caff|f9f67ba3|1391|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|12987|670|182843|241680874|955e9f0f7840656cb414dc4701badbf3|abfbed6e617310f9a48a3d7d2178f744|04b9449853d3e538df16bdd8150b136687eb5b25|b9430446|1390|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|13006|670|182841|241248630|c0ece051713335165b14e3ab9d9f98c2|29d2a35d06097bfe67d40a12318e4e30|4ea7bd7c483b3dd2a8f31a4962adf4258283bcc0|81faa59c|1390|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|13102|670|182842|241147650|83f7eb5fdde52d54b3d09b1c3df96edb|dd6cef9f91ffb5e75950b15172d989f2|d6108a47a006ad9357832152c0c28d1eb5f9f061|6e3c8d06|1390|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|13356|670|182844|241124581|876de999a71d00570d9c96d79a0a3609|ec39fa8d5d3a2a01b5418b06d95f1906|dead9fc51b1e4e68a43299c0bdd70ae3c7ad7b81|d7054cf0|1392|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|14158|670|203329|242688150|f4597384bccb01bc06795d2d1c448d0f|2b9b6960e14981ed9b9a88a07bb13344|0aa9231494fd9ef80291c95865e77c95fceb55d3|be62fd50|1390|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|14595|670|203326|241555244|db3bb4059d98ddb175942d8daf434ef3|9a5aa64e155c7942d7c5b45737f526d1|e660920a44ef030d35efa86f74c48fa9a7c12916|35622a7c|1385|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|14996|670|203328|242688756|6cf96e4adb01cd372d3c06247e3e2acc|c9834502e452381a915e58e1df2c0a1c|9d6d80216d4b8615a2fd47480b2cd4e85c36e625|55f29c77|1390|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+1002|15136|670|203327|243739160|08d6fe60dd08d1329808b1ef41e023f6|d9d1d07b1ac0ae869b73a3007ab559d2|19f6162e8fc849729cca752b06384125b8b642cb|ac8205b7|1391|10|very high|720x480|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+670|12948|Anime-Supreme|a-S|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+127|Alternative Present|0|100
+252|Angst|0|300
+490|Assassin|0|200
+120|Cyborgs|0|500
+289|Earth|0|600
+279|Europe|0|600
+263|Gunfights|0|400
+328|Human Enhancement|0|500
+339|Italy|0|600
+73|Lolicon|0|500
+273|Manga|0|600
+233|Plot Continuity|0|400
+11|Present|0|500
+8|Sci-Fi|0|400
+79|Seinen|0|600
+203|Special Squads|0|300
+493|Terrorist|0|200
+235|Tragedy|0|500
+295|Underworld|0|600
+84|Violence|0|400
+
+

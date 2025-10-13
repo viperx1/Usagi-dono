@@ -1,0 +1,32 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4151|52406|1|Complete Movie|||100|15.07.2006 00:00|9.48|42|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4151|52406|3661|482477|1883278379|ed6104e6dd2fd0a7f69cfcc53d036f0d|bb514015f2202929a62a9c6957438a06|cf69b1b44e156887f5529a93f557636229928b8f|e3c55e62|5899|10|very high|1280x720|H264/AVC|AC3|english|japanese|1|1|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+3661|35679|THORAnime|THORA|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|100
+252|Angst|0|100
+22|Asia|0|600
+137|Baseball|0|200
+17|Comedy|0|200
+236|Daily Life|0|400
+289|Earth|0|600
+498|Furo Scene|0|200
+239|High School|0|600
+23|Japan|0|600
+274|Novel|0|300
+233|Plot Continuity|0|600
+11|Present|0|600
+198|Romance|0|400
+21|School Life|0|600
+8|Sci-Fi|0|400
+153|Slapstick|0|200
+113|Sports|0|100
+163|Time Travel|0|600
+235|Tragedy|0|200
+
+

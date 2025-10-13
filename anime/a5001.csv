@@ -1,0 +1,19 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+5001|92262|1|Complete Movie|||25|10.02.2007 00:00|6.03|5|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+5001|92262|6680|496700|368466840|4d1c383c747732331b410522ce36344c|53e8e38aa3372c2aa32fc594de8252f2|5fb765f70263829cdc4ca0fa96f3b35179e2988a|1f056511|1250|10|very high|720x480|H264/AVC|AC3|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+6680|36580|AnimeClipse Fansubs &amp; Ureshii|AnimeClipse-Ureshii|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+252|Angst|0|600
+289|Earth|0|600
+15|Fantasy|0|300
+274|Novel|0|600
+88|Nudity|0|200
+10|Past|0|600
+79|Seinen|0|400
+
+

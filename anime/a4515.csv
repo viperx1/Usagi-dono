@@ -1,0 +1,18 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4515|66520|1|Complete Movie|||90|16.12.2006 00:00|5.79|14|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4515|66520|1412|365066|734003200|3e4ed9b5467e83623843776f3f76c468|5167ec805e6580b22106ea6bb366f468|19e2648410492bf9f3dc83e2ee91d4c689b27a2a|d382c035|5579|10|very high|768x432|XviD|MP3 CBR|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+1412|28367|Dattebayo|DB|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+486|Calling Your Attacks|0|300
+198|Romance|0|200
+5|Shounen|0|600
+18|Super Power|0|300
+173|Swordplay|0|600
+
+

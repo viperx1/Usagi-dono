@@ -1,0 +1,28 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1312|26320|2|Part 1 of 2|||50|17.04.2004 00:00|8.28|5|0|2
+1312|26321|3|Part 2 of 2|||55|17.04.2004 00:00|8.01|4|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1312|26320|670|160875|733970056|f6c120fca4852649b7e161c67d4fb42b|e30d97d5ecc4f22df0c7b8265280df34|8c56aad28d97f29c4ff81fc9fa1da76c10652506|430078db|2825|10|very high|640x360|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1312|26321|670|160876|747147067|2488e8673d8c902ba191e9d480980dff|3236a0e73e79efc90c57889cf9512c54|3e703ac981e7a4c1787949940c6be05f0f06b1e7|b6267a88|3254|10|very high|640x360|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+670|12949|Anime-Supreme|a-S|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|500
+259|Air Force|0|200
+120|Cyborgs|0|500
+12|Future|0|600
+263|Gunfights|0|500
+328|Human Enhancement|0|400
+273|Manga|0|600
+13|Mecha|0|400
+171|Military|0|300
+118|Piloted Robot|0|400
+26|Post-apocalypse|0|400
+117|Power Suit|0|400
+8|Sci-Fi|0|600
+79|Seinen|0|400
+
+

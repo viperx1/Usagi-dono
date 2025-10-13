@@ -1,0 +1,23 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+9327|6258|1|OVA|||4|18.08.2000 00:00|2.22|5|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+9327|6258|26|8222|46047232|ca0f963dfc675f91899d8a13bd9b7c17|0e5902a16ab3f23c61e6a7680679770c|7deda1ff2fa25c4c8462f0646ff484441c5d646b|6ef4fb41|211|10|med|512x384|DivX3|MP3 VBR||japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+26|76097|Psychlo-Anime|P-A|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|500
+253|Cyberpunk|0|400
+120|Cyborgs|0|600
+12|Future|0|600
+273|Manga|0|600
+140|Motorsport|0|400
+8|Sci-Fi|0|600
+79|Seinen|0|600
+113|Sports|0|600
+295|Underworld|0|200
+84|Violence|0|200
+
+

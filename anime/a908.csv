@@ -1,0 +1,28 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+908|9469|1|Silent Orbit||静かなる軌道[サイレント·オービット]|30|25.01.1997 00:00|1.18|1|0|3
+908|9470|2|Operation Meteor||過ぎ去りし流星[オペレーション·メテオ]|30|25.04.1997 00:00|1.58|1|0|3
+908|9472|3|Return To Forever||永遠への回帰[リターン·トゥ·フォーエバー]|30|25.07.1997 00:00|1.58|1|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+908|9469|7684|617773|393942775|0aac3cc98e0fabdeb059708d59e6e33a|a42f0df736232f5543a5353bd1abb7dd|76985f5d22973b8e9699debbbf34832aa20c0088|101ae5f9|1571|10|very high|704x480|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+908|9470|7684|618892|405727536|8975b3761d6adf20ccf626ca2ef2cb24|6e3e185985792466887fd75992b7ae32|18323927669e8aef7a7b92240de79bbf12d59cee|7bf1a9a9|1584|10|very high|704x480|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+908|9472|7684|618893|505864348|0a84dbcfc3ee43ac2560b1384e01a9ce|330a5cefec2588555954801569c9984c|6a310b5022179b7ad3da42ec7af527724cdacc4c|d3a8e9c5|1700|10|very high|704x480|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+7684|43638|OZC Anime|OZC|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+471|Christmas|0|200
+289|Earth|0|300
+13|Mecha|0|400
+118|Piloted Robot|0|600
+8|Sci-Fi|0|400
+129|Shipboard|0|100
+5|Shounen|0|600
+19|Space|0|400
+174|Space Travel|0|300
+84|Violence|0|200
+467|War|0|400
+
+

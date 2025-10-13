@@ -1,0 +1,27 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1218|27282|1|Complete Movie|||120|20.11.2004 00:00|8.76|29|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1218|27282|374|192537|2065546472|0af506224a4dd760ebecaa0e03a4405e|1eba8163cb2bfc16b8667f8c6366eb0b|d1f6dff2b4bc0b6f034c3174118be690daf323f3|57c38e8c|7149|10|very high|672x432|H264/AVC|DTS|english|japanese|1|4097|2|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+374|14938|KickAssAnime|KAA|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|200
+259|Air Force|0|400
+126|Alternative History|0|600
+464|Anti-War|0|200
+17|Comedy|0|100
+167|Demons|0|600
+15|Fantasy|0|400
+291|Fantasy World|0|500
+175|Magic|0|600
+78|Mina|0|600
+274|Novel|0|400
+198|Romance|0|400
+422|Steampunk|0|400
+244|Twisted|0|100
+467|War|0|400
+
+

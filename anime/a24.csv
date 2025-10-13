@@ -1,0 +1,95 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+24|151|1|Role Play||Role Play|25|04.04.2002 00:00|7.12|27|0|2
+24|253|2|Guardian||Guardian|25|11.04.2002 00:00|6.90|21|0|2
+24|254|3|Folklore||Folklore|25|18.04.2002 00:00|5.04|19|0|2
+24|256|4|Wanted||Wanted|25|25.04.2002 00:00|6.82|18|0|2
+24|268|5|Captured||Captured|25|02.05.2002 00:00|6.40|20|0|2
+24|668|6|Encounter||Encounter|25|09.05.2002 00:00|5.99|17|0|2
+24|669|7|Reason||Reason|25|16.05.2002 00:00|5.69|19|0|2
+24|670|8|Promise||Promise|25|23.05.2002 00:00|4.00|19|0|2
+24|671|9|Epitaph||Epitaph|25|30.05.2002 00:00|4.66|17|0|2
+24|672|10|Compensation||Compensation|25|06.06.2002 00:00|4.88|19|0|2
+24|673|11|Party||Party|25|13.06.2002 00:00|5.24|17|0|2
+24|674|12|Entanglement||Entanglement|25|20.06.2002 00:00|5.75|17|0|2
+24|675|13|Twilight Eye||Twilight Eye|25|27.06.2002 00:00|8.15|16|0|2
+24|676|14|Castle||Castle|25|04.07.2002 00:00|6.68|17|0|2
+24|677|15|Evidence||Evidence|25|11.07.2002 00:00|4.20|14|0|2
+24|678|16|Depth||Depth|25|18.07.2002 00:00|4.75|17|0|2
+24|679|17|Conflict||Conflict|25|25.07.2002 00:00|5.23|18|0|2
+24|509|18|Declaration||Declaration|25|01.08.2002 00:00|6.35|17|0|2
+24|1648|19|Recollection||Recollection|25|08.08.2002 00:00|7.43|18|0|2
+24|1649|20|Tempest||Tempest|25|15.08.2002 00:00|7.56|17|0|2
+24|3002|21|Despair||Despair|25|22.08.2002 00:00|6.28|16|0|2
+24|2159|22|Phantom||Phantom|25|29.08.2002 00:00|7.21|15|0|2
+24|2312|23|The Eve||The Eve|25|05.09.2002 00:00|7.58|15|0|2
+24|2313|24|Net Slum||Net Slum|25|12.09.2002 00:00|8.84|15|0|2
+24|2345|25|Catastrophe||Catastrophe|25|19.09.2002 00:00|8.53|16|0|2
+24|2347|26|Return||Return|25|26.09.2002 00:00|8.24|21|0|2
+24|7176|S1|Intermezzo||Intermezzo|25|28.03.2003 00:00|6.82|28|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+24|151|670|37893|221061374|65f3a1f282d35943f1e718b3b8ebe312|3c92e520f7241a6708ca438631657b0d|0d36c907b11fb361d25b1f9f9b7a1c22e85af878|0da97021|1423|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|5|2|ogm
+24|253|670|37884|224024863|495df0fa97cedbf3adfef33c32967e99|1b5f215131c9a728a40ef7a36b10cdec|72b48c520bcc1c7b1fe6dd05518ec62ec3fd0a3e|4b8f48fb|1423|10|very high|720x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|254|670|37895|186720394|b290a403f92143c816072fbad5caaa16|1b87fafd4c742728480423d5a593f265|fb8ba19e11adf6c30f0290633cf99bb36ebd6700|b6bdf2ce|1424|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|256|670|37900|179459083|c72f4fa8ed62cbe3cf0c1db2a5517bdd|addd655db8716b1ba8e402d3d584a83c|5462f24459a6309b5c8fe6160037d0e5f9593d1d|5079429e|1424|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|268|670|37890|203111081|f29470de15efef7c48127f5f4f79c17b|629b6d4385388813c730f17cfdcdd8b9|a0d61b0e4d1f837a1c104c19fa77823f6d75e48e|f587edf4|1421|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|668|670|37891|169610847|327bbcb95d5d1669845ea613d2dfcf9a|cdee3a25cbcb9176d316fd09bff38ffa|d807a72608149be42ed212d1cfb82a3ca57f5cfb|09cf96e7|1422|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|669|670|37879|174832087|d2382700c2badff9f1fc025d10e7fca8|25f3e40f871d3eeae39b4ac0010d33db|042567277d64f44e9655d8af07ca0444a2fe7170|b1009749|1422|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|670|670|37889|159308119|beff038b5821b04123b8476ac9ea9ae0|3c84e6687aa43abf4e19e941b4ae4c5d|e2c8d732e948a3ce4a89c7302e60d2af161f32d4|cb6eebf7|1403|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|671|670|37897|163121207|9f282ebff933f4e510dc6288c8a2cee2|a4c8137414dceefecceb888c759bf2e3|eb91607abae3d0fb766770102678a69210bb3f0c|b87d7da8|1423|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|672|670|37898|177197250|da8a53d9efe978833351a2a77d7ae357|0a7d2f35e221c16dd0409fd11014552e|8b849c8a65bd977ec886a629db7ea964fe265923|fa4e75d9|1421|10|very high|704x344|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|673|670|37886|192559133|e8565b1199ea7e7276f8adaace27c42f|405b823e50830cc1540569d680a78d43|4cb676eff9c8a8117d0525462f7cdd984ccbfa04|741a4ce7|1424|10|very high|704x352|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|674|670|37896|184805836|837e503df3598bf0f23dc1de0dea1965|4cf0de2d7003f7d004dd1fb2bdbe3eab|e4efa18a73be60377794783da1104d566551ff58|8fdb48d8|1424|10|very high|704x352|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|675|670|37887|147826246|4bd10c4d3a11aacdbfb2e035e2fa1820|db66c75d2d1767cb455aea9f3c136b2e|284b2e994348709e210a922cf65138b7736df0aa|f28360ae|1421|10|very high|704x352|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|676|670|37881|187770887|a121ac0e53ef5ac9ba6472b7b901534d|5ee4df4e9236c00cafefd8afbb64eeaf|6cee08a256fe7f31a3da7aa78690361aa232b011|28bc145d|1421|10|very high|704x352|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|677|670|46049|230388179|fba36c1e5ddf5872e45bafaf38c5c339|0826446795226da77be717dcbc323db1|b3997ef81728b7e0d804307f1046b4d2d3aa1978|95609dea|1417|10|very high|640x360|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|678|670|37894|220535266|29b8bd95bb0cbe31368625fb0494cfd0|2291c395e60d24cb9cdebd029d0dc8aa|abca87b0f2a47d20826fb75e9b982d75cd75c45b|06e05759|1424|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|679|670|37885|183378249|c17f90041de38b03568c35caa8ffe7f6|7b2a97a7dbe9ce2663070e95de32f1f0|1ebb5823ec93790e635f50a20d1526e37687ffb8|7226de49|1423|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|509|670|37888|200677667|cf71fb73c69ba3fac020319100b0c63d|6f8a0b207c5285a93f17bb7e86af446a|a37b577a65141326aa611fbbdad2bc16cc18eb9f|ed090fbc|1424|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|1648|670|37882|212979086|18834099f465f378ab97ba33afa96626|4daf847cd0c6cd02892ff0b5205fb2c7|da1ecd1493542371b5b9f604e5ad4a0e751aa9b0|fe65c4c6|1518|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|1649|670|37892|192103964|5ccd670fcc4c40bf31d03ebcbc1c77da|fef83b7950271138aa0496f01f5a7676|afa4ea25b6c25a97eadb308aff2d995c2cd71037|afb22570|1423|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|3002|670|37883|188171482|d693f6ccac1a896c62bb35cbf8c422b0|df52c5b89dcbbc92718dbc188bb6e6f1|21e732f008591a228cb0cc92650930602d65c533|e7c75bc9|1423|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|2159|670|37899|235349381|ddbbe8e7812af8dbf71531de07107a4c|f39fba841a40bf16cc83247314bac42b|ec4a6f676836d802733c053ad279cb07c02d0330|a9136c4a|1423|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|2312|670|37880|234792089|8e0ed55dbfbb05c47907b10ddc9eea04|8dd75792b047ad2d75743bee49c0b84c|6ef2ee75cbca816bc3c2d1cca466dea082261732|6ec5b604|1421|10|very high|704x384|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|2313|670|46052|199816605|e91a5a42fba5854005ade7e1c604398a|a80716998bebb594b663c9ed979d07c4|655007c5fca3919dbce226a12de06235351a5b72|fb693a93|1420|10|very high|640x360|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|2345|670|46053|206647391|5c574610fe1cffc3402c6aaa2273f7e7|eae3e9b3eece938e416b4b38de8df108|f129f20189411fbd06426e29e72b7fc4091b8e19|ee66ef28|1422|10|very high|640x360|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|2347|670|46050|215656061|4b872bd5baf93d83c843a8bfc6e6834d|ec2fe9617345ec8e509fc236aee69be7|1cae8009e45d358fae1efca70c1e944223397f7d|61d7d87c|1505|10|very high|640x360|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+24|7176|670|46051|225231607|5409e05ae2719533066fb5761fc90de7|9f6e5a0844a28b1f7ccd50913bd2cda9|3baf837bff1c0439766774db6bc7488a93eca523|c3e77fc4|1417|10|very high|640x360|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+670|3697|Anime-Supreme|a-S|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|200
+306|Adventure|0|200
+127|Alternative Present|0|400
+252|Angst|0|200
+22|Asia|0|100
+489|Dark-skinned Girl|0|200
+508|Desert|0|200
+289|Earth|0|100
+15|Fantasy|0|200
+291|Fantasy World|0|600
+497|Friendship|0|200
+23|Japan|0|100
+323|Law and Order|0|100
+230|Love Polygon|0|100
+175|Magic|0|100
+482|Magic Circles|0|100
+275|New|0|600
+88|Nudity|0|100
+151|Parody|0|100
+233|Plot Continuity|0|300
+552|Pseudo Tentacle Rape Scene|0|200
+459|Reverse Trap|0|200
+198|Romance|0|300
+79|Seinen|0|600
+278|Shoujo Ai|0|100
+488|Spellcasting|0|100
+18|Super Power|0|400
+173|Swordplay|0|100
+536|Unrequited Love|0|300
+84|Violence|0|100
+130|Virtual Reality|0|600
+
+

@@ -1,0 +1,36 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+8832|136463|1|Complete Movie|||120|25.06.2012 00:00|9.36|15|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+8832|136463|8697|1337610|1895067442|9fd40d739bf5d02abd22e670f48a1c8d|a1bec9c19b975334d45531016fe581a1|90af493fc73d9934839dba4fb2072060aa0086d8|e0d8acbe|7021|10|very high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|4101|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+8697|79945|Commie|Commie|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+306|Adventure|0|100
+471|Christmas|0|100
+240|College|0|100
+330|Coming of Age|0|600
+473|Confession|0|100
+183|Contemporary Fantasy|0|500
+535|Countryside|0|400
+236|Daily Life|0|400
+237|Elementary School|0|200
+497|Friendship|0|200
+498|Furo Scene|0|100
+23|Japan|0|600
+286|Josei|0|200
+201|Juujin|0|600
+78|Mina|0|500
+275|New|0|600
+88|Nudity|0|100
+11|Present|0|600
+198|Romance|0|100
+21|School Life|0|300
+79|Seinen|0|200
+86|Sex|0|100
+235|Tragedy|0|600
+513|Transfer Student|0|100
+
+

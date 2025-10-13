@@ -1,0 +1,31 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+8289|130682|1|Complete Movie|||45|17.09.2011 00:00|7.52|12|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+8289|130682|8697|1039498|630364010|654d804b87c479569f554e2a0c75b78d|5c41047a31d096796c2d973453aefa6f|9cb6e5d123d5fa7493e2238fffa12148544d5754|52244604|2700|10|high|1912x1072|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+8697|70747|Commie|Commie|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+252|Angst|0|100
+314|Anthropomorphism|0|100
+22|Asia|0|600
+343|Bishounen|0|200
+17|Comedy|0|200
+330|Coming of Age|0|400
+535|Countryside|0|400
+236|Daily Life|0|400
+289|Earth|0|600
+15|Fantasy|0|400
+23|Japan|0|600
+273|Manga|0|600
+78|Mina|0|400
+11|Present|0|600
+198|Romance|0|500
+21|School Life|0|100
+153|Slapstick|0|100
+481|Summer Festival|0|200
+235|Tragedy|0|300
+
+

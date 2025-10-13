@@ -1,0 +1,12 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+2899|28243|1|Complete Movie|||30|13.02.1988 00:00|6.66|1|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+2899|28243|3214|223143|253114740|06c6d4bf3bd48325d407a243d5c2f2df|b1fa2eeace028272e417a1033dbb2282|38797819106a75b9db811abaacc66aad93d8a9d5|a62647ae|1774|10|high|640x360|DivX5/6|MP3 CBR||instrumental|1|0|3|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+3214|16937|tikal|tikal|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+
+

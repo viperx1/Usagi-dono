@@ -3,6 +3,9 @@
 #include <QtGui>
 #include <QtAlgorithms>
 #include <QRegularExpression>
+#include <QProcess>
+#include <QDateTime>
+#include <QDir>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QTextEdit>
@@ -132,8 +135,7 @@ public:
 	// page hasher
     hashes_ *hashes;
 	void hashesinsertrow(QFileInfo, Qt::CheckState);
-	int parseMylistXML(const QString &content);
-	int parseMylistCSV(const QString &content);
+	int parseMylistCSVAdborg(const QString &tarGzPath);
     Window();
 	~Window();
 };

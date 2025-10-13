@@ -1,0 +1,23 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+496|5541|1|Complete Movie|||90|01.08.1998 00:00|6.43|2|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+496|5541|657|66721|733605062|b881f65251e2e2de2e8edf3e92c888d8|e364d587f6561016c8ba52a9e5962b93|8b7b75ab17b557a34ab0b56ab8ac4d6707e44761|b3495d6f|5160|10|very high|560x428|XviD|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+657|8037|AnimeOverture|#AO|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+471|Christmas|0|200
+160|Conspiracy|0|300
+289|Earth|0|400
+12|Future|0|600
+13|Mecha|0|400
+118|Piloted Robot|0|600
+8|Sci-Fi|0|400
+129|Shipboard|0|200
+19|Space|0|400
+174|Space Travel|0|200
+
+

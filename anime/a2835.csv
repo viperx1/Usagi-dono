@@ -1,0 +1,31 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+532|Alcohol|0|200
+252|Angst|0|100
+256|Art|0|400
+501|Art School|0|300
+22|Asia|0|600
+471|Christmas|0|200
+240|College|0|600
+17|Comedy|0|400
+330|Coming of Age|0|500
+236|Daily Life|0|400
+289|Earth|0|600
+497|Friendship|0|300
+23|Japan|0|600
+286|Josei|0|600
+230|Love Polygon|0|400
+273|Manga|0|600
+538|Multiple Couples|0|300
+233|Plot Continuity|0|400
+11|Present|0|600
+198|Romance|0|400
+153|Slapstick|0|400
+536|Unrequited Love|0|300
+
+

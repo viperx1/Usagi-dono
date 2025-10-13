@@ -1,0 +1,60 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+2169|28856|1|Close Encounter of the Third Kind||第三種接近遭遇|30|28.01.2005 00:00|6.80|20|0|2
+2169|34111|2|Love Letter||ラブレター|30|04.03.2005 00:00|6.55|18|0|2
+2169|38355|3|47 Minutes and 32 Seconds Past 6 in the Evening||十八時四十七分三十二秒|30|08.04.2005 00:00|5.03|14|0|2
+2169|38356|4|Suizenji, Answer Me||水前寺応答せよ|30|13.05.2005 00:00|7.09|14|0|2
+2169|38620|5|The Last Road||最後の道|30|03.06.2005 00:00|4.98|15|0|2
+2169|38678|6|Iriya`s Sky, Summer of UFO||イリヤの空, UFOの夏|30|08.07.2005 00:00|7.80|15|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+2169|28856|1510|128335|245202944|e1af71063dd9d9a67c8da71b4d6505e9|ff2f29876752dd6c1c7043d408c53ff3|c07f883f93bdf337febaa109fb54ba3cc55b109f|46b1f913|1550|10|very high|640x480|XviD|MP3 CBR|english|japanese|1|1|2|avi
+2169|34111|1510|155716|244705280|6bf7416374d3c3b314c3236785f4b97e|3dd6c372fa98c5c8524fd8da16c97c58|dc2313a7ca4fc901ddaf24fdb91a43a966728dc0|1b26dc7c|1550|10|very high|640x480|XviD|MP3 CBR|english|japanese|1|1|2|avi
+2169|38355|1510|158284|224921600|7182de00926e4dc7a1d7070f1edd6869|b79c310aa6488fd9116d7dd7431964fc|c749ab8cf0b7875b5204fcad5abb5a7fb230db11|941b95b2|1691|10|very high|640x480|XviD|MP3 CBR|english|japanese|0|1|2|avi
+2169|38356|1510|160176|243036160|2a2162f792944897de9d4bccce6924e3|30794940fe622bc09db0a58a1f11bb35|0f7399c62e936c9e12c6c26dd18111117e7e1185|c6e42ef8|1677|10|high|640x480|XviD|MP3 CBR|english|japanese|0|1|2|avi
+2169|38620|1510|161684|239128576|47cd5e14e59da916d8ba67d9de362cc3|28490defc73c295fbed76882bbfe25db|5e18006e27a75a56ce2e37eed27705218e28aa5d|c9ad1441|1577|10|very high|640x480|XviD|MP3 CBR|english|japanese|0|1|2|avi
+2169|38678|1510|168212|239011840|374f4c51301e48ec125969ac631ecbef|25cf27d7e96119cb77063f1ff87726d8|60eabf28a8fa11a6cabe8c9dd8889e6b55e0a8b6|042edc2d|1753|10|very high|640x480|XviD|MP3 CBR|english|japanese|0|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+1510|10713|AnimeYuki &amp; Sailor Spork Productions|AnY-Spork|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|200
+259|Air Force|0|100
+184|Alien|0|200
+127|Alternative Present|0|300
+252|Angst|0|400
+464|Anti-War|0|200
+22|Asia|0|600
+242|Clubs|0|300
+160|Conspiracy|0|500
+289|Earth|0|600
+282|Ecchi|0|100
+263|Gunfights|0|100
+239|High School|0|100
+328|Human Enhancement|0|100
+23|Japan|0|600
+230|Love Polygon|0|300
+13|Mecha|0|100
+171|Military|0|200
+262|Navy|0|200
+458|Nosebleed|0|200
+274|Novel|0|600
+88|Nudity|0|300
+118|Piloted Robot|0|100
+11|Present|0|600
+198|Romance|0|500
+457|School Festival|0|200
+21|School Life|0|200
+8|Sci-Fi|0|300
+79|Seinen|0|600
+331|Sexual Abuse|0|100
+220|Stereotypes|0|200
+255|Sudden Girlfriend Appearance|0|500
+172|Thriller|0|200
+235|Tragedy|0|600
+513|Transfer Student|0|200
+244|Twisted|0|400
+84|Violence|0|300
+467|War|0|400
+
+

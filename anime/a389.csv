@@ -1,0 +1,16 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+15|Fantasy|0|600
+291|Fantasy World|0|600
+269|Game|0|600
+233|Plot Continuity|0|500
+272|RPG|0|600
+5|Shounen|0|500
+
+

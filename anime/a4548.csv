@@ -1,0 +1,35 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+306|Adventure|0|600
+170|Angel|0|200
+252|Angst|0|200
+486|Calling Your Attacks|0|300
+17|Comedy|0|100
+535|Countryside|0|400
+508|Desert|0|200
+200|Dragon|0|200
+221|Elf|0|100
+15|Fantasy|0|600
+291|Fantasy World|0|600
+269|Game|0|600
+266|High Fantasy|0|500
+175|Magic|0|400
+482|Magic Circles|0|200
+20|Martial Arts|0|400
+233|Plot Continuity|0|600
+198|Romance|0|100
+272|RPG|0|600
+8|Sci-Fi|0|100
+18|Super Power|0|400
+173|Swordplay|0|500
+235|Tragedy|0|100
+244|Twisted|0|400
+84|Violence|0|300
+
+

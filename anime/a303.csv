@@ -1,0 +1,25 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+303|3758|1|Complete Movie|||90|16.04.1988 00:00|9.55|21|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+303|3758|374|234593|1061502243|a09734967465df13b6da36ccc90e7607|143d1b7e93944bc9f8df745423670861|8188b01c426a144a065e39325636648e70d2251c|3f518c0f|5180|10|very high|704x464|H264/AVC|(HE-)AAC|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+374|17721|KickAssAnime|KAA|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+306|Adventure|0|400
+22|Asia|0|600
+17|Comedy|0|200
+183|Contemporary Fantasy|0|600
+535|Countryside|0|400
+289|Earth|0|600
+15|Fantasy|0|600
+498|Furo Scene|0|200
+23|Japan|0|600
+78|Mina|0|600
+88|Nudity|0|100
+11|Present|0|600
+198|Romance|0|100
+
+

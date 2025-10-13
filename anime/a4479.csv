@@ -1,0 +1,12 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4479|49850|1|Complete Movie|||3|-|1.37|1|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4479|49850|3214|228822|226038344|d626384b368f62ffe82a96ab143a181f|543960b10d4f2e818da3d746beebd436|d6918a6eca5cb25114a008ba146301551ddf9716|3ca2ee5c|1598|10|med|640x480|DivX5/6|MP3 CBR||japanese|1|0|3|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+3214|17367|tikal|tikal|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+
+

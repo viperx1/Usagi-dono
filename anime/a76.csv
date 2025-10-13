@@ -1,0 +1,20 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+17|Comedy|0|400
+289|Earth|0|600
+485|Henshin|0|300
+23|Japan|0|600
+247|Mahou Shoujo|0|300
+151|Parody|0|100
+11|Present|0|500
+28|Samurai|0|400
+21|School Life|0|200
+173|Swordplay|0|400
+
+

@@ -1,0 +1,37 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+469|10604|1|Complete Movie|||90|20.11.2004 00:00|9.15|36|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+469|10604|102|126740|1464100864|0c64d8078c2f6829c5c1a6a0390492d8|2ce7dacb796bd66b6718f09543387099|4a71f1bde5f5bc78c0de03282cfaf0bcf7ccc9cb|d59175bc|5409|10|very high|856x480|XviD|AC3|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+102|7728|The Triad|Triad|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|100
+259|Air Force|0|100
+127|Alternative Present|0|600
+252|Angst|0|200
+22|Asia|0|600
+330|Coming of Age|0|300
+535|Countryside|0|400
+236|Daily Life|0|200
+289|Earth|0|600
+239|High School|0|100
+439|Hokkaido|0|200
+23|Japan|0|600
+238|Middle School|0|100
+171|Military|0|100
+262|Navy|0|100
+275|New|0|600
+233|Plot Continuity|0|200
+466|Post-War|0|300
+11|Present|0|600
+198|Romance|0|400
+21|School Life|0|100
+8|Sci-Fi|0|400
+79|Seinen|0|600
+235|Tragedy|0|200
+84|Violence|0|100
+
+

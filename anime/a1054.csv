@@ -1,0 +1,23 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1054|15270|1|OVA|||10|02.05.2002 00:00|8.10|14|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1054|15270|133|37846|157423616|fda6c2d6ecb624dca5e8103fa3d33791|13041f5c1cff09fc34476b348486acc0|4c60c6d95ad39dfa55607ef8216a472b40d281eb|0e6db14b|629|10|high|704x360|DivX5/6|MP3 VBR|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+133|3686|Wizzu|Wizzu|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|200
+289|Earth|0|600
+279|Europe|0|600
+25|Historical|0|600
+10|Past|0|600
+233|Plot Continuity|0|600
+79|Seinen|0|600
+173|Swordplay|0|400
+197|United Kingdom|0|600
+84|Violence|0|600
+467|War|0|300
+
+

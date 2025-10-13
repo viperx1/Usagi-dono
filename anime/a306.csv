@@ -1,0 +1,25 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+306|4012|1|Complete Movie|||95|18.07.1992 00:00|8.30|16|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+306|4012|374|127060|2093673752|85d135d8ccbe62e0b0e405f06545b389|9158326c6110ea01583ee024d1186771|0b6e4f76e181482201752d7048d0ecba6948d82a|5693e1f0|5611|10|very high|704x464|XviD|AC3|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+374|10692|KickAssAnime|KAA|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+441|1920s|0|400
+4|Action|0|400
+259|Air Force|0|400
+126|Alternative History|0|600
+314|Anthropomorphism|0|400
+279|Europe|0|600
+171|Military|0|400
+78|Mina|0|600
+225|Music|0|200
+396|Pirate|0|400
+198|Romance|0|400
+422|Steampunk|0|300
+295|Underworld|0|300
+
+

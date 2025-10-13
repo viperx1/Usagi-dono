@@ -1,0 +1,36 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+7031|108647|1|Complete Movie|||110|09.10.2009 00:00|2.31|6|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+7031|108647|9693|841896|1740276723|080b6b02be18a16341373dd8f1f21658|85b04031e2034d153521b1b6f72db5b3|e097ec864f7aecb1f371eacc2bc141ef3ae11e7b|336e3334|6563|10|very high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|5|3|mkv
+7031|108647|9693|838971|1740276929|7e4cee2f1a102a2d3b96741ff217ff79|a764b8b1a6a79ea3fa5edf1bb541e2b1|c9c76f9ac1d6595ace0b7bbbbba9ff4ed8cc0fef|dd26bb84|6564|10|very high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|1|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+9693|59359|Harth|Harth|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|300
+306|Adventure|0|200
+252|Angst|0|300
+160|Conspiracy|0|200
+461|Debacle|0|600
+289|Earth|0|600
+468|Earthquake|0|100
+263|Gunfights|0|200
+154|Horror|0|400
+23|Japan|0|100
+273|Manga|0|600
+20|Martial Arts|0|100
+445|New York|0|200
+88|Nudity|0|100
+26|Post-apocalypse|0|300
+8|Sci-Fi|0|600
+79|Seinen|0|600
+18|Super Power|0|100
+56|Tentacle|0|200
+172|Thriller|0|200
+235|Tragedy|0|500
+244|Twisted|0|400
+197|United Kingdom|0|400
+
+

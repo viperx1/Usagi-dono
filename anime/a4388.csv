@@ -1,0 +1,27 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4388|53539|1|Complete Movie|||90|21.04.2007 00:00|6.66|6|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4388|53539|3657|372225|994553856|84653bc21015129a68211e1d6ee082c2|647f045211164b3582d2ee352166c136|bee1e29aa0162d4ce2ac0de6bba33ef0c51b2fc1|7176c428|5180|10|very high|704x400|XviD|MP3 CBR|english|japanese|0|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+3657|28886|Static-Subs &amp; Eclipse Productions|SS-Eclipse|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|600
+127|Alternative Present|0|100
+22|Asia|0|600
+183|Contemporary Fantasy|0|600
+167|Demons|0|100
+289|Earth|0|600
+15|Fantasy|0|600
+23|Japan|0|600
+175|Magic|0|400
+274|Novel|0|600
+283|Pantsu|0|100
+11|Present|0|600
+79|Seinen|0|600
+18|Super Power|0|600
+479|Zettai Ryouiki|0|200
+
+

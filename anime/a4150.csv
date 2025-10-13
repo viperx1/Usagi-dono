@@ -1,0 +1,27 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|300
+126|Alternative History|0|600
+22|Asia|0|600
+343|Bishounen|0|500
+17|Comedy|0|400
+289|Earth|0|600
+15|Fantasy|0|400
+230|Love Polygon|0|300
+175|Magic|0|200
+20|Martial Arts|0|300
+274|Novel|0|600
+10|Past|0|600
+233|Plot Continuity|0|600
+484|Politics|0|300
+421|Reverse Harem|0|400
+198|Romance|0|400
+77|Shoujo|0|600
+173|Swordplay|0|300
+
+

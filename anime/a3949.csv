@@ -1,0 +1,23 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+3949|41124|1|Music Video|||5|13.03.1997 00:00|6.44|5|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+3949|41124|17|178928|150396928|7066ac825b1edba9729c4bbb2b530ec4|17ae8ab8c072128029281a643192d479|853eb4e8d6c061b1430d02f2145fe943047f11fd|daeae8a4|537|10|high|640x480|DivX3|MP3 CBR|english|japanese|1|5|3|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+17|13786|Hikari no Kiseki|HnK|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+306|Adventure|0|400
+22|Asia|0|600
+226|Band|0|600
+183|Contemporary Fantasy|0|400
+289|Earth|0|600
+15|Fantasy|0|400
+23|Japan|0|600
+225|Music|0|600
+275|New|0|600
+11|Present|0|600
+
+

@@ -1,0 +1,28 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1135|12814|1|OVA|||30|16.11.2003 00:00|2.78|8|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1135|12814|925|54357|237276403|4fe9c78d9e42ca6d7c6a9188e70bee5f|8eb5bf27effed5e390bdd442bd1aafc4|f6aca438a46fb2cea8e2a32861d12c3a3ef29008|1bb88e0d|1568|10|very high|704x396|XviD|(HE-)AAC|english|japanese|1|1|2|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+925|6287|Baka-Anime|B-A|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|200
+17|Comedy|0|600
+15|Fantasy|0|400
+291|Fantasy World|0|600
+12|Future|0|600
+175|Magic|0|400
+275|New|0|600
+458|Nosebleed|0|100
+88|Nudity|0|400
+151|Parody|0|600
+459|Reverse Trap|0|100
+79|Seinen|0|600
+153|Slapstick|0|600
+430|Sudden Naked Girl Appearance|0|100
+84|Violence|0|200
+130|Virtual Reality|0|600
+
+

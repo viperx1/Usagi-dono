@@ -1,0 +1,32 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+5297|81687|1|TV Special|||110|25.08.2007 00:00|9.87|1|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+5297|81687|5590|468437|736731032|93c898fdc8e58847955fad905125f63c|90ac8a2e00d1eb492c78c27044c7ad72|1d45112a961d797eb66f634771b0727ddbca5297|964f5112|6425|10|very high|704x400|XviD|MP3 CBR|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+5590|34774|Ureshii &amp; Froth-Bite|Ureshii-F-B|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+306|Adventure|0|500
+22|Asia|0|600
+330|Coming of Age|0|400
+535|Countryside|0|400
+236|Daily Life|0|200
+161|Detective|0|200
+289|Earth|0|600
+237|Elementary School|0|200
+15|Fantasy|0|600
+243|Goddess|0|100
+263|Gunfights|0|100
+23|Japan|0|600
+273|Manga|0|600
+487|Parental Abandonment|0|300
+11|Present|0|600
+21|School Life|0|300
+77|Shoujo|0|600
+235|Tragedy|0|100
+509|Witch|0|300
+
+

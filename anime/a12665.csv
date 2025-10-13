@@ -1,0 +1,12 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+12665|211419|67|A Fun Festival Double Date||楽しいお祭りW[ダブル]デート|25|22.01.2019 00:00|7.61|7|0|1
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+12665|211419|7172|2229828|1196654739|918b86d5712b7398e0b3d20f2dcdb141|b301bec15b121ccfa0c58f38f66b39d9|892bd817fbd7ca8e0b8315ab25c1ab4d1cec863e|fca2db9a|1434|10|very high|1920x1080|H264/AVC|(HE-)AAC|english|japanese|0|0|1|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+7172|124161|HorribleSubs|HorribleSubs|dropped
+GENREN
+GenID|GenName|isHentai|Weight 
+
+

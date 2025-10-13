@@ -1,0 +1,36 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1208|39865|1|Complete Movie|||100|14.09.2005 00:00|8.38|37|0|3
+1208|44735|S2|Reminiscence of Final Fantasy VII|||25|14.09.2005 00:00|7.22|1|0|3
+1208|44931|S3|Deleted Scenes|||3|-|-|0|0|3
+1208|15486|T2|Trailer 1|||2|-|8.04|6|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1208|39865|3661|577910|7028583707|1d6e972f8033a8db3b7884e6d08cd1db|4cb5c684d4f95d1ec4cc0568d4e4181c|972d35a6a5ea41e9f867e912ff143b3658e5cd40|b724543f|7586|10|very high|1280x720|H264/AVC|DTS|english|japanese|1|1|3|mkv
+1208|44735|183|250815|247229771|2cd9542c4b3b665cdcf851d92a047b72|440ffb839c14e6c8bfb24cf90d70913a|bb18f0f96fc9937f618751c23f6183ddf875c259|e843684d|1436|10|very high|720x448|H264/AVC|AC3|english|japanese|1|5|3|mkv
+1208|44931|2109|194109|41889613|a7f63db09cdb7f74b137c30bb6f2a494|9bc91630e2746958dc23d90461180226|17bb4ac55c7a3d345cb382beb7178cd5457ae8ea|5d8efe08|168|10|very high|720x400|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|3|mkv
+1208|15486|85|38380|47222784|21e54dd7434420aed843c39f28de9ef3|782e958979ea7865c4f3481e68e4b5af|e884f05e442560fe71d35661cd9337d783fa5c56|575a8caf|119|10|very high|704x388|XviD|MP3 VBR|english|japanese|1|1|3|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+2109|15052|Hitsuji|Hitsuji|complete
+183|18374|Anime-4ever|a4e|complete
+3661|41371|THORAnime|THORA|complete
+85|7778|Anime-Kraze|Ani-Kraze|specials only
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|600
+186|Dystopia|0|300
+289|Earth|0|600
+15|Fantasy|0|300
+291|Fantasy World|0|600
+12|Future|0|400
+269|Game|0|600
+263|Gunfights|0|300
+175|Magic|0|300
+20|Martial Arts|0|400
+272|RPG|0|600
+8|Sci-Fi|0|300
+79|Seinen|0|600
+173|Swordplay|0|500
+84|Violence|0|200
+
+

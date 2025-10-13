@@ -1,0 +1,74 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+412|4918|1|James` Misfortune||ジェイムズの災難|25|07.04.2001 00:00|2.20|1|0|2
+412|4917|2|Elevator of Capital Punishment||死刑台のエレベーター|25|14.04.2001 00:00|4.05|1|0|2
+412|4916|3|Leon`s Choice||レオンの選択|25|21.04.2001 00:00|-|0|0|2
+412|4915|4|Final Countdown||ファイナル・カウントダウン|25|28.04.2001 00:00|-|0|0|2
+412|4914|5|A Runaway Trip to Death||死への逃避行|25|05.05.2001 00:00|-|0|0|2
+412|4913|6|Get Away||GET AWAY|25|12.05.2001 00:00|-|0|0|2
+412|4912|7|Untouchable||アンタッチャブル|25|19.05.2001 00:00|4.05|1|0|2
+412|4911|8|The Grave of Humanity||仁義の墓場|25|26.05.2001 00:00|-|0|0|2
+412|4910|9|Lost in Space||ロスト・イン・スペース|25|02.06.2001 00:00|-|0|0|2
+412|11451|10|Total Recall||トータル・リコール|25|09.06.2001 00:00|4.05|1|0|2
+412|11449|11|Tightrope||タイト・ロープ|25|16.06.2001 00:00|-|0|0|2
+412|11448|12|Die Hard||ダイ・ハード|25|23.06.2001 00:00|-|0|0|2
+412|11450|13|Red Desert||赤い砂漠|25|30.06.2001 00:00|-|0|0|2
+412|11452|14|Rebecca||レベッカ|25|07.07.2001 00:00|-|0|0|2
+412|7593|15|Container for Sand||砂の器|25|14.07.2001 00:00|-|0|0|2
+412|12806|16|Massive Illusion||大いなる幻影|25|21.07.2001 00:00|-|0|0|2
+412|12812|17|Family Game||家族ゲーム|25|28.07.2001 00:00|-|0|0|2
+412|12808|18|Showdown at Noon||真昼の決斗|25|04.08.2001 00:00|2.20|1|0|2
+412|12809|19|The Time of Reunion||再会の時|25|11.08.2001 00:00|4.05|1|0|2
+412|12811|20|Upheaval||動乱|25|18.08.2001 00:00|-|0|0|2
+412|12804|21|Set Course for North, North West||北北西に進路を取れ|25|25.08.2001 00:00|-|0|0|2
+412|12807|22|Clash||激突|25|01.09.2001 00:00|-|0|0|2
+412|12803|23|Goodbye Mars||さよならマーズ|25|08.09.2001 00:00|-|0|0|2
+412|12805|24|Vanishing Point||バニシング・ポイント|25|15.09.2001 00:00|4.05|1|0|2
+412|12810|25|Sorrowing Angel||嘆きの天使|25|22.09.2001 00:00|-|0|0|2
+412|12813|26|Farewell to Arms||武器よさらば|25|29.09.2001 00:00|4.05|1|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+412|4918|41|28101|242254149|282b645be9e145b18a261c3ea76dad6c|b1719c0083f573eb98b896ebb99ea9c9|bdee732c6a6611579908e95b11c307e00c669be0|f16326a4|1460|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4917|41|28095|241998779|8292dae0ff69f4d19dcbf2b96ed02c68|336e8a1bfe964bf8ec7d60156aca1d85|50fb81e57837ed136391d0ed828ac3def6a76eec|f705f271|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4916|41|28102|242575048|20d564c94fbacf03958f0d1c35bff2f5|385b5b2c5f9e81a3c442a2497aeabcd6|bc34c319ee1a619970878885c18749406ff327da|1eaf0a7a|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4915|41|28106|242266364|fa52e9478e5902056d64384eadba9eaa|ada093b782fb461d82bec60f23c2434e|8faad357b41d8b271491b92a89a6c1169bf9a70b|134996da|1460|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4914|41|28099|242534060|2cc177c0b09fc95e637c3766332a8aa8|c6588ae89fe5e9d4740544adb0856184|c676e3804ff0e6d711d45ba0035a323c2fcd8df4|4d315f34|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4913|41|28100|243007826|4188dc7195bb7d109e638957cb985622|4cfba43d2dec692e923c763c35b8a9a4|dc679e84a32917a4632db52829cda4bf23b663c7|00379636|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4912|41|28094|242488177|faeb70a0ce21aaa45d4e35bc8ea18261|c0799838d7752a95d58a51f11c7f06c4|6bf1d0afec7b261af30d6f2b91da87dace7c7201|bfb42cc0|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4911|41|28098|242059971|d9093e58abd87470b396d94157090cc3|440a55513200c45f2f738e39be0b2825|3fba06c5cea56748d2c0510d8ba97f21db6b1181|b9c80817|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|4910|41|28104|242572686|1e2c317f1482cabc1cc2354c43febf9f|d75a6332b92507403afa94c84896b84c|dd9401b63edc9deee4533892a05b6a389944cab1|db1b216a|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|11451|41|28105|242242093|8e4ea00c37505fc4b089f528617250ac|f1b0d69459915c72e5fb32f3c82965d0|1b375a2245161b533ef8ffb25d9b87fe4f204dcd|9dfb048c|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|11449|41|28096|241892815|5e34d04122fe62c753765cf355daedb6|5e7ce7dc23d6841d207664d46923aead|552b9d4206b14c3575b57b2020b93cb421f07625|b46ca084|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|11448|41|28103|242110348|100e4b56a694759cbd8fb02837a19b9a|8f727aab4c513d972e820390c0e7f795|dac175b35c055fd1b6844983606f618096f6cf04|75f7b440|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|11450|41|28097|242822275|09e334b3b9652130f118802b43e31c8b|9e7371cf5355d23b66dba8a946d3bc55|0e2a37b5895fe5b230fe165a9d85b8faf211555c|4846c5ff|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|11452|41|29605|241959669|609583c72897244edf7c18edc642046c|bd0e7a98a1b1e30dd41df1be26055877|5c9b0e162ced579af7ceecedd55a15cad548635c|98e8a2de|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|7593|41|29615|241786550|9f0ece747548905ece935d25bebe4888|cd8e424b80d20d85733db7c3e5313662|18a60d85e09702d39752456dd397fb8c87cc0ffc|36dd3614|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12806|41|29611|242270883|0da6e01145c310432af4e9b7bd15c4c1|ac635f555624a28f74fdccdf8e3870ef|c464fbed8ff39d715f13a3a24758b5464883824a|f5c601f6|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12812|41|29613|242121635|1cba36233722922abee3ffebcce745e8|f8eaefeb35e8b473a3fd9cb65d83b892|4f773a36e523d4f9aa6e32ef6d98cd8665e8e33b|300d22aa|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12808|41|29606|242023282|34a8faac5f0edbb9b3286f9a27e09896|6941a494244ee2a48ac13d62190b7537|da7f7a26e14ffb494ebe077b2f282d1b40c9b62c|ef1a4516|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12809|41|29614|241996275|b069753ea8fdacd9ba71a596b1f5c3f3|16ea3844fcfe74b38bb66f67ed2a233e|4c11bc84c3cebef495a7bb67d3cef018074665d3|ee37eb7e|1460|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12811|41|29609|241943230|ebad1a2e96fbbf6cac491e90bb3af8d6|9968ffde3adb8978a5beb9b4ef9e35b7|73ebc4bab516a08ffdc200d04f53ed064bc92015|a929cdeb|1460|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12804|41|29616|242363182|ef32ef9e9c842d8e0c3c6bf2e0e25cc2|0223988aa5c4e306235828373e5ab9a1|eb0bc9155a519f013174f33e57db2b813992718c|ca33fd59|1460|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12807|41|29604|241845172|76c5812e419618ddf88237ad79e29b76|bd7277c0cd1b2f0aa308801b987ce171|ea2858f9bd837d47e05b5ae14f9ff65d2a67b022|8c9cfd35|1460|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12803|41|29610|242704440|d664fb6c67ddfaa2635e1209d1653d00|f4c37b349197a0c189f4a9017fb0000c|c25b9bf128de12bca30f3f454d8b746b931111e9|c030effc|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12805|41|29612|242058555|083f93dac9a66109bce2fb6c9a1750c7|4a57f67adc7782878f8c7d59abea7fd4|7067e4a8e3b2efe9ac30cff452523d903e1902f1|fd8926fd|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12810|41|29607|242066173|30dcd66622e149221de7c84f8edf80bb|5401ae897fa37e4ce3908a9540e7f5a6|7a763d81540e4650ec3fa529b21b7510ee62f331|b4071805|1461|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+412|12813|41|29608|251495202|7f3563836b33e705ea4f4ed6026c816c|d093a582ced36b438c79db767c46e10e|d1b694bead78b146fbd2d89092b73e44ce4ae7f0|6358d336|1518|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+41|1989|Zhentarim DivX|zx|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+270|Action Game|0|400
+306|Adventure|0|300
+289|Earth|0|200
+12|Future|0|400
+269|Game|0|400
+450|Mars|0|200
+13|Mecha|0|400
+128|Other Planet|0|500
+118|Piloted Robot|0|600
+8|Sci-Fi|0|400
+19|Space|0|400
+
+

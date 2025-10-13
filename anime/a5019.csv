@@ -1,0 +1,37 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+22|Asia|0|600
+17|Comedy|0|100
+183|Contemporary Fantasy|0|500
+245|Delinquents|0|200
+167|Demons|0|200
+289|Earth|0|600
+15|Fantasy|0|200
+239|High School|0|200
+23|Japan|0|600
+273|Manga|0|400
+487|Parental Abandonment|0|300
+10|Past|0|200
+528|Photography|0|200
+233|Plot Continuity|0|400
+11|Present|0|600
+533|Revenge|0|200
+198|Romance|0|400
+21|School Life|0|200
+79|Seinen|0|600
+153|Slapstick|0|100
+255|Sudden Girlfriend Appearance|0|400
+18|Super Power|0|400
+173|Swordplay|0|300
+235|Tragedy|0|300
+84|Violence|0|300
+285|Violent Retribution for Accidental Infringement|0|100
+479|Zettai Ryouiki|0|200
+
+

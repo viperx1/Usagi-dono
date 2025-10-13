@@ -1,0 +1,35 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+252|Angst|0|600
+22|Asia|0|600
+17|Comedy|0|300
+293|Dating Sim - Visual Novel|0|600
+161|Detective|0|400
+537|Drugs|0|300
+289|Earth|0|600
+282|Ecchi|0|100
+497|Friendship|0|300
+269|Game|0|600
+154|Horror|0|600
+23|Japan|0|600
+238|Middle School|0|300
+283|Pantsu|0|100
+487|Parental Abandonment|0|300
+10|Past|0|600
+233|Plot Continuity|0|400
+21|School Life|0|300
+79|Seinen|0|600
+153|Slapstick|0|300
+172|Thriller|0|300
+235|Tragedy|0|500
+244|Twisted|0|400
+295|Underworld|0|200
+84|Violence|0|500
+334|Yakuza|0|100
+
+

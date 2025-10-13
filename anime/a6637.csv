@@ -1,0 +1,24 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+6637|110547|1|Complete Movie|||90|13.03.2010 00:00|6.17|11|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+6637|110547|4288|791690|2369717324|3ab543182289cfdf99402e609782ce6c|b4dbf5b2494e387bdc7270b9d7d72ccf|20bdb0ff0678f00593dc8f357ac25e583403d367|db525b9a|5527|10|very high|1920x1080|H264/AVC|AC3|english|japanese|1|4096|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+4288|56671|FaNSuB|FaNSuB|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|200
+127|Alternative Present|0|600
+22|Asia|0|400
+512|Battle Royale|0|400
+160|Conspiracy|0|300
+289|Earth|0|400
+23|Japan|0|400
+286|Josei|0|600
+275|New|0|600
+198|Romance|0|100
+8|Sci-Fi|0|300
+493|Terrorist|0|200
+
+

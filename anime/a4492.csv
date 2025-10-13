@@ -1,0 +1,52 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4492|51042|1|A Yukata, Fireworks And Candy Apples Day||浴衣と花火とりんご飴の日|25|30.06.2006 00:00|6.47|5|0|2
+4492|51549|2|A Day with the Landlord, a Watermelon and a visit at the hospital||大家さんとスイカとお見舞いの日|25|07.07.2006 00:00|7.31|5|0|2
+4492|52178|3|A Day of Carrots, Lies, and the Echigoya Sisters||にんじんと嘘と越後屋姉妹の日|25|14.07.2006 00:00|3.35|7|0|2
+4492|52179|4|A Day of Perfurme, Asu, and Open House||香水とあすと授業参観の日|25|28.07.2006 00:00|5.77|4|0|2
+4492|52180|5|A Day of the Apartment, Sakura Trees, and Moving||アパートと桜と引越しの日|25|11.08.2006 00:00|5.64|3|0|2
+4492|52289|6|A Day of Loneliness, Ginko and Onee-sama||さびしさと銀子とお姉さまの日|25|18.08.2006 00:00|6.56|3|0|2
+4492|52290|7|A Day of Jealousy, Chocolates and Valentine||ヤキモチとチョコとバレンタインの日|25|25.08.2006 00:00|5.32|2|0|2
+4492|52291|8|A Day of Guitars, Dreams and a Music Teacher||ギターと夢と歌の先生の日|25|01.09.2006 00:00|6.56|3|0|2
+4492|52292|9|A Day of Emotions, Uneasiness and Cell Phones||想いと不安と携帯電話の日|25|08.09.2006 00:00|5.58|3|0|2
+4492|52293|10|A Day of Colds, Promises and Mother||風邪と約束とお母さんの日|25|15.09.2006 00:00|8.14|3|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4492|51042|2408|242267|164648960|9db499a9687c2f138c2e0607d02d9300|8b37c862df7baa905f081021038ccadd|ca516888f52d52622c57eb57be79b8cdb1390c0b|e3729a80|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|51549|2408|242474|165521408|4b61834bc64b129693360939131f5967|3872a678adfbc72e06c7df8151fa43a7|234c274b62f54c29424181a3fd2d0716a40254dd|056489d4|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52178|2408|242670|167278592|d886f575396d7a38290083bdf3fed8c8|a79c3f6fcde6c25426a08d9603a1fa8b|784ef4fca555f0c10d2104151ed0e3087e5f978b|fa9ed238|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52179|2408|245149|165531648|16e67d40ec59efbec26e4d99e61a1bc7|b399a150cd74302147af235be9cc7462|0bd2395952182aa9547154463a98738b4c061e62|8a6e566e|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52180|2408|251856|165615616|107128fafe2adcc68c6be984d7084739|f9a7d83c383a5212fa0dbf0a9a10029d|71afdbfe5305d755c3bb8d87f5bb95d4d5475bd6|cadf52b4|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52289|2408|256547|165519360|98f381196f316007755477b0abd83603|934f24210026c1fc61eeab79cd5cce29|ff5fab321b064a649096539a9517115d4346bc1c|ce1c8cde|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52290|2408|258334|165527552|2bb6135c9c0fde3baa9ed928baa98805|16a0bacee43b1e70f361785025755752|4ed7840ad455270e7e66335faff8dcdc413710c4|550a755b|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52291|2408|259301|165519360|2e0db09a130171b367592c3dea96f044|8c7f0daea4096e5dceebf69835d8d262|69deb01126480d6e05cce507d8f09f7d7fc544df|a7e92834|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52292|2408|260688|165638144|38a99216b683552236b853a3ff51bfe1|24d528ac6826462bad331498238b2537|d8f91c237bfd902f9a4924a1ba022eda1bbc988d|aee6542e|1390|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+4492|52293|2408|262584|163854336|793acc73e307e3ebd8818999ccb0bdb9|1bc92281f4fe6285393b055a215bb8ba|09dd4f18f76b57e7e1339f5eb89fa7da43352f43|31906eb6|1375|10|high|704x396|XviD|MP3 CBR|english|japanese|0|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+2408|18165|Doremi-fansubs|Doremi|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+170|Angel|0|100
+252|Angst|0|300
+22|Asia|0|600
+17|Comedy|0|200
+330|Coming of Age|0|200
+257|Cooking|0|100
+236|Daily Life|0|400
+289|Earth|0|600
+237|Elementary School|0|200
+23|Japan|0|600
+273|Manga|0|600
+238|Middle School|0|200
+225|Music|0|100
+487|Parental Abandonment|0|300
+233|Plot Continuity|0|200
+11|Present|0|600
+21|School Life|0|300
+79|Seinen|0|600
+220|Stereotypes|0|400
+481|Summer Festival|0|200
+235|Tragedy|0|200
+506|Valentine`s Day|0|200
+
+

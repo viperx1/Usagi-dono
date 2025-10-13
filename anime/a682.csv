@@ -1,0 +1,25 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+682|13382|1|The First Love of the Shikima||初恋裏色魔篇|30|26.07.1996 00:00|4.61|2|0|2
+682|13383|2|The Curse of the Mysterious Love||妖恋呪縛篇|30|23.08.1996 00:00|3.76|2|0|2
+682|17959|3|The Hell of the Cursed Love||邪恋地獄篇|30|11.10.1996 00:00|3.76|2|0|2
+682|17960|4|The Reincarnation of Sad Love||哀恋輪廻篇|30|08.11.1996 00:00|3.03|2|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+682|13382|91|44947|252133376|56aea9e20cd9cf77f937f7af03cb3aed|b454b86ed712ff4cc2e240de09a79d48|e253aaaace31c884b6c41a50f57b76b33f50469f|b5a60f2e|1718|10|high|512x384|DivX4|MP3 CBR|english|japanese|1|65|2|avi
+682|13383|91|44949|256331776|2354bf28855b516893a21d0e884a9c97|fe322d33754ada0c4d4ade6cdfdac300|ed1d181c0aed2b73544f53ab14c36277ae1779f6|60e9ee82|1706|10|high|512x384|DivX4|MP3 CBR|english|japanese|1|65|2|avi
+682|17959|91|44950|233535488|b704490ff0a7399bace8249c3b6616ff|99365013b5b0fedf56fd881974991420|32daa21905b3b27c1cf653d90337fb0d7bb4594e|e271d4eb|1599|10|high|512x384|DivX4|MP3 CBR|english|japanese|1|65|2|avi
+682|17960|91|44951|271134720|a4cad435033ccad5722eeeeab9c4e810|a8624f55f4c40a0b15767e388a990405|a16d15180caeab2b835869e8b1c0ea4a4442815b|a970802d|1718|10|high|512x384|DivX4|MP3 CBR|english|japanese|1|65|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+91|4899|Hentai-Zone|HZ|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+80|18 Restricted|1|600
+4|Action|0|400
+167|Demons|0|400
+15|Fantasy|0|400
+175|Magic|0|400
+273|Manga|0|600
+480|Uncensored Version Available|1|600
+
+

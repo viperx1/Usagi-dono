@@ -1,0 +1,56 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+1|1|1|Invasion||侵略|25|03.01.1999 00:00|3.09|31|0|2
+1|2|2|Kin of the Stars||星たちの眷族|25|10.01.1999 00:00|4.90|25|0|2
+1|1012|3|Daughter of Love||愛の娘|25|17.01.1999 00:00|6.88|21|0|2
+1|1011|4|Surprise Attack||奇襲|25|24.01.1999 00:00|7.04|22|0|2
+1|1010|5|The Battle of Gosroth||ゴースロスの戦い|25|31.01.1999 00:00|7.97|23|0|2
+1|1019|6|Mysterious Conspiracy||不可解な陰謀|25|07.02.1999 00:00|6.50|20|0|2
+1|1017|7|Fortunate Revolt||幸せな叛逆|25|14.02.1999 00:00|7.00|20|0|2
+1|1015|8|The Style of the Abh||アーヴの流儀|25|21.02.1999 00:00|6.99|20|0|2
+1|1013|9|To the Battlefield||戦場へ|25|28.02.1999 00:00|7.01|19|0|2
+1|1009|10|Escape: Just the Two of Us||二人だけの逃亡|25|07.03.1999 00:00|6.92|20|0|2
+1|1018|11|Sufugnoff Gateway Battle||スファグノーフ門沖会戦|25|14.03.1999 00:00|5.94|21|0|2
+1|1016|12|Lady of Chaos||惑乱の淑女|25|21.03.1999 00:00|6.70|20|0|2
+1|1014|13|Trouble Soaring Through Heaven||天翔る迷惑|40|28.03.1999 00:00|8.31|19|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+1|1|41|3864|238298721|6e8f7709db8cafacab4cebb75f24b5ad|3d5839d5b74e090910a561dbfc7dbdc0|7b6a351696625cec0e6f531cb1f1c22034a0f169|0dfec066|1505|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|2|41|3861|238684418|40b7de0729b3d90dc86d28fa5a2daab6|00882323c7f3e3c93a53a0c0690ddf17|3aecba606bb48aaa05cfe544537767262f937b19|9c0f5e2a|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1012|41|3858|238325013|91fa10a2cf33d9f55a2a84ccad0961af|0748ba18b9c90e5c1deba68a9c3c2829|6528ec011545fd7b2ac64dfea1e336d0973cdafc|7bb0130c|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1011|41|3855|236867488|d91139abe14f16a8878e1f3a5db183d0|ed17d66b19381ee3f7d6c57690951fa0|a8ae8a2cc853df864343cb5e586354dc640dc316|dadd1a6f|1505|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1010|41|195775|238143524|d04a0b9e6caed29687ae246ae2b49c56|2bd5a680b630be13b93a9870777f6d51|7b032c52a01db9510d0b6ae7370dc413e3dae7db|20de2b55|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1019|41|3863|217630370|8447b0dd4265124e1da525c092755e96|d1148f0fa94b31a865bad5d8e59169af|57a585863042d5742d377cf316100430fa07fd89|7f2ecf5e|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1017|41|3860|235121492|5ad0aca9ebfbfdd8912fe00a6bfcbae1|72ccdbd3130981e358bd7d29d57fe134|a38249e833ca5d5a6c74ae68545170a570bf8502|bf422eb4|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1015|41|3857|238497305|bf6b3bf219b9a3440b9c49c2735bd18a|bbdd0021c7ac6b81bbe580b88a399896|b4b427697d0daa630288a144a0a0b7dc8e53f925|dfb1de19|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1013|41|3867|231871498|7ef470382f3bca595cf1af85aa144c25|4041414d238bd95268e96f792b5e48c8|22e76bd1a37e0cb702b09babc0028daf82aef593|05af94f3|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1009|41|3862|238213380|663aba03a1616bf7215676498d8583bb|4baab99993b8e4639f0f84267d4dd24d|2b86cb73090763315f2901d882375a525e49d1c1|756968cc|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1018|41|3859|238173160|d2744e8d5b32d6798159b9fda7aa7254|bc44593b67b48d0d2a22e72857db11be|25b3edad4ace54d0edbfbea44123653c0263fd1c|a4d4bc57|1505|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1016|41|3856|238737515|85ecf17ff20cf56e148f3dc2f956a168|762da6bbc54e1fa274d3a129992be6a2|694ed513068aea45cc641a6dd4a68337a2ecb6bc|e1cc5251|1506|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+1|1014|41|3866|373229851|77c1c54b5d7c05ab38391a554bc4f945|933e6a73827d9f2a4a1f33dd490689cb|d675bdcc7cc4d29f022837cdfa6c92a7f7cb19ff|187f4a20|2401|10|very high|640x480|DivX5/6|Vorbis (Ogg Vorbis)|english|japanese|1|1|2|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+41|2342|Zhentarim DivX|zx|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+306|Adventure|0|200
+12|Future|0|600
+329|Genetic Modification|0|400
+263|Gunfights|0|200
+328|Human Enhancement|0|200
+52|Large Breasts|0|200
+171|Military|0|300
+274|Novel|0|400
+88|Nudity|0|200
+128|Other Planet|0|400
+233|Plot Continuity|0|600
+198|Romance|0|300
+8|Sci-Fi|0|500
+129|Shipboard|0|400
+505|Slow When It Comes to Love|0|300
+51|Small Breasts|0|200
+19|Space|0|600
+174|Space Travel|0|500
+467|War|0|400
+
+

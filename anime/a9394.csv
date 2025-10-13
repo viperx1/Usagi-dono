@@ -1,0 +1,49 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+9394|146418|1|Kotoura-san and Manabe-kun||琴浦さんと真鍋くん|25|11.01.2013 00:00|9.50|25|0|3
+9394|146692|2|The First......||初めての......|25|18.01.2013 00:00|7.50|18|0|3
+9394|146691|3|So Happy, So Fun||嬉しくて, 楽しくて|25|25.01.2013 00:00|8.56|15|0|3
+9394|146690|4|Changing World||変わる世界|25|01.02.2013 00:00|8.52|16|0|3
+9394|146954|5|School Paradise?||学園天国?|25|08.02.2013 00:00|5.95|15|0|3
+9394|146953|6|Summer Vacation!||夏休み!|25|15.02.2013 00:00|5.45|14|0|3
+9394|146952|7|In This World, I...||この世界に私は|25|22.02.2013 00:00|7.59|13|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+9394|146418|7172|1179893|570823184|4fab2636eb09a7b3cc1388946b498383|47f68f5733d9cb2674489aa38221e1ff|49653a48884bbcbb7c3cefc2ba0c23a376b9bfbd|2a7cf2c4|1420|10|very high|1920x1080|H264/AVC|(HE-)AAC|english|japanese|1|0|3|mkv
+9394|146692|7172|1183426|572795825|a7ffd543671a0e6f34ce171d8719d709|6fa14418bdbbe644a4a09c273c841d87|0c08da21da65ffe7d56eea47e64fafc256324814|d9bf38be|1420|10|very high|1920x1080|H264/AVC|(HE-)AAC|english|japanese|1|0|3|mkv
+9394|146691|7172|1186043|572425273|b87cd9af35d5b8ba04c904136deca73a|db40560c68bd0c2f9f17742958e3f10b|b6a94e36244920163537457fab7340e8345f26d8|d2718eac|1420|10|very high|1920x1080|H264/AVC|(HE-)AAC|english|japanese|1|0|3|mkv
+9394|146690|7172|1188258|571079031|858ccaf6faa883ea4d3abec9c6e73fff|cf1f34b080c9998271b512b67180980d|0b26643b6e22f380f1e363a6754c53e2dfb2bc84|fa257b96|1420|10|very high|1920x1080|H264/AVC|(HE-)AAC|english|japanese|1|0|3|mkv
+9394|146954|7172|1190519|571894877|381a2144c5bbbb858046dc6ea8fb119b|34c1524c9247f730b052ddb42e05465d|fe0f5bbc4d8a94c7b9743c9cf51345349800c9af|dd537559|1420|10|very high|1920x1080|H264/AVC|(HE-)AAC|english|japanese|1|0|3|mkv
+9394|146953|7172|1194251|342169677|1d83233ab055c5be9bcebdd7c42abc5c|b8142ea03e8c7fe396b0185bd69f866f|f9f504eab3261a7b433cd9717009330ecf2d3595|60ffeaa6|1420|10|high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|0|3|mkv
+9394|146952|7172|1197817|342096239|d0e40cdd09faae9f93b763da805b407f|9e285d9365a4021d3394ef23a80485d5|cf9a6ac33147c99c1bee73919311dc960672818c|0593baaf|1420|10|high|1280x720|H264/AVC|(HE-)AAC|english|japanese|1|0|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+7172|78767|HorribleSubs|HorribleSubs|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+453|4-koma|0|600
+252|Angst|0|500
+242|Clubs|0|500
+17|Comedy|0|500
+160|Conspiracy|0|300
+183|Contemporary Fantasy|0|600
+289|Earth|0|600
+282|Ecchi|0|200
+497|Friendship|0|600
+498|Furo Scene|0|100
+23|Japan|0|600
+534|Karaoke|0|200
+495|Lethal Cooking|0|100
+273|Manga|0|600
+487|Parental Abandonment|0|600
+198|Romance|0|500
+21|School Life|0|500
+492|School Sports Festival|0|200
+79|Seinen|0|400
+496|Shower Scene|0|100
+342|Super Deformed|0|400
+18|Super Power|0|100
+172|Thriller|0|400
+235|Tragedy|0|200
+513|Transfer Student|0|500
+
+

@@ -1,0 +1,26 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+275|3006|1|Complete Movie|||120|11.03.1984 00:00|8.99|17|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+275|3006|3484|458330|2100220059|44e6baa3a37d715769e7a0eda2340484|93777c6b44eef1ead283426943d98ea1|d825df45527ed65b4bf2416ff06101c76dda0845|b62d665c|7022|10|very high|672x432|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|9|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+3484|19692|niizk|niizk|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+306|Adventure|0|400
+464|Anti-War|0|200
+539|Ecology|0|300
+15|Fantasy|0|400
+12|Future|0|600
+273|Manga|0|600
+171|Military|0|400
+78|Mina|0|600
+414|Nopan|0|100
+26|Post-apocalypse|0|600
+8|Sci-Fi|0|400
+173|Swordplay|0|300
+467|War|0|400
+
+

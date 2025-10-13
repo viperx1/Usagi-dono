@@ -1,0 +1,13 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+3470|38595|1|Complete Movie|||40|11.11.1966 00:00|7.47|2|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+3470|38595|3214|218921|274532260|2912599675ce1cd26e2c793d97cc2d25|3a322d207d9ca4745e8ce5c08fc62b60|62f903b9a9116f04a819a974d168020a83aae99e|9abe9b60|1931|10|med|640x270|DivX5/6|MP3 CBR||instrumental|1|0|3|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+3214|16635|tikal|tikal|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+275|New|0|400
+
+

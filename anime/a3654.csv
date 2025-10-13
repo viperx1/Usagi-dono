@@ -1,0 +1,54 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+3654|46077|1|Yotsuya Ghost Story - Part 1||四谷怪談 序の幕|25|13.01.2006 00:00|5.78|25|0|2
+3654|46177|2|Yotsuya Ghost Story - Part 2||四谷怪談 二の幕|25|20.01.2006 00:00|5.72|24|0|2
+3654|46206|3|Yotsuya Ghost Story - Part 3||四谷怪談 三の幕|25|27.01.2006 00:00|5.83|21|0|2
+3654|46207|4|Yotsuya Ghost Story - Part 4||四谷怪談 大詰め|25|03.02.2006 00:00|6.45|22|0|2
+3654|46208|5|The Legend of Tenshu - Part 1||天守物語 序の幕|25|10.02.2006 00:00|6.77|21|0|2
+3654|46209|6|The Legend of Tenshu - Part 2||天守物語 二の幕|25|17.02.2006 00:00|7.04|20|0|2
+3654|46210|7|The Legend of Tenshu - Part 3||天守物語 三の幕|25|23.02.2006 00:00|6.82|19|0|2
+3654|46211|8|The Legend of Tenshu - Part 4||天守物語 大詰め|25|03.03.2006 00:00|7.80|20|0|2
+3654|46212|9|Bakeneko - Part 1||化猫 序の幕|25|10.03.2006 00:00|9.28|25|0|2
+3654|46213|10|Bakeneko - Part 2||化猫 二の幕|25|17.03.2006 00:00|9.25|24|0|2
+3654|46214|11|Bakeneko - Part 3||化猫 大詰め|25|24.03.2006 00:00|9.74|25|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+3654|46077|2812|204150|178858418|cab7da99ae101040da45be3d15199f9b|8ecab74250f33b280b2c67f3a4d75b5a|2c141c3d7a4ce15797097485cf6b39260a1183f3|e7cce2aa|1380|10|high|640x480|XviD|MP3 CBR|english|japanese|1|5|2|avi
+3654|46177|2812|209796|180176367|07a4dd7f097dc2161ff5be49aae0fe8f|539bc033f4812b7360450f35ff155a1a|77b5ceced153ebe3acbb74ec3108e08bda26a43f|03053df2|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4101|2|mkv
+3654|46206|2812|209641|179964386|974631c79b332bfd4355b973b71a143d|6888cfdcab33ed5757e5fc397c7ab3ca|fc4e23d10f3f4e0fa2c4d5eb1c27c49b28942706|8ed20747|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|mkv
+3654|46207|2812|211083|183928764|26b08b064732a34cdf8172fdd2498186|e883a3ac8cedd518dbee144a04934259|c74d4de4d557a6a564bf795fa22fe3b3a2e3d2ca|053dd050|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|mkv
+3654|46208|2812|217660|185133238|c0ffa5ce1886bbbf9bd67a71ac3bfb5d|873555667fb59b65022542fd9544efb7|b93e4a2f0694d0ae35bd33bef38efe077bb0a1c8|c4a8e74c|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|mkv
+3654|46209|2812|220683|180577039|24bb438ede46a65494f8be566a78d123|a028f9243817fed89c6089a956ee74cd|1d5c710d87b11c641cfb8f1cf81fafc4cbbdb2f2|bf68aa48|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|mkv
+3654|46210|2812|224598|180285757|ea883931d056df34530f4c977d43a79b|1d80cc6f2ba55eac7dcff98a7ec08f72|c11891375dff2ec373060c27ad885d9dd147487e|a39f9967|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|mkv
+3654|46211|2812|225407|180168413|6d2d84831c8cc7ee228e75cb7a1cbe26|55582753dd72ee3b06acac1582999740|4993804256d81480f5851a7bec012c6a921ff9e4|4d24f352|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|1|4097|2|mkv
+3654|46212|2812|226159|183259112|62519f34d5c6ae1036893d6c149f43bb|c2a91be5eb0ea82462d55c827603605a|11b7adbf0298f821daab4c6332535d4f850fb864|68076ad4|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|0|4097|2|mkv
+3654|46213|2812|226805|177443636|2dc1e56e5922481f720903f43fc833f7|90b0b4cbd3fea4196010a7631ececca0|096323d9a34f87f797eb10d948349747d2d72a0a|196845d8|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|0|4097|2|mkv
+3654|46214|2812|227362|242043952|3879d6bebada4ec28f07bcd2b47e4943|890e5cb41a6a8e57ba6c3a6d722de2f1|a4ac00e7a6f230fb7eac780117e0949c6f0dd7e3|39f4d6bd|1380|10|high|640x480|H264/AVC|Vorbis (Ogg Vorbis)|english|japanese|0|4097|2|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+2812|15681|gg|gg|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+252|Angst|0|400
+22|Asia|0|600
+183|Contemporary Fantasy|0|600
+167|Demons|0|400
+289|Earth|0|600
+15|Fantasy|0|600
+507|Ghost|0|200
+243|Goddess|0|400
+25|Historical|0|600
+154|Horror|0|600
+23|Japan|0|600
+274|Novel|0|600
+88|Nudity|0|100
+10|Past|0|600
+233|Plot Continuity|0|600
+198|Romance|0|200
+79|Seinen|0|600
+86|Sex|0|200
+173|Swordplay|0|400
+235|Tragedy|0|400
+84|Violence|0|400
+
+

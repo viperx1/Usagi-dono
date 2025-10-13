@@ -1,0 +1,29 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4847|80153|1|Complete Movie|||100|01.09.2007 00:00|8.41|28|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4847|80153|3661|598164|8458548625|a2cb16f0e22023b44b00f4c1a5ebe100|0cdcef27c2fa5801df1a292ccf413777|5122907d9d2fc6480d685f7759b7eba608ca5c96|77790ee2|6059|10|very high|1920x1080|H264/AVC|DTS|english|japanese|1|1|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+3661|42436|THORAnime|THORA|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|500
+184|Alien|0|600
+252|Angst|0|600
+314|Anthropomorphism|0|400
+12|Future|0|600
+328|Human Enhancement|0|500
+23|Japan|0|600
+13|Mecha|0|600
+238|Middle School|0|200
+171|Military|0|300
+275|New|0|600
+88|Nudity|0|100
+118|Piloted Robot|0|600
+26|Post-apocalypse|0|600
+5|Shounen|0|600
+235|Tragedy|0|500
+84|Violence|0|300
+
+

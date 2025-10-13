@@ -1,0 +1,13 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+4453|53715|1|Music Video|||2|-|1.58|3|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+4453|53715|0|251691|17059844|bc817f5fe4d23839996458485d10374e|8953d7ece164ebfa1ba6eb0b2d730672|588b72796342e375e2eba16c8c64ee81e3d1db54|dccc9f96|119|10|med|320x240|MPEG-1|MP2||instrumental|1|0|2|mpg
+GROUPS
+GID|AGID|Name|ShortName|State
+GENREN
+GenID|GenName|isHentai|Weight 
+154|Horror|0|300
+244|Twisted|0|300
+
+

@@ -1,0 +1,43 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+7|6585|1|Complete Movie|||135|12.07.1997 00:00|8.95|28|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+7|6585|374|290271|2046897938|57a1858a26dc2e3f3e0be3a0e4e98422|9974bce810c821f472a8e5fde9605934|be67bdea6b777be09c1990e8d15c1e6f1c9ad7f1|d8313503|8017|10|very high|704x464|H264/AVC|AC3|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+374|20543|KickAssAnime|KAA|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+306|Adventure|0|500
+252|Angst|0|200
+314|Anthropomorphism|0|300
+464|Anti-War|0|200
+22|Asia|0|600
+17|Comedy|0|100
+330|Coming of Age|0|200
+236|Daily Life|0|100
+167|Demons|0|100
+289|Earth|0|600
+15|Fantasy|0|400
+322|Feudal Warfare|0|300
+243|Goddess|0|100
+25|Historical|0|200
+154|Horror|0|200
+23|Japan|0|600
+175|Magic|0|200
+20|Martial Arts|0|200
+171|Military|0|200
+78|Mina|0|600
+275|New|0|600
+10|Past|0|600
+533|Revenge|0|200
+198|Romance|0|200
+28|Samurai|0|400
+18|Super Power|0|100
+173|Swordplay|0|200
+494|Talking Animals|0|200
+235|Tragedy|0|200
+84|Violence|0|200
+
+

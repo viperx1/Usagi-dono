@@ -1,0 +1,28 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+331|9120|2|Part 1 of 2|||65|02.08.1986 00:00|9.94|1|0|2
+331|9121|3|Part 2 of 2|||65|02.08.1986 00:00|9.94|1|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+331|9120|183|71315|734577403|d113cd1d49d9be2720e412ebee96ee44|3f5af0564d6d0a9f24c48dab50daa83f|ef2077dfbf4fdb8bb79adb69e0ebfbef2b6d1cd1|4b761df9|3893|10|high|704x384|DivX5/6|(HE-)AAC|english|japanese|1|1|2|mkv
+331|9121|183|71316|720120153|e54193631056e89798936bf7c83f48ca|b5c815044830111879592caa4767b2dd|fb04346ae550fabbc087e9783c784c984b2f4cbd|a98f463b|3582|10|high|704x384|DivX5/6|(HE-)AAC|english|japanese|1|1|2|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+183|8363|Anime-4ever|a4e|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|600
+306|Adventure|0|600
+119|Android|0|400
+464|Anti-War|0|200
+17|Comedy|0|200
+15|Fantasy|0|400
+448|Floating Island|0|500
+13|Mecha|0|400
+78|Mina|0|600
+275|New|0|600
+198|Romance|0|200
+8|Sci-Fi|0|400
+422|Steampunk|0|400
+255|Sudden Girlfriend Appearance|0|200
+
+

@@ -1,0 +1,30 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+420|4982|1|Electro Blood||Electro Blood|50|25.02.1995 00:00|5.36|14|0|2
+420|4984|2|Flesh & Stone||Flesh & Stone|30|21.04.1995 00:00|5.87|14|0|2
+420|4983|3|Heart Core||Heart Core|30|25.06.1995 00:00|6.09|13|0|2
+420|4985|4|Bit of Love||Bit of Love|30|25.11.1995 00:00|4.63|14|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+420|4982|79|5964|725076088|0f2288d9104c0c08474e404dcf373756|af9764cb70b44d228bd3c99c510fec62|94b6f47ca1628bdbaf28110382c6a4a05a5320f5|151816dd|2843|10|high|576x432|XviD|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+420|4984|79|5966|368029103|1407fe4c212320fa16781d3243e48cf4|8e14df3dc87830f1328ef3c2d7ddc086|c2d8b5e54e29ffa6325da90939832c0023ad2fea|de7b6137|1766|10|high|576x432|XviD|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+420|4983|79|5965|367603399|ca7b0913b50c6621f2afae3d901c92a7|f7635109f173090c9d65f83fd07b9d41|5aec46e1b829d492afb15752dc30f8dae8cd6294|72e51bf4|1677|10|high|576x432|XviD|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+420|4985|79|5963|366819715|fe79bace5c962f0942b124fa90c0442e|45a1426b3e0a4c5bebac8168e6b37960|f9454324d7736e8f24d02ec84aa3e67a987e52dc|7f4d5659|1719|10|high|576x432|XviD|Vorbis (Ogg Vorbis)|english|japanese|0|1|2|ogm
+GROUPS
+GID|AGID|Name|ShortName|State
+79|2000|Ripping Gods|RG|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|600
+119|Android|0|600
+177|Cops|0|600
+253|Cyberpunk|0|200
+12|Future|0|600
+263|Gunfights|0|200
+323|Law and Order|0|600
+20|Martial Arts|0|200
+128|Other Planet|0|600
+8|Sci-Fi|0|600
+220|Stereotypes|0|400
+172|Thriller|0|400
+
+

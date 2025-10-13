@@ -1,0 +1,35 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+6075|110542|1|Complete Movie|||130|23.01.2010 00:00|8.85|6|0|3
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+6075|110542|4678|828362|4704297708|30c1b0e826e9e4298f73fc9130d92d5c|0b7a70326e582279a55338fa4be94fd5|c342bfa317a86f44a49d302a644e59cef0663324|7137af1d|7812|10|very high|1280x720|H264/AVC|AC3|english|japanese|1|4097|3|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+4678|54061|BSS|BSS|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|500
+486|Calling Your Attacks|0|300
+271|Erotic Game|0|600
+15|Fantasy|0|600
+497|Friendship|0|300
+269|Game|0|600
+485|Henshin|0|300
+23|Japan|0|600
+201|Juujin|0|200
+175|Magic|0|500
+482|Magic Circles|0|200
+247|Mahou Shoujo|0|600
+13|Mecha|0|400
+88|Nudity|0|200
+283|Pantsu|0|100
+11|Present|0|600
+8|Sci-Fi|0|400
+79|Seinen|0|600
+174|Space Travel|0|100
+203|Special Squads|0|500
+494|Talking Animals|0|200
+163|Time Travel|0|100
+235|Tragedy|0|200
+
+

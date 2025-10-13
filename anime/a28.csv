@@ -1,0 +1,34 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+28|10063|1|Complete Movie|||125|16.07.1988 00:00|7.70|40|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+28|10063|3484|257185|2099355566|cbd7a5fccbf7f435bd4077e6c8890443|e01d20849a47364ed32104ff9b97f364|3230839d1b793772d2ab9875b9777f1c4fd77e8b|4c16ceb0|7453|10|very high|704x480|H264/AVC|AC3|english|japanese|1|1|2|mkv
+GROUPS
+GID|AGID|Name|ShortName|State
+3484|18552|niizk|niizk|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|400
+252|Angst|0|400
+253|Cyberpunk|0|400
+12|Future|0|600
+329|Genetic Modification|0|400
+263|Gunfights|0|300
+239|High School|0|400
+154|Horror|0|400
+328|Human Enhancement|0|400
+23|Japan|0|600
+273|Manga|0|600
+171|Military|0|500
+140|Motorsport|0|100
+88|Nudity|0|300
+26|Post-apocalypse|0|600
+198|Romance|0|100
+8|Sci-Fi|0|400
+79|Seinen|0|600
+331|Sexual Abuse|0|100
+386|Street Racing|0|100
+18|Super Power|0|500
+84|Violence|0|500
+
+

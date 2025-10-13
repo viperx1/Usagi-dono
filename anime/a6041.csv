@@ -1,0 +1,18 @@
+AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+6041|95983|1|Complete Movie|||95|13.12.2008 00:00|3.88|5|0|2
+FILES
+AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resoltuion|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+6041|95983|1412|651304|734003200|516cf6e8190767ff02ad2ac87f0117c4|78d87fa447ba5e03674858bdc4637cb7|b3ec7a43258ea984d2aed6c971837d311a5d2c17|d10e3484|5679|10|high|768x432|H264/AVC|MP3 CBR|english|japanese|1|1|2|avi
+GROUPS
+GID|AGID|Name|ShortName|State
+1412|44969|Dattebayo|DB|complete
+GENREN
+GenID|GenName|isHentai|Weight 
+4|Action|0|500
+486|Calling Your Attacks|0|300
+20|Martial Arts|0|400
+5|Shounen|0|600
+18|Super Power|0|400
+173|Swordplay|0|500
+
+

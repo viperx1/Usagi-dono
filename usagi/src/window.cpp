@@ -784,189 +784,142 @@ void Window::loadMylistFromDatabase()
 	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
 }
 
-int Window::parseMylistXML(const QString &content)
+int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 {
-	// Parse XML format mylist export from AniDB
-	// Format: <mylistexport><mylist lid="..." fid="..." ...>...</mylist></mylistexport>
+	// Parse csv-adborg format mylist export (tar.gz containing anime/*.csv files)
+	// Each CSV file contains pipe-delimited data with sections: anime info, FILES, GROUPS, GENREN
 	int count = 0;
 	QSqlDatabase db = QSqlDatabase::database();
-	db.transaction();
 	
-	// Simple XML parsing - look for mylist entries
-	QRegularExpression rx("<mylist\\s+([^>]+)>");
-	QRegularExpressionMatchIterator matchIterator = rx.globalMatch(content);
+	// Extract tar.gz to temporary directory
+	QString tempDir = QDir::tempPath() + "/usagi_mylist_" + QString::number(QDateTime::currentMSecsSinceEpoch());
+	QDir().mkpath(tempDir);
 	
-	while(matchIterator.hasNext())
+	// Use QProcess to extract tar.gz
+	QProcess tarProcess;
+	tarProcess.setWorkingDirectory(tempDir);
+	tarProcess.start("tar", QStringList() << "-xzf" << tarGzPath);
+	
+	if(!tarProcess.waitForFinished(30000))  // 30 second timeout
 	{
-		QRegularExpressionMatch match = matchIterator.next();
-		QString attributes = match.captured(1);
-		
-		// Extract attributes
-		QMap<QString, QString> attrs;
-		QRegularExpression attrRx("(\\w+)=\"([^\"]*)\"");
-		QRegularExpressionMatchIterator attrIterator = attrRx.globalMatch(attributes);
-		while(attrIterator.hasNext())
-		{
-			QRegularExpressionMatch attrMatch = attrIterator.next();
-			attrs[attrMatch.captured(1)] = attrMatch.captured(2);
-		}
-		
-		// Insert into database
-		if(attrs.contains("lid") && attrs.contains("fid"))
-		{
-			// Escape single quotes in storage field to prevent SQL injection
-			QString escapedStorage = attrs.value("storage", "");
-			escapedStorage.replace("'", "''");
-			
-			QString q = QString("INSERT OR REPLACE INTO `mylist` "
-				"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-				"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
-				.arg(attrs.value("lid", "0"))
-				.arg(attrs.value("fid", "0"))
-				.arg(attrs.value("eid", "0"))
-				.arg(attrs.value("aid", "0"))
-				.arg(attrs.value("gid", "0"))
-				.arg(attrs.value("state", "0"))
-				.arg((attrs.value("viewdate", "").isEmpty() || attrs.value("viewdate", "") == "0") ? "0" : "1")  // viewed = has non-zero viewdate
-				.arg(escapedStorage);
-			
-			QSqlQuery query(db);
-			if(query.exec(q))
-			{
-				count++;
-			}
-		}
+		logOutput->append("Error: Failed to extract tar.gz file (timeout)");
+		QDir(tempDir).removeRecursively();
+		return 0;
 	}
 	
-	db.commit();
-	return count;
-}
-
-int Window::parseMylistCSV(const QString &content)
-{
-	// Parse CSV/TXT format mylist export
-	// Supports multiple formats:
-	// - Standard: lid,fid,eid,aid,gid,date,state,viewdate,storage,...
-	// - csv-adborg: aid,eid,gid,lid,status,viewdate,anime_name,episode_name,...
-	int count = 0;
-	QSqlDatabase db = QSqlDatabase::database();
+	if(tarProcess.exitCode() != 0)
+	{
+		logOutput->append("Error: Failed to extract tar.gz file: " + tarProcess.readAllStandardError());
+		QDir(tempDir).removeRecursively();
+		return 0;
+	}
+	
+	// Find all CSV files in anime/ subdirectory
+	QDir animeDir(tempDir + "/anime");
+	if(!animeDir.exists())
+	{
+		logOutput->append("Error: anime/ directory not found in tar.gz");
+		QDir(tempDir).removeRecursively();
+		return 0;
+	}
+	
+	QStringList csvFiles = animeDir.entryList(QStringList() << "*.csv", QDir::Files);
+	
 	db.transaction();
 	
-	QStringList lines = content.split('\n');
-	bool firstLine = true;
-	QMap<QString, int> columnMap;
-	bool hasHeader = false;
-	
-	for(int i = 0; i < lines.size(); i++)
+	// Process each CSV file
+	foreach(const QString &csvFile, csvFiles)
 	{
-		QString line = lines[i].trimmed();
-		if(line.isEmpty())
+		QString filePath = animeDir.absoluteFilePath(csvFile);
+		QFile file(filePath);
+		
+		if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
 			continue;
 		
-		// Skip comment lines
-		if(line.startsWith("#"))
-			continue;
+		QTextStream in(&file);
+		QString content = in.readAll();
+		file.close();
 		
-		// Process header line to detect format
-		if(firstLine)
+		// Parse the file - look for FILES section
+		QStringList lines = content.split('\n');
+		bool inFilesSection = false;
+		QStringList fileHeaders;
+		
+		for(int i = 0; i < lines.size(); i++)
 		{
-			firstLine = false;
-			QString lowerLine = line.toLower();
+			QString line = lines[i].trimmed();
 			
-			// Check if this is a header line
-			if(lowerLine.contains("lid") || lowerLine.contains("aid"))
+			if(line.isEmpty())
+				continue;
+			
+			// Check for FILES section marker
+			if(line == "FILES")
 			{
-				hasHeader = true;
-				
-				// Parse header to build column map
-				QStringList headers = line.split(',');
-				for(int col = 0; col < headers.size(); col++)
+				inFilesSection = true;
+				// Next line should be headers
+				if(i + 1 < lines.size())
 				{
-					QString header = headers[col].trimmed().toLower();
-					columnMap[header] = col;
+					fileHeaders = lines[i + 1].split('|');
+					i++;  // Skip the header line
 				}
 				continue;
 			}
-		}
-		
-		QStringList fields = line.split(',');
-		
-		// Parse fields based on detected format
-		QString lid, fid, eid, aid, gid, state, viewdate, storage;
-		
-		if(hasHeader && !columnMap.isEmpty())
-		{
-			// Header-based parsing (supports csv-adborg and other templates)
-			lid = columnMap.contains("lid") && fields.size() > columnMap["lid"] 
-				? fields[columnMap["lid"]].trimmed() : "";
-			fid = columnMap.contains("fid") && fields.size() > columnMap["fid"] 
-				? fields[columnMap["fid"]].trimmed() : "";
-			eid = columnMap.contains("eid") && fields.size() > columnMap["eid"] 
-				? fields[columnMap["eid"]].trimmed() : "";
-			aid = columnMap.contains("aid") && fields.size() > columnMap["aid"] 
-				? fields[columnMap["aid"]].trimmed() : "";
-			gid = columnMap.contains("gid") && fields.size() > columnMap["gid"] 
-				? fields[columnMap["gid"]].trimmed() : "";
 			
-			// State can be "state" or "status"
-			if(columnMap.contains("state") && fields.size() > columnMap["state"])
-				state = fields[columnMap["state"]].trimmed();
-			else if(columnMap.contains("status") && fields.size() > columnMap["status"])
-				state = fields[columnMap["status"]].trimmed();
+			// Check for next section (GROUPS, GENREN, etc.)
+			if(line == "GROUPS" || line == "GENREN")
+			{
+				inFilesSection = false;
+				continue;
+			}
 			
-			viewdate = columnMap.contains("viewdate") && fields.size() > columnMap["viewdate"] 
-				? fields[columnMap["viewdate"]].trimmed() : "";
-			storage = columnMap.contains("storage") && fields.size() > columnMap["storage"] 
-				? fields[columnMap["storage"]].trimmed() : "";
-		}
-		else
-		{
-			// Position-based parsing (standard format without header)
-			if(fields.size() < 8)
-				continue;  // Need at least 8 fields
-			
-			lid = fields[0].trimmed();
-			fid = fields[1].trimmed();
-			eid = fields[2].trimmed();
-			aid = fields[3].trimmed();
-			gid = fields[4].trimmed();
-			state = fields[6].trimmed();
-			viewdate = fields[7].trimmed();
-			storage = fields.size() > 8 ? fields[8].trimmed() : "";
-		}
-		
-		// Validate required fields
-		if(lid.isEmpty() || aid.isEmpty())
-			continue;
-		
-		// fid is optional for csv-adborg template
-		if(fid.isEmpty())
-			fid = "0";
-		
-		// Escape single quotes in storage field to prevent SQL injection
-		QString escapedStorage = storage;
-		escapedStorage.replace("'", "''");
-		
-		// Insert into database
-		QString q = QString("INSERT OR REPLACE INTO `mylist` "
-			"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-			"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
-			.arg(lid)
-			.arg(fid)
-			.arg(eid.isEmpty() ? "0" : eid)
-			.arg(aid)
-			.arg(gid.isEmpty() ? "0" : gid)
-			.arg(state.isEmpty() ? "0" : state)
-			.arg(viewdate.isEmpty() || viewdate == "0" ? "0" : "1")
-			.arg(escapedStorage);
-		
-		QSqlQuery query(db);
-		if(query.exec(q))
-		{
-			count++;
+			// Parse file entries in FILES section
+			if(inFilesSection && !fileHeaders.isEmpty())
+			{
+				QStringList fields = line.split('|');
+				
+				if(fields.size() < 20)  // Need at least 20 fields for complete data
+					continue;
+				
+				// Extract fields from FILES section
+				// AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resolution|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+				QString aid = fields[0].trimmed();
+				QString eid = fields[1].trimmed();
+				QString gid = fields[2].trimmed();
+				QString fid = fields[3].trimmed();
+				QString isWatched = fields.size() > 17 ? fields[17].trimmed() : "0";
+				QString state = fields.size() > 18 ? fields[18].trimmed() : "0";
+				QString myState = fields.size() > 19 ? fields[19].trimmed() : "0";
+				
+				// Validate required fields
+				if(fid.isEmpty() || aid.isEmpty())
+					continue;
+				
+				// Insert into database
+				// We don't have lid from this format, so we'll use fid as a unique identifier
+				QString q = QString("INSERT OR REPLACE INTO `mylist` "
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '')")
+					.arg(fid)  // Use fid as lid since we don't have lid
+					.arg(fid)
+					.arg(eid.isEmpty() ? "0" : eid)
+					.arg(aid)
+					.arg(gid.isEmpty() ? "0" : gid)
+					.arg(myState.isEmpty() ? "0" : myState)  // Use myState as state
+					.arg(isWatched == "1" ? "1" : "0");  // viewed = isWatched
+				
+				QSqlQuery query(db);
+				if(query.exec(q))
+				{
+					count++;
+				}
+			}
 		}
 	}
 	
 	db.commit();
+	
+	// Clean up temporary directory
+	QDir(tempDir).removeRecursively();
+	
 	return count;
 }
