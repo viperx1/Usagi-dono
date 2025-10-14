@@ -152,6 +152,13 @@ if(WIN32)
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     
+    # Check if Qt is statically linked and add necessary definitions
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        message(STATUS "Detected static Qt6 libraries - adding QT_STATIC and QT_STATICPLUGIN definitions")
+        add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+    endif()
+    
     # Clean up Qt target interface options
     # Qt6 imported targets might have MSVC-style flags in their INTERFACE_LINK_OPTIONS and INTERFACE_COMPILE_OPTIONS
     foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
