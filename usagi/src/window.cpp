@@ -380,7 +380,9 @@ void Window::ButtonHasherClearClick()
 void Window::ButtonLoginClick()
 {
     bool loggedin = adbapi->LoggedIn();
-    qDebug()<<__FILE__<<__LINE__<<"loggedin="<<loggedin;
+    QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " loggedin=" + (loggedin ? "true" : "false");
+    qDebug() << logMsg;
+    getNotifyLogAppend(logMsg);
     if(loggedin == true)
     {
         adbapi->Logout();
@@ -615,10 +617,14 @@ void myAniDBApi::Debug(QString msg)
 
 void Window::getNotifyMylistAdd(QString tag, int code)
 {
-    qDebug()<<__FILE__<<__LINE__<<"getNotifyMylistAdd()"<<tag<<code;
+    QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyMylistAdd() tag=" + tag + " code=" + QString::number(code);
+    qDebug() << logMsg;
+    getNotifyLogAppend(logMsg);
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
-        qDebug()<<__FILE__<<__LINE__<<"hashes->item(i, 5)->text() == tag"<<hashes->item(i, 5)->text()<<"=="<<tag;
+        QString itemLogMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " hashes->item(i, 5)->text() == tag " + hashes->item(i, 5)->text() + " == " + tag;
+        qDebug() << itemLogMsg;
+        getNotifyLogAppend(itemLogMsg);
         if(hashes->item(i, 5)->text() == tag || hashes->item(i, 6)->text() == tag)
 		{
 			QColor green_light; green_light.setRgb(0, 255, 0);
@@ -628,21 +634,27 @@ void Window::getNotifyMylistAdd(QString tag, int code)
             {
                 hashes->item(i, 0)->setBackground(green_light.toRgb());
                 hashes->item(i, 1)->setText("2");
-                qDebug()<<"310-2";
+                QString msg310 = "310-2";
+                qDebug() << msg310;
+                getNotifyLogAppend(msg310);
                 return;
             }
             if(code == 320)
             {
                 hashes->item(i, 0)->setBackground(red.toRgb());
                 hashes->item(i, 1)->setText("4"); // no such file
-                qDebug()<<"320-4";
+                QString msg320 = "320-4";
+                qDebug() << msg320;
+                getNotifyLogAppend(msg320);
                 return;
             }
             else if(code == 311 || code == 210)
 			{
                 hashes->item(i, 0)->setBackground(green_dark.toRgb());
 				hashes->item(i, 1)->setText("3");
-                qDebug()<<"311/210-3";
+                QString msg311 = "311/210-3";
+                qDebug() << msg311;
+                getNotifyLogAppend(msg311);
 				if(renameto->checkState() > 0)
 				{
 					// TODO: rename
@@ -655,7 +667,9 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 
 void Window::getNotifyLoggedIn(QString tag, int code)
 {
-    qDebug()<<__FILE__<<__LINE__<<"[Window] Login notification received - Tag:"<<tag<<"Code:"<<code;
+    QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] Login notification received - Tag: " + tag + " Code: " + QString::number(code);
+    qDebug() << logMsg;
+    getNotifyLogAppend(logMsg);
     loginbutton->setText(QString("Logout - logged in with tag %1 and code %2").arg(tag).arg(code));
 	
 	// Enable notifications after successful login
@@ -665,13 +679,17 @@ void Window::getNotifyLoggedIn(QString tag, int code)
 
 void Window::getNotifyLoggedOut(QString tag, int code)
 {
-    qDebug()<<__FILE__<<__LINE__<<"getNotifyLoggedOut";
+    QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] getNotifyLoggedOut";
+    qDebug() << logMsg;
+    getNotifyLogAppend(logMsg);
     loginbutton->setText(QString("Login - logged out with tag %1 and code %2").arg(tag).arg(code));
 }
 
 void Window::getNotifyMessageReceived(int nid, QString message)
 {
-	qDebug()<<__FILE__<<__LINE__<<"Notification received:"<<nid<<message;
+	QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] Notification received: " + QString::number(nid) + " " + message;
+	qDebug() << logMsg;
+	getNotifyLogAppend(logMsg);
 	logOutput->append(QString("Notification %1 received").arg(nid));
 	
 	// Check if message contains mylist export link
