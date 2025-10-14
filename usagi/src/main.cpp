@@ -3,6 +3,13 @@
 #include "crashlog.h"
 //#include "main.h"
 
+// Import static plugins for Qt static builds
+#ifdef QT_STATIC
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
+#endif
+
 //myAniDBApi *adbapi;
 Window *window;
 
