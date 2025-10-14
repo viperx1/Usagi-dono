@@ -149,7 +149,35 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 
     QString ReplyID = token.first();//.first();//Message.Mid(0, Message.Find(" "));
 
-    qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tag:"<<Tag<<"ReplyID:"<<ReplyID;
+	// Handle cases where AniDB responds without a tag (e.g., "598 UNKNOWN COMMAND")
+	// In this case, what we parsed as Tag is actually the ReplyID
+	// This can happen when the command is so malformed that the server cannot extract the tag
+	bool tagIsNumeric = false;
+	Tag.toInt(&tagIsNumeric);
+	
+	if(tagIsNumeric && token.size() > 0 && !ReplyID.isEmpty())
+	{
+		// Check if ReplyID looks like a text response rather than a numeric code
+		bool replyIsNumeric = false;
+		ReplyID.toInt(&replyIsNumeric);
+		
+		if(!replyIsNumeric)
+		{
+			// What we thought was the Tag is actually the ReplyID
+			// Common case: "598 UNKNOWN COMMAND" becomes Tag="598", ReplyID="UNKNOWN"
+			ReplyID = Tag;
+			Tag = "0"; // Use default tag since none was provided
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tagless response detected - Tag:"<<Tag<<"ReplyID:"<<ReplyID;
+		}
+		else
+		{
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tag:"<<Tag<<"ReplyID:"<<ReplyID;
+		}
+	}
+	else
+	{
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tag:"<<Tag<<"ReplyID:"<<ReplyID;
+	}
 
 	token.pop_front();
 

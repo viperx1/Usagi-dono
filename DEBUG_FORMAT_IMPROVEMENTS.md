@@ -22,9 +22,11 @@ D:/a/Usagi-dono/Usagi-dono/usagi/src/window.cpp 655 [Window] Login notification 
 D:/a/Usagi-dono/Usagi-dono/usagi/src/anidbapi.cpp 603 [AniDB Queue] Sending query - Tag: "39" Command: "NOTIFYLIST"
 D:/a/Usagi-dono/Usagi-dono/usagi/src/anidbapi.cpp 522 [AniDB Send] Command: "NOTIFYLIST&s=ufc7n&tag=39"
 D:/a/Usagi-dono/Usagi-dono/usagi/src/anidbapi.cpp 610 [AniDB Sent] Command: "NOTIFYLIST"
-D:/a/Usagi-dono/Usagi-dono/usagi/src/anidbapi.cpp 152 [AniDB Response] Tag: "598" ReplyID: "UNKNOWN"
-D:/a/Usagi-dono/Usagi-dono/usagi/src/anidbapi.cpp 360 [AniDB Error] ParseMessage - UNSUPPORTED ReplyID: "UNKNOWN" Tag: "598"
+D:/a/Usagi-dono/Usagi-dono/usagi/src/anidbapi.cpp 170 [AniDB Response] Tagless response detected - Tag: "0" ReplyID: "598"
+D:/a/Usagi-dono/Usagi-dono/usagi/src/anidbapi.cpp 366 [AniDB Error] 598 UNKNOWN COMMAND - Tag: "0" - check request format
 ```
+
+**Note:** With the tagless response detection fix (Oct 2024), responses like "598 UNKNOWN COMMAND" without a tag are now properly detected and handled. The parser detects when the first token is numeric (error code) and the second token is non-numeric (error text), and correctly identifies this as a tagless response.
 
 ## Changes Made
 
@@ -62,6 +64,7 @@ Error messages are now more descriptive:
 Updated 20+ debug statements to use the new format:
 - Line 19: DNS resolution error
 - Line 152: Response parsing
+- Line 152-180: **Tagless response detection** (added Oct 2024) - Detects and handles error responses without tags like "598 UNKNOWN COMMAND"
 - Line 167: Logout response
 - Line 248: MYLISTSTATS response
 - Line 254: WISHLIST response
