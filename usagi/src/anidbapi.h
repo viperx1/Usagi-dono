@@ -154,6 +154,7 @@ public:
     QString File(qint64, QString);
 	QString PushAck(int nid);
 	QString NotifyEnable();
+	QString NotifyGet(int nid);
 	
 	// Command builders - return formatted command strings for testing
 	QString buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc);
@@ -164,6 +165,7 @@ public:
 	QString buildFileCommand(qint64 size, QString ed2k, unsigned int fmask, unsigned int amask);
 	QString buildPushAckCommand(int nid);
 	QString buildNotifyListCommand();
+	QString buildNotifyGetCommand(int nid);
 	/* Api End === */
 
 	unsigned long LocalIdentify(int size, QString ed2khash);
