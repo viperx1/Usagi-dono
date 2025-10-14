@@ -698,7 +698,7 @@ void AniDBApi::downloadAnimeTitles()
 {
 	Debug("Downloading anime titles from AniDB...");
 	
-	QNetworkRequest request(QUrl("http://anidb.net/api/anime-titles.dat.gz"));
+	QNetworkRequest request{QUrl("http://anidb.net/api/anime-titles.dat.gz")};
 	request.setHeader(QNetworkRequest::UserAgentHeader, QString("Usagi/%1").arg(clientver));
 	
 	networkManager->get(request);
