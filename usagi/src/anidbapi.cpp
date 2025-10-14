@@ -16,7 +16,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	{
 		// Fallback to a default IP or leave uninitialized
 		// DNS resolution failed, socket operations will be skipped
-		qDebug()<<__FILE__<<__LINE__<<"DNS resolution for api.anidb.net failed";
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] DNS resolution for api.anidb.net failed";
 	}
 	anidbport = 9000;
 	loggedin = 0;
@@ -149,7 +149,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 
     QString ReplyID = token.first();//.first();//Message.Mid(0, Message.Find(" "));
 
-    qDebug()<<__FILE__<<__LINE__<<Tag<<" "<<ReplyID;
+    qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tag:"<<Tag<<"ReplyID:"<<ReplyID;
 
 	token.pop_front();
 
@@ -164,7 +164,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         notifyLoggedIn(Tag, 201);
 	}
     else if(ReplyID == "203"){ // 203 LOGGED OUT
-        qDebug()<<__FILE__<<__LINE__<<"Parse message"<<"203";
+        qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 203 LOGGED OUT - Tag:"<<Tag;
 		loggedin = 0;
         notifyLoggedOut(Tag, 203);
 	}
@@ -245,13 +245,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Response format: entries|watched|size|viewed size|viewed%|watched%|episodes watched
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"MYLISTSTATS:"<<token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 222 MYLISTSTATS - Tag:"<<Tag<<"Data:"<<token2.first();
 	}
 	else if(ReplyID == "223"){ // 223 WISHLIST
 		// Parse wishlist response
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"WISHLIST:"<<token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 223 WISHLIST - Tag:"<<Tag<<"Data:"<<token2.first();
 	}
 	else if(ReplyID == "310"){ // 310 FILE ALREADY IN MYLIST
 		// resend with tag and &edit=1
@@ -272,7 +272,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		notifyMylistAdd(Tag, 311);
 	}
 	else if(ReplyID == "312"){ // 312 NO SUCH MYLIST ENTRY
-		qDebug()<<__FILE__<<__LINE__<<"NO SUCH MYLIST ENTRY";
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag:"<<Tag;
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
         QString q;
@@ -293,7 +293,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString title = parts[4];
 			QString body = parts[5];
 			
-			qDebug()<<__FILE__<<__LINE__<<"Notification received:"<<nid<<title<<body;
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 270 NOTIFICATION - NID:"<<nid<<"Title:"<<title<<"Body:"<<body;
 			
 			// Emit signal for notification
 			emit notifyMessageReceived(nid, body);
@@ -303,22 +303,22 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 	}
 	else if(ReplyID == "271"){ // 271 NOTIFYACK - NOTIFICATION ACKNOWLEDGED
-		qDebug()<<__FILE__<<__LINE__<<"Notification acknowledged";
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 271 NOTIFICATION ACKNOWLEDGED - Tag:"<<Tag;
 	}
 	else if(ReplyID == "272"){ // 272 NO SUCH NOTIFICATION
-		qDebug()<<__FILE__<<__LINE__<<"No such notification";
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 272 NO SUCH NOTIFICATION - Tag:"<<Tag;
 	}
 	else if(ReplyID == "290"){ // 290 NOTIFYLIST
 		// Parse notification list
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"NOTIFYLIST:"<<token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST - Tag:"<<Tag<<"Data:"<<token2.first();
 	}
 	else if(ReplyID == "291"){ // 291 NOTIFYLIST ENTRY
 		// Parse notification list entry
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"NOTIFYLIST ENTRY:"<<token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST ENTRY - Tag:"<<Tag<<"Data:"<<token2.first();
 	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
 		loggedin = 0;
@@ -351,13 +351,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
     }
 	else if(ReplyID == "598"){ // 598 UNKNOWN COMMAND
 		// This typically means the command was malformed or not recognized
-		qDebug()<<__FILE__<<__LINE__<<"UNKNOWN COMMAND - check request format";
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] 598 UNKNOWN COMMAND - Tag:"<<Tag<<"- check request format";
 	}
 	else if(ReplyID == "601"){ // 601 ANIDB OUT OF SERVICE - TRY AGAIN LATER
 	}
     else
     {
-        qDebug()<<__FILE__<<__LINE__<<"ParseMessage - not supported ReplyID ("<<ReplyID<<")";
+        qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] ParseMessage - UNSUPPORTED ReplyID:"<<ReplyID<<"Tag:"<<Tag;
     }
     waitingForReply.isWaiting = false;
 	return ReplyID;
@@ -381,7 +381,7 @@ QString AniDBApi::Logout()
 {
 	QString msg;
 	msg = QString("LOGOUT ");
-    qDebug()<<__FILE__<<__LINE__<<msg;
+    qDebug()<<__FILE__<<__LINE__<<"[AniDB API] Sending LOGOUT command";
     Send(msg, "LOGOUT", "0");
 
 	return 0;
@@ -508,7 +508,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 {
 	if(Socket == nullptr)
 	{
-		qDebug()<<__FILE__<<__LINE__<<"Socket not initialized, cannot send";
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] Socket not initialized, cannot send";
 		return 0;
 	}
 	QString a;
@@ -519,7 +519,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	Debug("AniDBApi: Send: " + (a.length() > 0 ? a : a = str));
 
 	a = QString("%1&tag=%2").arg(a).arg(tag);
-    qDebug()<<__FILE__<<__LINE__<<a;
+    qDebug()<<__FILE__<<__LINE__<<"[AniDB Send] Command:"<<a;
 //    QByteArray bytes = a.toUtf8();
 //	const char *ptr = bytes.data();
 //	Socket->write(ptr);
@@ -600,21 +600,21 @@ int AniDBApi::SendPacket()
             {
                 tag = query.value(0).toString();
                 str = query.value(1).toString();
-                qDebug()<<__FILE__<<__LINE__<<"got query to send:"<<tag<<str;
+                qDebug()<<__FILE__<<__LINE__<<"[AniDB Queue] Sending query - Tag:"<<tag<<"Command:"<<str;
                 if(!LoggedIn() && !str.contains("AUTH"))
                 {
                     Auth();
                     return 0;
                 }
                 Send(str,"", tag);
-                qDebug()<<__FILE__<<__LINE__<<str;
+                qDebug()<<__FILE__<<__LINE__<<"[AniDB Sent] Command:"<<str;
             }
         }
     }
 	Recv();
     if(waitingForReply.isWaiting == true && waitingForReply.start.elapsed() > 10000)
     {
-        qDebug()<<__FILE__<<__LINE__<<"waited for reply for more than 10 seconds="<<waitingForReply.start.elapsed();
+        qDebug()<<__FILE__<<__LINE__<<"[AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed:"<<waitingForReply.start.elapsed()<<"ms";
     }
 	return 0;
 }
