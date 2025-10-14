@@ -607,7 +607,7 @@ void Window::apitesterProcess()
 void myAniDBApi::Debug(QString msg)
 {
 	// Output to console (for development and debugging)
-	qDebug() << "AniDBApi:" << msg;
+	qDebug() << msg;
 	// Also emit signal to update Log tab in UI
 	emit notifyLogAppend(msg);
 //	window->logAppend(msg);
