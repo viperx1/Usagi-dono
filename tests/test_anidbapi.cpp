@@ -45,6 +45,11 @@ private slots:
     
     // Command name validation test
     void testCommandNamesAreValid();
+    
+    // Command format validation tests
+    void testNotifyListCommandFormat();
+    void testPushAckCommandFormat();
+    void testAllCommandsHaveProperSpacing();
 
 private:
     AniDBApi* api;
@@ -454,6 +459,167 @@ void TestAniDBApiCommands::testCommandNamesAreValid()
     
     // Report what commands were tested
     qDebug() << "Validated commands against API definition:" << commandsToTest;
+}
+
+// ===== Notification Command Tests =====
+
+void TestAniDBApiCommands::testNotifyListCommandFormat()
+{
+    // Test NOTIFYLIST command format
+    api->NotifyEnable();
+    
+    // Get the command that was inserted
+    QString msg = getLastPacketCommand();
+    
+    // Verify command is not empty
+    QVERIFY(!msg.isEmpty());
+    
+    // Verify command is exactly "NOTIFYLIST " (with trailing space)
+    QCOMPARE(msg, QString("NOTIFYLIST "));
+    
+    // Verify it ends with a space (required for parameterless commands)
+    QVERIFY(msg.endsWith(' '));
+}
+
+void TestAniDBApiCommands::testPushAckCommandFormat()
+{
+    // Test PUSHACK command format
+    int nid = 12345;
+    api->PushAck(nid);
+    
+    // Get the command that was inserted
+    QString msg = getLastPacketCommand();
+    
+    // Verify command is not empty
+    QVERIFY(!msg.isEmpty());
+    
+    // Verify command starts with PUSHACK
+    QVERIFY(msg.startsWith("PUSHACK "));
+    
+    // Verify nid parameter
+    QVERIFY(msg.contains("nid="));
+    QVERIFY(msg.contains(QString("nid=%1").arg(nid)));
+    
+    // Verify there's a space after command name before parameters
+    QRegularExpression spacePattern("^PUSHACK ");
+    QVERIFY(spacePattern.match(msg).hasMatch());
+}
+
+// ===== Global Command Format Validation Test =====
+
+void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
+{
+    // This test validates that ALL commands follow the AniDB UDP API format rule:
+    // 1. Commands with parameters must have a space after command name: "COMMAND param1=value"
+    // 2. Commands without parameters must end with a space: "COMMAND "
+    //
+    // This prevents issues like "NOTIFYLIST&s=xxx" which gets rejected with 598 UNKNOWN COMMAND
+    
+    struct CommandTest {
+        QString name;
+        QString command;
+        bool hasParameters;
+    };
+    
+    QList<CommandTest> commands;
+    
+    // Test AUTH command
+    api->Auth();
+    QString authCmd = getLastPacketCommand();
+    commands.append({"AUTH", authCmd, true});
+    clearPackets();
+    
+    // Test LOGOUT command (has trailing space, no parameters)
+    QString logoutCmd = QString("LOGOUT ");
+    commands.append({"LOGOUT", logoutCmd, false});
+    
+    // Test MYLISTADD command
+    api->MylistAdd(734003200, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", 0, 1, "", false);
+    QString mylistaddCmd = getLastPacketCommand();
+    commands.append({"MYLISTADD", mylistaddCmd, true});
+    clearPackets();
+    
+    // Test FILE command
+    api->File(734003200, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
+    QString fileCmd = getLastPacketCommand();
+    commands.append({"FILE", fileCmd, true});
+    clearPackets();
+    
+    // Test MYLIST command (with parameter)
+    api->Mylist(12345);
+    QString mylistCmd = getLastPacketCommand();
+    commands.append({"MYLIST", mylistCmd, true});
+    clearPackets();
+    
+    // Test MYLISTSTATS command (no parameters, should have trailing space)
+    api->Mylist(-1);
+    QString myliststatsCmd = getLastPacketCommand();
+    commands.append({"MYLISTSTATS", myliststatsCmd, false});
+    clearPackets();
+    
+    // Test PUSHACK command
+    api->PushAck(12345);
+    QString pushackCmd = getLastPacketCommand();
+    commands.append({"PUSHACK", pushackCmd, true});
+    clearPackets();
+    
+    // Test NOTIFYLIST command (no parameters, should have trailing space)
+    api->NotifyEnable();
+    QString notifylistCmd = getLastPacketCommand();
+    commands.append({"NOTIFYLIST", notifylistCmd, false});
+    clearPackets();
+    
+    // Validate each command
+    for (const CommandTest& test : commands) {
+        // Verify command is not empty
+        QVERIFY2(!test.command.isEmpty(), 
+                 QString("%1 command is empty").arg(test.name).toLatin1());
+        
+        // Extract command name from the command string
+        QString cmdName;
+        if (test.command.contains(' ')) {
+            cmdName = test.command.split(' ').first();
+        } else {
+            cmdName = test.command.split('=').first();
+        }
+        
+        // Verify command name matches expected
+        QVERIFY2(cmdName == test.name || test.command.startsWith(test.name + " "),
+                 QString("%1: command doesn't start correctly - got '%2'")
+                     .arg(test.name).arg(test.command).toLatin1());
+        
+        if (test.hasParameters) {
+            // Commands with parameters must have a space after the command name
+            // Format: "COMMAND param1=value" or "COMMAND param1=value&param2=value"
+            QVERIFY2(test.command.contains(' ') && test.command.indexOf(' ') < test.command.indexOf('='),
+                     QString("%1: command with parameters must have space after command name - got '%2'")
+                         .arg(test.name).arg(test.command).toLatin1());
+            
+            // Verify the space comes right after the command name
+            int spacePos = test.command.indexOf(' ');
+            QString beforeSpace = test.command.left(spacePos);
+            QVERIFY2(beforeSpace == test.name,
+                     QString("%1: expected command name before space, got '%2' in '%3'")
+                         .arg(test.name).arg(beforeSpace).arg(test.command).toLatin1());
+                         
+        } else {
+            // Commands without parameters must end with a space
+            // Format: "COMMAND "
+            QVERIFY2(test.command.endsWith(' '),
+                     QString("%1: parameterless command must end with space - got '%2'")
+                         .arg(test.name).arg(test.command).toLatin1());
+            
+            // Verify it's exactly "COMMANDNAME " (command + one space, nothing else)
+            QVERIFY2(test.command == test.name + " ",
+                     QString("%1: expected exactly '%2 ' but got '%3'")
+                         .arg(test.name).arg(test.name).arg(test.command).toLatin1());
+        }
+    }
+    
+    // Report summary
+    qDebug() << "Validated proper spacing for" << commands.size() << "commands";
+    qDebug() << "Commands with parameters:" << commands.size() - 3;  // AUTH, MYLISTADD, FILE, MYLIST, PUSHACK
+    qDebug() << "Commands without parameters:" << 3;  // LOGOUT, MYLISTSTATS, NOTIFYLIST
 }
 
 QTEST_MAIN(TestAniDBApiCommands)

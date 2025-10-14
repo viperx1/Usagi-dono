@@ -343,6 +343,76 @@ These tests help ensure compliance with:
 ❌ **Rate Limiting**: Timer/queue behavior not tested  
 ❌ **Error Handling**: Focus is on successful command generation  
 
+### 7. Notification Command Tests
+
+#### testNotifyListCommandFormat()
+Validates the NOTIFYLIST command format.
+
+**Test Flow**:
+1. Calls `api->NotifyEnable()`
+2. Retrieves command from database
+3. Validates format
+
+**Verifies**:
+- Command is exactly `"NOTIFYLIST "` (with trailing space)
+- Parameterless commands end with a space
+
+**Purpose**: Prevents "598 UNKNOWN COMMAND" errors caused by missing space (e.g., `NOTIFYLIST&s=xxx` instead of `NOTIFYLIST &s=xxx`)
+
+#### testPushAckCommandFormat()
+Validates the PUSHACK command format.
+
+**Test Flow**:
+1. Calls `api->PushAck(12345)`
+2. Retrieves command from database
+3. Validates format and parameters
+
+**Verifies**:
+- Command starts with `"PUSHACK "`
+- Contains `nid=` parameter
+- Has space after command name before parameters
+
+### 8. Global Command Format Validation
+
+#### testAllCommandsHaveProperSpacing()
+**Most Important Test** - Validates ALL commands follow the AniDB UDP API spacing rule.
+
+**Purpose**: Ensures global compliance with the format rule:
+- Commands with parameters: `COMMAND param1=value1&param2=value2`
+- Commands without parameters: `COMMAND `
+
+**Test Flow**:
+1. Tests all implemented commands:
+   - AUTH, LOGOUT, MYLISTADD, FILE, MYLIST, MYLISTSTATS, PUSHACK, NOTIFYLIST
+2. For each command, verifies:
+   - **Commands with parameters**: Space exists after command name and before first `=`
+   - **Commands without parameters**: Ends with exactly one space
+3. Reports validation summary
+
+**Verifies**:
+- AUTH: `AUTH user=xxx&pass=xxx...` ✅
+- LOGOUT: `LOGOUT ` ✅
+- MYLISTADD: `MYLISTADD size=xxx&ed2k=xxx...` ✅
+- FILE: `FILE size=xxx&ed2k=xxx...` ✅
+- MYLIST: `MYLIST lid=xxx` ✅
+- MYLISTSTATS: `MYLISTSTATS ` ✅
+- PUSHACK: `PUSHACK nid=xxx` ✅
+- NOTIFYLIST: `NOTIFYLIST ` ✅
+
+**Why This Matters**:
+Without proper spacing, commands are malformed:
+- ❌ `NOTIFYLIST&s=xxx` → Server returns "598 UNKNOWN COMMAND"
+- ✅ `NOTIFYLIST &s=xxx` → Server accepts and processes
+
+**Test Output Example**:
+```
+Validated proper spacing for 8 commands
+Commands with parameters: 5
+Commands without parameters: 3
+```
+
+This test catches spacing issues at test time rather than runtime, preventing API errors in production.
+
 ## Future Enhancements
 
 Potential additions to the test suite:
