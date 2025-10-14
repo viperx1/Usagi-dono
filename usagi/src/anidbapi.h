@@ -152,6 +152,8 @@ public:
     QString MylistAdd(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit = 0);
     QString Mylist(int lid = -1);
     QString File(qint64, QString);
+	QString PushAck(int nid);
+	QString NotifyEnable();
 	/* Api End === */
 
 	unsigned long LocalIdentify(int size, QString ed2khash);
@@ -200,6 +202,7 @@ signals:
 	void notifyMylistAdd(QString, int);
     void notifyLoggedIn(QString, int);
     void notifyLoggedOut(QString, int);
+	void notifyMessageReceived(int nid, QString message);
 };
 
 #endif // ANIDBAPI_H

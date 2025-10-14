@@ -224,6 +224,7 @@ Window::Window()
     // footer - signals
     connect(adbapi, SIGNAL(notifyLoggedIn(QString,int)), this, SLOT(getNotifyLoggedIn(QString,int)));
     connect(adbapi, SIGNAL(notifyLoggedOut(QString,int)), this, SLOT(getNotifyLoggedOut(QString,int)));
+	connect(adbapi, SIGNAL(notifyMessageReceived(int,QString)), this, SLOT(getNotifyMessageReceived(int,QString)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
 
     // end
@@ -642,12 +643,97 @@ void Window::getNotifyLoggedIn(QString tag, int code)
 {
     qDebug()<<__FILE__<<__LINE__<<"getNotifyLoggedIn";
     loginbutton->setText(QString("Logout - logged in with tag %1 and code %2").arg(tag).arg(code));
+	
+	// Enable notifications after successful login
+	adbapi->NotifyEnable();
+	logOutput->append("Notifications enabled");
 }
 
 void Window::getNotifyLoggedOut(QString tag, int code)
 {
     qDebug()<<__FILE__<<__LINE__<<"getNotifyLoggedOut";
     loginbutton->setText(QString("Login - logged out with tag %1 and code %2").arg(tag).arg(code));
+}
+
+void Window::getNotifyMessageReceived(int nid, QString message)
+{
+	qDebug()<<__FILE__<<__LINE__<<"Notification received:"<<nid<<message;
+	logOutput->append(QString("Notification %1 received").arg(nid));
+	
+	// Check if message contains mylist export link
+	// AniDB notification format typically contains URLs in the body
+	// Look for patterns like: http://anidb.net/mylist-export/...tgz
+	QRegularExpression urlRegex("https?://[^\\s]+\\.tgz");
+	QRegularExpressionMatch match = urlRegex.match(message);
+	
+	if(match.hasMatch())
+	{
+		QString exportUrl = match.captured(0);
+		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
+		mylistStatusLabel->setText("MyList Status: Downloading export...");
+		
+		// Download the file
+		QNetworkAccessManager *manager = new QNetworkAccessManager(this);
+		QNetworkRequest request(QUrl(exportUrl));
+		request.setHeader(QNetworkRequest::UserAgentHeader, "Usagi/1");
+		
+		QNetworkReply *reply = manager->get(request);
+		
+		// Connect to download finished signal
+		connect(reply, &QNetworkReply::finished, this, [this, reply, manager]() {
+			if(reply->error() == QNetworkReply::NoError)
+			{
+				// Save to temporary file
+				QString tempPath = QDir::tempPath() + "/mylist_export_" + 
+					QString::number(QDateTime::currentMSecsSinceEpoch()) + ".tgz";
+				
+				QFile file(tempPath);
+				if(file.open(QIODevice::WriteOnly))
+				{
+					file.write(reply->readAll());
+					file.close();
+					
+					logOutput->append(QString("Export downloaded to: %1").arg(tempPath));
+					mylistStatusLabel->setText("MyList Status: Parsing export...");
+					
+					// Parse the csv-adborg file
+					int count = parseMylistCSVAdborg(tempPath);
+					
+					if(count > 0)
+					{
+						logOutput->append(QString("Successfully imported %1 mylist entries").arg(count));
+						mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(count));
+						loadMylistFromDatabase();  // Refresh the display
+					}
+					else
+					{
+						logOutput->append("No entries imported from notification export");
+						mylistStatusLabel->setText("MyList Status: Import failed");
+					}
+					
+					// Clean up temporary file
+					QFile::remove(tempPath);
+				}
+				else
+				{
+					logOutput->append("Error: Cannot save export file");
+					mylistStatusLabel->setText("MyList Status: Download failed");
+				}
+			}
+			else
+			{
+				logOutput->append(QString("Error downloading export: %1").arg(reply->errorString()));
+				mylistStatusLabel->setText("MyList Status: Download failed");
+			}
+			
+			reply->deleteLater();
+			manager->deleteLater();
+		});
+	}
+	else
+	{
+		logOutput->append("No mylist export link found in notification");
+	}
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)

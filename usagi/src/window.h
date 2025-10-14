@@ -6,6 +6,9 @@
 #include <QProcess>
 #include <QDateTime>
 #include <QDir>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkRequest>
+#include <QtNetwork/QNetworkReply>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QTextEdit>
@@ -126,6 +129,7 @@ public slots:
 	void getNotifyMylistAdd(QString, int);
     void getNotifyLoggedIn(QString, int);
     void getNotifyLoggedOut(QString, int);
+	void getNotifyMessageReceived(int nid, QString message);
     void safeClose();
     void loadMylistFromDatabase();
 signals:
