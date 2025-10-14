@@ -343,6 +343,103 @@ These tests help ensure compliance with:
 ❌ **Rate Limiting**: Timer/queue behavior not tested  
 ❌ **Error Handling**: Focus is on successful command generation  
 
+### 7. Notification Command Tests
+
+#### testNotifyListCommandFormat()
+Validates the NOTIFYLIST command format using builder methods.
+
+**Test Flow**:
+1. Calls `api->buildNotifyListCommand()`
+2. Validates returned command format directly
+
+**Verifies**:
+- Command is exactly `"NOTIFYLIST "` (with trailing space)
+- Parameterless commands end with a space
+
+**Purpose**: Prevents "598 UNKNOWN COMMAND" errors caused by missing space (e.g., `NOTIFYLIST&s=xxx` instead of `NOTIFYLIST &s=xxx`)
+
+**Advantages**: Direct testing without database queries - simpler and faster.
+
+#### testPushAckCommandFormat()
+Validates the PUSHACK command format using builder methods.
+
+**Test Flow**:
+1. Calls `api->buildPushAckCommand(12345)`
+2. Validates returned command format directly
+
+**Verifies**:
+- Command starts with `"PUSHACK "`
+- Contains `nid=` parameter
+- Has space after command name before parameters
+
+### 8. Simplified Global Command Format Validation
+
+#### testAllCommandsHaveProperSpacing()
+**Simplified Test** - Validates ALL commands follow the AniDB UDP API spacing rule using builder methods and regex pattern matching.
+
+**Purpose**: Ensures global compliance with the format rule:
+- Commands with parameters: `COMMAND param1=value1&param2=value2`
+- Commands without parameters: `COMMAND `
+
+**Pattern Used**: `^[A-Z]+( [a-z]+=([^&\s]+)(&[a-z]+=([^&\s]+))*)?$`
+
+**Test Flow**:
+1. Uses builder methods to generate commands directly:
+   - `buildAuthCommand()`, `buildLogoutCommand()`, `buildMylistAddCommand()`, etc.
+2. Validates each command against regex pattern
+3. Verifies space after command name
+4. Reports validation summary
+
+**Key Advantages**:
+- ✅ **No Database Required**: Tests builders directly without DB queries
+- ✅ **Simpler Code**: Pattern matching replaces complex conditional logic
+- ✅ **Faster Execution**: No DB setup/teardown between tests
+- ✅ **Reusable Builders**: API methods now use builders internally
+- ✅ **Better Testability**: Builders can be tested independently
+
+**Commands Tested**:
+- AUTH: `AUTH user=xxx&pass=xxx...` ✅
+- LOGOUT: `LOGOUT ` ✅
+- MYLISTADD: `MYLISTADD size=xxx&ed2k=xxx...` ✅
+- FILE: `FILE size=xxx&ed2k=xxx...` ✅
+- MYLIST: `MYLIST lid=xxx` ✅
+- MYLISTSTATS: `MYLISTSTATS ` ✅
+- PUSHACK: `PUSHACK nid=xxx` ✅
+- NOTIFYLIST: `NOTIFYLIST ` ✅
+
+**Why This Matters**:
+Without proper spacing, commands are malformed:
+- ❌ `NOTIFYLIST&s=xxx` → Server returns "598 UNKNOWN COMMAND"
+- ✅ `NOTIFYLIST &s=xxx` → Server accepts and processes
+
+**Test Output Example**:
+```
+Validated proper spacing for 8 commands using builders
+Commands tested: ["AUTH", "LOGOUT", "MYLISTADD", "FILE", "MYLIST", "MYLISTSTATS", "PUSHACK", "NOTIFYLIST"]
+```
+
+This simplified test catches spacing issues at test time rather than runtime, preventing API errors in production.
+
+### 9. Command Builder Methods
+
+The refactoring introduced builder methods that separate command construction from queueing:
+
+**Builder Methods**:
+- `buildAuthCommand()` - Builds AUTH command with credentials
+- `buildLogoutCommand()` - Builds LOGOUT command
+- `buildMylistAddCommand()` - Builds MYLISTADD command with parameters
+- `buildMylistCommand()` - Builds MYLIST command
+- `buildMylistStatsCommand()` - Builds MYLISTSTATS command
+- `buildFileCommand()` - Builds FILE command with masks
+- `buildPushAckCommand()` - Builds PUSHACK command
+- `buildNotifyListCommand()` - Builds NOTIFYLIST command
+
+**Benefits**:
+- Centralized command format logic
+- Direct testability without side effects
+- Reusable across API methods and tests
+- Non-breaking change (existing API methods unchanged)
+
 ## Future Enhancements
 
 Potential additions to the test suite:

@@ -45,6 +45,11 @@ private slots:
     
     // Command name validation test
     void testCommandNamesAreValid();
+    
+    // Command format validation tests
+    void testNotifyListCommandFormat();
+    void testPushAckCommandFormat();
+    void testAllCommandsHaveProperSpacing();
 
 private:
     AniDBApi* api;
@@ -454,6 +459,99 @@ void TestAniDBApiCommands::testCommandNamesAreValid()
     
     // Report what commands were tested
     qDebug() << "Validated commands against API definition:" << commandsToTest;
+}
+
+// ===== Notification Command Tests =====
+
+void TestAniDBApiCommands::testNotifyListCommandFormat()
+{
+    // Test NOTIFYLIST command format using builder
+    QString cmd = api->buildNotifyListCommand();
+    
+    // Verify command is exactly "NOTIFYLIST " (with trailing space)
+    QCOMPARE(cmd, QString("NOTIFYLIST "));
+    
+    // Verify it ends with a space (required for parameterless commands)
+    QVERIFY(cmd.endsWith(' '));
+}
+
+void TestAniDBApiCommands::testPushAckCommandFormat()
+{
+    // Test PUSHACK command format using builder
+    int nid = 12345;
+    QString cmd = api->buildPushAckCommand(nid);
+    
+    // Verify command starts with PUSHACK
+    QVERIFY(cmd.startsWith("PUSHACK "));
+    
+    // Verify nid parameter
+    QVERIFY(cmd.contains("nid="));
+    QVERIFY(cmd.contains(QString("nid=%1").arg(nid)));
+}
+
+// ===== Simplified Global Command Format Validation Test =====
+
+void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
+{
+    // Simplified test using builder methods to validate command format
+    // Pattern: "COMMAND" or "COMMAND param1=value1&param2=value2"
+    // All commands must have space after command name before parameters
+    
+    QRegularExpression pattern("^[A-Z]+( [a-z]+=([^&\\s]+)(&[a-z]+=([^&\\s]+))*)?$");
+    
+    QStringList commands;
+    QStringList commandNames;
+    
+    // Build all commands using builder methods - direct testing without DB
+    commands << api->buildAuthCommand("testuser", "testpass", 3, "usagitest", 1, "utf8");
+    commandNames << "AUTH";
+    
+    commands << api->buildLogoutCommand();
+    commandNames << "LOGOUT";
+    
+    commands << api->buildMylistAddCommand(734003200, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", 0, 1, "", false);
+    commandNames << "MYLISTADD";
+    
+    commands << api->buildFileCommand(734003200, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", 0x7ff8fef8, 0xf0f0f0f0);
+    commandNames << "FILE";
+    
+    commands << api->buildMylistCommand(12345);
+    commandNames << "MYLIST";
+    
+    commands << api->buildMylistStatsCommand();
+    commandNames << "MYLISTSTATS";
+    
+    commands << api->buildPushAckCommand(12345);
+    commandNames << "PUSHACK";
+    
+    commands << api->buildNotifyListCommand();
+    commandNames << "NOTIFYLIST";
+    
+    // Validate each command against pattern
+    for (int i = 0; i < commands.size(); ++i) {
+        QString cmd = commands[i];
+        QString name = commandNames[i];
+        
+        QVERIFY2(!cmd.isEmpty(), 
+                 QString("%1 command is empty").arg(name).toLatin1());
+        
+        QVERIFY2(pattern.match(cmd).hasMatch(),
+                 QString("%1 command doesn't match pattern: '%2'").arg(name).arg(cmd).toLatin1());
+        
+        // Verify command starts with expected name
+        QVERIFY2(cmd.startsWith(name),
+                 QString("%1 command doesn't start with '%2': '%3'").arg(name).arg(name).arg(cmd).toLatin1());
+        
+        // Verify space after command name
+        if (cmd.length() > name.length()) {
+            QVERIFY2(cmd.at(name.length()) == ' ',
+                     QString("%1 command missing space after command name: '%2'").arg(name).arg(cmd).toLatin1());
+        }
+    }
+    
+    // Report summary
+    qDebug() << "Validated proper spacing for" << commands.size() << "commands using builders";
+    qDebug() << "Commands tested:" << commandNames;
 }
 
 QTEST_MAIN(TestAniDBApiCommands)
