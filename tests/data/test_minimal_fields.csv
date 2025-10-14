@@ -1,4 +1,0 @@
-# Test CSV with minimal fields
-aid,lid,status,viewdate
-901234,123456,1,1234567890
-901235,123457,1,0
