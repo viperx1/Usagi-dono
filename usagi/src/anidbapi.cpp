@@ -393,8 +393,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 
 QString AniDBApi::Auth()
 {
-	QString msg;
-	msg = QString("AUTH user=%1&pass=%2&protover=%3&client=%4&clientver=%5&enc=%6").arg(AniDBApi::username).arg(AniDBApi::password).arg(AniDBApi::protover).arg(AniDBApi::client).arg(AniDBApi::clientver).arg(AniDBApi::enc);
+	QString msg = buildAuthCommand(AniDBApi::username, AniDBApi::password, AniDBApi::protover, AniDBApi::client, AniDBApi::clientver, AniDBApi::enc);
 	QString q;
 	q = QString("INSERT OR REPLACE INTO `packets` (`tag`, `str`) VALUES ('0', '%1');").arg(msg);
 	QSqlQuery query(q);
@@ -407,8 +406,7 @@ QString AniDBApi::Auth()
 
 QString AniDBApi::Logout()
 {
-	QString msg;
-	msg = QString("LOGOUT ");
+	QString msg = buildLogoutCommand();
     qDebug()<<__FILE__<<__LINE__<<"[AniDB API] Sending LOGOUT command";
     Send(msg, "LOGOUT", "0");
 
@@ -421,21 +419,7 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 	{
 		Auth();
 	}
-	QString msg;
-	msg = QString("MYLISTADD size=%1&ed2k=%2").arg(size).arg(ed2khash);
-	if(viewed > 0 && viewed < 3)
-	{
-		msg += QString("&viewed=%1").arg(viewed-1);
-	}
-	if(storage.length() > 0)
-	{
-		msg += QString("&storage=%1").arg(storage);
-	}
-	if(edit == 1)
-	{
-		msg += QString("&edit=1");
-	}
-	msg += QString("&state=%1").arg(state);
+	QString msg = buildMylistAddCommand(size, ed2khash, viewed, state, storage, edit);
 	QString q;
 	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
@@ -463,12 +447,11 @@ QString AniDBApi::File(qint64 size, QString ed2k)
 				aEPISODE_NUMBER | aEPISODE_NAME | aEPISODE_NAME_ROMAJI | aEPISODE_NAME_KANJI |
 				aEPISODE_RATING | aEPISODE_VOTE_COUNT | aGROUP_NAME | aGROUP_NAME_SHORT |
 				aDATE_AID_RECORD_UPDATED;
-	unsigned int fmask = fAID | fEID | fGID | fLID | fOTHEREPS | fISDEPR | fSTATE | fSIZE | fED2K | fMD5 | fSHA1 |
+	unsigned int fmask = fAID | fEID | fGID | fLID | fOTHEREPS | fIsDEPR | fSTATE | fSIZE | fED2K | fMD5 | fSHA1 |
 				fCRC32 | fQUALITY | fSOURCE | fCODEC_AUDIO | fBITRATE_AUDIO | fCODEC_VIDEO | fBITRATE_VIDEO |
 				fRESOLUTION | fFILETYPE | fLANG_DUB | fLANG_SUB | fLENGTH | fDESCRIPTION | fAIRDATE |
 				fFILENAME;
-	QString msg;
-	msg = QString("FILE size=%1&ed2k=%2&fmask=%3&amask=%4").arg(size).arg(ed2k).arg(fmask, 8, 16, QChar('0')).arg(amask, 8, 16, QChar('0'));
+	QString msg = buildFileCommand(size, ed2k, fmask, amask);
 	Debug(msg);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(q);
@@ -485,12 +468,12 @@ QString AniDBApi::Mylist(int lid)
 	QString msg;
 	if(lid > 0)
 	{
-		msg = QString("MYLIST lid=%1").arg(lid);
+		msg = buildMylistCommand(lid);
 	}
 	else
 	{
 		// Query all mylist entries - we'll need to do this iteratively or use MYLISTSTATS first
-		msg = QString("MYLISTSTATS ");
+		msg = buildMylistStatsCommand();
 	}
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
@@ -505,7 +488,7 @@ QString AniDBApi::PushAck(int nid)
 	{
 		Auth();
 	}
-	QString msg = QString("PUSHACK nid=%1").arg(nid);
+	QString msg = buildPushAckCommand(nid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
 	query.exec(q);
@@ -520,12 +503,73 @@ QString AniDBApi::NotifyEnable()
 		Auth();
 	}
 	// Request notification list to enable push notifications
-	QString msg = QString("NOTIFYLIST ");
+	QString msg = buildNotifyListCommand();
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
 	query.exec(q);
 	return GetTag(msg);
 }
+
+/* === Command Builders === */
+// These methods build formatted command strings for testing and reuse
+
+QString AniDBApi::buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc)
+{
+	return QString("AUTH user=%1&pass=%2&protover=%3&client=%4&clientver=%5&enc=%6")
+		.arg(username).arg(password).arg(protover).arg(client).arg(clientver).arg(enc);
+}
+
+QString AniDBApi::buildLogoutCommand()
+{
+	return QString("LOGOUT ");
+}
+
+QString AniDBApi::buildMylistAddCommand(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit)
+{
+	QString msg = QString("MYLISTADD size=%1&ed2k=%2").arg(size).arg(ed2khash);
+	if(viewed > 0 && viewed < 3)
+	{
+		msg += QString("&viewed=%1").arg(viewed-1);
+	}
+	if(storage.length() > 0)
+	{
+		msg += QString("&storage=%1").arg(storage);
+	}
+	if(edit == 1)
+	{
+		msg += QString("&edit=1");
+	}
+	msg += QString("&state=%1").arg(state);
+	return msg;
+}
+
+QString AniDBApi::buildMylistCommand(int lid)
+{
+	return QString("MYLIST lid=%1").arg(lid);
+}
+
+QString AniDBApi::buildMylistStatsCommand()
+{
+	return QString("MYLISTSTATS ");
+}
+
+QString AniDBApi::buildFileCommand(qint64 size, QString ed2k, unsigned int fmask, unsigned int amask)
+{
+	return QString("FILE size=%1&ed2k=%2&fmask=%3&amask=%4")
+		.arg(size).arg(ed2k).arg(fmask, 8, 16, QChar('0')).arg(amask, 8, 16, QChar('0'));
+}
+
+QString AniDBApi::buildPushAckCommand(int nid)
+{
+	return QString("PUSHACK nid=%1").arg(nid);
+}
+
+QString AniDBApi::buildNotifyListCommand()
+{
+	return QString("NOTIFYLIST ");
+}
+
+/* === End Command Builders === */
 
 QString AniDBApi::GetSID()
 {
