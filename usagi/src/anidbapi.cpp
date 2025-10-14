@@ -337,16 +337,72 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 272 NO SUCH NOTIFICATION - Tag:"<<Tag;
 	}
 	else if(ReplyID == "290"){ // 290 NOTIFYLIST
-		// Parse notification list
+		// Parse notification list - show all entries
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST - Tag:"<<Tag<<"Data:"<<token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST - Tag:"<<Tag<<"Entry count:"<<token2.size();
+		
+		// Log all notification entries
+		for(int i = 0; i < token2.size(); i++)
+		{
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST Entry"<<i+1<<"of"<<token2.size()<<":"<<token2[i];
+		}
+		
+		// Find the last message notification (M|nid) and fetch its content
+		QString lastMessageNid;
+		for(int i = token2.size() - 1; i >= 0; i--)
+		{
+			if(token2[i].startsWith("M|"))
+			{
+				lastMessageNid = token2[i].mid(2); // Extract nid after "M|"
+				break;
+			}
+		}
+		
+		if(!lastMessageNid.isEmpty())
+		{
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST - Fetching last message notification:"<<lastMessageNid;
+			NotifyGet(lastMessageNid.toInt());
+		}
 	}
 	else if(ReplyID == "291"){ // 291 NOTIFYLIST ENTRY
-		// Parse notification list entry
+		// Parse notification list entry - this is sent for each entry when using pagination
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST ENTRY - Tag:"<<Tag<<"Data:"<<token2.first();
+		
+		// Check if this is a message notification and fetch it
+		if(token2.first().startsWith("M|"))
+		{
+			QString nid = token2.first().mid(2);
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST ENTRY - Message notification, fetching:"<<nid;
+			NotifyGet(nid.toInt());
+		}
+	}
+	else if(ReplyID == "293"){ // 293 NOTIFYGET - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
+		// Parse notification message details
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		QStringList parts = token2.first().split("|");
+		if(parts.size() >= 6)
+		{
+			int nid = parts[0].toInt();
+			QString type = parts[1];
+			QString title = parts[4];
+			QString body = parts[5];
+			
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 293 NOTIFYGET - NID:"<<nid<<"Type:"<<type<<"Title:"<<title<<"Body:"<<body;
+			
+			// Emit signal for notification (same as 270 for automatic download/import)
+			emit notifyMessageReceived(nid, body);
+			
+			// Acknowledge the notification
+			PushAck(nid);
+		}
+		else
+		{
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 293 NOTIFYGET - Invalid format, parts count:"<<parts.size();
+		}
 	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
 		loggedin = 0;
@@ -510,6 +566,20 @@ QString AniDBApi::NotifyEnable()
 	return GetTag(msg);
 }
 
+QString AniDBApi::NotifyGet(int nid)
+{
+	// Get details of a specific notification
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	QString msg = buildNotifyGetCommand(nid);
+	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query;
+	query.exec(q);
+	return GetTag(msg);
+}
+
 /* === Command Builders === */
 // These methods build formatted command strings for testing and reuse
 
@@ -567,6 +637,11 @@ QString AniDBApi::buildPushAckCommand(int nid)
 QString AniDBApi::buildNotifyListCommand()
 {
 	return QString("NOTIFYLIST ");
+}
+
+QString AniDBApi::buildNotifyGetCommand(int nid)
+{
+	return QString("NOTIFYGET nid=%1").arg(nid);
 }
 
 /* === End Command Builders === */
