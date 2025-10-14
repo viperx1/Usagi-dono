@@ -635,7 +635,7 @@ int AniDBApi::SendPacket()
                     return 0;
                 }
                 Send(str,"", tag);
-                qDebug()<<__FILE__<<__LINE__<<"[AniDB Sent] Command:"<<str;
+                qDebug()<<__FILE__<<__LINE__<<"[AniDB Sent] Command:"<<lastSentPacket;
             }
         }
     }
