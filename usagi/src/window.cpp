@@ -652,7 +652,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 
 void Window::getNotifyLoggedIn(QString tag, int code)
 {
-    qDebug()<<__FILE__<<__LINE__<<"getNotifyLoggedIn";
+    qDebug()<<__FILE__<<__LINE__<<"[Window] Login notification received - Tag:"<<tag<<"Code:"<<code;
     loginbutton->setText(QString("Logout - logged in with tag %1 and code %2").arg(tag).arg(code));
 	
 	// Enable notifications after successful login
