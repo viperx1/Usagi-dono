@@ -674,7 +674,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		
 		// Download the file
 		QNetworkAccessManager *manager = new QNetworkAccessManager(this);
-		QNetworkRequest request(QUrl(exportUrl));
+		QNetworkRequest request{QUrl(exportUrl)};
 		request.setHeader(QNetworkRequest::UserAgentHeader, "Usagi/1");
 		
 		QNetworkReply *reply = manager->get(request);
