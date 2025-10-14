@@ -102,25 +102,11 @@ Window::Window()
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pageMylist->addWidget(mylistTreeWidget);
     
-    // Add buttons for mylist
-    QHBoxLayout *mylistButtons = new QHBoxLayout();
-    QPushButton *mylistRefreshButton = new QPushButton("Load MyList from Database");
-    QPushButton *mylistFetchButton = new QPushButton("Fetch MyList Stats from API");
-    QPushButton *mylistImportButton = new QPushButton("Import MyList from File");
-    mylistButtons->addWidget(mylistRefreshButton);
-    mylistButtons->addWidget(mylistFetchButton);
-    mylistButtons->addWidget(mylistImportButton);
-    pageMylist->addLayout(mylistButtons);
-    
-    connect(mylistRefreshButton, &QPushButton::clicked, [this]() {
-        loadMylistFromDatabase();
-    });
-    connect(mylistFetchButton, &QPushButton::clicked, [this]() {
-        fetchMylistStatsFromAPI();
-    });
-    connect(mylistImportButton, &QPushButton::clicked, [this]() {
-        importMylistFromFile();
-    });
+    // Add progress status label
+    mylistStatusLabel = new QLabel("MyList Status: Ready");
+    mylistStatusLabel->setAlignment(Qt::AlignCenter);
+    mylistStatusLabel->setStyleSheet("padding: 5px; background-color: #f0f0f0;");
+    pageMylist->addWidget(mylistStatusLabel);
     
     mylistTreeWidget->show();
 
@@ -238,6 +224,7 @@ Window::Window()
     // footer - signals
     connect(adbapi, SIGNAL(notifyLoggedIn(QString,int)), this, SLOT(getNotifyLoggedIn(QString,int)));
     connect(adbapi, SIGNAL(notifyLoggedOut(QString,int)), this, SLOT(getNotifyLoggedOut(QString,int)));
+	connect(adbapi, SIGNAL(notifyMessageReceived(int,QString)), this, SLOT(getNotifyMessageReceived(int,QString)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
 
     // end
@@ -245,6 +232,13 @@ Window::Window()
 
 
     adbapi->CreateSocket();
+    
+    // Automatically load mylist on startup
+    QTimer::singleShot(1000, this, [this]() {
+        mylistStatusLabel->setText("MyList Status: Loading from database...");
+        loadMylistFromDatabase();
+        mylistStatusLabel->setText("MyList Status: Ready");
+    });
 }
 
 Window::~Window()
@@ -649,12 +643,97 @@ void Window::getNotifyLoggedIn(QString tag, int code)
 {
     qDebug()<<__FILE__<<__LINE__<<"getNotifyLoggedIn";
     loginbutton->setText(QString("Logout - logged in with tag %1 and code %2").arg(tag).arg(code));
+	
+	// Enable notifications after successful login
+	adbapi->NotifyEnable();
+	logOutput->append("Notifications enabled");
 }
 
 void Window::getNotifyLoggedOut(QString tag, int code)
 {
     qDebug()<<__FILE__<<__LINE__<<"getNotifyLoggedOut";
     loginbutton->setText(QString("Login - logged out with tag %1 and code %2").arg(tag).arg(code));
+}
+
+void Window::getNotifyMessageReceived(int nid, QString message)
+{
+	qDebug()<<__FILE__<<__LINE__<<"Notification received:"<<nid<<message;
+	logOutput->append(QString("Notification %1 received").arg(nid));
+	
+	// Check if message contains mylist export link
+	// AniDB notification format typically contains URLs in the body
+	// Look for patterns like: http://anidb.net/mylist-export/...tgz
+	QRegularExpression urlRegex("https?://[^\\s]+\\.tgz");
+	QRegularExpressionMatch match = urlRegex.match(message);
+	
+	if(match.hasMatch())
+	{
+		QString exportUrl = match.captured(0);
+		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
+		mylistStatusLabel->setText("MyList Status: Downloading export...");
+		
+		// Download the file
+		QNetworkAccessManager *manager = new QNetworkAccessManager(this);
+		QNetworkRequest request(QUrl(exportUrl));
+		request.setHeader(QNetworkRequest::UserAgentHeader, "Usagi/1");
+		
+		QNetworkReply *reply = manager->get(request);
+		
+		// Connect to download finished signal
+		connect(reply, &QNetworkReply::finished, this, [this, reply, manager]() {
+			if(reply->error() == QNetworkReply::NoError)
+			{
+				// Save to temporary file
+				QString tempPath = QDir::tempPath() + "/mylist_export_" + 
+					QString::number(QDateTime::currentMSecsSinceEpoch()) + ".tgz";
+				
+				QFile file(tempPath);
+				if(file.open(QIODevice::WriteOnly))
+				{
+					file.write(reply->readAll());
+					file.close();
+					
+					logOutput->append(QString("Export downloaded to: %1").arg(tempPath));
+					mylistStatusLabel->setText("MyList Status: Parsing export...");
+					
+					// Parse the csv-adborg file
+					int count = parseMylistCSVAdborg(tempPath);
+					
+					if(count > 0)
+					{
+						logOutput->append(QString("Successfully imported %1 mylist entries").arg(count));
+						mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(count));
+						loadMylistFromDatabase();  // Refresh the display
+					}
+					else
+					{
+						logOutput->append("No entries imported from notification export");
+						mylistStatusLabel->setText("MyList Status: Import failed");
+					}
+					
+					// Clean up temporary file
+					QFile::remove(tempPath);
+				}
+				else
+				{
+					logOutput->append("Error: Cannot save export file");
+					mylistStatusLabel->setText("MyList Status: Download failed");
+				}
+			}
+			else
+			{
+				logOutput->append(QString("Error downloading export: %1").arg(reply->errorString()));
+				mylistStatusLabel->setText("MyList Status: Download failed");
+			}
+			
+			reply->deleteLater();
+			manager->deleteLater();
+		});
+	}
+	else
+	{
+		logOutput->append("No mylist export link found in notification");
+	}
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
@@ -788,203 +867,145 @@ void Window::loadMylistFromDatabase()
 	mylistTreeWidget->expandAll();
 	
 	logOutput->append(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
+	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
 }
 
-void Window::fetchMylistStatsFromAPI()
+int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 {
-	// Call MYLISTSTATS command to get mylist statistics
-	logOutput->append("Fetching mylist statistics from API...");
-	adbapi->Mylist(-1);  // -1 triggers MYLISTSTATS
-	logOutput->append("MYLISTSTATS command sent. Note: To get actual mylist entries, use 'Import MyList from File' with an export from https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export");
-}
-
-void Window::importMylistFromFile()
-{
-	// Open file dialog to select mylist export file
-	QString fileName = QFileDialog::getOpenFileName(this,
-		tr("Import MyList Export"), lastDir,
-		tr("MyList Files (*.xml *.txt *.csv);;All Files (*)"));
-	
-	if(fileName.isEmpty())
-		return;
-	
-	QFileInfo fileInfo(fileName);
-	lastDir = fileInfo.absolutePath();
-	
-	// Read the file
-	QFile file(fileName);
-	if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
-	{
-		logOutput->append("Error: Cannot open file " + fileName);
-		return;
-	}
-	
-	QTextStream in(&file);
-	QString content = in.readAll();
-	file.close();
-	
-	// Parse based on file extension
-	QString ext = fileInfo.suffix().toLower();
-	int importedCount = 0;
-	
-	if(ext == "xml")
-	{
-		// Parse XML format from AniDB mylist export
-		importedCount = parseMylistXML(content);
-	}
-	else if(ext == "txt" || ext == "csv")
-	{
-		// Parse CSV/TXT format
-		importedCount = parseMylistCSV(content);
-	}
-	else
-	{
-		// Try to auto-detect format
-		if(content.trimmed().startsWith("<?xml") || content.contains("<mylist"))
-		{
-			importedCount = parseMylistXML(content);
-		}
-		else
-		{
-			importedCount = parseMylistCSV(content);
-		}
-	}
-	
-	if(importedCount > 0)
-	{
-		logOutput->append(QString("Successfully imported %1 mylist entries").arg(importedCount));
-		loadMylistFromDatabase();  // Refresh the display
-	}
-	else
-	{
-		logOutput->append("No entries imported. Please check the file format.");
-	}
-}
-
-int Window::parseMylistXML(const QString &content)
-{
-	// Parse XML format mylist export from AniDB
-	// Format: <mylistexport><mylist lid="..." fid="..." ...>...</mylist></mylistexport>
+	// Parse csv-adborg format mylist export (tar.gz containing anime/*.csv files)
+	// Each CSV file contains pipe-delimited data with sections: anime info, FILES, GROUPS, GENREN
 	int count = 0;
 	QSqlDatabase db = QSqlDatabase::database();
+	
+	// Extract tar.gz to temporary directory
+	QString tempDir = QDir::tempPath() + "/usagi_mylist_" + QString::number(QDateTime::currentMSecsSinceEpoch());
+	QDir().mkpath(tempDir);
+	
+	// Use QProcess to extract tar.gz
+	QProcess tarProcess;
+	tarProcess.setWorkingDirectory(tempDir);
+	tarProcess.start("tar", QStringList() << "-xzf" << tarGzPath);
+	
+	if(!tarProcess.waitForFinished(30000))  // 30 second timeout
+	{
+		logOutput->append("Error: Failed to extract tar.gz file (timeout)");
+		QDir(tempDir).removeRecursively();
+		return 0;
+	}
+	
+	if(tarProcess.exitCode() != 0)
+	{
+		logOutput->append("Error: Failed to extract tar.gz file: " + tarProcess.readAllStandardError());
+		QDir(tempDir).removeRecursively();
+		return 0;
+	}
+	
+	// Find all CSV files in anime/ subdirectory
+	QDir animeDir(tempDir + "/anime");
+	if(!animeDir.exists())
+	{
+		logOutput->append("Error: anime/ directory not found in tar.gz");
+		QDir(tempDir).removeRecursively();
+		return 0;
+	}
+	
+	QStringList csvFiles = animeDir.entryList(QStringList() << "*.csv", QDir::Files);
+	
 	db.transaction();
 	
-	// Simple XML parsing - look for mylist entries
-	QRegularExpression rx("<mylist\\s+([^>]+)>");
-	QRegularExpressionMatchIterator matchIterator = rx.globalMatch(content);
-	
-	while(matchIterator.hasNext())
+	// Process each CSV file
+	foreach(const QString &csvFile, csvFiles)
 	{
-		QRegularExpressionMatch match = matchIterator.next();
-		QString attributes = match.captured(1);
+		QString filePath = animeDir.absoluteFilePath(csvFile);
+		QFile file(filePath);
 		
-		// Extract attributes
-		QMap<QString, QString> attrs;
-		QRegularExpression attrRx("(\\w+)=\"([^\"]*)\"");
-		QRegularExpressionMatchIterator attrIterator = attrRx.globalMatch(attributes);
-		while(attrIterator.hasNext())
-		{
-			QRegularExpressionMatch attrMatch = attrIterator.next();
-			attrs[attrMatch.captured(1)] = attrMatch.captured(2);
-		}
+		if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
+			continue;
 		
-		// Insert into database
-		if(attrs.contains("lid") && attrs.contains("fid"))
+		QTextStream in(&file);
+		QString content = in.readAll();
+		file.close();
+		
+		// Parse the file - look for FILES section
+		QStringList lines = content.split('\n');
+		bool inFilesSection = false;
+		QStringList fileHeaders;
+		
+		for(int i = 0; i < lines.size(); i++)
 		{
-			// Escape single quotes in storage field to prevent SQL injection
-			QString escapedStorage = attrs.value("storage", "");
-			escapedStorage.replace("'", "''");
+			QString line = lines[i].trimmed();
 			
-			QString q = QString("INSERT OR REPLACE INTO `mylist` "
-				"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-				"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
-				.arg(attrs.value("lid", "0"))
-				.arg(attrs.value("fid", "0"))
-				.arg(attrs.value("eid", "0"))
-				.arg(attrs.value("aid", "0"))
-				.arg(attrs.value("gid", "0"))
-				.arg(attrs.value("state", "0"))
-				.arg((attrs.value("viewdate", "").isEmpty() || attrs.value("viewdate", "") == "0") ? "0" : "1")  // viewed = has non-zero viewdate
-				.arg(escapedStorage);
+			if(line.isEmpty())
+				continue;
 			
-			QSqlQuery query(db);
-			if(query.exec(q))
+			// Check for FILES section marker
+			if(line == "FILES")
 			{
-				count++;
+				inFilesSection = true;
+				// Next line should be headers
+				if(i + 1 < lines.size())
+				{
+					fileHeaders = lines[i + 1].split('|');
+					i++;  // Skip the header line
+				}
+				continue;
+			}
+			
+			// Check for next section (GROUPS, GENREN, etc.)
+			if(line == "GROUPS" || line == "GENREN")
+			{
+				inFilesSection = false;
+				continue;
+			}
+			
+			// Parse file entries in FILES section
+			if(inFilesSection && !fileHeaders.isEmpty())
+			{
+				QStringList fields = line.split('|');
+				
+				if(fields.size() < 20)  // Need at least 20 fields for complete data
+					continue;
+				
+				// Extract fields from FILES section
+				// AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resolution|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
+				QString aid = fields[0].trimmed();
+				QString eid = fields[1].trimmed();
+				QString gid = fields[2].trimmed();
+				QString fid = fields[3].trimmed();
+				QString isWatched = fields.size() > 17 ? fields[17].trimmed() : "0";
+				QString state = fields.size() > 18 ? fields[18].trimmed() : "0";
+				QString myState = fields.size() > 19 ? fields[19].trimmed() : "0";
+				
+				// Validate required fields
+				if(fid.isEmpty() || aid.isEmpty())
+					continue;
+				
+				// Insert into database
+				// We don't have lid from this format, so we'll use fid as a unique identifier
+				QString q = QString("INSERT OR REPLACE INTO `mylist` "
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '')")
+					.arg(fid)  // Use fid as lid since we don't have lid
+					.arg(fid)
+					.arg(eid.isEmpty() ? "0" : eid)
+					.arg(aid)
+					.arg(gid.isEmpty() ? "0" : gid)
+					.arg(myState.isEmpty() ? "0" : myState)  // Use myState as state
+					.arg(isWatched == "1" ? "1" : "0");  // viewed = isWatched
+				
+				QSqlQuery query(db);
+				if(query.exec(q))
+				{
+					count++;
+				}
 			}
 		}
 	}
 	
 	db.commit();
-	return count;
-}
-
-int Window::parseMylistCSV(const QString &content)
-{
-	// Parse CSV/TXT format mylist export
-	// Expected format: lid,fid,eid,aid,gid,date,state,viewdate,storage,...
-	int count = 0;
-	QSqlDatabase db = QSqlDatabase::database();
-	db.transaction();
 	
-	QStringList lines = content.split('\n');
-	bool firstLine = true;
+	// Clean up temporary directory
+	QDir(tempDir).removeRecursively();
 	
-	for(int i = 0; i < lines.size(); i++)
-	{
-		QString line = lines[i].trimmed();
-		if(line.isEmpty())
-			continue;
-		
-		// Skip header line
-		if(firstLine)
-		{
-			firstLine = false;
-			if(line.toLower().contains("lid") || line.startsWith("#"))
-				continue;
-		}
-		
-		QStringList fields = line.split(',');
-		if(fields.size() < 8)
-			continue;  // Need at least 8 fields
-		
-		// Parse fields
-		QString lid = fields[0].trimmed();
-		QString fid = fields[1].trimmed();
-		QString eid = fields[2].trimmed();
-		QString aid = fields[3].trimmed();
-		QString gid = fields[4].trimmed();
-		QString state = fields[6].trimmed();
-		QString viewdate = fields[7].trimmed();
-		QString storage = fields.size() > 8 ? fields[8].trimmed() : "";
-		
-		if(lid.isEmpty() || fid.isEmpty())
-			continue;
-		
-		// Escape single quotes in storage field to prevent SQL injection
-		QString escapedStorage = storage;
-		escapedStorage.replace("'", "''");
-		
-		// Insert into database
-		QString q = QString("INSERT OR REPLACE INTO `mylist` "
-			"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-			"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
-			.arg(lid)
-			.arg(fid)
-			.arg(eid)
-			.arg(aid)
-			.arg(gid)
-			.arg(state)
-			.arg(viewdate.isEmpty() || viewdate == "0" ? "0" : "1")
-			.arg(escapedStorage);
-		
-		QSqlQuery query(db);
-		if(query.exec(q))
-		{
-			count++;
-		}
-	}
-	
-	db.commit();
 	return count;
 }

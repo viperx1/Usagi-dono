@@ -3,6 +3,12 @@
 #include <QtGui>
 #include <QtAlgorithms>
 #include <QRegularExpression>
+#include <QProcess>
+#include <QDateTime>
+#include <QDir>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkRequest>
+#include <QtNetwork/QNetworkReply>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QTextEdit>
@@ -81,6 +87,7 @@ private:
 
     // page mylist
     QTreeWidget *mylistTreeWidget;
+    QLabel *mylistStatusLabel;
 	// page settings
 
     QLabel *labelLogin;
@@ -122,10 +129,9 @@ public slots:
 	void getNotifyMylistAdd(QString, int);
     void getNotifyLoggedIn(QString, int);
     void getNotifyLoggedOut(QString, int);
+	void getNotifyMessageReceived(int nid, QString message);
     void safeClose();
     void loadMylistFromDatabase();
-    void fetchMylistStatsFromAPI();
-    void importMylistFromFile();
 signals:
 	void hashFiles(QStringList);
 	void notifyStopHasher();
@@ -133,8 +139,7 @@ public:
 	// page hasher
     hashes_ *hashes;
 	void hashesinsertrow(QFileInfo, Qt::CheckState);
-	int parseMylistXML(const QString &content);
-	int parseMylistCSV(const QString &content);
+	int parseMylistCSVAdborg(const QString &tarGzPath);
     Window();
 	~Window();
 };

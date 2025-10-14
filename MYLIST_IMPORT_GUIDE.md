@@ -16,7 +16,32 @@ This method uses the AniDB UDP API to fetch mylist statistics:
 3. Statistics will be returned (total entries, watched count, etc.)
 4. Note: This only provides statistics, not the actual mylist entries
 
-## Method 2: Import from Export File (Recommended)
+## Method 2: Download MyList from AniDB (NEW - Easiest)
+
+The quickest way to import your complete mylist:
+
+### Step 1: Download from AniDB
+1. Open Usagi-dono application
+2. Go to the **MyList** tab
+3. Click **"Download MyList from AniDB"** button
+4. Select your preferred template format:
+   - **csv-adborg (Recommended)** - Optimized format, works with all features
+   - **xml** - Full structured data
+   - **csv** - Standard format
+   - **json** - JSON format
+   - **anidb** - AniDB default
+5. Your browser will open to AniDB's export page
+6. Log in to AniDB if needed
+7. Click **"Export"** to download the file
+
+### Step 2: Import the Downloaded File
+1. Return to Usagi-dono
+2. Click **"Import MyList from File"**
+3. Select the file you just downloaded
+4. The application will automatically detect the format and import the data
+5. After import, your mylist will display automatically
+
+## Method 3: Import from Export File (Manual Download)
 
 To import your complete mylist with all entries:
 
@@ -52,10 +77,22 @@ To import your complete mylist with all entries:
 ```
 
 ### CSV/TXT Format
+
+The application now supports multiple CSV template formats:
+
+#### Standard MYLISTEXPORT Format
 ```
 lid,fid,eid,aid,gid,date,state,viewdate,storage,source,other,filestate
 123456,789012,345678,901234,567890,1234567890,1,1234567890,/path/to/file,...
 ```
+
+#### csv-adborg Template Format
+```
+aid,eid,gid,lid,status,viewdate,anime_name,episode_name
+901234,345678,567890,123456,1,1234567890,Test Anime,Episode 1
+```
+
+The parser automatically detects which format is being used by reading the header row and mapping columns by name. This means you can use any AniDB MYLISTEXPORT template that includes the required fields (lid, aid).
 
 ## Data Fields
 

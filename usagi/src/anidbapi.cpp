@@ -282,6 +282,44 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         QSqlQuery query;
         query.exec(q);
     }
+	else if(ReplyID == "270"){ // 270 NOTIFICATION - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
+		// Parse notification message
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		QStringList parts = token2.first().split("|");
+		if(parts.size() >= 6)
+		{
+			int nid = parts[0].toInt();
+			QString title = parts[4];
+			QString body = parts[5];
+			
+			qDebug()<<__FILE__<<__LINE__<<"Notification received:"<<nid<<title<<body;
+			
+			// Emit signal for notification
+			emit notifyMessageReceived(nid, body);
+			
+			// Acknowledge the notification
+			PushAck(nid);
+		}
+	}
+	else if(ReplyID == "271"){ // 271 NOTIFYACK - NOTIFICATION ACKNOWLEDGED
+		qDebug()<<__FILE__<<__LINE__<<"Notification acknowledged";
+	}
+	else if(ReplyID == "272"){ // 272 NO SUCH NOTIFICATION
+		qDebug()<<__FILE__<<__LINE__<<"No such notification";
+	}
+	else if(ReplyID == "290"){ // 290 NOTIFYLIST
+		// Parse notification list
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		qDebug()<<__FILE__<<__LINE__<<"NOTIFYLIST:"<<token2.first();
+	}
+	else if(ReplyID == "291"){ // 291 NOTIFYLIST ENTRY
+		// Parse notification list entry
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		qDebug()<<__FILE__<<__LINE__<<"NOTIFYLIST ENTRY:"<<token2.first();
+	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
 		loggedin = 0;
 		if(ReplyTo != "LOGOUT"){
@@ -426,6 +464,35 @@ QString AniDBApi::Mylist(int lid)
 		// Query all mylist entries - we'll need to do this iteratively or use MYLISTSTATS first
 		msg = QString("MYLISTSTATS ");
 	}
+	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query;
+	query.exec(q);
+	return GetTag(msg);
+}
+
+QString AniDBApi::PushAck(int nid)
+{
+	// Acknowledge a received notification
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	QString msg = QString("PUSHACK nid=%1").arg(nid);
+	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query;
+	query.exec(q);
+	return GetTag(msg);
+}
+
+QString AniDBApi::NotifyEnable()
+{
+	// Enable push notifications
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	// Request notification list to enable push notifications
+	QString msg = QString("NOTIFYLIST");
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
 	query.exec(q);

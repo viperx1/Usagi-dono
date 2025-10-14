@@ -41,3 +41,8 @@ Testing/
 # GitHub Actions workflow artifacts
 build_log.txt
 issue_body.md
+# Temporary mylist test data
+anime/
+*.tgz
+mylist.csv
+changelog.txt
