@@ -366,17 +366,32 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 	}
 	else if(ReplyID == "291"){ // 291 NOTIFYLIST ENTRY
-		// Parse notification list entry - this is sent for each entry when using pagination
+		// Parse notification list - can contain single entry (pagination) or full list
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST ENTRY - Tag:"<<Tag<<"Data:"<<token2.first();
+		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST - Tag:"<<Tag<<"Entry count:"<<token2.size();
 		
-		// Check if this is a message notification and fetch it
-		if(token2.first().startsWith("M|"))
+		// Log all notification entries
+		for(int i = 0; i < token2.size(); i++)
 		{
-			QString nid = token2.first().mid(2);
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST ENTRY - Message notification, fetching:"<<nid;
-			NotifyGet(nid.toInt());
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST Entry"<<i+1<<"of"<<token2.size()<<":"<<token2[i];
+		}
+		
+		// Find the last message notification (M|nid) and fetch its content
+		QString lastMessageNid;
+		for(int i = token2.size() - 1; i >= 0; i--)
+		{
+			if(token2[i].startsWith("M|"))
+			{
+				lastMessageNid = token2[i].mid(2); // Extract nid after "M|"
+				break;
+			}
+		}
+		
+		if(!lastMessageNid.isEmpty())
+		{
+			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST - Fetching last message notification:"<<lastMessageNid;
+			NotifyGet(lastMessageNid.toInt());
 		}
 	}
 	else if(ReplyID == "293"){ // 293 NOTIFYGET - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
