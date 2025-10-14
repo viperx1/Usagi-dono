@@ -16,6 +16,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 # Enable automatic MOC
 set(CMAKE_AUTOMOC ON)
 
+# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
+endif()
+
 # Enable testing
 enable_testing()
 
@@ -32,6 +38,12 @@ set(HASH_TEST_HEADERS
 )
 
 add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_hash PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
 
 target_link_libraries(test_hash PRIVATE
     Qt6::Core
@@ -63,6 +75,12 @@ set(CRASHLOG_TEST_HEADERS
 )
 
 add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_crashlog PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
 
 target_link_libraries(test_crashlog PRIVATE
     Qt6::Core
@@ -108,6 +126,12 @@ add_executable(test_anidbapi ${ANIDBAPI_TEST_SOURCES} ${ANIDBAPI_TEST_HEADERS})
 
 target_compile_definitions(test_anidbapi PRIVATE CRYPTOPP_DEBUG=0)
 
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_anidbapi PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
 target_link_libraries(test_anidbapi PRIVATE
     Qt6::Core
     Qt6::Test
@@ -150,6 +174,12 @@ set(ANIME_TITLES_TEST_HEADERS
 add_executable(test_anime_titles ${ANIME_TITLES_TEST_SOURCES} ${ANIME_TITLES_TEST_HEADERS})
 
 target_compile_definitions(test_anime_titles PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_anime_titles PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
 
 target_link_libraries(test_anime_titles PRIVATE
     Qt6::Core

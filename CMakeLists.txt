@@ -138,6 +138,13 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     message(STATUS "Detected static Qt6 libraries - configuring for static build")
     # Must define QT_STATIC before including any Qt headers
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+    
+    # Also add to Qt targets' interface to ensure MOC sees it
+    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
+        if(TARGET ${qt_target})
+            target_compile_definitions(${qt_target} INTERFACE QT_STATIC QT_STATICPLUGIN)
+        endif()
+    endforeach()
 endif()
 
 set(CMAKE_AUTOMOC ON)
