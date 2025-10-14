@@ -51,6 +51,17 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
+# For static Qt builds, import required static plugins
+if(WIN32)
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        # Import platform plugins for static Qt on Windows
+        qt_import_plugins(usagi
+            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+        )
+    endif()
+endif()
+
 # Link Qt libraries
 target_link_libraries(usagi PRIVATE
     Qt6::Core
@@ -61,9 +72,37 @@ target_link_libraries(usagi PRIVATE
     z
 )
 
+# For static Qt builds on Windows, we need additional system libraries
+if(WIN32)
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        # Static Qt6 on Windows requires these additional libraries
+        target_link_libraries(usagi PRIVATE
+            winmm        # Windows multimedia
+            version      # Version information
+            netapi32     # Network API
+            ws2_32       # Windows Sockets (already may be linked by Qt but explicit doesn't hurt)
+            iphlpapi     # IP Helper API
+            crypt32      # Cryptography API
+            ole32        # OLE32
+            oleaut32     # OLE Automation
+            uuid         # UUID functions
+        )
+    endif()
+endif()
+
 # Link platform-specific libraries
 if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
+    
+    # For static Qt builds, link Qt6::EntryPoint which contains WinMain
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        # Qt6::EntryPoint provides WinMain/main entry point for static builds
+        if(TARGET Qt6::EntryPoint)
+            target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
+        endif()
+    endif()
     
     # Force console subsystem for LLVM MinGW
     # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt

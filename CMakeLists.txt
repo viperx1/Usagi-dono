@@ -132,6 +132,14 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 
+# Check if Qt is statically linked and add necessary definitions BEFORE any compilation
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    message(STATUS "Detected static Qt6 libraries - configuring for static build")
+    # Must define QT_STATIC before including any Qt headers
+    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+endif()
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
@@ -152,11 +160,11 @@ if(WIN32)
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     
-    # Check if Qt is statically linked and add necessary definitions
+    # Check if Qt is statically linked and ensure definitions are set
     get_target_property(qt_core_type Qt6::Core TYPE)
     if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        message(STATUS "Detected static Qt6 libraries - adding QT_STATIC and QT_STATICPLUGIN definitions")
-        add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+        # Already added above, but ensure it's set
+        message(STATUS "Verifying static Qt6 configuration")
     endif()
     
     # Clean up Qt target interface options
