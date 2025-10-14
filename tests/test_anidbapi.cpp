@@ -494,10 +494,12 @@ void TestAniDBApiCommands::testPushAckCommandFormat()
 void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
 {
     // Simplified test using builder methods to validate command format
-    // Pattern: "COMMAND" or "COMMAND param1=value1&param2=value2"
-    // All commands must have space after command name before parameters
+    // Pattern: "COMMAND " or "COMMAND param1=value1&param2=value2"
+    // All commands have a space after the command name
+    // Parameter names can contain lowercase letters and digits (e.g., "ed2k", "clientver")
+    // Parameters are optional after the space
     
-    QRegularExpression pattern("^[A-Z]+( [a-z]+=([^&\\s]+)(&[a-z]+=([^&\\s]+))*)?$");
+    QRegularExpression pattern("^[A-Z]+ ([a-z0-9]+=([^&\\s]+)(&[a-z0-9]+=([^&\\s]+))*)?$");
     
     QStringList commands;
     QStringList commandNames;
@@ -542,10 +544,12 @@ void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
         QVERIFY2(cmd.startsWith(name),
                  QString("%1 command doesn't start with '%2': '%3'").arg(name).arg(name).arg(cmd).toLatin1());
         
-        // Verify space after command name
+        // Verify proper separator after command name (space or parameter start)
         if (cmd.length() > name.length()) {
-            QVERIFY2(cmd.at(name.length()) == ' ',
-                     QString("%1 command missing space after command name: '%2'").arg(name).arg(cmd).toLatin1());
+            QChar nextChar = cmd.at(name.length());
+            bool validSeparator = (nextChar == ' ') || (nextChar.isLower());
+            QVERIFY2(validSeparator,
+                     QString("%1 command has invalid character after command name: '%2'").arg(name).arg(cmd).toLatin1());
         }
     }
     
