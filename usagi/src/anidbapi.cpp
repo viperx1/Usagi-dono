@@ -520,7 +520,7 @@ QString AniDBApi::NotifyEnable()
 		Auth();
 	}
 	// Request notification list to enable push notifications
-	QString msg = QString("NOTIFYLIST");
+	QString msg = QString("NOTIFYLIST ");
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
 	query.exec(q);
