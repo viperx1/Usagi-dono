@@ -39,6 +39,7 @@ private:
 	bool eventFilter(QObject *, QEvent *);
 	void closeEvent(QCloseEvent *);
     QTimer *safeclose;
+    QTimer *startupTimer;
     QElapsedTimer waitforlogout;
 	// main layout
     QBoxLayout *layout;
@@ -132,6 +133,7 @@ public slots:
 	void getNotifyMessageReceived(int nid, QString message);
     void safeClose();
     void loadMylistFromDatabase();
+    void startupInitialization();
 signals:
 	void hashFiles(QStringList);
 	void notifyStopHasher();

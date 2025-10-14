@@ -20,6 +20,12 @@ Window::Window()
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
 
+    // Timer for startup initialization (delayed to ensure UI is ready)
+    startupTimer = new QTimer(this);
+    startupTimer->setSingleShot(true);
+    startupTimer->setInterval(1000);
+    connect(startupTimer, SIGNAL(timeout()), this, SLOT(startupInitialization()));
+
     // main window
     this->setWindowTitle("Usagi");
 //    this->setFixedWidth(800);
@@ -233,12 +239,8 @@ Window::Window()
 
     adbapi->CreateSocket();
     
-    // Automatically load mylist on startup
-    QTimer::singleShot(1000, this, [this]() {
-        mylistStatusLabel->setText("MyList Status: Loading from database...");
-        loadMylistFromDatabase();
-        mylistStatusLabel->setText("MyList Status: Ready");
-    });
+    // Automatically load mylist on startup (using timer for delayed initialization)
+    startupTimer->start();
 }
 
 Window::~Window()
@@ -463,6 +465,15 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 void Window::safeClose()
 {
     this->close();
+}
+
+void Window::startupInitialization()
+{
+    // This slot is called 1 second after the window is constructed
+    // to allow the UI to be fully initialized before loading data
+    mylistStatusLabel->setText("MyList Status: Loading from database...");
+    loadMylistFromDatabase();
+    mylistStatusLabel->setText("MyList Status: Ready");
 }
 
 void Window::hasherFinished()
