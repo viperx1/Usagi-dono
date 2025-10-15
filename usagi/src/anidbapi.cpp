@@ -674,7 +674,8 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 		return 0;
 	}
 	QString a;
-	if(SID.length() > 0)
+	// NOTIFYGET command should not include session parameter according to AniDB UDP API
+	if(SID.length() > 0 && !str.startsWith("NOTIFYGET"))
 	{
 		a = QString("%1&s=%2").arg(str).arg(SID);
 	}
