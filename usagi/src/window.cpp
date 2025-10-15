@@ -16,6 +16,12 @@ Window::Window()
 //	settings = new QSettings("settings.dat", QSettings::IniFormat);
 //	adbapi->SetUsername(settings->value("username").toString());
 //	adbapi->SetPassword(settings->value("password").toString());
+	
+	// Initialize notification tracking
+	expectedNotificationsToCheck = 0;
+	notificationsCheckedWithoutExport = 0;
+	isCheckingNotifications = false;
+	
     safeclose = new QTimer;
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
@@ -231,6 +237,10 @@ Window::Window()
     connect(adbapi, SIGNAL(notifyLoggedIn(QString,int)), this, SLOT(getNotifyLoggedIn(QString,int)));
     connect(adbapi, SIGNAL(notifyLoggedOut(QString,int)), this, SLOT(getNotifyLoggedOut(QString,int)));
 	connect(adbapi, SIGNAL(notifyMessageReceived(int,QString)), this, SLOT(getNotifyMessageReceived(int,QString)));
+	connect(adbapi, SIGNAL(notifyCheckStarting(int)), this, SLOT(getNotifyCheckStarting(int)));
+	connect(adbapi, SIGNAL(notifyExportQueued(QString)), this, SLOT(getNotifyExportQueued(QString)));
+	connect(adbapi, SIGNAL(notifyExportAlreadyInQueue(QString)), this, SLOT(getNotifyExportAlreadyInQueue(QString)));
+	connect(adbapi, SIGNAL(notifyExportNoSuchTemplate(QString)), this, SLOT(getNotifyExportNoSuchTemplate(QString)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
 
     // end
@@ -708,6 +718,11 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
 		mylistStatusLabel->setText("MyList Status: Downloading export...");
 		
+		// Reset notification checking state since we found an export
+		isCheckingNotifications = false;
+		expectedNotificationsToCheck = 0;
+		notificationsCheckedWithoutExport = 0;
+		
 		// Download the file
 		QNetworkAccessManager *manager = new QNetworkAccessManager(this);
 		QNetworkRequest request{QUrl(exportUrl)};
@@ -769,7 +784,62 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	else
 	{
 		logOutput->append("No mylist export link found in notification");
+		
+		// Track notifications checked without finding export
+		if(isCheckingNotifications)
+		{
+			notificationsCheckedWithoutExport++;
+			
+			// If we've checked all expected notifications and found no export, request one
+			if(notificationsCheckedWithoutExport >= expectedNotificationsToCheck)
+			{
+				logOutput->append(QString("Checked %1 notifications with no export link found - requesting new export").arg(expectedNotificationsToCheck));
+				mylistStatusLabel->setText("MyList Status: Requesting export...");
+				
+				// Request MYLISTEXPORT with csv-adborg template
+				adbapi->MylistExport("csv-adborg");
+				
+				// Reset state
+				isCheckingNotifications = false;
+				expectedNotificationsToCheck = 0;
+				notificationsCheckedWithoutExport = 0;
+			}
+		}
 	}
+}
+
+void Window::getNotifyCheckStarting(int count)
+{
+	// Called when anidbapi starts checking notifications
+	isCheckingNotifications = true;
+	expectedNotificationsToCheck = count;
+	notificationsCheckedWithoutExport = 0;
+	logOutput->append(QString("Starting to check %1 notifications for mylist export link").arg(count));
+}
+
+void Window::getNotifyExportQueued(QString tag)
+{
+	// 217 EXPORT QUEUED - Export request accepted
+	logOutput->append(QString("MyList export queued successfully (Tag: %1)").arg(tag));
+	mylistStatusLabel->setText("MyList Status: Export queued - waiting for notification...");
+	// AniDB will send a notification when the export is ready
+	// The notification will contain the download link
+}
+
+void Window::getNotifyExportAlreadyInQueue(QString tag)
+{
+	// 318 EXPORT ALREADY IN QUEUE - Cannot queue another export
+	logOutput->append(QString("MyList export already in queue (Tag: %1) - waiting for current export to complete").arg(tag));
+	mylistStatusLabel->setText("MyList Status: Export already queued - waiting...");
+	// No need to take action - wait for the existing export notification
+}
+
+void Window::getNotifyExportNoSuchTemplate(QString tag)
+{
+	// 317 EXPORT NO SUCH TEMPLATE - Invalid template name
+	logOutput->append(QString("ERROR: MyList export template not found (Tag: %1)").arg(tag));
+	mylistStatusLabel->setText("MyList Status: Export failed - invalid template");
+	// This should not happen with "csv-adborg" template, but log for debugging
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)

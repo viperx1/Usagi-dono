@@ -100,6 +100,11 @@ private:
 	// page notify
 	QTextEdit *notifyOutput;
 
+	// Notification tracking for mylist export
+	int expectedNotificationsToCheck;
+	int notificationsCheckedWithoutExport;
+	bool isCheckingNotifications;
+
 	// page log
 	QTextEdit *logOutput;
 
@@ -131,6 +136,10 @@ public slots:
     void getNotifyLoggedIn(QString, int);
     void getNotifyLoggedOut(QString, int);
 	void getNotifyMessageReceived(int nid, QString message);
+	void getNotifyCheckStarting(int count);
+	void getNotifyExportQueued(QString tag);
+	void getNotifyExportAlreadyInQueue(QString tag);
+	void getNotifyExportNoSuchTemplate(QString tag);
     void safeClose();
     void loadMylistFromDatabase();
     void startupInitialization();
