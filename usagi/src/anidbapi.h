@@ -155,6 +155,7 @@ public:
 	QString PushAck(int nid);
 	QString NotifyEnable();
 	QString NotifyGet(int nid);
+	QString MylistExport(QString template_name = "csv-adborg");
 	
 	// Command builders - return formatted command strings for testing
 	QString buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc);
@@ -166,6 +167,7 @@ public:
 	QString buildPushAckCommand(int nid);
 	QString buildNotifyListCommand();
 	QString buildNotifyGetCommand(int nid);
+	QString buildMylistExportCommand(QString template_name);
 	/* Api End === */
 
 	unsigned long LocalIdentify(int size, QString ed2khash);
@@ -215,6 +217,7 @@ signals:
     void notifyLoggedIn(QString, int);
     void notifyLoggedOut(QString, int);
 	void notifyMessageReceived(int nid, QString message);
+	void notifyCheckStarting(int count);
 };
 
 #endif // ANIDBAPI_H
