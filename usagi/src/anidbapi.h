@@ -64,6 +64,11 @@ private:
 	// Anime titles download and management
 	QNetworkAccessManager *networkManager;
 	QDateTime lastAnimeTitlesUpdate;
+	
+	// Export notification checking
+	QTimer *notifyCheckTimer;
+	bool isExportQueued;
+	int notifyCheckAttempts;
 
 //    QTextCodec *codec;
 	enum progress
@@ -210,6 +215,7 @@ public:
 public slots:
 	int SendPacket();
 	int Recv();
+	void checkForNotifications();
 private slots:
 	void onAnimeTitlesDownloaded(QNetworkReply *reply);
 signals:
