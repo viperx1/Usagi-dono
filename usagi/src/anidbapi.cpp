@@ -394,25 +394,52 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			NotifyGet(lastMessageNid.toInt());
 		}
 	}
-	else if(ReplyID == "293"){ // 293 NOTIFYGET - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
-		// Parse notification message details
+	else if(ReplyID == "292"){ // 292 NOTIFYGET (type=M) - {int4 id}|{int4 from_user_id}|{str from_user_name}|{int4 date}|{int4 type}|{str title}|{str body}
+		// Parse message notification details (type=M)
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		QStringList parts = token2.first().split("|");
+		if(parts.size() >= 7)
+		{
+			int id = parts[0].toInt();
+			// parts[1] is from_user_id, parts[2] is from_user_name
+			// parts[3] is date, parts[4] is message type
+			QString title = parts[5];
+			QString body = parts[6];
+			
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 292 NOTIFYGET - ID: " + QString::number(id) + " Title: " + title + " Body: " + body);
+			
+			// Emit signal for notification (same as 270 for automatic download/import)
+			emit notifyMessageReceived(id, body);
+			
+			// Acknowledge the notification
+			PushAck(id);
+		}
+		else
+		{
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 292 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()));
+		}
+	}
+	else if(ReplyID == "293"){ // 293 NOTIFYGET (type=N) - {int4 relid}|{int4 type}|{int2 count}|{int4 date}|{str relidname}|{str fids}
+		// Parse notification details (type=N)
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		QStringList parts = token2.first().split("|");
 		if(parts.size() >= 6)
 		{
-			int nid = parts[0].toInt();
+			int relid = parts[0].toInt();
 			QString type = parts[1];
-			QString title = parts[4];
-			QString body = parts[5];
+			QString count = parts[2];
+			QString relidname = parts[4];
+			QString fids = parts[5];
 			
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - NID: " + QString::number(nid) + " Type: " + type + " Title: " + title + " Body: " + body);
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - RelID: " + QString::number(relid) + " Type: " + type + " Count: " + count + " Name: " + relidname + " FIDs: " + fids);
 			
-			// Emit signal for notification (same as 270 for automatic download/import)
-			emit notifyMessageReceived(nid, body);
+			// Note: For N-type notifications, we don't emit notifyMessageReceived as these are file notifications
+			// They would need different handling for new file notifications
 			
 			// Acknowledge the notification
-			PushAck(nid);
+			PushAck(relid);
 		}
 		else
 		{
@@ -656,7 +683,9 @@ QString AniDBApi::buildNotifyListCommand()
 
 QString AniDBApi::buildNotifyGetCommand(int nid)
 {
-	return QString("NOTIFYGET nid=%1").arg(nid);
+	// NOTIFYGET requires type parameter: type=M for messages, type=N for notifications
+	// Currently only fetching message notifications from NOTIFYLIST
+	return QString("NOTIFYGET type=M&id=%1").arg(nid);
 }
 
 /* === End Command Builders === */

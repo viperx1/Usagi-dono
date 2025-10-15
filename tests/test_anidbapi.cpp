@@ -49,6 +49,7 @@ private slots:
     // Command format validation tests
     void testNotifyListCommandFormat();
     void testPushAckCommandFormat();
+    void testNotifyGetCommandFormat();
     void testAllCommandsHaveProperSpacing();
 
 private:
@@ -489,6 +490,27 @@ void TestAniDBApiCommands::testPushAckCommandFormat()
     QVERIFY(cmd.contains(QString("nid=%1").arg(nid)));
 }
 
+void TestAniDBApiCommands::testNotifyGetCommandFormat()
+{
+    // Test NOTIFYGET command format using builder
+    int id = 4998280;
+    QString cmd = api->buildNotifyGetCommand(id);
+    
+    // Verify command starts with NOTIFYGET
+    QVERIFY(cmd.startsWith("NOTIFYGET "));
+    
+    // Verify type parameter (type=M for messages, type=N for notifications)
+    QVERIFY(cmd.contains("type="));
+    
+    // Verify id parameter (not nid!)
+    QVERIFY(cmd.contains("id="));
+    QVERIFY(cmd.contains(QString("id=%1").arg(id)));
+    
+    // According to AniDB UDP API: NOTIFYGET type={str type}&id={int4 id}
+    // For message notifications from NOTIFYLIST: type=M
+    QVERIFY(cmd.contains("type=M"));
+}
+
 // ===== Simplified Global Command Format Validation Test =====
 
 void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
@@ -528,6 +550,9 @@ void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
     
     commands << api->buildNotifyListCommand();
     commandNames << "NOTIFYLIST";
+    
+    commands << api->buildNotifyGetCommand(4998280);
+    commandNames << "NOTIFYGET";
     
     // Validate each command against pattern
     for (int i = 0; i < commands.size(); ++i) {
