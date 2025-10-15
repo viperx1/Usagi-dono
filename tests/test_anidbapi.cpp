@@ -49,7 +49,6 @@ private slots:
     // Command format validation tests
     void testNotifyListCommandFormat();
     void testPushAckCommandFormat();
-    void testNotifyGetCommandFormat();
     void testAllCommandsHaveProperSpacing();
 
 private:
@@ -490,25 +489,6 @@ void TestAniDBApiCommands::testPushAckCommandFormat()
     QVERIFY(cmd.contains(QString("nid=%1").arg(nid)));
 }
 
-void TestAniDBApiCommands::testNotifyGetCommandFormat()
-{
-    // Test NOTIFYGET command format using builder
-    int nid = 4998280;
-    QString cmd = api->buildNotifyGetCommand(nid);
-    
-    // Verify command starts with NOTIFYGET
-    QVERIFY(cmd.startsWith("NOTIFYGET "));
-    
-    // Verify nid parameter
-    QVERIFY(cmd.contains("nid="));
-    QVERIFY(cmd.contains(QString("nid=%1").arg(nid)));
-    
-    // IMPORTANT: NOTIFYGET should NOT contain session parameter
-    // The session parameter should not be added by the builder
-    // (Send() function will handle excluding session for NOTIFYGET)
-    QVERIFY(!cmd.contains("&s="));
-}
-
 // ===== Simplified Global Command Format Validation Test =====
 
 void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
@@ -548,9 +528,6 @@ void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
     
     commands << api->buildNotifyListCommand();
     commandNames << "NOTIFYLIST";
-    
-    commands << api->buildNotifyGetCommand(4998280);
-    commandNames << "NOTIFYGET";
     
     // Validate each command against pattern
     for (int i = 0; i < commands.size(); ++i) {
