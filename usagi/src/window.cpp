@@ -692,14 +692,18 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	getNotifyLogAppend(logMsg);
 	logOutput->append(QString("Notification %1 received").arg(nid));
 	
+	// Prevent downloading multiple exports simultaneously
+	static bool isDownloadingExport = false;
+	
 	// Check if message contains mylist export link
 	// AniDB notification format typically contains URLs in the body
 	// Look for patterns like: http://anidb.net/mylist-export/...tgz
 	QRegularExpression urlRegex("https?://[^\\s]+\\.tgz");
 	QRegularExpressionMatch match = urlRegex.match(message);
 	
-	if(match.hasMatch())
+	if(match.hasMatch() && !isDownloadingExport)
 	{
+		isDownloadingExport = true;
 		QString exportUrl = match.captured(0);
 		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
 		mylistStatusLabel->setText("MyList Status: Downloading export...");

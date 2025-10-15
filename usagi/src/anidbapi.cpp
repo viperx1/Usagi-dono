@@ -348,21 +348,32 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i]);
 		}
 		
-		// Find the last message notification (M|nid) and fetch its content
-		QString lastMessageNid;
-		for(int i = token2.size() - 1; i >= 0; i--)
+		// Collect all message notification IDs (M|nid entries)
+		// Export notifications could be in any of these messages, not just the last one
+		QStringList messageNids;
+		for(int i = 0; i < token2.size(); i++)
 		{
 			if(token2[i].startsWith("M|"))
 			{
-				lastMessageNid = token2[i].mid(2); // Extract nid after "M|"
-				break;
+				messageNids.append(token2[i].mid(2)); // Extract nid after "M|"
 			}
 		}
 		
-		if(!lastMessageNid.isEmpty())
+		// Fetch the last several message notifications to search for export link
+		// The export notification is most likely recent, but not guaranteed to be the very last one
+		const int maxNotificationsToFetch = 10;
+		int notificationsToFetch = qMin(messageNids.size(), maxNotificationsToFetch);
+		
+		if(notificationsToFetch > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching last message notification: " + lastMessageNid);
-			NotifyGet(lastMessageNid.toInt());
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching last " + QString::number(notificationsToFetch) + " message notifications");
+			for(int i = 0; i < notificationsToFetch; i++)
+			{
+				// Fetch from the end of the list (most recent first)
+				QString nid = messageNids[messageNids.size() - 1 - i];
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
+				NotifyGet(nid.toInt());
+			}
 		}
 	}
 	else if(ReplyID == "291"){ // 291 NOTIFYLIST ENTRY
@@ -377,21 +388,32 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i]);
 		}
 		
-		// Find the last message notification (M|nid) and fetch its content
-		QString lastMessageNid;
-		for(int i = token2.size() - 1; i >= 0; i--)
+		// Collect all message notification IDs (M|nid entries)
+		// Export notifications could be in any of these messages, not just the last one
+		QStringList messageNids;
+		for(int i = 0; i < token2.size(); i++)
 		{
 			if(token2[i].startsWith("M|"))
 			{
-				lastMessageNid = token2[i].mid(2); // Extract nid after "M|"
-				break;
+				messageNids.append(token2[i].mid(2)); // Extract nid after "M|"
 			}
 		}
 		
-		if(!lastMessageNid.isEmpty())
+		// Fetch the last several message notifications to search for export link
+		// The export notification is most likely recent, but not guaranteed to be the very last one
+		const int maxNotificationsToFetch = 10;
+		int notificationsToFetch = qMin(messageNids.size(), maxNotificationsToFetch);
+		
+		if(notificationsToFetch > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching last message notification: " + lastMessageNid);
-			NotifyGet(lastMessageNid.toInt());
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching last " + QString::number(notificationsToFetch) + " message notifications");
+			for(int i = 0; i < notificationsToFetch; i++)
+			{
+				// Fetch from the end of the list (most recent first)
+				QString nid = messageNids[messageNids.size() - 1 - i];
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
+				NotifyGet(nid.toInt());
+			}
 		}
 	}
 	else if(ReplyID == "292"){ // 292 NOTIFYGET (type=M) - {int4 id}|{int4 from_user_id}|{str from_user_name}|{int4 date}|{int4 type}|{str title}|{str body}

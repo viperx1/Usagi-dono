@@ -203,3 +203,26 @@ endif()
 
 add_test(NAME test_anime_titles COMMAND test_anime_titles -v2)
 
+# Test 5: URL extraction from notifications
+add_executable(test_url_extraction test_url_extraction.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_url_extraction PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_url_extraction PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_url_extraction PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_url_extraction COMMAND test_url_extraction -v2)
+
