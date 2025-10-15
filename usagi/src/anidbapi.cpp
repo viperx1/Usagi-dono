@@ -16,7 +16,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	{
 		// Fallback to a default IP or leave uninitialized
 		// DNS resolution failed, socket operations will be skipped
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] DNS resolution for api.anidb.net failed";
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] DNS resolution for api.anidb.net failed");
 	}
 	anidbport = 9000;
 	loggedin = 0;
@@ -167,16 +167,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Common case: "598 UNKNOWN COMMAND" becomes Tag="598", ReplyID="UNKNOWN"
 			ReplyID = Tag;
 			Tag = "0"; // Use default tag since none was provided
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tagless response detected - Tag:"<<Tag<<"ReplyID:"<<ReplyID;
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] Tagless response detected - Tag: " + Tag + " ReplyID: " + ReplyID);
 		}
 		else
 		{
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tag:"<<Tag<<"ReplyID:"<<ReplyID;
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID);
 		}
 	}
 	else
 	{
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] Tag:"<<Tag<<"ReplyID:"<<ReplyID;
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID);
 	}
 
 	token.pop_front();
@@ -192,7 +192,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         notifyLoggedIn(Tag, 201);
 	}
     else if(ReplyID == "203"){ // 203 LOGGED OUT
-        qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 203 LOGGED OUT - Tag:"<<Tag;
+        Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 203 LOGGED OUT - Tag: " + Tag);
 		loggedin = 0;
         notifyLoggedOut(Tag, 203);
 	}
@@ -235,7 +235,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(token2.at(26)).replace("'", "''"));
 		QSqlQuery query(db);
 		query.exec(q);
-		qDebug()<<query.lastError().text();
+		Debug("Database query error: " + query.lastError().text());
 //		qDebug()<<q;
 /*		while(!token2.isEmpty())
 		{
@@ -266,20 +266,20 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						.arg(token2.size() > 12 ? QString(token2.at(12)).replace("'", "''") : "0");
 			QSqlQuery query(db);
 			query.exec(q);
-			qDebug()<<query.lastError().text();
+			Debug("Database query error: " + query.lastError().text());
 		}
 	}
 	else if(ReplyID == "222"){ // 222 MYLISTSTATS
 		// Response format: entries|watched|size|viewed size|viewed%|watched%|episodes watched
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 222 MYLISTSTATS - Tag:"<<Tag<<"Data:"<<token2.first();
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 222 MYLISTSTATS - Tag: " + Tag + " Data: " + token2.first());
 	}
 	else if(ReplyID == "223"){ // 223 WISHLIST
 		// Parse wishlist response
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 223 WISHLIST - Tag:"<<Tag<<"Data:"<<token2.first();
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first());
 	}
 	else if(ReplyID == "310"){ // 310 FILE ALREADY IN MYLIST
 		// resend with tag and &edit=1
@@ -300,13 +300,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		notifyMylistAdd(Tag, 311);
 	}
 	else if(ReplyID == "312"){ // 312 NO SUCH MYLIST ENTRY
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag:"<<Tag;
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag);
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
         QString q;
         notifyMylistAdd(Tag, 320);
         q = QString("DELETE from `packets` WHERE `tag` = '%1'").arg(Tag);
-        qDebug()<<QString(q)<<QString(Tag);
+        Debug("Database delete query: " + q + " Tag: " + Tag);
         QSqlQuery query;
         query.exec(q);
     }
@@ -321,7 +321,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString title = parts[4];
 			QString body = parts[5];
 			
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 270 NOTIFICATION - NID:"<<nid<<"Title:"<<title<<"Body:"<<body;
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 270 NOTIFICATION - NID: " + QString::number(nid) + " Title: " + title + " Body: " + body);
 			
 			// Emit signal for notification
 			emit notifyMessageReceived(nid, body);
@@ -331,21 +331,21 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 	}
 	else if(ReplyID == "271"){ // 271 NOTIFYACK - NOTIFICATION ACKNOWLEDGED
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 271 NOTIFICATION ACKNOWLEDGED - Tag:"<<Tag;
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 271 NOTIFICATION ACKNOWLEDGED - Tag: " + Tag);
 	}
 	else if(ReplyID == "272"){ // 272 NO SUCH NOTIFICATION
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 272 NO SUCH NOTIFICATION - Tag:"<<Tag;
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 272 NO SUCH NOTIFICATION - Tag: " + Tag);
 	}
 	else if(ReplyID == "290"){ // 290 NOTIFYLIST
 		// Parse notification list - show all entries
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST - Tag:"<<Tag<<"Entry count:"<<token2.size();
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()));
 		
 		// Log all notification entries
 		for(int i = 0; i < token2.size(); i++)
 		{
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST Entry"<<i+1<<"of"<<token2.size()<<":"<<token2[i];
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i]);
 		}
 		
 		// Find the last message notification (M|nid) and fetch its content
@@ -361,7 +361,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		
 		if(!lastMessageNid.isEmpty())
 		{
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 290 NOTIFYLIST - Fetching last message notification:"<<lastMessageNid;
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching last message notification: " + lastMessageNid);
 			NotifyGet(lastMessageNid.toInt());
 		}
 	}
@@ -369,12 +369,12 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Parse notification list - can contain single entry (pagination) or full list
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST - Tag:"<<Tag<<"Entry count:"<<token2.size();
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()));
 		
 		// Log all notification entries
 		for(int i = 0; i < token2.size(); i++)
 		{
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST Entry"<<i+1<<"of"<<token2.size()<<":"<<token2[i];
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i]);
 		}
 		
 		// Find the last message notification (M|nid) and fetch its content
@@ -390,7 +390,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		
 		if(!lastMessageNid.isEmpty())
 		{
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 291 NOTIFYLIST - Fetching last message notification:"<<lastMessageNid;
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching last message notification: " + lastMessageNid);
 			NotifyGet(lastMessageNid.toInt());
 		}
 	}
@@ -406,7 +406,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString title = parts[4];
 			QString body = parts[5];
 			
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 293 NOTIFYGET - NID:"<<nid<<"Type:"<<type<<"Title:"<<title<<"Body:"<<body;
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - NID: " + QString::number(nid) + " Type: " + type + " Title: " + title + " Body: " + body);
 			
 			// Emit signal for notification (same as 270 for automatic download/import)
 			emit notifyMessageReceived(nid, body);
@@ -416,7 +416,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 		else
 		{
-			qDebug()<<__FILE__<<__LINE__<<"[AniDB Response] 293 NOTIFYGET - Invalid format, parts count:"<<parts.size();
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()));
 		}
 	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
@@ -450,13 +450,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
     }
 	else if(ReplyID == "598"){ // 598 UNKNOWN COMMAND
 		// This typically means the command was malformed or not recognized
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] 598 UNKNOWN COMMAND - Tag:"<<Tag<<"- check request format";
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] 598 UNKNOWN COMMAND - Tag: " + Tag + " - check request format");
 	}
 	else if(ReplyID == "601"){ // 601 ANIDB OUT OF SERVICE - TRY AGAIN LATER
 	}
     else
     {
-        qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] ParseMessage - UNSUPPORTED ReplyID:"<<ReplyID<<"Tag:"<<Tag;
+        Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] ParseMessage - UNSUPPORTED ReplyID: " + ReplyID + " Tag: " + Tag);
     }
     waitingForReply.isWaiting = false;
 	return ReplyID;
@@ -468,7 +468,7 @@ QString AniDBApi::Auth()
 	QString q;
 	q = QString("INSERT OR REPLACE INTO `packets` (`tag`, `str`) VALUES ('0', '%1');").arg(msg);
 	QSqlQuery query(q);
-	qDebug()<<"auth"<<query.lastError().text();
+	Debug("Auth database query error: " + query.lastError().text());
 
 //	Send(msg, "AUTH", "xxx");
 
@@ -478,7 +478,7 @@ QString AniDBApi::Auth()
 QString AniDBApi::Logout()
 {
 	QString msg = buildLogoutCommand();
-    qDebug()<<__FILE__<<__LINE__<<"[AniDB API] Sending LOGOUT command";
+    Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Sending LOGOUT command");
     Send(msg, "LOGOUT", "0");
 
 	return 0;
@@ -498,7 +498,7 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 
 /*	q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = 0").arg(msg);
 	query.exec(q);
-	qDebug()<<query.lastError().text();
+	Debug("Database query error: " + query.lastError().text());
 
 	if(query.isSelect())
 	{
@@ -670,7 +670,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 {
 	if(Socket == nullptr)
 	{
-		qDebug()<<__FILE__<<__LINE__<<"[AniDB Error] Socket not initialized, cannot send";
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] Socket not initialized, cannot send");
 		return 0;
 	}
 	QString a;
@@ -681,7 +681,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	Debug("AniDBApi: Send: " + (a.length() > 0 ? a : a = str));
 
 	a = QString("%1&tag=%2").arg(a).arg(tag);
-    qDebug()<<__FILE__<<__LINE__<<"[AniDB Send] Command:"<<a;
+    Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Send] Command: " + a);
 //    QByteArray bytes = a.toUtf8();
 //	const char *ptr = bytes.data();
 //	Socket->write(ptr);
@@ -762,21 +762,21 @@ int AniDBApi::SendPacket()
             {
                 tag = query.value(0).toString();
                 str = query.value(1).toString();
-                qDebug()<<__FILE__<<__LINE__<<"[AniDB Queue] Sending query - Tag:"<<tag<<"Command:"<<str;
+                Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Queue] Sending query - Tag: " + tag + " Command: " + str);
                 if(!LoggedIn() && !str.contains("AUTH"))
                 {
                     Auth();
                     return 0;
                 }
                 Send(str,"", tag);
-                qDebug()<<__FILE__<<__LINE__<<"[AniDB Sent] Command:"<<lastSentPacket;
+                Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Sent] Command: " + lastSentPacket);
             }
         }
     }
 	Recv();
     if(waitingForReply.isWaiting == true && waitingForReply.start.elapsed() > 10000)
     {
-        qDebug()<<__FILE__<<__LINE__<<"[AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed:"<<waitingForReply.start.elapsed()<<"ms";
+        Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed: " + QString::number(waitingForReply.start.elapsed()) + " ms");
     }
 	return 0;
 }
