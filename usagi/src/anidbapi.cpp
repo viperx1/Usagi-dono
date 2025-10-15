@@ -412,8 +412,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Emit signal for notification (same as 270 for automatic download/import)
 			emit notifyMessageReceived(id, body);
 			
-			// Acknowledge the notification
-			PushAck(id);
+			// Note: PUSHACK is only for PUSH notifications (code 270), not for fetched notifications via NOTIFYGET
 		}
 		else
 		{
@@ -438,8 +437,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Note: For N-type notifications, we don't emit notifyMessageReceived as these are file notifications
 			// They would need different handling for new file notifications
 			
-			// Acknowledge the notification
-			PushAck(relid);
+			// Note: PUSHACK is only for PUSH notifications (code 270), not for fetched notifications via NOTIFYGET
 		}
 		else
 		{
@@ -480,6 +478,11 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] 598 UNKNOWN COMMAND - Tag: " + Tag + " - check request format");
 	}
 	else if(ReplyID == "601"){ // 601 ANIDB OUT OF SERVICE - TRY AGAIN LATER
+	}
+	else if(ReplyID == "702"){ // 702 NO SUCH PACKET PENDING
+		// This occurs when trying to PUSHACK a notification that wasn't sent via PUSH
+		// PUSHACK is only for notifications received via code 270 (PUSH), not for notifications fetched via NOTIFYGET
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 702 NO SUCH PACKET PENDING - Tag: " + Tag);
 	}
     else
     {
