@@ -693,14 +693,32 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	logOutput->append(QString("Notification %1 received").arg(nid));
 	
 	// Check if message contains mylist export link
-	// AniDB notification format typically contains URLs in the body
-	// Look for patterns like: http://anidb.net/mylist-export/...tgz
-	QRegularExpression urlRegex("https?://[^\\s]+\\.tgz");
-	QRegularExpressionMatch match = urlRegex.match(message);
+	// AniDB notification format can contain URLs in two formats:
+	// 1. Plain: https://anidb.net/export/12345.tgz
+	// 2. BBCode: [url=https://anidb.net/export/12345.tgz]Download[/url]
+	QString exportUrl;
 	
-	if(match.hasMatch())
+	// First try to match BBCode format: [url=...]...[/url]
+	QRegularExpression bbcodeRegex("\\[url=(https?://[^\\]]+\\.tgz)\\]");
+	QRegularExpressionMatch bbcodeMatch = bbcodeRegex.match(message);
+	
+	if(bbcodeMatch.hasMatch())
 	{
-		QString exportUrl = match.captured(0);
+		exportUrl = bbcodeMatch.captured(1);  // Capture group 1 is the URL inside [url=...]
+	}
+	else
+	{
+		// Fallback to plain URL format
+		QRegularExpression plainRegex("https?://[^\\s]+\\.tgz");
+		QRegularExpressionMatch plainMatch = plainRegex.match(message);
+		if(plainMatch.hasMatch())
+		{
+			exportUrl = plainMatch.captured(0);
+		}
+	}
+	
+	if(!exportUrl.isEmpty())
+	{
 		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
 		mylistStatusLabel->setText("MyList Status: Downloading export...");
 		
