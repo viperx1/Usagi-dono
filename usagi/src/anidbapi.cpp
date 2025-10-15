@@ -56,6 +56,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
 		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `settings`(`id` INTEGER PRIMARY KEY, `name` TEXT UNIQUE, `value` TEXT);");
+		query.exec("CREATE TABLE IF NOT EXISTS `notifications`(`nid` INTEGER PRIMARY KEY, `type` TEXT, `from_user_id` INTEGER, `from_user_name` TEXT, `date` INTEGER, `message_type` INTEGER, `title` TEXT, `body` TEXT, `received_at` INTEGER, `acknowledged` BOOL DEFAULT 0);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
 		query.exec("SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC");
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Committing database transaction");
@@ -365,10 +366,29 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(parts.size() >= 6)
 		{
 			int nid = parts[0].toInt();
+			int type = parts[1].toInt();
+			int fromuid = parts[2].toInt();
+			int date = parts[3].toInt();
 			QString title = parts[4];
 			QString body = parts[5];
 			
 			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 270 NOTIFICATION - NID: " + QString::number(nid) + " Title: " + title + " Body: " + body);
+			
+			// Store notification in database
+			QSqlQuery query(db);
+			QString q = QString("INSERT OR REPLACE INTO `notifications` (`nid`, `type`, `from_user_id`, `date`, `message_type`, `title`, `body`, `received_at`, `acknowledged`) VALUES (%1, 'PUSH', %2, %3, %4, '%5', '%6', %7, 0);")
+				.arg(nid)
+				.arg(fromuid)
+				.arg(date)
+				.arg(type)
+				.arg(QString(title).replace("'", "''"))
+				.arg(QString(body).replace("'", "''"))
+				.arg(QDateTime::currentSecsSinceEpoch());
+			query.exec(q);
+			if(query.lastError().isValid())
+			{
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Database] Error storing notification: " + query.lastError().text());
+			}
 			
 			// Emit signal for notification
 			emit notifyMessageReceived(nid, body);
@@ -473,12 +493,31 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(parts.size() >= 7)
 		{
 			int id = parts[0].toInt();
-			// parts[1] is from_user_id, parts[2] is from_user_name
-			// parts[3] is date, parts[4] is message type
+			int from_user_id = parts[1].toInt();
+			QString from_user_name = parts[2];
+			int date = parts[3].toInt();
+			int type = parts[4].toInt();
 			QString title = parts[5];
 			QString body = parts[6];
 			
 			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 292 NOTIFYGET - ID: " + QString::number(id) + " Title: " + title + " Body: " + body);
+			
+			// Store notification in database
+			QSqlQuery query(db);
+			QString q = QString("INSERT OR REPLACE INTO `notifications` (`nid`, `type`, `from_user_id`, `from_user_name`, `date`, `message_type`, `title`, `body`, `received_at`, `acknowledged`) VALUES (%1, 'FETCHED', %2, '%3', %4, %5, '%6', '%7', %8, 0);")
+				.arg(id)
+				.arg(from_user_id)
+				.arg(QString(from_user_name).replace("'", "''"))
+				.arg(date)
+				.arg(type)
+				.arg(QString(title).replace("'", "''"))
+				.arg(QString(body).replace("'", "''"))
+				.arg(QDateTime::currentSecsSinceEpoch());
+			query.exec(q);
+			if(query.lastError().isValid())
+			{
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Database] Error storing notification: " + query.lastError().text());
+			}
 			
 			// Emit signal for notification (same as 270 for automatic download/import)
 			emit notifyMessageReceived(id, body);
@@ -498,12 +537,28 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(parts.size() >= 6)
 		{
 			int relid = parts[0].toInt();
-			QString type = parts[1];
-			QString count = parts[2];
+			int type = parts[1].toInt();
+			int count = parts[2].toInt();
+			int date = parts[3].toInt();
 			QString relidname = parts[4];
 			QString fids = parts[5];
 			
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - RelID: " + QString::number(relid) + " Type: " + type + " Count: " + count + " Name: " + relidname + " FIDs: " + fids);
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - RelID: " + QString::number(relid) + " Type: " + QString::number(type) + " Count: " + QString::number(count) + " Name: " + relidname + " FIDs: " + fids);
+			
+			// Store file notification in database
+			QSqlQuery query(db);
+			QString body = QString("File notification - RelID: %1, Count: %2, Name: %3, FIDs: %4").arg(relid).arg(count).arg(relidname).arg(fids);
+			QString q = QString("INSERT OR REPLACE INTO `notifications` (`nid`, `type`, `date`, `message_type`, `title`, `body`, `received_at`, `acknowledged`) VALUES (%1, 'FILE', %2, %3, 'File Notification', '%4', %5, 0);")
+				.arg(relid)
+				.arg(date)
+				.arg(type)
+				.arg(QString(body).replace("'", "''"))
+				.arg(QDateTime::currentSecsSinceEpoch());
+			query.exec(q);
+			if(query.lastError().isValid())
+			{
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Database] Error storing file notification: " + query.lastError().text());
+			}
 			
 			// Note: For N-type notifications, we don't emit notifyMessageReceived as these are file notifications
 			// They would need different handling for new file notifications
