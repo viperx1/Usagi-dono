@@ -218,6 +218,9 @@ signals:
     void notifyLoggedOut(QString, int);
 	void notifyMessageReceived(int nid, QString message);
 	void notifyCheckStarting(int count);
+	void notifyExportQueued(QString tag);
+	void notifyExportAlreadyInQueue(QString tag);
+	void notifyExportNoSuchTemplate(QString tag);
 };
 
 #endif // ANIDBAPI_H

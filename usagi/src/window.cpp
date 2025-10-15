@@ -238,6 +238,9 @@ Window::Window()
     connect(adbapi, SIGNAL(notifyLoggedOut(QString,int)), this, SLOT(getNotifyLoggedOut(QString,int)));
 	connect(adbapi, SIGNAL(notifyMessageReceived(int,QString)), this, SLOT(getNotifyMessageReceived(int,QString)));
 	connect(adbapi, SIGNAL(notifyCheckStarting(int)), this, SLOT(getNotifyCheckStarting(int)));
+	connect(adbapi, SIGNAL(notifyExportQueued(QString)), this, SLOT(getNotifyExportQueued(QString)));
+	connect(adbapi, SIGNAL(notifyExportAlreadyInQueue(QString)), this, SLOT(getNotifyExportAlreadyInQueue(QString)));
+	connect(adbapi, SIGNAL(notifyExportNoSuchTemplate(QString)), this, SLOT(getNotifyExportNoSuchTemplate(QString)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
 
     // end
@@ -812,6 +815,31 @@ void Window::getNotifyCheckStarting(int count)
 	expectedNotificationsToCheck = count;
 	notificationsCheckedWithoutExport = 0;
 	logOutput->append(QString("Starting to check %1 notifications for mylist export link").arg(count));
+}
+
+void Window::getNotifyExportQueued(QString tag)
+{
+	// 217 EXPORT QUEUED - Export request accepted
+	logOutput->append(QString("MyList export queued successfully (Tag: %1)").arg(tag));
+	mylistStatusLabel->setText("MyList Status: Export queued - waiting for notification...");
+	// AniDB will send a notification when the export is ready
+	// The notification will contain the download link
+}
+
+void Window::getNotifyExportAlreadyInQueue(QString tag)
+{
+	// 318 EXPORT ALREADY IN QUEUE - Cannot queue another export
+	logOutput->append(QString("MyList export already in queue (Tag: %1) - waiting for current export to complete").arg(tag));
+	mylistStatusLabel->setText("MyList Status: Export already queued - waiting...");
+	// No need to take action - wait for the existing export notification
+}
+
+void Window::getNotifyExportNoSuchTemplate(QString tag)
+{
+	// 317 EXPORT NO SUCH TEMPLATE - Invalid template name
+	logOutput->append(QString("ERROR: MyList export template not found (Tag: %1)").arg(tag));
+	mylistStatusLabel->setText("MyList Status: Export failed - invalid template");
+	// This should not happen with "csv-adborg" template, but log for debugging
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)

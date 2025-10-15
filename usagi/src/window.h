@@ -137,6 +137,9 @@ public slots:
     void getNotifyLoggedOut(QString, int);
 	void getNotifyMessageReceived(int nid, QString message);
 	void getNotifyCheckStarting(int count);
+	void getNotifyExportQueued(QString tag);
+	void getNotifyExportAlreadyInQueue(QString tag);
+	void getNotifyExportNoSuchTemplate(QString tag);
     void safeClose();
     void loadMylistFromDatabase();
     void startupInitialization();
