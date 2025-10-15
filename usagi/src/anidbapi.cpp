@@ -3,14 +3,18 @@
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Constructor started");
 	protover = 3;
 	client = client_; //"usagi";
 	clientver = clientver_; //1;
 	enc = "utf8";
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Starting DNS lookup for api.anidb.net (this may block)");
 	host = QHostInfo::fromName("api.anidb.net");
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] DNS lookup completed");
 	if(!host.addresses().isEmpty())
 	{
 		anidbaddr.setAddress(host.addresses().first().toIPv4Address());
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] DNS resolved successfully to " + host.addresses().first().toString());
 	}
 	else
 	{
@@ -22,6 +26,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	loggedin = 0;
 	Socket = nullptr;
 
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Setting up database connection");
 	// Check if default database connection already exists (e.g., in tests)
 	if(QSqlDatabase::contains(QSqlDatabase::defaultConnection))
 	{
@@ -36,8 +41,10 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 
     aes_key = "8fsd789f7sd7f6sd78695g35345g34gf4";
 
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Opening database");
 	if(db.open())
 	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Database opened, starting transaction");
 		db.transaction();
 //		Debug("AniDBApi: Database opened");
 		query = QSqlQuery(db);
@@ -51,9 +58,12 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `settings`(`id` INTEGER PRIMARY KEY, `name` TEXT UNIQUE, `value` TEXT);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
 		query.exec("SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC");
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Committing database transaction");
 		db.commit();
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Database transaction committed");
 	}
 //	QStringList names = QStringList()<<"username"<<"password";
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Reading settings from database");
 	while(query.next())
 	{
 		if(query.value(0).toString() == "username")
@@ -75,9 +85,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	}
 
 	// Initialize network manager for anime titles download
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Initializing network manager");
 	networkManager = new QNetworkAccessManager(this);
 	connect(networkManager, &QNetworkAccessManager::finished, this, &AniDBApi::onAnimeTitlesDownloaded);
 
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Setting up packet sender timer");
 	packetsender = new QTimer();
 	connect(packetsender, SIGNAL(timeout()), this, SLOT(SendPacket()));
 
@@ -85,10 +97,18 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	packetsender->start();
 
 	// Check and download anime titles if needed (automatically on startup)
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Checking if anime titles need update");
 	if(shouldUpdateAnimeTitles())
 	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Starting anime titles download");
 		downloadAnimeTitles();
 	}
+	else
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Anime titles are up to date, skipping download");
+	}
+
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Constructor completed successfully");
 
 //	codec = QTextCodec::codecForName("UTF-8");
 }
@@ -893,6 +913,7 @@ QString AniDBApi::GetTag(QString str)
 
 bool AniDBApi::shouldUpdateAnimeTitles()
 {
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Checking if anime titles need update");
 	// Check if we should download anime titles
 	// Download if: never downloaded before OR last update was more than 24 hours ago
 	// Read from database to ensure we have the most up-to-date timestamp
@@ -902,12 +923,15 @@ bool AniDBApi::shouldUpdateAnimeTitles()
 	if(!query.next())
 	{
 		// Never downloaded before
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] No previous download found, download needed");
 		return true;
 	}
 	
 	QDateTime lastUpdate = QDateTime::fromSecsSinceEpoch(query.value(0).toLongLong());
 	qint64 secondsSinceLastUpdate = lastUpdate.secsTo(QDateTime::currentDateTime());
-	return secondsSinceLastUpdate > 86400; // 86400 seconds = 24 hours
+	bool needsUpdate = secondsSinceLastUpdate > 86400; // 86400 seconds = 24 hours
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Last update was " + QString::number(secondsSinceLastUpdate) + " seconds ago, needs update: " + (needsUpdate ? "yes" : "no"));
+	return needsUpdate;
 }
 
 void AniDBApi::downloadAnimeTitles()
@@ -931,6 +955,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 		return;
 	}
 	
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Download callback triggered");
 	if(reply->error() != QNetworkReply::NoError)
 	{
 		Debug(QString("Failed to download anime titles: %1").arg(reply->errorString()));
@@ -948,10 +973,12 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	QByteArray decompressedData;
 	
 	// Check if it's gzip format (starts with 0x1f 0x8b)
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting decompression");
 	if(compressedData.size() >= 2 && 
 	   (unsigned char)compressedData[0] == 0x1f && 
 	   (unsigned char)compressedData[1] == 0x8b)
 	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Detected gzip format, using zlib decompression");
 		// It's gzip format - use zlib to decompress
 		// Initialize zlib stream
 		z_stream stream;
@@ -974,6 +1001,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 		const int CHUNK = 4 * 1024 * 1024;
 		unsigned char* out = new unsigned char[CHUNK];
 		
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting inflate operation (this may take a moment)");
 		// Decompress
 		do {
 			stream.avail_out = CHUNK;
@@ -992,12 +1020,14 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 			decompressedData.append((char*)out, have);
 		} while(ret != Z_STREAM_END);
 		
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Decompression completed successfully");
 		// Clean up
 		delete[] out;
 		inflateEnd(&stream);
 	}
 	else
 	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Not gzip format, trying qUncompress");
 		// Try direct decompression with qUncompress (for zlib format)
 		decompressedData = qUncompress(compressedData);
 	}
@@ -1010,7 +1040,9 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	
 	Debug(QString("Decompressed to %1 bytes").arg(decompressedData.size()));
 	
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting to parse and store titles");
 	parseAndStoreAnimeTitles(decompressedData);
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Finished parsing and storing titles");
 	
 	// Update last download timestamp
 	lastAnimeTitlesUpdate = QDateTime::currentDateTime();
@@ -1030,16 +1062,20 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 		return;
 	}
 	
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting to parse anime titles data (" + QString::number(data.size()) + " bytes)");
 	QString content = QString::fromUtf8(data);
 	QStringList lines = content.split('\n', Qt::SkipEmptyParts);
 	
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting database transaction for " + QString::number(lines.size()) + " lines");
 	db.transaction();
 	
 	// Clear old titles
 	QSqlQuery query(db);
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Clearing old anime titles from database");
 	query.exec("DELETE FROM `anime_titles`");
 	
 	int count = 0;
+	int progressInterval = 1000; // Report progress every 1000 titles
 	for(const QString &line : lines)
 	{
 		// Skip comments and empty lines
@@ -1065,9 +1101,16 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 						.arg(aid).arg(type).arg(language).arg(title);
 			query.exec(q);
 			count++;
+			
+			// Report progress periodically to show it's not frozen
+			if(count % progressInterval == 0)
+			{
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Processing progress: " + QString::number(count) + " titles inserted");
+			}
 		}
 	}
 	
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Committing database transaction with " + QString::number(count) + " titles");
 	db.commit();
-	Debug(QString("Parsed and stored %1 anime titles").arg(count));
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Parsed and stored " + QString::number(count) + " anime titles successfully");
 }
