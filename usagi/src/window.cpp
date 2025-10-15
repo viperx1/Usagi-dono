@@ -690,7 +690,6 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] Notification received: " + QString::number(nid) + " " + message;
 	qDebug() << logMsg;
 	getNotifyLogAppend(logMsg);
-	logOutput->append(QString("Notification %1 received").arg(nid));
 	
 	// Prevent downloading multiple exports simultaneously
 	static bool isDownloadingExport = false;
@@ -705,6 +704,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	{
 		isDownloadingExport = true;
 		QString exportUrl = match.captured(0);
+		logOutput->append(QString("Notification %1 received").arg(nid));
 		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
 		mylistStatusLabel->setText("MyList Status: Downloading export...");
 		
@@ -766,10 +766,8 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 			manager->deleteLater();
 		});
 	}
-	else
-	{
-		logOutput->append("No mylist export link found in notification");
-	}
+	// Don't log "No mylist export link found" for every notification - it creates log spam
+	// The notification is already logged via qDebug() and getNotifyLogAppend() above for debugging
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
