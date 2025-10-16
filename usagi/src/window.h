@@ -146,6 +146,7 @@ public slots:
 	void onMylistItemExpanded(QTreeWidgetItem *item);
     void safeClose();
     void loadMylistFromDatabase();
+    void updateEpisodeInTree(int eid, int aid);
     void startupInitialization();
     bool isMylistFirstRunComplete();
     void setMylistFirstRunComplete();
