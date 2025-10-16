@@ -105,6 +105,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	connect(notifyCheckTimer, SIGNAL(timeout()), this, SLOT(checkForNotifications()));
 	isExportQueued = false;
 	notifyCheckAttempts = 0;
+	notifyCheckIntervalMs = 60000; // Start with 1 minute
 
 	// Check and download anime titles if needed (automatically on startup)
 	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Checking if anime titles need update");
@@ -309,9 +310,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Start periodic notification checking
 		isExportQueued = true;
 		notifyCheckAttempts = 0;
-		notifyCheckTimer->setInterval(30000); // Check every 30 seconds
+		notifyCheckIntervalMs = 60000; // Start with 1 minute
+		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		notifyCheckTimer->start();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Started periodic notification checking (every 30 seconds)");
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Started periodic notification checking (every 1 minute initially)");
 		
 		emit notifyExportQueued(Tag);
 	}
@@ -669,6 +671,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
 				isExportQueued = false;
 				notifyCheckTimer->stop();
+				notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
 			}
 			
 			// Emit signal for notification
@@ -846,6 +849,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
 				isExportQueued = false;
 				notifyCheckTimer->stop();
+				notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
 			}
 			
 			// Emit signal for notification (same as 270 for automatic download/import)
@@ -1582,7 +1586,8 @@ void AniDBApi::checkForNotifications()
 	}
 	
 	notifyCheckAttempts++;
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Periodic notification check (attempt " + QString::number(notifyCheckAttempts) + ")");
+	int intervalMinutes = notifyCheckIntervalMs / 60000;
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Periodic notification check (attempt " + QString::number(notifyCheckAttempts) + ", interval: " + QString::number(intervalMinutes) + " minutes)");
 	
 	// Check for new notifications by requesting NOTIFYLIST
 	if(SID.length() > 0 && LoginStatus() > 0)
@@ -1599,13 +1604,20 @@ void AniDBApi::checkForNotifications()
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Not logged in, skipping notification check");
 	}
 	
-	// Stop checking after 20 attempts (10 minutes with 30-second intervals)
-	// AniDB export generation typically completes within a few minutes
+	// Increase check interval by 1 minute for next check (no new notification found)
+	notifyCheckIntervalMs += 60000;
+	notifyCheckTimer->setInterval(notifyCheckIntervalMs);
+	int nextIntervalMinutes = notifyCheckIntervalMs / 60000;
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Next check will be in " + QString::number(nextIntervalMinutes) + " minutes");
+	
+	// Stop checking after 20 attempts
+	// With increasing intervals (1, 2, 3, ... 20 minutes), this gives plenty of time
 	if(notifyCheckAttempts >= 20)
 	{
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Stopping notification checks after 20 attempts");
 		notifyCheckTimer->stop();
 		isExportQueued = false;
 		notifyCheckAttempts = 0;
+		notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
 	}
 }

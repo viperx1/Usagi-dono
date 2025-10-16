@@ -69,6 +69,7 @@ private:
 	QTimer *notifyCheckTimer;
 	bool isExportQueued;
 	int notifyCheckAttempts;
+	int notifyCheckIntervalMs; // Current check interval in milliseconds
 
 //    QTextCodec *codec;
 	enum progress
