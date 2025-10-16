@@ -58,8 +58,9 @@ private slots:
     // Notification database tests
     void testNotificationsTableExists();
     
-    // MYLISTADD database storage test
+    // MYLISTADD database storage tests
     void testMylistAddResponseStoredInDatabase();
+    void testMylistEditResponseUpdatesDatabase();
 
 private:
     AniDBApi* api;
@@ -731,6 +732,90 @@ void TestAniDBApiCommands::testMylistAddResponseStoredInDatabase()
     
     qDebug() << "Successfully verified MYLISTADD response stored in database";
     qDebug() << "  lid:" << lid << "fid:" << fid << "aid:" << aid << "eid:" << eid;
+    
+    // Clean up
+    q = QString("DELETE FROM `mylist` WHERE `lid` = %1").arg(lid);
+    query.exec(q);
+    q = QString("DELETE FROM `file` WHERE `fid` = %1").arg(fid);
+    query.exec(q);
+}
+
+void TestAniDBApiCommands::testMylistEditResponseUpdatesDatabase()
+{
+    // This test verifies that when a MYLISTADD response with edit=1 
+    // receives a 311 MYLIST ENTRY EDITED response, the entry is updated in the database
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    QVERIFY(db.isOpen());
+    
+    // Step 1: Insert a file entry into the database
+    QString fid = "3825688";
+    QString aid = "18796";
+    QString eid = "297777";
+    QString gid = "16326";
+    qint64 size = 1468257417;
+    QString ed2k = "d46543aef15b4919cf966de5f339324c";
+    
+    QString q = QString("INSERT OR REPLACE INTO `file` "
+        "(`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, `size`, `ed2k`, "
+        "`md5`, `sha1`, `crc`, `quality`, `source`, `codec_audio`, `bitrate_audio`, "
+        "`codec_video`, `bitrate_video`, `resolution`, `filetype`, `lang_dub`, `lang_sub`, "
+        "`length`, `description`, `airdate`, `filename`) "
+        "VALUES ('%1', '%2', '%3', '%4', '0', '', '0', '1', '%5', '%6', '', '', '', '', '', '', '0', '', '0', '', '', '', '', '0', '', '0', '')")
+        .arg(fid).arg(aid).arg(eid).arg(gid).arg(size).arg(ed2k);
+    
+    QSqlQuery query(db);
+    QVERIFY2(query.exec(q), QString("Failed to insert file entry: %1").arg(query.lastError().text()).toLatin1());
+    
+    // Step 2: Insert an existing mylist entry (to simulate editing)
+    QString lid = "423064548";
+    q = QString("INSERT OR REPLACE INTO `mylist` "
+        "(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
+        "VALUES (%1, %2, %3, %4, %5, 0, 0, '')")
+        .arg(lid).arg(fid).arg(eid).arg(aid).arg(gid);
+    QVERIFY2(query.exec(q), QString("Failed to insert initial mylist entry: %1").arg(query.lastError().text()).toLatin1());
+    
+    // Step 3: Simulate sending a MYLISTADD command with edit=1
+    int viewed = 2;  // Changed to 2 (will be stored as 1)
+    int state = 2;   // Changed state
+    QString storage = "HDD";  // Added storage
+    bool edit = true;
+    
+    QString tag = api->MylistAdd(size, ed2k, viewed, state, storage, edit);
+    QVERIFY(!tag.isEmpty());
+    
+    // Verify the command was stored in packets table with edit=1
+    q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(tag);
+    QVERIFY2(query.exec(q), QString("Failed to query packets: %1").arg(query.lastError().text()).toLatin1());
+    QVERIFY2(query.next(), "MYLISTADD command not found in packets table");
+    QString mylistAddCmd = query.value(0).toString();
+    QVERIFY(mylistAddCmd.contains("MYLISTADD"));
+    QVERIFY(mylistAddCmd.contains("&edit=1"));
+    
+    // Step 4: Simulate receiving a 311 MYLIST ENTRY EDITED response
+    QString response = QString("%1 311 MYLIST ENTRY EDITED\n%2").arg(tag).arg(lid);
+    
+    // Parse the response (this will trigger the database update logic)
+    api->ParseMessage(response, "", "");
+    
+    // Step 5: Verify the mylist entry was updated in the database
+    q = QString("SELECT `lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage` "
+        "FROM `mylist` WHERE `lid` = %1").arg(lid);
+    QVERIFY2(query.exec(q), QString("Failed to query mylist: %1").arg(query.lastError().text()).toLatin1());
+    QVERIFY2(query.next(), "Mylist entry not found in database");
+    
+    // Verify the stored values were updated
+    QCOMPARE(query.value(0).toString(), lid);
+    QCOMPARE(query.value(1).toString(), fid);
+    QCOMPARE(query.value(2).toString(), eid);
+    QCOMPARE(query.value(3).toString(), aid);
+    QCOMPARE(query.value(4).toString(), gid);
+    QCOMPARE(query.value(5).toString(), QString::number(state));
+    QCOMPARE(query.value(6).toString(), QString::number(viewed - 1)); // viewed is decremented in MylistAdd
+    QCOMPARE(query.value(7).toString(), storage);
+    
+    qDebug() << "Successfully verified MYLISTADD edit (311) response updated database";
+    qDebug() << "  lid:" << lid << "state:" << state << "viewed:" << (viewed - 1) << "storage:" << storage;
     
     // Clean up
     q = QString("DELETE FROM `mylist` WHERE `lid` = %1").arg(lid);
