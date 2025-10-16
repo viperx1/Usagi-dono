@@ -966,8 +966,8 @@ void Window::loadMylistFromDatabase()
 		if(!filename.isEmpty())
 		{
 			// Try to extract episode number from filename using common patterns
-			// Patterns like: E01, e01, - 01, _01_, [01], etc.
-			QRegularExpression epRegex("\\b[Ee](\\d+)\\b|\\s-\\s(\\d+)|_(\\d+)_|\\[(\\d+)\\]|\\s(\\d+)\\s");
+			// Patterns like: E01, e01, - 01, _01_, [01], S01E07, _e12_, etc.
+			QRegularExpression epRegex("\\b[Ee](\\d+)\\b|[Ss]\\d+[Ee](\\d+)|[_\\s][Ee](\\d+)[_\\s]|\\s-\\s(\\d+)|_(\\d+)_|\\[(\\d+)\\]|\\s(\\d+)\\s");
 			QRegularExpressionMatch match = epRegex.match(filename);
 			if(match.hasMatch())
 			{
