@@ -891,10 +891,12 @@ void Window::loadMylistFromDatabase()
 	mylistTreeWidget->clear();
 	
 	// Query the database for mylist entries joined with anime and episode data
+	// Also try to get anime name from anime_titles table if anime table is empty
 	QSqlDatabase db = QSqlDatabase::database();
 	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
-					"e.name as episode_name, e.epno "
+					"e.name as episode_name, e.epno, "
+					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
@@ -924,11 +926,18 @@ void Window::loadMylistFromDatabase()
 		int epTotal = q.value(8).toInt();
 		QString episodeName = q.value(9).toString();
 		QString epno = q.value(10).toString();  // Episode number from database
+		QString animeTitle = q.value(11).toString();  // From anime_titles table
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
 		{
 			animeName = animeNameEnglish;
+		}
+		
+		// If anime name is still empty, try anime_titles table
+		if(animeName.isEmpty() && !animeTitle.isEmpty())
+		{
+			animeName = animeTitle;
 		}
 		
 		// If anime name is still empty, use aid
@@ -1062,10 +1071,12 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 		QString content = in.readAll();
 		file.close();
 		
-		// Parse the file - look for FILES section
+		// Parse the file - first parse anime header, then FILES section
 		QStringList lines = content.split('\n');
 		bool inFilesSection = false;
+		bool inAnimeSection = true;  // Anime data comes first
 		QStringList fileHeaders;
+		QStringList animeHeaders;
 		
 		for(int i = 0; i < lines.size(); i++)
 		{
@@ -1078,6 +1089,7 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 			if(line == "FILES")
 			{
 				inFilesSection = true;
+				inAnimeSection = false;
 				// Next line should be headers
 				if(i + 1 < lines.size())
 				{
@@ -1091,6 +1103,56 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 			if(line == "GROUPS" || line == "GENREN")
 			{
 				inFilesSection = false;
+				inAnimeSection = false;
+				continue;
+			}
+			
+			// Parse anime header and data rows (before FILES section)
+			if(inAnimeSection)
+			{
+				if(animeHeaders.isEmpty())
+				{
+					// First line is the anime header
+					// AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
+					animeHeaders = line.split('|');
+					continue;
+				}
+				else
+				{
+					// Parse anime data row
+					QStringList fields = line.split('|');
+					if(fields.size() < 3)
+						continue;
+					
+					QString aid = fields[0].trimmed();
+					QString eid = fields[1].trimmed();
+					QString epno = fields[2].trimmed();
+					QString name = fields.size() > 3 ? fields[3].trimmed() : "";
+					QString romaji = fields.size() > 4 ? fields[4].trimmed() : "";
+					QString kanji = fields.size() > 5 ? fields[5].trimmed() : "";
+					
+					// Insert episode data
+					// The format has: AID|EID|EPNo|Name|Romaji|Kanji|...
+					// where Name/Romaji/Kanji are episode names in different languages
+					if(!eid.isEmpty())
+					{
+						QString episodeName = name;
+						QString episodeRomaji = romaji;
+						QString episodeKanji = kanji;
+						
+						QString q_episode = QString("INSERT OR REPLACE INTO `episode` "
+							"(`eid`, `name`, `nameromaji`, `namekanji`, `epno`) "
+							"VALUES ('%1', '%2', '%3', '%4', '%5')")
+							.arg(eid.replace("'", "''"))
+							.arg(episodeName.replace("'", "''"))
+							.arg(episodeRomaji.replace("'", "''"))
+							.arg(episodeKanji.replace("'", "''"))
+							.arg(epno.replace("'", "''"));
+						
+						QSqlQuery query(db);
+						query.exec(q_episode);
+					}
+				}
 				continue;
 			}
 			
