@@ -1017,11 +1017,16 @@ void Window::loadMylistFromDatabase()
 		{
 			// Fallback to EID if episode number not available
 			episodeNumber = QString::number(eid);
+			logOutput->append(QString("Warning: No episode number found for EID %1 (AID %2)").arg(eid).arg(aid));
 		}
 		episodeItem->setText(1, episodeNumber);
 		
 		// Column 2: Episode title
 		episodeItem->setText(2, episodeName);
+		if(episodeName.isEmpty())
+		{
+			logOutput->append(QString("Warning: No episode name found for EID %1 (AID %2)").arg(eid).arg(aid));
+		}
 		
 		// State: 0=unknown, 1=on hdd, 2=on cd, 3=deleted
 		QString stateStr;
@@ -1174,21 +1179,27 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 					// where Name/Romaji/Kanji are episode names in different languages
 					if(!eid.isEmpty())
 					{
-						QString episodeName = name;
-						QString episodeRomaji = romaji;
-						QString episodeKanji = kanji;
+						// Use QString copies to avoid modifying the original variables
+						QString eid_escaped = QString(eid).replace("'", "''");
+						QString name_escaped = QString(name).replace("'", "''");
+						QString romaji_escaped = QString(romaji).replace("'", "''");
+						QString kanji_escaped = QString(kanji).replace("'", "''");
+						QString epno_escaped = QString(epno).replace("'", "''");
 						
 						QString q_episode = QString("INSERT OR REPLACE INTO `episode` "
 							"(`eid`, `name`, `nameromaji`, `namekanji`, `epno`) "
 							"VALUES ('%1', '%2', '%3', '%4', '%5')")
-							.arg(eid.replace("'", "''"))
-							.arg(episodeName.replace("'", "''"))
-							.arg(episodeRomaji.replace("'", "''"))
-							.arg(episodeKanji.replace("'", "''"))
-							.arg(epno.replace("'", "''"));
+							.arg(eid_escaped)
+							.arg(name_escaped)
+							.arg(romaji_escaped)
+							.arg(kanji_escaped)
+							.arg(epno_escaped);
 						
 						QSqlQuery query(db);
-						query.exec(q_episode);
+						if(!query.exec(q_episode))
+						{
+							logOutput->append(QString("Error inserting episode %1: %2").arg(eid).arg(query.lastError().text()));
+						}
 					}
 				}
 				continue;
@@ -1233,6 +1244,10 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 				if(query.exec(q))
 				{
 					count++;
+				}
+				else
+				{
+					logOutput->append(QString("Error inserting mylist entry (fid=%1): %2").arg(fid).arg(query.lastError().text()));
 				}
 			}
 		}

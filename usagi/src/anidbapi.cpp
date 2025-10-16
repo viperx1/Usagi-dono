@@ -300,8 +300,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(token2.at(26)).replace("'", "''"))
 					.arg(QString(token2.at(26)).replace("'", "''"));
 		QSqlQuery query(db);
-		query.exec(q);
-		Debug("Database query error: " + query.lastError().text());
+		if(!query.exec(q))
+		{
+			Debug("Database query error: " + query.lastError().text());
+		}
 		
 		// Parse anime/episode data if available (indices 27+)
 		// Anime data fields based on amask: eptotal|eplast|year|type|relaidlist|relaidtype|category|
@@ -351,8 +353,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(nameother).replace("'", "''"))
 					.arg(QString(nameshort).replace("'", "''"))
 					.arg(QString(synonyms).replace("'", "''"));
-				query.exec(q_anime);
-				Debug("Anime database query error: " + query.lastError().text());
+				if(!query.exec(q_anime))
+				{
+					Debug("Anime database query error: " + query.lastError().text());
+				}
 			}
 			
 			// Store episode data including episode number
@@ -366,8 +370,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(eprating).replace("'", "''"))
 					.arg(QString(epvotecount).replace("'", "''"))
 					.arg(QString(epno).replace("'", "''"));  // Store episode number!
-				query.exec(q_episode);
-				Debug("Episode database query error: " + query.lastError().text());
+				if(!query.exec(q_episode))
+				{
+					Debug("Episode database query error: " + query.lastError().text());
+				}
 			}
 		}
 	}
@@ -393,8 +399,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						.arg(token2.size() > 11 ? QString(token2.at(11)).replace("'", "''") : "")
 						.arg(token2.size() > 12 ? QString(token2.at(12)).replace("'", "''") : "0");
 			QSqlQuery query(db);
-			query.exec(q);
-			Debug("Database query error: " + query.lastError().text());
+			if(!query.exec(q))
+			{
+				Debug("Database query error: " + query.lastError().text());
+			}
 		}
 	}
 	else if(ReplyID == "222"){ // 222 MYLISTSTATS
