@@ -101,14 +101,15 @@ Window::Window()
 
     // page mylist
     mylistTreeWidget = new QTreeWidget(this);
-    mylistTreeWidget->setColumnCount(6);
-    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "State" << "Viewed" << "Storage" << "Mylist ID");
+    mylistTreeWidget->setColumnCount(7);
+    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID");
     mylistTreeWidget->setColumnWidth(0, 300);
-    mylistTreeWidget->setColumnWidth(1, 150);
-    mylistTreeWidget->setColumnWidth(2, 100);
-    mylistTreeWidget->setColumnWidth(3, 80);
-    mylistTreeWidget->setColumnWidth(4, 200);
-    mylistTreeWidget->setColumnWidth(5, 80);
+    mylistTreeWidget->setColumnWidth(1, 80);
+    mylistTreeWidget->setColumnWidth(2, 250);
+    mylistTreeWidget->setColumnWidth(3, 100);
+    mylistTreeWidget->setColumnWidth(4, 80);
+    mylistTreeWidget->setColumnWidth(5, 200);
+    mylistTreeWidget->setColumnWidth(6, 80);
     mylistTreeWidget->setAlternatingRowColors(true);
     mylistTreeWidget->setSortingEnabled(true);
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -980,25 +981,47 @@ void Window::loadMylistFromDatabase()
 		QTreeWidgetItem *episodeItem = new QTreeWidgetItem(animeItem);
 		episodeItem->setText(0, ""); // Empty for episode child
 		
-		// Build episode display string
-		QString episodeDisplay;
+		// Column 1: Episode number or type
+		QString episodeNumber;
 		if(!epno.isEmpty())
 		{
-			// Use episode number from database
-			episodeDisplay = QString("Episode %1").arg(epno);
+			// Parse episode number to determine type
+			QString epnoUpper = epno.toUpper();
+			if(epnoUpper.startsWith("S"))
+			{
+				episodeNumber = QString("Special %1").arg(epno.mid(1));
+			}
+			else if(epnoUpper.startsWith("C"))
+			{
+				episodeNumber = QString("Credit %1").arg(epno.mid(1));
+			}
+			else if(epnoUpper.startsWith("T"))
+			{
+				episodeNumber = QString("Trailer %1").arg(epno.mid(1));
+			}
+			else if(epnoUpper.startsWith("P"))
+			{
+				episodeNumber = QString("Parody %1").arg(epno.mid(1));
+			}
+			else if(epnoUpper.startsWith("O"))
+			{
+				episodeNumber = QString("Other %1").arg(epno.mid(1));
+			}
+			else
+			{
+				// Regular episode number
+				episodeNumber = epno;
+			}
 		}
 		else
 		{
 			// Fallback to EID if episode number not available
-			episodeDisplay = QString("EID: %1").arg(eid);
+			episodeNumber = QString::number(eid);
 		}
+		episodeItem->setText(1, episodeNumber);
 		
-		// Add episode name if available
-		if(!episodeName.isEmpty())
-		{
-			episodeDisplay += QString(" - %1").arg(episodeName);
-		}
-		episodeItem->setText(1, episodeDisplay);
+		// Column 2: Episode title
+		episodeItem->setText(2, episodeName);
 		
 		// State: 0=unknown, 1=on hdd, 2=on cd, 3=deleted
 		QString stateStr;
@@ -1010,12 +1033,12 @@ void Window::loadMylistFromDatabase()
 			case 3: stateStr = "Deleted"; break;
 			default: stateStr = QString::number(state); break;
 		}
-		episodeItem->setText(2, stateStr);
+		episodeItem->setText(3, stateStr);
 		
 		// Viewed: 0=no, 1=yes
-		episodeItem->setText(3, viewed ? "Yes" : "No");
-		episodeItem->setText(4, storage);
-		episodeItem->setText(5, QString::number(lid));
+		episodeItem->setText(4, viewed ? "Yes" : "No");
+		episodeItem->setText(5, storage);
+		episodeItem->setText(6, QString::number(lid));
 		
 		episodeItem->setData(0, Qt::UserRole, eid); // Store eid
 		episodeItem->setData(0, Qt::UserRole + 1, lid); // Store lid
@@ -1023,8 +1046,8 @@ void Window::loadMylistFromDatabase()
 		totalEntries++;
 	}
 	
-	// Expand all anime items
-	mylistTreeWidget->expandAll();
+	// Keep anime items collapsed by default
+	// (User can expand manually if needed)
 	
 	logOutput->append(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
 	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
