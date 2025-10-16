@@ -890,14 +890,16 @@ void Window::loadMylistFromDatabase()
 {
 	mylistTreeWidget->clear();
 	
-	// Query the database for mylist entries joined with anime and episode data
+	// Query the database for mylist entries joined with anime, episode, and file data
 	QSqlDatabase db = QSqlDatabase::database();
 	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
-					"e.name as episode_name "
+					"e.name as episode_name, "
+					"f.filename "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
+					"LEFT JOIN file f ON m.fid = f.fid "
 					"ORDER BY a.nameromaji, m.eid";
 	
 	QSqlQuery q(db);
@@ -923,6 +925,7 @@ void Window::loadMylistFromDatabase()
 		QString animeNameEnglish = q.value(7).toString();
 		int epTotal = q.value(8).toInt();
 		QString episodeName = q.value(9).toString();
+		QString filename = q.value(10).toString();
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -956,11 +959,64 @@ void Window::loadMylistFromDatabase()
 		episodeItem->setText(0, ""); // Empty for episode child
 		
 		// Build episode display string
-		QString episodeDisplay = QString("Episode %1").arg(eid);
-		if(!episodeName.isEmpty())
+		QString episodeDisplay;
+		
+		// Try to extract episode number from filename if available
+		int episodeNumber = -1;
+		if(!filename.isEmpty())
+		{
+			// Try to extract episode number from filename using common patterns
+			// Patterns like: E01, e01, - 01, _01_, [01], etc.
+			QRegularExpression epRegex("\\b[Ee](\\d+)\\b|\\s-\\s(\\d+)|_(\\d+)_|\\[(\\d+)\\]|\\s(\\d+)\\s");
+			QRegularExpressionMatch match = epRegex.match(filename);
+			if(match.hasMatch())
+			{
+				// Get the first captured group that's not empty
+				for(int i = 1; i <= match.lastCapturedIndex(); i++)
+				{
+					QString capture = match.captured(i);
+					if(!capture.isEmpty())
+					{
+						episodeNumber = capture.toInt();
+						break;
+					}
+				}
+			}
+		}
+		
+		// Build the display string based on available data
+		if(episodeNumber > 0)
+		{
+			// We found an episode number in the filename
+			episodeDisplay = QString("Episode %1").arg(episodeNumber);
+		}
+		else if(!episodeName.isEmpty())
+		{
+			// No episode number found, but we have an episode name
+			// Check if episode name already starts with "Episode" or a number
+			if(episodeName.startsWith("Episode ", Qt::CaseInsensitive) || 
+			   episodeName.at(0).isDigit())
+			{
+				episodeDisplay = episodeName;
+			}
+			else
+			{
+				// Episode name doesn't include number, just show the name
+				episodeDisplay = episodeName;
+			}
+		}
+		else
+		{
+			// No episode number or name available, use eid but make it clear it's an ID
+			episodeDisplay = QString("EID: %1").arg(eid);
+		}
+		
+		// If we have episode number and name, combine them
+		if(episodeNumber > 0 && !episodeName.isEmpty())
 		{
 			episodeDisplay += QString(" - %1").arg(episodeName);
 		}
+		
 		episodeItem->setText(1, episodeDisplay);
 		
 		// State: 0=unknown, 1=on hdd, 2=on cd, 3=deleted
