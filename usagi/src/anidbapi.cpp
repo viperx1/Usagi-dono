@@ -51,7 +51,9 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `mylist`(`lid` INTEGER PRIMARY KEY, `fid` INTEGER, `eid` INTEGER, `aid` INTEGER, `gid` INTEGER, `date` INTEGER, `state` INTEGER, `viewed` INTEGER, `viewdate` INTEGER, `storage` TEXT, `source` TEXT, `other` TEXT, `filestate` INTEGER)");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT);");
         query.exec("CREATE TABLE IF NOT EXISTS `file`(`fid` INTEGER PRIMARY KEY, `aid` INTEGER, `eid` INTEGER, `gid` INTEGER, `lid` INTEGER, `othereps` TEXT, `isdepr` INTEGER, `state` INTEGER, `size` BIGINT, `ed2k` TEXT, `md5` TEXT, `sha1` TEXT, `crc` TEXT, `quality` TEXT, `source` TEXT, `codec_audio` TEXT, `bitrate_audio` INTEGER, `codec_video` TEXT, `bitrate_video` INTEGER, `resolution` TEXT, `filetype` TEXT, `lang_dub` TEXT, `lang_sub` TEXT, `length` INTEGER, `description` TEXT, `airdate` INTEGER, `filename` TEXT);");
-		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER);");
+		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT);");
+		// Add epno column if it doesn't exist (for existing databases)
+		query.exec("ALTER TABLE `episode` ADD COLUMN `epno` TEXT");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
 		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT);");
@@ -266,7 +268,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
-		// 1 = file id
+		
+		// Parse file data (indices 0-26)
 		QString q = QString("INSERT OR REPLACE INTO `file` (`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, `size`, `ed2k`, `md5`, `sha1`, `crc`, `quality`, `source`, `codec_audio`, `bitrate_audio`, `codec_video`, `bitrate_video`, `resolution`, `filetype`, `lang_dub`, `lang_sub`, `length`, `description`, `airdate`, `filename`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13', '%14', '%15', '%16', '%17', '%18', '%19', '%20', '%21', '%22', '%23', '%24', '%25', '%26', '%27')")
 					.arg(QString(token2.at(0)).replace("'", "''"))
 					.arg(QString(token2.at(1)).replace("'", "''"))
@@ -299,12 +302,74 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QSqlQuery query(db);
 		query.exec(q);
 		Debug("Database query error: " + query.lastError().text());
-//		qDebug()<<q;
-/*		while(!token2.isEmpty())
+		
+		// Parse anime/episode data if available (indices 27+)
+		// Anime data fields based on amask: eptotal|eplast|year|type|relaidlist|relaidtype|category|
+		//   nameromaji|namekanji|nameenglish|nameother|nameshort|synonyms|
+		//   epno|epname|epnameromaji|epnamekanji|eprating|epvotecount|groupname|groupshortname|dateaidrecordupdated
+		if(token2.size() > 27)
 		{
-			Debug("-- " + token2.first());
-			token2.pop_front();
-		}*/
+			QString aid = token2.size() > 1 ? token2.at(1) : "";
+			QString eid = token2.size() > 2 ? token2.at(2) : "";
+			
+			// Anime data starts at index 27
+			QString eptotal = token2.size() > 27 ? token2.at(27) : "";
+			QString eplast = token2.size() > 28 ? token2.at(28) : "";
+			QString year = token2.size() > 29 ? token2.at(29) : "";
+			QString type = token2.size() > 30 ? token2.at(30) : "";
+			QString relaidlist = token2.size() > 31 ? token2.at(31) : "";
+			QString relaidtype = token2.size() > 32 ? token2.at(32) : "";
+			QString category = token2.size() > 33 ? token2.at(33) : "";
+			QString nameromaji = token2.size() > 34 ? token2.at(34) : "";
+			QString namekanji = token2.size() > 35 ? token2.at(35) : "";
+			QString nameenglish = token2.size() > 36 ? token2.at(36) : "";
+			QString nameother = token2.size() > 37 ? token2.at(37) : "";
+			QString nameshort = token2.size() > 38 ? token2.at(38) : "";
+			QString synonyms = token2.size() > 39 ? token2.at(39) : "";
+			QString epno = token2.size() > 40 ? token2.at(40) : "";  // Episode number!
+			QString epname = token2.size() > 41 ? token2.at(41) : "";
+			QString epnameromaji = token2.size() > 42 ? token2.at(42) : "";
+			QString epnamekanji = token2.size() > 43 ? token2.at(43) : "";
+			QString eprating = token2.size() > 44 ? token2.at(44) : "";
+			QString epvotecount = token2.size() > 45 ? token2.at(45) : "";
+			
+			// Store anime data
+			if(!aid.isEmpty())
+			{
+				QString q_anime = QString("INSERT OR REPLACE INTO `anime` (`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, `relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, `nameother`, `nameshort`, `synonyms`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13', '%14')")
+					.arg(QString(aid).replace("'", "''"))
+					.arg(QString(eptotal).replace("'", "''"))
+					.arg(QString(eplast).replace("'", "''"))
+					.arg(QString(year).replace("'", "''"))
+					.arg(QString(type).replace("'", "''"))
+					.arg(QString(relaidlist).replace("'", "''"))
+					.arg(QString(relaidtype).replace("'", "''"))
+					.arg(QString(category).replace("'", "''"))
+					.arg(QString(nameromaji).replace("'", "''"))
+					.arg(QString(namekanji).replace("'", "''"))
+					.arg(QString(nameenglish).replace("'", "''"))
+					.arg(QString(nameother).replace("'", "''"))
+					.arg(QString(nameshort).replace("'", "''"))
+					.arg(QString(synonyms).replace("'", "''"));
+				query.exec(q_anime);
+				Debug("Anime database query error: " + query.lastError().text());
+			}
+			
+			// Store episode data including episode number
+			if(!eid.isEmpty())
+			{
+				QString q_episode = QString("INSERT OR REPLACE INTO `episode` (`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
+					.arg(QString(eid).replace("'", "''"))
+					.arg(QString(epname).replace("'", "''"))
+					.arg(QString(epnameromaji).replace("'", "''"))
+					.arg(QString(epnamekanji).replace("'", "''"))
+					.arg(QString(eprating).replace("'", "''"))
+					.arg(QString(epvotecount).replace("'", "''"))
+					.arg(QString(epno).replace("'", "''"));  // Store episode number!
+				query.exec(q_episode);
+				Debug("Episode database query error: " + query.lastError().text());
+			}
+		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
 		QStringList token2 = Message.split("\n");
