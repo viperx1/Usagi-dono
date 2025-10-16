@@ -43,6 +43,9 @@ private slots:
     void testMylistCommandWithLid();
     void testMylistStatCommandFormat();
     
+    // EPISODE command tests
+    void testEpisodeCommandFormat();
+    
     // Command name validation test
     void testCommandNamesAreValid();
     
@@ -381,6 +384,33 @@ void TestAniDBApiCommands::testMylistStatCommandFormat()
     
     // Verify command is MYLISTSTATS
     QVERIFY(msg.startsWith("MYLISTSTATS"));
+}
+
+// ===== EPISODE Command Tests =====
+
+void TestAniDBApiCommands::testEpisodeCommandFormat()
+{
+    // Test EPISODE command with episode ID
+    int testEid = 12345;
+    api->Episode(testEid);
+    
+    // Get the command that was inserted
+    QString msg = getLastPacketCommand();
+    
+    // Verify command is not empty
+    QVERIFY(!msg.isEmpty());
+    
+    // Verify command starts with EPISODE
+    QVERIFY(msg.startsWith("EPISODE"));
+    
+    // Verify command contains eid parameter
+    QVERIFY(msg.contains("eid="));
+    
+    // Verify the EID is correct
+    QVERIFY(msg.contains(QString("eid=%1").arg(testEid)));
+    
+    // Verify no extra spaces or formatting issues
+    QVERIFY(!msg.contains("  "));  // No double spaces
 }
 
 void TestAniDBApiCommands::testCommandNamesAreValid()

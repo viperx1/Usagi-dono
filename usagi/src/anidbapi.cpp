@@ -417,6 +417,47 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		token2.pop_front();
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first());
 	}
+	else if(ReplyID == "240"){ // 240 EPISODE
+		// Response format: eid|aid|length|rating|votes|epno|eng|romaji|kanji|aired|type
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		token2 = token2.first().split("|");
+		
+		if(token2.size() >= 7)
+		{
+			QString eid = token2.at(0);
+			QString aid = token2.at(1);
+			// length, rating, votes are at indices 2, 3, 4
+			QString epno = token2.at(5);
+			QString epname = token2.at(6);  // English name
+			QString epnameromaji = token2.size() > 7 ? token2.at(7) : "";
+			QString epnamekanji = token2.size() > 8 ? token2.at(8) : "";
+			QString rating = token2.size() > 3 ? token2.at(3) : "";
+			QString votecount = token2.size() > 4 ? token2.at(4) : "";
+			
+			// Store episode data in database
+			QString q_episode = QString("INSERT OR REPLACE INTO `episode` (`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
+				.arg(QString(eid).replace("'", "''"))
+				.arg(QString(epname).replace("'", "''"))
+				.arg(QString(epnameromaji).replace("'", "''"))
+				.arg(QString(epnamekanji).replace("'", "''"))
+				.arg(QString(rating).replace("'", "''"))
+				.arg(QString(votecount).replace("'", "''"))
+				.arg(QString(epno).replace("'", "''"));
+			
+			QSqlQuery query(db);
+			if(!query.exec(q_episode))
+			{
+				Debug("Episode database query error: " + query.lastError().text());
+			}
+			else
+			{
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 240 EPISODE stored - EID: " + eid + " AID: " + aid + " EPNO: " + epno + " Name: " + epname);
+				// Emit signal to notify UI that episode data was updated
+				emit notifyEpisodeUpdated(eid.toInt(), aid.toInt());
+			}
+		}
+	}
 	else if(ReplyID == "310"){ // 310 FILE ALREADY IN MYLIST
 		// resend with tag and &edit=1
 		QString q;
@@ -910,6 +951,21 @@ QString AniDBApi::MylistExport(QString template_name)
 	return GetTag(msg);
 }
 
+QString AniDBApi::Episode(int eid)
+{
+	// Request episode information by episode ID
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Requesting EPISODE data for EID: " + QString::number(eid));
+	QString msg = buildEpisodeCommand(eid);
+	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query;
+	query.exec(q);
+	return GetTag(msg);
+}
+
 /* === Command Builders === */
 // These methods build formatted command strings for testing and reuse
 
@@ -981,6 +1037,13 @@ QString AniDBApi::buildMylistExportCommand(QString template_name)
 	// MYLISTEXPORT template={str template}
 	// Request mylist export with specified template (e.g., "csv-adborg")
 	return QString("MYLISTEXPORT template=%1").arg(template_name);
+}
+
+QString AniDBApi::buildEpisodeCommand(int eid)
+{
+	// EPISODE eid={int4 eid}
+	// Request episode information for a specific episode ID
+	return QString("EPISODE eid=%1").arg(eid);
 }
 
 /* === End Command Builders === */
