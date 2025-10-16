@@ -653,6 +653,8 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString msg310 = "310-2";
                 qDebug() << msg310;
                 getNotifyLogAppend(msg310);
+                // Refresh mylist widget to ensure it's up to date
+                loadMylistFromDatabase();
                 return;
             }
             if(code == 320)
@@ -675,6 +677,8 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 				{
 					// TODO: rename
 				}
+				// Refresh mylist widget to show the newly added entry
+				loadMylistFromDatabase();
 				return;
 			}
 		}
@@ -1200,6 +1204,9 @@ void Window::loadMylistFromDatabase()
 	
 	logOutput->append(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
 	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
+	
+	// Set default sort order to ascending by anime name (column 0)
+	mylistTreeWidget->sortByColumn(0, Qt::AscendingOrder);
 }
 
 int Window::parseMylistCSVAdborg(const QString &tarGzPath)
