@@ -227,6 +227,78 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         notifyLoggedOut(Tag, 203);
 	}
 	else if(ReplyID == "210"){ // 210 MYLIST ENTRY ADDED
+		// Parse lid from response message
+		QStringList token2 = Message.split("\n");
+		token2.pop_front(); // Remove the status line
+		QString lid = token2.first().trimmed();
+		
+		// Get the original MYLISTADD command from packets table
+		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
+		QSqlQuery query(db);
+		if(query.exec(q) && query.next())
+		{
+			QString mylistAddCmd = query.value(0).toString();
+			
+			// Parse parameters from the MYLISTADD command
+			// Format: MYLISTADD size=X&ed2k=Y&viewed=Z&state=W&storage=S
+			QStringList params = mylistAddCmd.split("&");
+			QString size, ed2k, viewed = "0", state = "0", storage = "";
+			
+			for(const QString& param : params)
+			{
+				if(param.contains("size="))
+					size = param.mid(param.indexOf("size=") + 5).split("&").first();
+				else if(param.contains("ed2k="))
+					ed2k = param.mid(param.indexOf("ed2k=") + 5).split("&").first();
+				else if(param.contains("viewed="))
+					viewed = param.mid(param.indexOf("viewed=") + 7).split("&").first();
+				else if(param.contains("state="))
+					state = param.mid(param.indexOf("state=") + 6).split("&").first();
+				else if(param.contains("storage="))
+					storage = param.mid(param.indexOf("storage=") + 8).split("&").first();
+			}
+			
+			// Look up file info (fid, eid, aid, gid) from file table using size and ed2k
+			QString fid, eid, aid, gid;
+			q = QString("SELECT `fid`, `eid`, `aid`, `gid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'")
+				.arg(size).arg(ed2k);
+			QSqlQuery fileQuery(db);
+			if(fileQuery.exec(q) && fileQuery.next())
+			{
+				fid = fileQuery.value(0).toString();
+				eid = fileQuery.value(1).toString();
+				aid = fileQuery.value(2).toString();
+				gid = fileQuery.value(3).toString();
+				
+				// Insert into mylist table
+				q = QString("INSERT OR REPLACE INTO `mylist` "
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					.arg(lid)
+					.arg(fid.isEmpty() ? "0" : fid)
+					.arg(eid.isEmpty() ? "0" : eid)
+					.arg(aid.isEmpty() ? "0" : aid)
+					.arg(gid.isEmpty() ? "0" : gid)
+					.arg(state)
+					.arg(viewed)
+					.arg(QString(storage).replace("'", "''"));
+				
+				QSqlQuery insertQuery(db);
+				if(!insertQuery.exec(q))
+				{
+					Debug("Failed to insert mylist entry: " + insertQuery.lastError().text());
+				}
+				else
+				{
+					Debug(QString("Successfully added mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
+				}
+			}
+			else
+			{
+				Debug("Could not find file info for size=" + size + " ed2k=" + ed2k);
+			}
+		}
+		
 		notifyMylistAdd(Tag, 210);
 	}
 	else if(ReplyID == "217"){ // 217 EXPORT QUEUED
@@ -474,6 +546,78 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		notifyMylistAdd(Tag, 310);
 	}
 	else if(ReplyID == "311"){ // 311 MYLIST ENTRY EDITED
+		// Parse lid from response message
+		QStringList token2 = Message.split("\n");
+		token2.pop_front(); // Remove the status line
+		QString lid = token2.first().trimmed();
+		
+		// Get the original MYLISTADD command from packets table
+		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
+		QSqlQuery query(db);
+		if(query.exec(q) && query.next())
+		{
+			QString mylistAddCmd = query.value(0).toString();
+			
+			// Parse parameters from the MYLISTADD command
+			// Format: MYLISTADD size=X&ed2k=Y&viewed=Z&state=W&storage=S
+			QStringList params = mylistAddCmd.split("&");
+			QString size, ed2k, viewed = "0", state = "0", storage = "";
+			
+			for(const QString& param : params)
+			{
+				if(param.contains("size="))
+					size = param.mid(param.indexOf("size=") + 5).split("&").first();
+				else if(param.contains("ed2k="))
+					ed2k = param.mid(param.indexOf("ed2k=") + 5).split("&").first();
+				else if(param.contains("viewed="))
+					viewed = param.mid(param.indexOf("viewed=") + 7).split("&").first();
+				else if(param.contains("state="))
+					state = param.mid(param.indexOf("state=") + 6).split("&").first();
+				else if(param.contains("storage="))
+					storage = param.mid(param.indexOf("storage=") + 8).split("&").first();
+			}
+			
+			// Look up file info (fid, eid, aid, gid) from file table using size and ed2k
+			QString fid, eid, aid, gid;
+			q = QString("SELECT `fid`, `eid`, `aid`, `gid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'")
+				.arg(size).arg(ed2k);
+			QSqlQuery fileQuery(db);
+			if(fileQuery.exec(q) && fileQuery.next())
+			{
+				fid = fileQuery.value(0).toString();
+				eid = fileQuery.value(1).toString();
+				aid = fileQuery.value(2).toString();
+				gid = fileQuery.value(3).toString();
+				
+				// Update mylist table
+				q = QString("INSERT OR REPLACE INTO `mylist` "
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					.arg(lid)
+					.arg(fid.isEmpty() ? "0" : fid)
+					.arg(eid.isEmpty() ? "0" : eid)
+					.arg(aid.isEmpty() ? "0" : aid)
+					.arg(gid.isEmpty() ? "0" : gid)
+					.arg(state)
+					.arg(viewed)
+					.arg(QString(storage).replace("'", "''"));
+				
+				QSqlQuery insertQuery(db);
+				if(!insertQuery.exec(q))
+				{
+					Debug("Failed to update mylist entry: " + insertQuery.lastError().text());
+				}
+				else
+				{
+					Debug(QString("Successfully updated mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
+				}
+			}
+			else
+			{
+				Debug("Could not find file info for size=" + size + " ed2k=" + ed2k);
+			}
+		}
+		
 		notifyMylistAdd(Tag, 311);
 	}
 	else if(ReplyID == "312"){ // 312 NO SUCH MYLIST ENTRY
