@@ -380,7 +380,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(token2.at(24)).replace("'", "''"))
 					.arg(QString(token2.at(25)).replace("'", "''"))
 					.arg(QString(token2.at(26)).replace("'", "''"))
-					.arg(QString(token2.at(26)).replace("'", "''"));
+					.arg(token2.size() > 27 ? QString(token2.at(27)).replace("'", "''") : "");
 		QSqlQuery query(db);
 		if(!query.exec(q))
 		{
@@ -460,31 +460,62 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
+		// Get the original MYLIST command to extract the lid parameter
+		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
+		QSqlQuery query(db);
+		QString lid;
+		
+		if(query.exec(q) && query.next())
+		{
+			QString mylistCmd = query.value(0).toString();
+			// Extract lid from command like "MYLIST lid=12345"
+			int lidStart = mylistCmd.indexOf("lid=");
+			if(lidStart != -1)
+			{
+				lidStart += 4; // Move past "lid="
+				int lidEnd = mylistCmd.indexOf("&", lidStart);
+				if(lidEnd == -1)
+					lidEnd = mylistCmd.indexOf(" ", lidStart);
+				if(lidEnd == -1)
+					lidEnd = mylistCmd.length();
+				lid = mylistCmd.mid(lidStart, lidEnd - lidStart);
+			}
+		}
+		
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
-		// Parse mylist entry: lid|fid|eid|aid|gid|date|state|viewdate|storage|source|other|filestate
-		if(token2.size() >= 12)
+		// Parse mylist entry: fid|eid|aid|gid|date|state|viewdate|storage|source|other|filestate
+		// Note: lid is NOT included in the response - it's extracted from the query command
+		if(token2.size() >= 11 && !lid.isEmpty())
 		{
-			QString q = QString("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13')")
+			q = QString("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13')")
+						.arg(lid)
 						.arg(QString(token2.at(0)).replace("'", "''"))
 						.arg(QString(token2.at(1)).replace("'", "''"))
 						.arg(QString(token2.at(2)).replace("'", "''"))
 						.arg(QString(token2.at(3)).replace("'", "''"))
 						.arg(QString(token2.at(4)).replace("'", "''"))
 						.arg(QString(token2.at(5)).replace("'", "''"))
-						.arg(QString(token2.at(6)).replace("'", "''"))
+						.arg(token2.size() > 6 ? QString(token2.at(6)).replace("'", "''") : "0")
 						.arg(token2.size() > 7 ? QString(token2.at(7)).replace("'", "''") : "0")
-						.arg(token2.size() > 8 ? QString(token2.at(8)).replace("'", "''") : "0")
+						.arg(token2.size() > 8 ? QString(token2.at(8)).replace("'", "''") : "")
 						.arg(token2.size() > 9 ? QString(token2.at(9)).replace("'", "''") : "")
 						.arg(token2.size() > 10 ? QString(token2.at(10)).replace("'", "''") : "")
-						.arg(token2.size() > 11 ? QString(token2.at(11)).replace("'", "''") : "")
-						.arg(token2.size() > 12 ? QString(token2.at(12)).replace("'", "''") : "0");
-			QSqlQuery query(db);
-			if(!query.exec(q))
+						.arg(token2.size() > 11 ? QString(token2.at(11)).replace("'", "''") : "0");
+			QSqlQuery insertQuery(db);
+			if(!insertQuery.exec(q))
 			{
-				Debug("Database query error: " + query.lastError().text());
+				Debug("Database query error: " + insertQuery.lastError().text());
 			}
+			else
+			{
+				Debug(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))));
+			}
+		}
+		else if(lid.isEmpty())
+		{
+			Debug("Could not extract lid from MYLIST command");
 		}
 	}
 	else if(ReplyID == "222"){ // 222 MYLISTSTATS
