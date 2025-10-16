@@ -51,6 +51,9 @@ private slots:
     void testPushAckCommandFormat();
     void testNotifyGetCommandFormat();
     void testAllCommandsHaveProperSpacing();
+    
+    // Notification database tests
+    void testNotificationsTableExists();
 
 private:
     AniDBApi* api;
@@ -585,3 +588,44 @@ void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
 
 QTEST_MAIN(TestAniDBApiCommands)
 #include "test_anidbapi.moc"
+// ===== Notification Database Tests =====
+
+void TestAniDBApiCommands::testNotificationsTableExists()
+{
+    // Verify that the notifications table was created in the database
+    QSqlDatabase db = QSqlDatabase::database();
+    QVERIFY(db.isOpen());
+    
+    // Check if notifications table exists
+    QSqlQuery query(db);
+    bool success = query.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='notifications'");
+    QVERIFY2(success, "Failed to query sqlite_master table");
+    QVERIFY2(query.next(), "Notifications table does not exist in database");
+    
+    QString tableName = query.value(0).toString();
+    QCOMPARE(tableName, QString("notifications"));
+    
+    // Verify the table has the expected columns
+    success = query.exec("PRAGMA table_info(notifications)");
+    QVERIFY2(success, "Failed to get table info for notifications");
+    
+    QStringList expectedColumns;
+    expectedColumns << "nid" << "type" << "from_user_id" << "from_user_name" 
+                    << "date" << "message_type" << "title" << "body" 
+                    << "received_at" << "acknowledged";
+    
+    QStringList actualColumns;
+    while(query.next())
+    {
+        actualColumns << query.value(1).toString(); // Column name is at index 1
+    }
+    
+    // Verify all expected columns exist
+    for(const QString &col : expectedColumns)
+    {
+        QVERIFY2(actualColumns.contains(col), 
+                 QString("Expected column '%1' not found in notifications table").arg(col).toLatin1());
+    }
+    
+    qDebug() << "Notifications table verified with columns:" << actualColumns;
+}
