@@ -70,6 +70,11 @@ private:
 	bool isExportQueued;
 	int notifyCheckAttempts;
 	int notifyCheckIntervalMs; // Current check interval in milliseconds
+	qint64 exportQueuedTimestamp; // Timestamp when export was queued
+	
+	void saveExportQueueState();
+	void loadExportQueueState();
+	void checkForExistingExport();
 
 //    QTextCodec *codec;
 	enum progress
