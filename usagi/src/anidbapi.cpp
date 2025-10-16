@@ -105,6 +105,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	connect(notifyCheckTimer, SIGNAL(timeout()), this, SLOT(checkForNotifications()));
 	isExportQueued = false;
 	notifyCheckAttempts = 0;
+	notifyCheckIntervalMs = 60000; // Start with 1 minute
+	exportQueuedTimestamp = 0;
+	
+	// Load any persisted export queue state from previous session
+	loadExportQueueState();
 
 	// Check and download anime titles if needed (automatically on startup)
 	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Checking if anime titles need update");
@@ -309,9 +314,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Start periodic notification checking
 		isExportQueued = true;
 		notifyCheckAttempts = 0;
-		notifyCheckTimer->setInterval(30000); // Check every 30 seconds
+		notifyCheckIntervalMs = 60000; // Start with 1 minute
+		exportQueuedTimestamp = QDateTime::currentSecsSinceEpoch();
+		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		notifyCheckTimer->start();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Started periodic notification checking (every 30 seconds)");
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Started periodic notification checking (every 1 minute initially)");
+		
+		// Save state to persist across restarts
+		saveExportQueueState();
 		
 		emit notifyExportQueued(Tag);
 	}
@@ -669,6 +679,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
 				isExportQueued = false;
 				notifyCheckTimer->stop();
+				notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
+				notifyCheckAttempts = 0;
+				exportQueuedTimestamp = 0;
+				saveExportQueueState();
 			}
 			
 			// Emit signal for notification
@@ -846,6 +860,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
 				isExportQueued = false;
 				notifyCheckTimer->stop();
+				notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
+				notifyCheckAttempts = 0;
+				exportQueuedTimestamp = 0;
+				saveExportQueueState();
 			}
 			
 			// Emit signal for notification (same as 270 for automatic download/import)
@@ -1581,8 +1599,24 @@ void AniDBApi::checkForNotifications()
 		return;
 	}
 	
+	// Check if we've exceeded 48 hours since export was queued
+	qint64 elapsedSeconds = QDateTime::currentSecsSinceEpoch() - exportQueuedTimestamp;
+	qint64 elapsedHours = elapsedSeconds / 3600;
+	if(elapsedSeconds > 48 * 3600)  // 48 hours = 172800 seconds
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Stopping notification checks after 48 hours");
+		notifyCheckTimer->stop();
+		isExportQueued = false;
+		notifyCheckAttempts = 0;
+		notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
+		exportQueuedTimestamp = 0;
+		saveExportQueueState();
+		return;
+	}
+	
 	notifyCheckAttempts++;
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Periodic notification check (attempt " + QString::number(notifyCheckAttempts) + ")");
+	int intervalMinutes = notifyCheckIntervalMs / 60000;
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Periodic notification check (attempt " + QString::number(notifyCheckAttempts) + ", interval: " + QString::number(intervalMinutes) + " minutes, elapsed: " + QString::number(elapsedHours) + " hours)");
 	
 	// Check for new notifications by requesting NOTIFYLIST
 	if(SID.length() > 0 && LoginStatus() > 0)
@@ -1599,13 +1633,132 @@ void AniDBApi::checkForNotifications()
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Not logged in, skipping notification check");
 	}
 	
-	// Stop checking after 20 attempts (10 minutes with 30-second intervals)
-	// AniDB export generation typically completes within a few minutes
-	if(notifyCheckAttempts >= 20)
+	// Increase check interval by 1 minute for next check (no new notification found)
+	// Cap at 60 minutes to avoid very long waits
+	notifyCheckIntervalMs += 60000;
+	if(notifyCheckIntervalMs > 3600000)  // Cap at 60 minutes
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Stopping notification checks after 20 attempts");
-		notifyCheckTimer->stop();
+		notifyCheckIntervalMs = 3600000;
+	}
+	notifyCheckTimer->setInterval(notifyCheckIntervalMs);
+	int nextIntervalMinutes = notifyCheckIntervalMs / 60000;
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Next check will be in " + QString::number(nextIntervalMinutes) + " minutes");
+	
+	// Save state after each check
+	saveExportQueueState();
+}
+
+void AniDBApi::saveExportQueueState()
+{
+	QSqlQuery query(db);
+	
+	// Save isExportQueued
+	QString q1 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued', '%1');").arg(isExportQueued ? "1" : "0");
+	query.exec(q1);
+	
+	// Save notifyCheckAttempts
+	QString q2 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_check_attempts', '%1');").arg(notifyCheckAttempts);
+	query.exec(q2);
+	
+	// Save notifyCheckIntervalMs
+	QString q3 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_check_interval_ms', '%1');").arg(notifyCheckIntervalMs);
+	query.exec(q3);
+	
+	// Save exportQueuedTimestamp
+	QString q4 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued_timestamp', '%1');").arg(exportQueuedTimestamp);
+	query.exec(q4);
+	
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Saved export queue state to database");
+}
+
+void AniDBApi::loadExportQueueState()
+{
+	QSqlQuery query(db);
+	query.exec("SELECT `name`, `value` FROM `settings` WHERE `name` IN ('export_queued', 'export_check_attempts', 'export_check_interval_ms', 'export_queued_timestamp')");
+	
+	bool hadExportQueued = false;
+	
+	while(query.next())
+	{
+		QString name = query.value(0).toString();
+		QString value = query.value(1).toString();
+		
+		if(name == "export_queued")
+		{
+			isExportQueued = (value == "1");
+			hadExportQueued = isExportQueued;
+		}
+		else if(name == "export_check_attempts")
+		{
+			notifyCheckAttempts = value.toInt();
+		}
+		else if(name == "export_check_interval_ms")
+		{
+			notifyCheckIntervalMs = value.toInt();
+		}
+		else if(name == "export_queued_timestamp")
+		{
+			exportQueuedTimestamp = value.toLongLong();
+		}
+	}
+	
+	if(hadExportQueued)
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Loaded export queue state from database - queued since " + QDateTime::fromSecsSinceEpoch(exportQueuedTimestamp).toString());
+		
+		// Check if export has already been ready (check for existing notification first)
+		// This will be triggered after login when we have a session
+		QTimer::singleShot(5000, this, SLOT(checkForExistingExport()));
+	}
+	else
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] No pending export found in database");
+	}
+}
+
+void AniDBApi::checkForExistingExport()
+{
+	if(!isExportQueued)
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] No export queued, skipping check for existing export");
+		return;
+	}
+	
+	// Check if we've exceeded 48 hours since export was queued
+	qint64 elapsedSeconds = QDateTime::currentSecsSinceEpoch() - exportQueuedTimestamp;
+	if(elapsedSeconds > 48 * 3600)  // 48 hours
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export queue expired (>48 hours), clearing state");
 		isExportQueued = false;
 		notifyCheckAttempts = 0;
+		notifyCheckIntervalMs = 60000;
+		exportQueuedTimestamp = 0;
+		saveExportQueueState();
+		return;
+	}
+	
+	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Checking for existing export notification on startup");
+	
+	// Check if we're logged in
+	if(SID.length() > 0 && LoginStatus() > 0)
+	{
+		// Request notification list to check if export is already ready
+		QString msg = buildNotifyListCommand();
+		QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+		QSqlQuery query(db);
+		query.exec(q);
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Requested NOTIFYLIST to check for existing export");
+		
+		// Resume periodic checking with the saved interval
+		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
+		notifyCheckTimer->start();
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Resumed periodic notification checking");
+	}
+	else
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Not logged in yet, will check after login");
+		// The check will be triggered again after login via the timer
+		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
+		notifyCheckTimer->start();
 	}
 }
