@@ -161,6 +161,7 @@ public:
 	QString NotifyEnable();
 	QString NotifyGet(int nid);
 	QString MylistExport(QString template_name = "csv-adborg");
+	QString Episode(int eid);
 	
 	// Command builders - return formatted command strings for testing
 	QString buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc);
@@ -173,6 +174,7 @@ public:
 	QString buildNotifyListCommand();
 	QString buildNotifyGetCommand(int nid);
 	QString buildMylistExportCommand(QString template_name);
+	QString buildEpisodeCommand(int eid);
 	/* Api End === */
 
 	unsigned long LocalIdentify(int size, QString ed2khash);
@@ -227,6 +229,7 @@ signals:
 	void notifyExportQueued(QString tag);
 	void notifyExportAlreadyInQueue(QString tag);
 	void notifyExportNoSuchTemplate(QString tag);
+	void notifyEpisodeUpdated(int eid, int aid);
 };
 
 #endif // ANIDBAPI_H

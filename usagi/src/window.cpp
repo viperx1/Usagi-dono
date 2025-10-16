@@ -245,6 +245,8 @@ Window::Window()
 	connect(adbapi, SIGNAL(notifyExportQueued(QString)), this, SLOT(getNotifyExportQueued(QString)));
 	connect(adbapi, SIGNAL(notifyExportAlreadyInQueue(QString)), this, SLOT(getNotifyExportAlreadyInQueue(QString)));
 	connect(adbapi, SIGNAL(notifyExportNoSuchTemplate(QString)), this, SLOT(getNotifyExportNoSuchTemplate(QString)));
+	connect(adbapi, SIGNAL(notifyEpisodeUpdated(int,int)), this, SLOT(getNotifyEpisodeUpdated(int,int)));
+	connect(mylistTreeWidget, SIGNAL(itemExpanded(QTreeWidgetItem*)), this, SLOT(onMylistItemExpanded(QTreeWidgetItem*)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
 
     // end
@@ -875,6 +877,41 @@ void Window::getNotifyExportNoSuchTemplate(QString tag)
 	// This should not happen with "csv-adborg" template, but log for debugging
 }
 
+void Window::onMylistItemExpanded(QTreeWidgetItem *item)
+{
+	// When an anime item is expanded, queue EPISODE API requests for missing data
+	if(!item)
+		return;
+	
+	// Get the AID from the item (stored in UserRole)
+	int aid = item->data(0, Qt::UserRole).toInt();
+	if(aid == 0)
+		return;  // Not an anime item (might be an episode child)
+	
+	// Iterate through child episodes and queue API requests for missing data
+	int childCount = item->childCount();
+	for(int i = 0; i < childCount; i++)
+	{
+		QTreeWidgetItem *episodeItem = item->child(i);
+		int eid = episodeItem->data(0, Qt::UserRole).toInt();
+		
+		// Check if this episode needs data and hasn't been requested yet
+		if(episodesNeedingData.contains(eid))
+		{
+			logOutput->append(QString("Requesting episode data for EID %1 (AID %2)").arg(eid).arg(aid));
+			adbapi->Episode(eid);
+			episodesNeedingData.remove(eid);  // Remove from tracking set to avoid duplicate requests
+		}
+	}
+}
+
+void Window::getNotifyEpisodeUpdated(int eid, int aid)
+{
+	// Episode data was updated in the database, refresh the mylist display
+	logOutput->append(QString("Episode data received for EID %1 (AID %2), refreshing display...").arg(eid).arg(aid));
+	loadMylistFromDatabase();
+}
+
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
 {
 	QTableWidgetItem *item1 = new QTableWidgetItem(QTableWidgetItem(QString(file.fileName())));
@@ -905,6 +942,7 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
 void Window::loadMylistFromDatabase()
 {
 	mylistTreeWidget->clear();
+	episodesNeedingData.clear();  // Clear tracking set
 	
 	// Query the database for mylist entries joined with anime and episode data
 	// Also try to get anime name from anime_titles table if anime table is empty
@@ -1016,17 +1054,18 @@ void Window::loadMylistFromDatabase()
 		else
 		{
 			// Fallback to EID if episode number not available
-			episodeNumber = QString::number(eid);
-			logOutput->append(QString("Warning: No episode number found for EID %1 (AID %2)").arg(eid).arg(aid));
+			episodeNumber = "Loading...";
+			episodesNeedingData.insert(eid);  // Track this episode for lazy loading
 		}
 		episodeItem->setText(1, episodeNumber);
 		
 		// Column 2: Episode title
-		episodeItem->setText(2, episodeName);
 		if(episodeName.isEmpty())
 		{
-			logOutput->append(QString("Warning: No episode name found for EID %1 (AID %2)").arg(eid).arg(aid));
+			episodeName = "Loading...";
+			episodesNeedingData.insert(eid);  // Track this episode for lazy loading
 		}
+		episodeItem->setText(2, episodeName);
 		
 		// State: 0=unknown, 1=on hdd, 2=on cd, 3=deleted
 		QString stateStr;

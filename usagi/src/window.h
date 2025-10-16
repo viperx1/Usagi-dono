@@ -89,6 +89,7 @@ private:
     // page mylist
     QTreeWidget *mylistTreeWidget;
     QLabel *mylistStatusLabel;
+	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
 	// page settings
 
     QLabel *labelLogin;
@@ -141,6 +142,8 @@ public slots:
 	void getNotifyExportQueued(QString tag);
 	void getNotifyExportAlreadyInQueue(QString tag);
 	void getNotifyExportNoSuchTemplate(QString tag);
+	void getNotifyEpisodeUpdated(int eid, int aid);
+	void onMylistItemExpanded(QTreeWidgetItem *item);
     void safeClose();
     void loadMylistFromDatabase();
     void startupInitialization();
