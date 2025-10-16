@@ -57,6 +57,9 @@ private slots:
     
     // Notification database tests
     void testNotificationsTableExists();
+    
+    // MYLISTADD database storage test
+    void testMylistAddResponseStoredInDatabase();
 
 private:
     AniDBApi* api;
@@ -616,8 +619,6 @@ void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
     qDebug() << "Commands tested:" << commandNames;
 }
 
-QTEST_MAIN(TestAniDBApiCommands)
-#include "test_anidbapi.moc"
 // ===== Notification Database Tests =====
 
 void TestAniDBApiCommands::testNotificationsTableExists()
@@ -659,3 +660,84 @@ void TestAniDBApiCommands::testNotificationsTableExists()
     
     qDebug() << "Notifications table verified with columns:" << actualColumns;
 }
+
+void TestAniDBApiCommands::testMylistAddResponseStoredInDatabase()
+{
+    // This test verifies that when a MYLISTADD response (210) is received,
+    // the mylist entry is stored in the local database
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    QVERIFY(db.isOpen());
+    
+    // Step 1: Insert a file entry into the database (simulating a FILE response)
+    QString fid = "3825687";
+    QString aid = "18795";
+    QString eid = "297776";
+    QString gid = "16325";
+    qint64 size = 1468257416;
+    QString ed2k = "c46543aef15b4919cf966de5f339324b";
+    
+    QString q = QString("INSERT OR REPLACE INTO `file` "
+        "(`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, `size`, `ed2k`, "
+        "`md5`, `sha1`, `crc`, `quality`, `source`, `codec_audio`, `bitrate_audio`, "
+        "`codec_video`, `bitrate_video`, `resolution`, `filetype`, `lang_dub`, `lang_sub`, "
+        "`length`, `description`, `airdate`, `filename`) "
+        "VALUES ('%1', '%2', '%3', '%4', '0', '', '0', '1', '%5', '%6', '', '', '', '', '', '', '0', '', '0', '', '', '', '', '0', '', '0', '')")
+        .arg(fid).arg(aid).arg(eid).arg(gid).arg(size).arg(ed2k);
+    
+    QSqlQuery query(db);
+    QVERIFY2(query.exec(q), QString("Failed to insert file entry: %1").arg(query.lastError().text()).toLatin1());
+    
+    // Step 2: Simulate sending a MYLISTADD command
+    int viewed = 1;
+    int state = 1;
+    QString storage = "";
+    bool edit = false;
+    
+    QString tag = api->MylistAdd(size, ed2k, viewed, state, storage, edit);
+    QVERIFY(!tag.isEmpty());
+    
+    // Verify the command was stored in packets table
+    q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(tag);
+    QVERIFY2(query.exec(q), QString("Failed to query packets: %1").arg(query.lastError().text()).toLatin1());
+    QVERIFY2(query.next(), "MYLISTADD command not found in packets table");
+    QString mylistAddCmd = query.value(0).toString();
+    QVERIFY(mylistAddCmd.contains("MYLISTADD"));
+    QVERIFY(mylistAddCmd.contains(QString("size=%1").arg(size)));
+    QVERIFY(mylistAddCmd.contains(QString("ed2k=%1").arg(ed2k)));
+    
+    // Step 3: Simulate receiving a 210 MYLIST ENTRY ADDED response
+    QString lid = "423064547";
+    QString response = QString("%1 210 MYLIST ENTRY ADDED\n%2").arg(tag).arg(lid);
+    
+    // Parse the response (this will trigger the database storage logic)
+    api->ParseMessage(response, "", "");
+    
+    // Step 4: Verify the mylist entry was stored in the database
+    q = QString("SELECT `lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage` "
+        "FROM `mylist` WHERE `lid` = %1").arg(lid);
+    QVERIFY2(query.exec(q), QString("Failed to query mylist: %1").arg(query.lastError().text()).toLatin1());
+    QVERIFY2(query.next(), "Mylist entry not found in database");
+    
+    // Verify the stored values
+    QCOMPARE(query.value(0).toString(), lid);
+    QCOMPARE(query.value(1).toString(), fid);
+    QCOMPARE(query.value(2).toString(), eid);
+    QCOMPARE(query.value(3).toString(), aid);
+    QCOMPARE(query.value(4).toString(), gid);
+    QCOMPARE(query.value(5).toString(), QString::number(state));
+    QCOMPARE(query.value(6).toString(), QString::number(viewed - 1)); // viewed is decremented in MylistAdd
+    QCOMPARE(query.value(7).toString(), storage);
+    
+    qDebug() << "Successfully verified MYLISTADD response stored in database";
+    qDebug() << "  lid:" << lid << "fid:" << fid << "aid:" << aid << "eid:" << eid;
+    
+    // Clean up
+    q = QString("DELETE FROM `mylist` WHERE `lid` = %1").arg(lid);
+    query.exec(q);
+    q = QString("DELETE FROM `file` WHERE `fid` = %1").arg(fid);
+    query.exec(q);
+}
+
+QTEST_MAIN(TestAniDBApiCommands)
+#include "test_anidbapi.moc"
