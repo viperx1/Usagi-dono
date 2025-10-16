@@ -203,6 +203,7 @@ Window::Window()
 	editPassword->setText(adbapi->getPassword());
     editPassword->setEchoMode(QLineEdit::Password);
     buttonSaveSettings = new QPushButton("Save");
+    buttonRequestMylistExport = new QPushButton("Request MyList Export");
 
     pageSettings->addWidget(labelLogin, 0, 0);
     pageSettings->addWidget(editLogin, 0, 1);
@@ -210,12 +211,14 @@ Window::Window()
     pageSettings->addWidget(editPassword, 1, 1);
     pageSettings->setRowStretch(2, 1000);
     pageSettings->addWidget(buttonSaveSettings, 3, 0);
+    pageSettings->addWidget(buttonRequestMylistExport, 4, 0);
 
     pageSettings->setColumnStretch(2, 100);
     pageSettings->setRowStretch(5, 100);
 
 	// page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
+    connect(buttonRequestMylistExport, SIGNAL(clicked()), this, SLOT(requestMylistExportManually()));
 
     // page log
     logOutput = new QTextEdit;
@@ -772,6 +775,9 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 						logOutput->append(QString("Successfully imported %1 mylist entries").arg(count));
 						mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(count));
 						loadMylistFromDatabase();  // Refresh the display
+						
+						// Mark first run as complete after successful import
+						setMylistFirstRunComplete();
 					}
 					else
 					{
@@ -807,14 +813,23 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		{
 			notificationsCheckedWithoutExport++;
 			
-			// If we've checked all expected notifications and found no export, request one
+			// If we've checked all expected notifications and found no export
 			if(notificationsCheckedWithoutExport >= expectedNotificationsToCheck)
 			{
-				logOutput->append(QString("Checked %1 notifications with no export link found - requesting new export").arg(expectedNotificationsToCheck));
-				mylistStatusLabel->setText("MyList Status: Requesting export...");
-				
-				// Request MYLISTEXPORT with csv-adborg template
-				adbapi->MylistExport("csv-adborg");
+				// Only auto-request export on first run
+				if(!isMylistFirstRunComplete())
+				{
+					logOutput->append(QString("Checked %1 notifications with no export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
+					mylistStatusLabel->setText("MyList Status: Requesting export (first run)...");
+					
+					// Request MYLISTEXPORT with csv-adborg template
+					adbapi->MylistExport("csv-adborg");
+				}
+				else
+				{
+					logOutput->append(QString("Checked %1 notifications with no export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
+					mylistStatusLabel->setText("MyList Status: No export found - request manually in Settings");
+				}
 				
 				// Reset state
 				isCheckingNotifications = false;
@@ -1206,4 +1221,37 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 	QDir(tempDir).removeRecursively();
 	
 	return count;
+}
+
+bool Window::isMylistFirstRunComplete()
+{
+	// Check if mylist first run has been completed
+	QSqlDatabase db = QSqlDatabase::database();
+	QSqlQuery query(db);
+	query.exec("SELECT `value` FROM `settings` WHERE `name` = 'mylist_first_run_complete'");
+	
+	if(query.next())
+	{
+		return query.value(0).toString() == "1";
+	}
+	
+	return false;  // Default: first run not complete
+}
+
+void Window::setMylistFirstRunComplete()
+{
+	// Mark mylist first run as complete
+	QSqlDatabase db = QSqlDatabase::database();
+	QSqlQuery query(db);
+	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'mylist_first_run_complete', '1')");
+	query.exec(q);
+	logOutput->append("MyList first run marked as complete");
+}
+
+void Window::requestMylistExportManually()
+{
+	// Manual mylist export request from Settings
+	logOutput->append("Manually requesting MyList export...");
+	mylistStatusLabel->setText("MyList Status: Requesting export...");
+	adbapi->MylistExport("csv-adborg");
 }
