@@ -1708,9 +1708,13 @@ void AniDBApi::loadExportQueueState()
 		
 		// Check if export has already been ready (check for existing notification first)
 		// This will be triggered after login when we have a session
-		// Use static_cast<int> to ensure we call the int overload, not the chrono overload
+		// Use QTimer with single-shot mode instead of QTimer::singleShot to avoid chrono overload
 		// The chrono overload is not available in static Qt 6.9.2 builds with LLVM MinGW
-		QTimer::singleShot(static_cast<int>(5000), this, [this]() { checkForExistingExport(); });
+		QTimer *delayTimer = new QTimer(this);
+		delayTimer->setSingleShot(true);
+		connect(delayTimer, &QTimer::timeout, this, &AniDBApi::checkForExistingExport);
+		connect(delayTimer, &QTimer::timeout, delayTimer, &QTimer::deleteLater);
+		delayTimer->start(5000);
 	}
 	else
 	{
