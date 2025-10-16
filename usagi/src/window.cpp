@@ -894,7 +894,7 @@ void Window::loadMylistFromDatabase()
 	QSqlDatabase db = QSqlDatabase::database();
 	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
-					"e.name as episode_name "
+					"e.name as episode_name, e.epno "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
@@ -923,6 +923,7 @@ void Window::loadMylistFromDatabase()
 		QString animeNameEnglish = q.value(7).toString();
 		int epTotal = q.value(8).toInt();
 		QString episodeName = q.value(9).toString();
+		QString epno = q.value(10).toString();  // Episode number from database
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -956,7 +957,19 @@ void Window::loadMylistFromDatabase()
 		episodeItem->setText(0, ""); // Empty for episode child
 		
 		// Build episode display string
-		QString episodeDisplay = QString("Episode %1").arg(eid);
+		QString episodeDisplay;
+		if(!epno.isEmpty())
+		{
+			// Use episode number from database
+			episodeDisplay = QString("Episode %1").arg(epno);
+		}
+		else
+		{
+			// Fallback to EID if episode number not available
+			episodeDisplay = QString("EID: %1").arg(eid);
+		}
+		
+		// Add episode name if available
 		if(!episodeName.isEmpty())
 		{
 			episodeDisplay += QString(" - %1").arg(episodeName);
