@@ -1708,7 +1708,7 @@ void AniDBApi::loadExportQueueState()
 		
 		// Check if export has already been ready (check for existing notification first)
 		// This will be triggered after login when we have a session
-		QTimer::singleShot(5000, this, SLOT(checkForExistingExport()));
+		QTimer::singleShot(5000, this, [this]() { checkForExistingExport(); });
 	}
 	else
 	{
