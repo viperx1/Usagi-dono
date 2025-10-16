@@ -449,22 +449,42 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 		}
 		
-		// Fetch the last several message notifications to search for export link
+		// Check database to filter out already-fetched notifications
+		QStringList newNids;
+		QSqlQuery query(db);
+		for(int i = 0; i < messageNids.size(); i++)
+		{
+			QString nid = messageNids[i];
+			query.exec(QString("SELECT nid FROM notifications WHERE nid = %1").arg(nid));
+			if(!query.next())
+			{
+				// Not in database, this is a new notification
+				newNids.append(nid);
+			}
+		}
+		
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Total messages: " + QString::number(messageNids.size()) + ", New messages: " + QString::number(newNids.size()));
+		
+		// Fetch only new message notifications to search for export link
 		// The export notification is most likely recent, but not guaranteed to be the very last one
 		const int maxNotificationsToFetch = 10;
-		int notificationsToFetch = qMin(messageNids.size(), maxNotificationsToFetch);
+		int notificationsToFetch = qMin(newNids.size(), maxNotificationsToFetch);
 		
 		if(notificationsToFetch > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching last " + QString::number(notificationsToFetch) + " message notifications");
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching " + QString::number(notificationsToFetch) + " new message notifications");
 			emit notifyCheckStarting(notificationsToFetch);
 			for(int i = 0; i < notificationsToFetch; i++)
 			{
 				// Fetch from the end of the list (most recent first)
-				QString nid = messageNids[messageNids.size() - 1 - i];
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
+				QString nid = newNids[newNids.size() - 1 - i];
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching new message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
 				NotifyGet(nid.toInt());
 			}
+		}
+		else if(messageNids.size() > 0)
+		{
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - No new notifications to fetch, all are already in database");
 		}
 	}
 	else if(ReplyID == "291"){ // 291 NOTIFYLIST ENTRY
@@ -490,22 +510,42 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 		}
 		
-		// Fetch the last several message notifications to search for export link
+		// Check database to filter out already-fetched notifications
+		QStringList newNids;
+		QSqlQuery query(db);
+		for(int i = 0; i < messageNids.size(); i++)
+		{
+			QString nid = messageNids[i];
+			query.exec(QString("SELECT nid FROM notifications WHERE nid = %1").arg(nid));
+			if(!query.next())
+			{
+				// Not in database, this is a new notification
+				newNids.append(nid);
+			}
+		}
+		
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Total messages: " + QString::number(messageNids.size()) + ", New messages: " + QString::number(newNids.size()));
+		
+		// Fetch only new message notifications to search for export link
 		// The export notification is most likely recent, but not guaranteed to be the very last one
 		const int maxNotificationsToFetch = 10;
-		int notificationsToFetch = qMin(messageNids.size(), maxNotificationsToFetch);
+		int notificationsToFetch = qMin(newNids.size(), maxNotificationsToFetch);
 		
 		if(notificationsToFetch > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching last " + QString::number(notificationsToFetch) + " message notifications");
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching " + QString::number(notificationsToFetch) + " new message notifications");
 			emit notifyCheckStarting(notificationsToFetch);
 			for(int i = 0; i < notificationsToFetch; i++)
 			{
 				// Fetch from the end of the list (most recent first)
-				QString nid = messageNids[messageNids.size() - 1 - i];
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
+				QString nid = newNids[newNids.size() - 1 - i];
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching new message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
 				NotifyGet(nid.toInt());
 			}
+		}
+		else if(messageNids.size() > 0)
+		{
+			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - No new notifications to fetch, all are already in database");
 		}
 	}
 	else if(ReplyID == "292"){ // 292 NOTIFYGET (type=M) - {int4 id}|{int4 from_user_id}|{str from_user_name}|{int4 date}|{int4 type}|{str title}|{str body}
