@@ -96,6 +96,7 @@ private:
     QLabel *labelPassword;
     QLineEdit *editPassword;
     QPushButton *buttonSaveSettings;
+    QPushButton *buttonRequestMylistExport;
 
 	// page notify
 	QTextEdit *notifyOutput;
@@ -143,6 +144,9 @@ public slots:
     void safeClose();
     void loadMylistFromDatabase();
     void startupInitialization();
+    bool isMylistFirstRunComplete();
+    void setMylistFirstRunComplete();
+    void requestMylistExportManually();
 signals:
 	void hashFiles(QStringList);
 	void notifyStopHasher();
