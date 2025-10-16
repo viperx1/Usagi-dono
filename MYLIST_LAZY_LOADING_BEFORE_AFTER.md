@@ -53,7 +53,8 @@ User expands anime - requesting data...
 Requesting episode data for EID 1 (AID 1)
 Requesting episode data for EID 2 (AID 1)
 ...
-Episode data received for EID 1 (AID 1), refreshing display...
+Episode data received for EID 1 (AID 1), updating field...
+Updated episode in tree: EID 1, epno: 1, name: The Beginning
 
 After data arrives:
 ├── [-] Anime: Example Anime #1  (expanded)
@@ -110,10 +111,11 @@ After data arrives:
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 6. UI Refreshes Automatically                               │
+│ 6. UI Updates Targeted Field                                │
 │    - getNotifyEpisodeUpdated() slot triggered               │
-│    - loadMylistFromDatabase() reloads tree                  │
+│    - updateEpisodeInTree() updates only the episode item    │
 │    - Episode now shows proper number and name               │
+│    - Tree structure and expansion state preserved           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -152,9 +154,16 @@ void onMylistItemExpanded(QTreeWidgetItem *item) {
         episodesNeedingData.remove(eid);
 }
 
-// On data received: refresh
+// On data received: update targeted field
 void getNotifyEpisodeUpdated(int eid, int aid) {
-    loadMylistFromDatabase();
+    updateEpisodeInTree(eid, aid);
+}
+
+void updateEpisodeInTree(int eid, int aid) {
+    // Query only the updated episode's data
+    // Find episode item in tree
+    // Update only episode number and name fields
+    episodesNeedingData.remove(eid);
 }
 ```
 
@@ -170,6 +179,7 @@ void testEpisodeCommandFormat() {
 
 ## Statistics
 
+### Original Lazy Loading Implementation
 - **Total changes**: 142 lines added, 4 removed
 - **Files modified**: 5
 - **New API commands**: 1 (EPISODE)
@@ -178,6 +188,14 @@ void testEpisodeCommandFormat() {
 - **New slots**: 2 (onMylistItemExpanded, getNotifyEpisodeUpdated)
 - **Documentation files**: 2
 
+### Field Update Optimization (Latest)
+- **Additional changes**: 106 lines added, 2 removed
+- **Files modified**: 2 (window.h, window.cpp)
+- **New methods**: 1 (updateEpisodeInTree)
+- **Modified methods**: 1 (getNotifyEpisodeUpdated)
+- **Documentation files**: 1 (MYLIST_FIELD_UPDATE_IMPLEMENTATION.md)
+- **Benefit**: Targeted field updates instead of full list refresh
+
 ## Backwards Compatibility
 
 ✅ **Fully compatible** - no breaking changes:
@@ -185,4 +203,6 @@ void testEpisodeCommandFormat() {
 - Existing API commands still work
 - Existing UI elements unchanged
 - Existing settings and configuration preserved
-- Only behavior change: replacing warnings with loading placeholders
+- Only behavior changes:
+  - Replaced warnings with loading placeholders
+  - Optimized to update single fields instead of refreshing entire list

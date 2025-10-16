@@ -907,9 +907,114 @@ void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 
 void Window::getNotifyEpisodeUpdated(int eid, int aid)
 {
-	// Episode data was updated in the database, refresh the mylist display
-	logOutput->append(QString("Episode data received for EID %1 (AID %2), refreshing display...").arg(eid).arg(aid));
-	loadMylistFromDatabase();
+	// Episode data was updated in the database, update only the specific episode item
+	logOutput->append(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
+	updateEpisodeInTree(eid, aid);
+}
+
+void Window::updateEpisodeInTree(int eid, int aid)
+{
+	// Query the database for the updated episode data
+	QSqlDatabase db = QSqlDatabase::database();
+	QString query = QString("SELECT epno, name FROM episode WHERE eid = %1").arg(eid);
+	QSqlQuery q(db);
+	
+	if(!q.exec(query))
+	{
+		logOutput->append("Error querying episode data: " + q.lastError().text());
+		return;
+	}
+	
+	if(!q.next())
+	{
+		logOutput->append(QString("No episode data found for EID %1").arg(eid));
+		return;
+	}
+	
+	QString epno = q.value(0).toString();
+	QString episodeName = q.value(1).toString();
+	
+	// Find the episode item in the tree by iterating through anime items
+	int topLevelCount = mylistTreeWidget->topLevelItemCount();
+	for(int i = 0; i < topLevelCount; i++)
+	{
+		QTreeWidgetItem *animeItem = mylistTreeWidget->topLevelItem(i);
+		int animeAid = animeItem->data(0, Qt::UserRole).toInt();
+		
+		// Only check children of the matching anime
+		if(animeAid == aid)
+		{
+			int childCount = animeItem->childCount();
+			for(int j = 0; j < childCount; j++)
+			{
+				QTreeWidgetItem *episodeItem = animeItem->child(j);
+				int episodeEid = episodeItem->data(0, Qt::UserRole).toInt();
+				
+				if(episodeEid == eid)
+				{
+					// Found the episode item - update its fields
+					
+					// Update episode number (Column 1)
+					QString episodeNumber;
+					if(!epno.isEmpty())
+					{
+						// Parse episode number to determine type
+						QString epnoUpper = epno.toUpper();
+						if(epnoUpper.startsWith("S"))
+						{
+							episodeNumber = QString("Special %1").arg(epno.mid(1));
+						}
+						else if(epnoUpper.startsWith("C"))
+						{
+							episodeNumber = QString("Credit %1").arg(epno.mid(1));
+						}
+						else if(epnoUpper.startsWith("T"))
+						{
+							episodeNumber = QString("Trailer %1").arg(epno.mid(1));
+						}
+						else if(epnoUpper.startsWith("P"))
+						{
+							episodeNumber = QString("Parody %1").arg(epno.mid(1));
+						}
+						else if(epnoUpper.startsWith("O"))
+						{
+							episodeNumber = QString("Other %1").arg(epno.mid(1));
+						}
+						else
+						{
+							// Regular episode number
+							episodeNumber = epno;
+						}
+					}
+					else
+					{
+						episodeNumber = "Unknown";
+					}
+					episodeItem->setText(1, episodeNumber);
+					
+					// Update episode name (Column 2)
+					if(!episodeName.isEmpty())
+					{
+						episodeItem->setText(2, episodeName);
+					}
+					else
+					{
+						episodeItem->setText(2, "Unknown");
+					}
+					
+					// Remove from tracking set since data has been loaded
+					episodesNeedingData.remove(eid);
+					
+					logOutput->append(QString("Updated episode in tree: EID %1, epno: %2, name: %3")
+						.arg(eid).arg(episodeNumber).arg(episodeName));
+					return;
+				}
+			}
+		}
+	}
+	
+	// If we get here, the episode item wasn't found in the tree
+	logOutput->append(QString("Episode item not found in tree for EID %1 (AID %2)").arg(eid).arg(aid));
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
