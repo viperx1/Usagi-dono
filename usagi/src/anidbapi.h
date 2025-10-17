@@ -167,7 +167,7 @@ public:
 	QString PushAck(int nid);
 	QString NotifyEnable();
 	QString NotifyGet(int nid);
-	QString MylistExport(QString template_name = "csv-adborg");
+	QString MylistExport(QString template_name = "xml-plain-cs");
 	QString Episode(int eid);
 	
 	// Command builders - return formatted command strings for testing

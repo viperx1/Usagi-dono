@@ -332,7 +332,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	else if(ReplyID == "317"){ // 317 EXPORT NO SUCH TEMPLATE
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 317 EXPORT NO SUCH TEMPLATE - Tag: " + Tag);
 		// The requested template name does not exist
-		// Valid templates: csv-adborg, xml, csv, json, anidb
+		// Valid templates: xml-plain-cs, xml, csv, json, anidb
 		emit notifyExportNoSuchTemplate(Tag);
 	}
 	else if(ReplyID == "318"){ // 318 EXPORT ALREADY IN QUEUE
@@ -1228,7 +1228,7 @@ QString AniDBApi::buildNotifyGetCommand(int nid)
 QString AniDBApi::buildMylistExportCommand(QString template_name)
 {
 	// MYLISTEXPORT template={str template}
-	// Request mylist export with specified template (e.g., "csv-adborg")
+	// Request mylist export with specified template (e.g., "xml-plain-cs")
 	return QString("MYLISTEXPORT template=%1").arg(template_name);
 }
 

@@ -774,8 +774,8 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					logOutput->append(QString("Export downloaded to: %1").arg(tempPath));
 					mylistStatusLabel->setText("MyList Status: Parsing export...");
 					
-					// Parse the csv-adborg file
-					int count = parseMylistCSVAdborg(tempPath);
+					// Parse the xml-plain-cs file
+					int count = parseMylistExport(tempPath);
 					
 					if(count > 0)
 					{
@@ -829,8 +829,8 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					logOutput->append(QString("Checked %1 notifications with no export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
 					mylistStatusLabel->setText("MyList Status: Requesting export (first run)...");
 					
-					// Request MYLISTEXPORT with csv-adborg template
-					adbapi->MylistExport("csv-adborg");
+					// Request MYLISTEXPORT with xml-plain-cs template
+					adbapi->MylistExport("xml-plain-cs");
 				}
 				else
 				{
@@ -878,7 +878,7 @@ void Window::getNotifyExportNoSuchTemplate(QString tag)
 	// 317 EXPORT NO SUCH TEMPLATE - Invalid template name
 	logOutput->append(QString("ERROR: MyList export template not found (Tag: %1)").arg(tag));
 	mylistStatusLabel->setText("MyList Status: Export failed - invalid template");
-	// This should not happen with "csv-adborg" template, but log for debugging
+	// This should not happen with "xml-plain-cs" template, but log for debugging
 }
 
 void Window::onMylistItemExpanded(QTreeWidgetItem *item)
@@ -1209,10 +1209,9 @@ void Window::loadMylistFromDatabase()
 	mylistTreeWidget->sortByColumn(0, Qt::AscendingOrder);
 }
 
-int Window::parseMylistCSVAdborg(const QString &tarGzPath)
+int Window::parseMylistExport(const QString &tarGzPath)
 {
-	// Parse csv-adborg format mylist export (tar.gz containing anime/*.csv files)
-	// Each CSV file contains pipe-delimited data with sections: anime info, FILES, GROUPS, GENREN
+	// Parse xml-plain-cs format mylist export (tar.gz containing XML file with proper lid values)
 	int count = 0;
 	QSqlDatabase db = QSqlDatabase::database();
 	
@@ -1239,157 +1238,74 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 		return 0;
 	}
 	
-	// Find all CSV files in anime/ subdirectory
-	QDir animeDir(tempDir + "/anime");
-	if(!animeDir.exists())
+	// Find XML file in extracted directory
+	QDir extractedDir(tempDir);
+	QStringList xmlFiles = extractedDir.entryList(QStringList() << "*.xml", QDir::Files);
+	
+	if(xmlFiles.isEmpty())
 	{
-		logOutput->append("Error: anime/ directory not found in tar.gz");
+		logOutput->append("Error: No XML file found in tar.gz");
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
 	
-	QStringList csvFiles = animeDir.entryList(QStringList() << "*.csv", QDir::Files);
+	// Parse the XML file
+	QString xmlFilePath = extractedDir.absoluteFilePath(xmlFiles.first());
+	QFile xmlFile(xmlFilePath);
 	
+	if(!xmlFile.open(QIODevice::ReadOnly | QIODevice::Text))
+	{
+		logOutput->append("Error: Cannot open XML file");
+		QDir(tempDir).removeRecursively();
+		return 0;
+	}
+	
+	QXmlStreamReader xml(&xmlFile);
 	db.transaction();
 	
-	// Process each CSV file
-	foreach(const QString &csvFile, csvFiles)
+	// Parse XML structure: <mylistexport><mylist lid="..." fid="..." .../></mylistexport>
+	while(!xml.atEnd() && !xml.hasError())
 	{
-		QString filePath = animeDir.absoluteFilePath(csvFile);
-		QFile file(filePath);
+		QXmlStreamReader::TokenType token = xml.readNext();
 		
-		if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
-			continue;
-		
-		QTextStream in(&file);
-		QString content = in.readAll();
-		file.close();
-		
-		// Parse the file - first parse anime header, then FILES section
-		QStringList lines = content.split('\n');
-		bool inFilesSection = false;
-		bool inAnimeSection = true;  // Anime data comes first
-		QStringList fileHeaders;
-		QStringList animeHeaders;
-		
-		for(int i = 0; i < lines.size(); i++)
+		if(token == QXmlStreamReader::StartElement)
 		{
-			QString line = lines[i].trimmed();
-			
-			if(line.isEmpty())
-				continue;
-			
-			// Check for FILES section marker
-			if(line == "FILES")
+			if(xml.name() == QString("mylist"))
 			{
-				inFilesSection = true;
-				inAnimeSection = false;
-				// Next line should be headers
-				if(i + 1 < lines.size())
-				{
-					fileHeaders = lines[i + 1].split('|');
-					i++;  // Skip the header line
-				}
-				continue;
-			}
-			
-			// Check for next section (GROUPS, GENREN, etc.)
-			if(line == "GROUPS" || line == "GENREN")
-			{
-				inFilesSection = false;
-				inAnimeSection = false;
-				continue;
-			}
-			
-			// Parse anime header and data rows (before FILES section)
-			if(inAnimeSection)
-			{
-				if(animeHeaders.isEmpty())
-				{
-					// First line is the anime header
-					// AID|EID|EPNo|Name|Romaji|Kanji|Length|Aired|Rating|Votes|State|myState
-					animeHeaders = line.split('|');
-					continue;
-				}
-				else
-				{
-					// Parse anime data row
-					QStringList fields = line.split('|');
-					if(fields.size() < 3)
-						continue;
-					
-					QString aid = fields[0].trimmed();
-					QString eid = fields[1].trimmed();
-					QString epno = fields[2].trimmed();
-					QString name = fields.size() > 3 ? fields[3].trimmed() : "";
-					QString romaji = fields.size() > 4 ? fields[4].trimmed() : "";
-					QString kanji = fields.size() > 5 ? fields[5].trimmed() : "";
-					
-					// Insert episode data
-					// The format has: AID|EID|EPNo|Name|Romaji|Kanji|...
-					// where Name/Romaji/Kanji are episode names in different languages
-					if(!eid.isEmpty())
-					{
-						// Use QString copies to avoid modifying the original variables
-						QString eid_escaped = QString(eid).replace("'", "''");
-						QString name_escaped = QString(name).replace("'", "''");
-						QString romaji_escaped = QString(romaji).replace("'", "''");
-						QString kanji_escaped = QString(kanji).replace("'", "''");
-						QString epno_escaped = QString(epno).replace("'", "''");
-						
-						QString q_episode = QString("INSERT OR REPLACE INTO `episode` "
-							"(`eid`, `name`, `nameromaji`, `namekanji`, `epno`) "
-							"VALUES ('%1', '%2', '%3', '%4', '%5')")
-							.arg(eid_escaped)
-							.arg(name_escaped)
-							.arg(romaji_escaped)
-							.arg(kanji_escaped)
-							.arg(epno_escaped);
-						
-						QSqlQuery query(db);
-						if(!query.exec(q_episode))
-						{
-							logOutput->append(QString("Error inserting episode %1: %2").arg(eid).arg(query.lastError().text()));
-						}
-					}
-				}
-				continue;
-			}
-			
-			// Parse file entries in FILES section
-			if(inFilesSection && !fileHeaders.isEmpty())
-			{
-				QStringList fields = line.split('|');
+				// Extract attributes from mylist element
+				QXmlStreamAttributes attributes = xml.attributes();
 				
-				if(fields.size() < 20)  // Need at least 20 fields for complete data
-					continue;
-				
-				// Extract fields from FILES section
-				// AID|EID|GID|FID|size|ed2k|md5|sha1|crc|Length|Type|Quality|Resolution|vCodec|aCodec|sub|dub|isWatched|State|myState|FileType
-				QString aid = fields[0].trimmed();
-				QString eid = fields[1].trimmed();
-				QString gid = fields[2].trimmed();
-				QString fid = fields[3].trimmed();
-				QString isWatched = fields.size() > 17 ? fields[17].trimmed() : "0";
-				QString state = fields.size() > 18 ? fields[18].trimmed() : "0";
-				QString myState = fields.size() > 19 ? fields[19].trimmed() : "0";
+				QString lid = attributes.value("lid").toString();
+				QString fid = attributes.value("fid").toString();
+				QString eid = attributes.value("eid").toString();
+				QString aid = attributes.value("aid").toString();
+				QString gid = attributes.value("gid").toString();
+				QString state = attributes.value("state").toString();
+				QString viewdate = attributes.value("viewdate").toString();
+				QString storage = attributes.value("storage").toString();
 				
 				// Validate required fields
-				if(fid.isEmpty() || aid.isEmpty())
+				if(lid.isEmpty() || aid.isEmpty())
 					continue;
 				
-				// Insert into database
-				// We don't have lid from this format, so we'll use fid as a unique identifier
+				// Determine viewed status from viewdate
+				QString viewed = (!viewdate.isEmpty() && viewdate != "0") ? "1" : "0";
+				
+				// Escape single quotes in storage
+				QString storage_escaped = QString(storage).replace("'", "''");
+				
+				// Insert into database with proper lid value
 				QString q = QString("INSERT OR REPLACE INTO `mylist` "
 					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-					"VALUES (%1, %2, %3, %4, %5, %6, %7, '')")
-					.arg(fid)  // Use fid as lid since we don't have lid
-					.arg(fid)
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					.arg(lid)  // Now using proper lid from XML
+					.arg(fid.isEmpty() ? "0" : fid)
 					.arg(eid.isEmpty() ? "0" : eid)
 					.arg(aid)
 					.arg(gid.isEmpty() ? "0" : gid)
-					.arg(myState.isEmpty() ? "0" : myState)  // Use myState as state
-					.arg(isWatched == "1" ? "1" : "0");  // viewed = isWatched
+					.arg(state.isEmpty() ? "0" : state)
+					.arg(viewed)
+					.arg(storage_escaped);
 				
 				QSqlQuery query(db);
 				if(query.exec(q))
@@ -1398,12 +1314,18 @@ int Window::parseMylistCSVAdborg(const QString &tarGzPath)
 				}
 				else
 				{
-					logOutput->append(QString("Error inserting mylist entry (fid=%1): %2").arg(fid).arg(query.lastError().text()));
+					logOutput->append(QString("Error inserting mylist entry (lid=%1): %2").arg(lid).arg(query.lastError().text()));
 				}
 			}
 		}
 	}
 	
+	if(xml.hasError())
+	{
+		logOutput->append(QString("XML parsing error: %1").arg(xml.errorString()));
+	}
+	
+	xmlFile.close();
 	db.commit();
 	
 	// Clean up temporary directory
@@ -1442,5 +1364,5 @@ void Window::requestMylistExportManually()
 	// Manual mylist export request from Settings
 	logOutput->append("Manually requesting MyList export...");
 	mylistStatusLabel->setText("MyList Status: Requesting export...");
-	adbapi->MylistExport("csv-adborg");
+	adbapi->MylistExport("xml-plain-cs");
 }
