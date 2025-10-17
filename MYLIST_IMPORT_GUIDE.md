@@ -25,7 +25,7 @@ The quickest way to import your complete mylist:
 2. Go to the **MyList** tab
 3. Click **"Download MyList from AniDB"** button
 4. Select your preferred template format:
-   - **csv-adborg (Recommended)** - Optimized format, works with all features
+   - **xml-plain-cs (Recommended)** - XML format with proper lid values, prevents duplicate entries
    - **xml** - Full structured data
    - **csv** - Standard format
    - **json** - JSON format
@@ -50,9 +50,8 @@ To import your complete mylist with all entries:
 1. Log in to your AniDB account at https://anidb.net
 2. Navigate to your MyList: https://anidb.net/perl-bin/animedb.pl?show=mylist
 3. Click on "Export" at the top of the page
-4. Choose one of the following formats:
-   - **XML** (recommended) - Full structured data
-   - **CSV/TXT** - Comma-separated values
+4. Choose the following template format:
+   - **xml-plain-cs** (recommended) - XML format with proper lid values
 5. Download the export file to your computer
 
 ### Step 2: Import the File
@@ -76,23 +75,37 @@ To import your complete mylist with all entries:
 </mylistexport>
 ```
 
-### CSV/TXT Format
+### xml-plain-cs Format (Recommended)
 
-The application now supports multiple CSV template formats:
+The xml-plain-cs template provides proper mylist ID (lid) values in a hierarchical XML structure, preventing duplicate entries and maintaining consistency with the AniDB API:
 
-#### Standard MYLISTEXPORT Format
-```
-lid,fid,eid,aid,gid,date,state,viewdate,storage,source,other,filestate
-123456,789012,345678,901234,567890,1234567890,1,1234567890,/path/to/file,...
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<MyList>
+<User Id="71837" Name="viperx"/>
+<Anime Id="1135" Name=".hack//Gift">
+  <Ep Id="12814" EpNo="1" Name="OVA">
+    <File Id="54357" LId="16588092" GroupId="925" 
+          Storage="a005" ViewDate="2006-08-18T22:00:00Z" MyState="2"/>
+  </Ep>
+</Anime>
+</MyList>
 ```
 
-#### csv-adborg Template Format
-```
-aid,eid,gid,lid,status,viewdate,anime_name,episode_name
-901234,345678,567890,123456,1,1234567890,Test Anime,Episode 1
-```
+**Key Structure:**
+- Hierarchical: `MyList > Anime > Ep > File`
+- **`LId` in File element** = MyList ID (lid) - unique identifier
+- **`Id` in File element** = File ID (fid) - different from LId
+- **`Id` in Ep element** = Episode ID (eid)
+- **`Id` in Anime element** = Anime ID (aid)
 
-The parser automatically detects which format is being used by reading the header row and mapping columns by name. This means you can use any AniDB MYLISTEXPORT template that includes the required fields (lid, aid).
+**Key Benefits:**
+- Contains proper `LId` (MyList ID) values in File elements
+- `LId` and file `Id` are different values (unlike old csv-adborg format which used fid as lid)
+- Prevents duplicate entries and maintains data integrity
+- Fully compatible with AniDB API responses
+- Includes rich metadata (anime names, episode names, etc.) all in one export
+- Fully compatible with AniDB API responses
 
 ## Data Fields
 
@@ -127,3 +140,4 @@ The parser automatically detects which format is being used by reading the heade
 - The UDP API has strict rate limiting, so bulk queries are not supported
 - After importing, you can use the normal file hashing feature to update entries
 - The import process respects your existing database data
+- **Important:** The old csv-adborg format is no longer supported due to data integrity issues (it used fid as lid placeholder, causing duplicate entries)

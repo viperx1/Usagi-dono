@@ -226,3 +226,27 @@ endif()
 
 add_test(NAME test_url_extraction COMMAND test_url_extraction -v2)
 
+# Test 6: MyList XML Parser
+add_executable(test_mylist_xml_parser test_mylist_xml_parser.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_mylist_xml_parser PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_mylist_xml_parser PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_mylist_xml_parser PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_mylist_xml_parser COMMAND test_mylist_xml_parser -v2)
+

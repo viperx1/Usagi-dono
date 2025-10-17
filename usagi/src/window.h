@@ -22,6 +22,7 @@
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTreeWidget>
+#include <QXmlStreamReader>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
 //#include "hasherthread.h"
@@ -158,7 +159,7 @@ public:
 	// page hasher
     hashes_ *hashes;
 	void hashesinsertrow(QFileInfo, Qt::CheckState);
-	int parseMylistCSVAdborg(const QString &tarGzPath);
+	int parseMylistExport(const QString &tarGzPath);
     Window();
 	~Window();
 };
