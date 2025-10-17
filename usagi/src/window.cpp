@@ -1312,6 +1312,8 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	// LId is the mylist ID (lid), Id is the file ID (fid)
 	QString currentAid;
 	QString currentEid;
+	QString currentEpNo;
+	QString currentEpName;
 	
 	while(!xml.atEnd() && !xml.hasError())
 	{
@@ -1327,9 +1329,31 @@ int Window::parseMylistExport(const QString &tarGzPath)
 			}
 			else if(xml.name() == QString("Ep"))
 			{
-				// Get episode ID from Ep element
+				// Get episode ID, number, and name from Ep element
 				QXmlStreamAttributes attributes = xml.attributes();
 				currentEid = attributes.value("Id").toString();
+				currentEpNo = attributes.value("EpNo").toString();
+				currentEpName = attributes.value("Name").toString();
+				
+				// Store episode data in episode table if we have valid data
+				if(!currentEid.isEmpty() && (!currentEpNo.isEmpty() || !currentEpName.isEmpty()))
+				{
+					QString epName_escaped = QString(currentEpName).replace("'", "''");
+					QString epNo_escaped = QString(currentEpNo).replace("'", "''");
+					
+					QString episodeQuery = QString("INSERT OR REPLACE INTO `episode` "
+						"(`eid`, `epno`, `name`) VALUES (%1, '%2', '%3')")
+						.arg(currentEid)
+						.arg(epNo_escaped)
+						.arg(epName_escaped);
+					
+					QSqlQuery episodeQueryExec(db);
+					if(!episodeQueryExec.exec(episodeQuery))
+					{
+						logOutput->append(QString("Warning: Failed to insert episode data (eid=%1): %2")
+							.arg(currentEid).arg(episodeQueryExec.lastError().text()));
+					}
+				}
 			}
 			else if(xml.name() == QString("File"))
 			{

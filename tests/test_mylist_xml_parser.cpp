@@ -48,6 +48,20 @@ void TestMylistXMLParser::initTestCase()
         ")";
     
     QVERIFY(query.exec(createTable));
+    
+    // Create episode table
+    QString createEpisodeTable = 
+        "CREATE TABLE IF NOT EXISTS `episode` ("
+        "`eid` INTEGER PRIMARY KEY, "
+        "`name` TEXT, "
+        "`nameromaji` TEXT, "
+        "`namekanji` TEXT, "
+        "`rating` INTEGER, "
+        "`votecount` INTEGER, "
+        "`epno` TEXT"
+        ")";
+    
+    QVERIFY(query.exec(createEpisodeTable));
 }
 
 QString TestMylistXMLParser::createSampleXMLExport()
@@ -58,17 +72,17 @@ QString TestMylistXMLParser::createSampleXMLExport()
         "<MyList>\n"
         "<User Id=\"12345\" Name=\"testuser\"/>\n"
         "<Anime Id=\"1135\" Eps=\"1\">\n"
-        "  <Ep Id=\"12814\" EpNo=\"1\">\n"
+        "  <Ep Id=\"12814\" EpNo=\"1\" Name=\"OVA\">\n"
         "    <File Id=\"54357\" LId=\"16588092\" GroupId=\"925\" Storage=\"a005\" "
         "ViewDate=\"2006-08-18T22:00:00Z\" MyState=\"2\"/>\n"
         "  </Ep>\n"
         "</Anime>\n"
         "<Anime Id=\"222\" Eps=\"4\">\n"
-        "  <Ep Id=\"2614\" EpNo=\"1\">\n"
+        "  <Ep Id=\"2614\" EpNo=\"1\" Name=\"First Episode\">\n"
         "    <File Id=\"47082\" LId=\"21080811\" GroupId=\"925\" Storage=\"a040\" "
         "ViewDate=\"2007-02-10T23:58:00Z\" MyState=\"2\"/>\n"
         "  </Ep>\n"
-        "  <Ep Id=\"2615\" EpNo=\"2\">\n"
+        "  <Ep Id=\"2615\" EpNo=\"2\" Name=\"Second Episode\">\n"
         "    <File Id=\"47083\" LId=\"21080812\" GroupId=\"925\" Storage=\"\" "
         "ViewDate=\"\" MyState=\"2\"/>\n"
         "  </Ep>\n"
@@ -141,6 +155,8 @@ void TestMylistXMLParser::testXMLParsing()
     // Parse XML structure: <MyList><Anime><Ep><File LId="..." Id="..."/></Ep></Anime></MyList>
     QString currentAid;
     QString currentEid;
+    QString currentEpNo;
+    QString currentEpName;
     
     while(!xml.atEnd() && !xml.hasError())
     {
@@ -157,6 +173,25 @@ void TestMylistXMLParser::testXMLParsing()
             {
                 QXmlStreamAttributes attributes = xml.attributes();
                 currentEid = attributes.value("Id").toString();
+                currentEpNo = attributes.value("EpNo").toString();
+                currentEpName = attributes.value("Name").toString();
+                
+                // Store episode data in episode table if we have valid data
+                if(!currentEid.isEmpty() && (!currentEpNo.isEmpty() || !currentEpName.isEmpty()))
+                {
+                    QString epName_escaped = QString(currentEpName).replace("'", "''");
+                    QString epNo_escaped = QString(currentEpNo).replace("'", "''");
+                    
+                    QString episodeQuery = QString("INSERT OR REPLACE INTO `episode` "
+                        "(`eid`, `epno`, `name`) VALUES (%1, '%2', '%3')")
+                        .arg(currentEid)
+                        .arg(epNo_escaped)
+                        .arg(epName_escaped);
+                    
+                    QSqlQuery episodeQueryExec(db);
+                    QVERIFY2(episodeQueryExec.exec(episodeQuery), 
+                        QString("Failed to insert episode: %1").arg(episodeQueryExec.lastError().text()).toUtf8().constData());
+                }
             }
             else if(xml.name() == QString("File"))
             {
@@ -231,6 +266,30 @@ void TestMylistXMLParser::testXMLParsing()
     // Verify that lid and fid are different (not duplicated)
     QVERIFY(query.exec("SELECT lid, fid FROM mylist WHERE lid = fid"));
     QVERIFY(!query.next());  // Should be no results where lid == fid
+    
+    // Verify episode data was stored correctly
+    QVERIFY(query.exec("SELECT eid, epno, name FROM episode ORDER BY eid"));
+    
+    // First episode - eid 2614
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 2614);
+    QCOMPARE(query.value(1).toString(), QString("1"));
+    QCOMPARE(query.value(2).toString(), QString("First Episode"));
+    
+    // Second episode - eid 2615
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 2615);
+    QCOMPARE(query.value(1).toString(), QString("2"));
+    QCOMPARE(query.value(2).toString(), QString("Second Episode"));
+    
+    // Third episode - eid 12814
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 12814);
+    QCOMPARE(query.value(1).toString(), QString("1"));
+    QCOMPARE(query.value(2).toString(), QString("OVA"));
+    
+    // Verify no more episode entries
+    QVERIFY(!query.next());
     
     // Clean up
     QDir(tempDir).removeRecursively();
