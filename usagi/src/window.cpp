@@ -748,7 +748,6 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		if(!expectedTemplate.isEmpty() && !message.contains(expectedTemplate, Qt::CaseInsensitive))
 		{
 			logOutput->append(QString("MyList export link found but template mismatch: expected '%1', skipping").arg(expectedTemplate));
-			logOutput->append("No mylist export link found in notification");
 			
 			// Track notifications checked without finding correct export
 			if(isCheckingNotifications)
@@ -764,8 +763,10 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 						logOutput->append(QString("Checked %1 notifications with no matching export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
 						mylistStatusLabel->setText("MyList Status: Requesting export (first run)...");
 						
-						// Request MYLISTEXPORT with xml-plain-cs template
-						adbapi->MylistExport("xml-plain-cs");
+						// Request MYLISTEXPORT with xml-plain-cs template (default)
+						// If a template was already requested, use that; otherwise use xml-plain-cs
+						QString templateToRequest = expectedTemplate.isEmpty() ? "xml-plain-cs" : expectedTemplate;
+						adbapi->MylistExport(templateToRequest);
 					}
 					else
 					{

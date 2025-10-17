@@ -104,7 +104,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	notifyCheckTimer = new QTimer();
 	connect(notifyCheckTimer, SIGNAL(timeout()), this, SLOT(checkForNotifications()));
 	isExportQueued = false;
-	requestedExportTemplate = ""; // No template requested yet
+	requestedExportTemplate = QString(); // No template requested yet
 	notifyCheckAttempts = 0;
 	notifyCheckIntervalMs = 60000; // Start with 1 minute
 	exportQueuedTimestamp = 0;
@@ -891,7 +891,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			{
 				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
 				isExportQueued = false;
-				requestedExportTemplate = ""; // Clear the requested template
+				requestedExportTemplate.clear(); // Clear the requested template
 				notifyCheckTimer->stop();
 				notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
 				notifyCheckAttempts = 0;
