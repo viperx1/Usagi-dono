@@ -846,7 +846,8 @@ void TestAniDBApiCommands::testNotifyCheckIntervalNotIncreasedWhenNotLoggedIn()
     query.exec(QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued_timestamp', '%1')").arg(currentTime));
     
     // Step 2: Create a new API instance that will load this state
-    AniDBApi* testApi = new AniDBApi("usagitest", 1);
+    // Use QScopedPointer for RAII to ensure proper cleanup even if test fails
+    QScopedPointer<AniDBApi> testApi(new AniDBApi("usagitest", 1));
     
     // Give the API time to initialize (it starts async tasks)
     QTest::qWait(100);
@@ -875,8 +876,7 @@ void TestAniDBApiCommands::testNotifyCheckIntervalNotIncreasedWhenNotLoggedIn()
     qDebug() << "  Interval after check (not logged in):" << intervalAfterCheck << "ms";
     qDebug() << "  Expected: no increase (should stay at 60000 ms)";
     
-    // Clean up
-    delete testApi;
+    // Clean up database state (QScopedPointer automatically deletes testApi)
     query.exec("DELETE FROM `settings` WHERE `name` IN ('export_queued', 'export_check_attempts', 'export_check_interval_ms', 'export_queued_timestamp')");
 }
 

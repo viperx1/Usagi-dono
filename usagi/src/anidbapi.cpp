@@ -1670,7 +1670,7 @@ void AniDBApi::checkForNotifications()
 		query.exec(q);
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Requesting NOTIFYLIST to check for export notification");
 		
-		// Increase check interval by 1 minute for next check (no new notification found)
+		// Increase check interval by 1 minute after each successful check attempt
 		// Cap at 60 minutes to avoid very long waits
 		notifyCheckIntervalMs += 60000;
 		if(notifyCheckIntervalMs > 3600000)  // Cap at 60 minutes
