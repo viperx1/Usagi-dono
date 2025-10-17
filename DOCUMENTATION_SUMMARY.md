@@ -4,7 +4,7 @@ This document lists all remaining markdown documentation in the repository and t
 
 ## Documentation Structure
 
-The repository now contains **13 markdown files** focused on current features and active guides.
+The repository now contains **15 markdown files** focused on current features, active guides, and future plans.
 
 ### Current Feature Documentation (5 files)
 
@@ -77,9 +77,28 @@ Documentation for the test suite:
    - Test specifications
    - Validation procedures
 
+### Future Plans (2 files)
+
+Plans for future enhancements to the application:
+
+1. **FEATURE_PLAN_ANIME_TRACKING.md** - Comprehensive feature plan
+   - Anime tracking and playback integration
+   - Torrent management (qBittorrent integration)
+   - Smart file organization
+   - Watch status tracking
+   - Statistics and insights
+   - 7-phase implementation roadmap
+
+2. **TECHNICAL_DESIGN_NOTES.md** - Technical implementation details
+   - Database migration strategy
+   - Code architecture patterns
+   - API integration specifications
+   - Performance considerations
+   - Testing strategies
+
 ## What Was Removed
 
-**65 markdown files** were removed, consisting of:
+**63 markdown files** were removed, consisting of:
 
 ### Past Implementation Summaries (54 files)
 - PR summaries and overviews
@@ -90,21 +109,23 @@ Documentation for the test suite:
 
 These documented past work that is now complete and integrated into the codebase. The actual code and tests serve as the source of truth, making these historical documents unnecessary.
 
-### Future Plans Not Being Pursued (11 files)
-- `FEATURE_PLAN_ANIME_TRACKING.md` - Extensive future plans for torrent integration, playback manager, and advanced anime tracking
-- `TECHNICAL_DESIGN_NOTES.md` - Technical design for unimplemented features
+### Other Future Plans Not Being Pursued (9 files)
+- `MYLIST_DOWNLOAD_FEATURE.md` - Proposed feature not in codebase
+- `EXPORT_URL_EXTRACTION_FIX.md` - Future fix plan
 - Various test plans for features not yet implemented
 - Quick start guides for features that were never completed
 
 These documented aspirational features that are not currently in the codebase and are not actively being worked on.
 
+**Note**: The main future plans (`FEATURE_PLAN_ANIME_TRACKING.md` and `TECHNICAL_DESIGN_NOTES.md`) are retained as they represent the project's roadmap and vision.
+
 ## Maintenance
 
 Going forward:
 
-- **Keep**: Documentation for current features, usage guides, and technical reference
+- **Keep**: Documentation for current features, usage guides, technical reference, and future plans
 - **Remove**: Implementation summaries and PR documentation once the work is merged
-- **Remove**: Future plan documents if the features are not going to be implemented
+- **Remove**: Minor future plan documents if the features are definitively not going to be implemented
 - **Update**: Existing docs when features change significantly
 
 ## Finding Documentation
@@ -117,6 +138,9 @@ find . -name "*.md" -not -path "./.git/*"
 
 # View feature documentation
 cat ANIME_TITLES_FEATURE.md
+
+# View future plans
+cat FEATURE_PLAN_ANIME_TRACKING.md
 
 # View test documentation
 cat tests/README.md
