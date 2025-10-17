@@ -250,3 +250,26 @@ endif()
 
 add_test(NAME test_mylist_xml_parser COMMAND test_mylist_xml_parser -v2)
 
+# Test 7: Export template verification in notifications
+add_executable(test_export_template_verification test_export_template_verification.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_export_template_verification PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_export_template_verification PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_export_template_verification PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_export_template_verification COMMAND test_export_template_verification -v2)
+
