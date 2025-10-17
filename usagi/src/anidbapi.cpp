@@ -1669,22 +1669,26 @@ void AniDBApi::checkForNotifications()
 		QSqlQuery query(db);
 		query.exec(q);
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Requesting NOTIFYLIST to check for export notification");
+		
+		// Increase check interval by 1 minute after each successful check attempt
+		// Cap at 60 minutes to avoid very long waits
+		notifyCheckIntervalMs += 60000;
+		if(notifyCheckIntervalMs > 3600000)  // Cap at 60 minutes
+		{
+			notifyCheckIntervalMs = 3600000;
+		}
+		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
+		int nextIntervalMinutes = notifyCheckIntervalMs / 60000;
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Next check will be in " + QString::number(nextIntervalMinutes) + " minutes");
 	}
 	else
 	{
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Not logged in, skipping notification check");
+		// Don't increase interval when not logged in - keep trying at the same interval
+		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
+		int nextIntervalMinutes = notifyCheckIntervalMs / 60000;
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Will retry in " + QString::number(nextIntervalMinutes) + " minutes after login");
 	}
-	
-	// Increase check interval by 1 minute for next check (no new notification found)
-	// Cap at 60 minutes to avoid very long waits
-	notifyCheckIntervalMs += 60000;
-	if(notifyCheckIntervalMs > 3600000)  // Cap at 60 minutes
-	{
-		notifyCheckIntervalMs = 3600000;
-	}
-	notifyCheckTimer->setInterval(notifyCheckIntervalMs);
-	int nextIntervalMinutes = notifyCheckIntervalMs / 60000;
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Next check will be in " + QString::number(nextIntervalMinutes) + " minutes");
 	
 	// Save state after each check
 	saveExportQueueState();

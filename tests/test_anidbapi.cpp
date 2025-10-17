@@ -61,6 +61,9 @@ private slots:
     // MYLISTADD database storage tests
     void testMylistAddResponseStoredInDatabase();
     void testMylistEditResponseUpdatesDatabase();
+    
+    // Export notification interval tests
+    void testNotifyCheckIntervalNotIncreasedWhenNotLoggedIn();
 
 private:
     AniDBApi* api;
@@ -822,6 +825,59 @@ void TestAniDBApiCommands::testMylistEditResponseUpdatesDatabase()
     query.exec(q);
     q = QString("DELETE FROM `file` WHERE `fid` = %1").arg(fid);
     query.exec(q);
+}
+
+void TestAniDBApiCommands::testNotifyCheckIntervalNotIncreasedWhenNotLoggedIn()
+{
+    // This test verifies that the notification check interval does not increase
+    // when the user is not logged in, as per the fix for the issue where the
+    // interval would increase from 1 to 2 minutes even when no actual check was performed
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    QVERIFY(db.isOpen());
+    QSqlQuery query(db);
+    
+    // Step 1: Set up an export queue state to trigger periodic checks
+    // Set isExportQueued = 1, initial interval = 60000 (1 minute)
+    query.exec("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued', '1')");
+    query.exec("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_check_attempts', '0')");
+    query.exec("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_check_interval_ms', '60000')");
+    qint64 currentTime = QDateTime::currentSecsSinceEpoch();
+    query.exec(QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued_timestamp', '%1')").arg(currentTime));
+    
+    // Step 2: Create a new API instance that will load this state
+    // Use QScopedPointer for RAII to ensure proper cleanup even if test fails
+    QScopedPointer<AniDBApi> testApi(new AniDBApi("usagitest", 1));
+    
+    // Give the API time to initialize (it starts async tasks)
+    QTest::qWait(100);
+    
+    // Step 3: Verify initial interval is 60000 ms (1 minute)
+    query.exec("SELECT `value` FROM `settings` WHERE `name` = 'export_check_interval_ms'");
+    QVERIFY(query.next());
+    int initialInterval = query.value(0).toInt();
+    QCOMPARE(initialInterval, 60000);
+    
+    // Step 4: Manually trigger checkForNotifications() when NOT logged in
+    // (SID is empty, LoginStatus is 0 by default in test)
+    testApi->checkForNotifications();
+    
+    // Give the system time to process
+    QTest::qWait(100);
+    
+    // Step 5: Verify the interval has NOT increased (should still be 60000 ms)
+    query.exec("SELECT `value` FROM `settings` WHERE `name` = 'export_check_interval_ms'");
+    QVERIFY(query.next());
+    int intervalAfterCheck = query.value(0).toInt();
+    QCOMPARE(intervalAfterCheck, 60000);  // Should remain 60000, not increase to 120000
+    
+    qDebug() << "Successfully verified interval does not increase when not logged in";
+    qDebug() << "  Initial interval:" << initialInterval << "ms";
+    qDebug() << "  Interval after check (not logged in):" << intervalAfterCheck << "ms";
+    qDebug() << "  Expected: no increase (should stay at 60000 ms)";
+    
+    // Clean up database state (QScopedPointer automatically deletes testApi)
+    query.exec("DELETE FROM `settings` WHERE `name` IN ('export_queued', 'export_check_attempts', 'export_check_interval_ms', 'export_queued_timestamp')");
 }
 
 QTEST_MAIN(TestAniDBApiCommands)
