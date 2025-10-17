@@ -104,6 +104,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	notifyCheckTimer = new QTimer();
 	connect(notifyCheckTimer, SIGNAL(timeout()), this, SLOT(checkForNotifications()));
 	isExportQueued = false;
+	requestedExportTemplate = QString(); // No template requested yet
 	notifyCheckAttempts = 0;
 	notifyCheckIntervalMs = 60000; // Start with 1 minute
 	exportQueuedTimestamp = 0;
@@ -890,6 +891,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			{
 				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
 				isExportQueued = false;
+				requestedExportTemplate.clear(); // Clear the requested template
 				notifyCheckTimer->stop();
 				notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
 				notifyCheckAttempts = 0;
@@ -1137,6 +1139,10 @@ QString AniDBApi::MylistExport(QString template_name)
 		Auth();
 	}
 	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Requesting MYLISTEXPORT with template: " + template_name);
+	
+	// Store the requested template so we can verify the notification matches
+	requestedExportTemplate = template_name;
+	
 	QString msg = buildMylistExportCommand(template_name);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query;
@@ -1244,6 +1250,11 @@ QString AniDBApi::buildEpisodeCommand(int eid)
 QString AniDBApi::GetSID()
 {
 	return AniDBApi::SID;
+}
+
+QString AniDBApi::GetRequestedExportTemplate()
+{
+	return requestedExportTemplate;
 }
 
 int AniDBApi::Send(QString str, QString msgtype, QString tag)

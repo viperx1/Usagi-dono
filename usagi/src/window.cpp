@@ -741,6 +741,48 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	
 	if(!exportUrl.isEmpty() && !isDownloadingExport)
 	{
+		// Verify that the notification message contains the expected template name
+		QString expectedTemplate = adbapi->GetRequestedExportTemplate();
+		
+		// If a template was requested, verify the message mentions it
+		if(!expectedTemplate.isEmpty() && !message.contains(expectedTemplate, Qt::CaseInsensitive))
+		{
+			logOutput->append(QString("MyList export link found but template mismatch: expected '%1', skipping").arg(expectedTemplate));
+			
+			// Track notifications checked without finding correct export
+			if(isCheckingNotifications)
+			{
+				notificationsCheckedWithoutExport++;
+				
+				// If we've checked all expected notifications and found no matching export
+				if(notificationsCheckedWithoutExport >= expectedNotificationsToCheck)
+				{
+					// Only auto-request export on first run
+					if(!isMylistFirstRunComplete())
+					{
+						logOutput->append(QString("Checked %1 notifications with no matching export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
+						mylistStatusLabel->setText("MyList Status: Requesting export (first run)...");
+						
+						// Request MYLISTEXPORT with xml-plain-cs template (default)
+						// If a template was already requested, use that; otherwise use xml-plain-cs
+						QString templateToRequest = expectedTemplate.isEmpty() ? "xml-plain-cs" : expectedTemplate;
+						adbapi->MylistExport(templateToRequest);
+					}
+					else
+					{
+						logOutput->append(QString("Checked %1 notifications with no matching export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
+						mylistStatusLabel->setText("MyList Status: No export found - request manually in Settings");
+					}
+					
+					// Reset state
+					isCheckingNotifications = false;
+					expectedNotificationsToCheck = 0;
+					notificationsCheckedWithoutExport = 0;
+				}
+			}
+			return;
+		}
+		
 		isDownloadingExport = true;
 		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
 		mylistStatusLabel->setText("MyList Status: Downloading export...");
@@ -758,7 +800,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		QNetworkReply *reply = manager->get(request);
 		
 		// Connect to download finished signal
-		connect(reply, &QNetworkReply::finished, this, [this, reply, manager]() {
+		connect(reply, &QNetworkReply::finished, this, [this, reply, manager, &isDownloadingExport]() {
 			if(reply->error() == QNetworkReply::NoError)
 			{
 				// Save to temporary file
@@ -806,6 +848,9 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 				logOutput->append(QString("Error downloading export: %1").arg(reply->errorString()));
 				mylistStatusLabel->setText("MyList Status: Download failed");
 			}
+			
+			// Reset the flag to allow future downloads
+			isDownloadingExport = false;
 			
 			reply->deleteLater();
 			manager->deleteLater();

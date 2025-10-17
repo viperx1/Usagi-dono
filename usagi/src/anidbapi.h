@@ -69,6 +69,7 @@ private:
 	// Export notification checking
 	QTimer *notifyCheckTimer;
 	bool isExportQueued;
+	QString requestedExportTemplate; // Track which template was requested
 	int notifyCheckAttempts;
 	int notifyCheckIntervalMs; // Current check interval in milliseconds
 	qint64 exportQueuedTimestamp; // Timestamp when export was queued
@@ -215,6 +216,7 @@ public:
 	/* Anime Titles End === */
 
 	QString GetSID();
+	QString GetRequestedExportTemplate(); // Get the template name that was requested for export
     QString GetTag(QString);
 	virtual void Debug(QString msg);
 	virtual int LoginStatus();
