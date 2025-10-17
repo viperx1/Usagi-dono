@@ -800,7 +800,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		QNetworkReply *reply = manager->get(request);
 		
 		// Connect to download finished signal
-		connect(reply, &QNetworkReply::finished, this, [this, reply, manager, &isDownloadingExport]() {
+		connect(reply, &QNetworkReply::finished, this, [this, reply, manager]() {
 			if(reply->error() == QNetworkReply::NoError)
 			{
 				// Save to temporary file
