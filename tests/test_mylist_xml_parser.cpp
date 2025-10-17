@@ -1,6 +1,7 @@
 #include <QtTest/QtTest>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QDir>
 #include <QFile>
 #include <QProcess>
