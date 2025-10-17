@@ -51,9 +51,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `mylist`(`lid` INTEGER PRIMARY KEY, `fid` INTEGER, `eid` INTEGER, `aid` INTEGER, `gid` INTEGER, `date` INTEGER, `state` INTEGER, `viewed` INTEGER, `viewdate` INTEGER, `storage` TEXT, `source` TEXT, `other` TEXT, `filestate` INTEGER)");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT);");
         query.exec("CREATE TABLE IF NOT EXISTS `file`(`fid` INTEGER PRIMARY KEY, `aid` INTEGER, `eid` INTEGER, `gid` INTEGER, `lid` INTEGER, `othereps` TEXT, `isdepr` INTEGER, `state` INTEGER, `size` BIGINT, `ed2k` TEXT, `md5` TEXT, `sha1` TEXT, `crc` TEXT, `quality` TEXT, `source` TEXT, `codec_audio` TEXT, `bitrate_audio` INTEGER, `codec_video` TEXT, `bitrate_video` INTEGER, `resolution` TEXT, `filetype` TEXT, `lang_dub` TEXT, `lang_sub` TEXT, `length` INTEGER, `description` TEXT, `airdate` INTEGER, `filename` TEXT);");
-		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT);");
+		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT, `type` INTEGER);");
 		// Add epno column if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `episode` ADD COLUMN `epno` TEXT");
+		// Add type column if it doesn't exist (for existing databases)
+		query.exec("ALTER TABLE `episode` ADD COLUMN `type` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
 		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT);");
@@ -443,16 +445,35 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 			
 			// Store episode data including episode number
+			// Derive episode type from epno prefix if not provided separately
+			// Type values: 1=regular, 2=special (S), 3=credit (C), 4=trailer (T), 5=parody (P), 6=other (O)
 			if(!eid.isEmpty())
 			{
-				QString q_episode = QString("INSERT OR REPLACE INTO `episode` (`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
+				QString eptype = "1";  // Default to regular episode
+				if(!epno.isEmpty())
+				{
+					QString epnoUpper = epno.toUpper();
+					if(epnoUpper.startsWith("S"))
+						eptype = "2";  // Special
+					else if(epnoUpper.startsWith("C"))
+						eptype = "3";  // Credit
+					else if(epnoUpper.startsWith("T"))
+						eptype = "4";  // Trailer
+					else if(epnoUpper.startsWith("P"))
+						eptype = "5";  // Parody
+					else if(epnoUpper.startsWith("O"))
+						eptype = "6";  // Other
+				}
+				
+				QString q_episode = QString("INSERT OR REPLACE INTO `episode` (`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`, `type`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8')")
 					.arg(QString(eid).replace("'", "''"))
 					.arg(QString(epname).replace("'", "''"))
 					.arg(QString(epnameromaji).replace("'", "''"))
 					.arg(QString(epnamekanji).replace("'", "''"))
 					.arg(QString(eprating).replace("'", "''"))
 					.arg(QString(epvotecount).replace("'", "''"))
-					.arg(QString(epno).replace("'", "''"));  // Store episode number!
+					.arg(QString(epno).replace("'", "''"))
+					.arg(eptype);
 				if(!query.exec(q_episode))
 				{
 					Debug("Episode database query error: " + query.lastError().text());
@@ -548,16 +569,18 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString epnamekanji = token2.size() > 8 ? token2.at(8) : "";
 			QString rating = token2.size() > 3 ? token2.at(3) : "";
 			QString votecount = token2.size() > 4 ? token2.at(4) : "";
+			QString type = token2.size() > 10 ? token2.at(10) : "0";  // Episode type (1=regular, 2=special, etc.)
 			
 			// Store episode data in database
-			QString q_episode = QString("INSERT OR REPLACE INTO `episode` (`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
+			QString q_episode = QString("INSERT OR REPLACE INTO `episode` (`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`, `type`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8')")
 				.arg(QString(eid).replace("'", "''"))
 				.arg(QString(epname).replace("'", "''"))
 				.arg(QString(epnameromaji).replace("'", "''"))
 				.arg(QString(epnamekanji).replace("'", "''"))
 				.arg(QString(rating).replace("'", "''"))
 				.arg(QString(votecount).replace("'", "''"))
-				.arg(QString(epno).replace("'", "''"));
+				.arg(QString(epno).replace("'", "''"))
+				.arg(QString(type).replace("'", "''"));
 			
 			QSqlQuery query(db);
 			if(!query.exec(q_episode))
@@ -566,7 +589,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 			else
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 240 EPISODE stored - EID: " + eid + " AID: " + aid + " EPNO: " + epno + " Name: " + epname);
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 240 EPISODE stored - EID: " + eid + " AID: " + aid + " EPNO: " + epno + " Type: " + type + " Name: " + epname);
 				// Emit signal to notify UI that episode data was updated
 				emit notifyEpisodeUpdated(eid.toInt(), aid.toInt());
 			}
