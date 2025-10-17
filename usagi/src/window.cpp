@@ -1334,18 +1334,25 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				currentEid = attributes.value("Id").toString();
 				currentEpNo = attributes.value("EpNo").toString();
 				currentEpName = attributes.value("Name").toString();
+				QString currentEpNameRomaji = attributes.value("NameRomaji").toString();
+				QString currentEpNameKanji = attributes.value("NameKanji").toString();
 				
 				// Store episode data in episode table if we have valid data
 				if(!currentEid.isEmpty() && (!currentEpNo.isEmpty() || !currentEpName.isEmpty()))
 				{
 					QString epName_escaped = QString(currentEpName).replace("'", "''");
 					QString epNo_escaped = QString(currentEpNo).replace("'", "''");
+					QString epNameRomaji_escaped = QString(currentEpNameRomaji).replace("'", "''");
+					QString epNameKanji_escaped = QString(currentEpNameKanji).replace("'", "''");
 					
 					QString episodeQuery = QString("INSERT OR REPLACE INTO `episode` "
-						"(`eid`, `epno`, `name`) VALUES (%1, '%2', '%3')")
+						"(`eid`, `epno`, `name`, `nameromaji`, `namekanji`) "
+						"VALUES (%1, '%2', '%3', '%4', '%5')")
 						.arg(currentEid)
 						.arg(epNo_escaped)
-						.arg(epName_escaped);
+						.arg(epName_escaped)
+						.arg(epNameRomaji_escaped)
+						.arg(epNameKanji_escaped);
 					
 					QSqlQuery episodeQueryExec(db);
 					if(!episodeQueryExec.exec(episodeQuery))
