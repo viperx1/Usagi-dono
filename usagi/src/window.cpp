@@ -800,7 +800,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		QNetworkReply *reply = manager->get(request);
 		
 		// Connect to download finished signal
-		connect(reply, &QNetworkReply::finished, this, [this, reply, manager]() {
+		connect(reply, &QNetworkReply::finished, this, [this, reply, manager, &isDownloadingExport]() {
 			if(reply->error() == QNetworkReply::NoError)
 			{
 				// Save to temporary file
@@ -848,6 +848,9 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 				logOutput->append(QString("Error downloading export: %1").arg(reply->errorString()));
 				mylistStatusLabel->setText("MyList Status: Download failed");
 			}
+			
+			// Reset the flag to allow future downloads
+			isDownloadingExport = false;
 			
 			reply->deleteLater();
 			manager->deleteLater();
