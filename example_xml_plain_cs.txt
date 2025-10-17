@@ -1,0 +1,92 @@
+# Example xml-plain-cs Format File
+# This demonstrates the structure that parseMylistExport now parses
+
+## File: mylist.xml (from xml-plain-cs template)
+
+<?xml version="1.0" encoding="UTF-8"?>
+<mylistexport>
+  <mylist lid="123456" fid="789012" eid="297776" aid="5178" gid="1412" date="1609459200" 
+          state="1" viewdate="1640995200" storage="HDD" source="BluRay" other="" filestate="1"/>
+  <mylist lid="234567" fid="890123" eid="298777" aid="5179" gid="1413" date="1609545600" 
+          state="2" viewdate="1641081600" storage="CD/DVD" source="Web" other="" filestate="1"/>
+  <mylist lid="345678" fid="901234" eid="299778" aid="5180" gid="1414" date="1609632000" 
+          state="1" viewdate="0" storage="" source="" other="" filestate="1"/>
+</mylistexport>
+
+## What Gets Parsed
+
+### Key Benefits Over Old csv-adborg Format:
+
+1. **Proper LID Values**: Each entry has a unique mylist ID (lid) that is different from the file ID (fid)
+   - Entry 1: lid=123456, fid=789012 (different values - correct!)
+   - Entry 2: lid=234567, fid=890123 (different values - correct!)
+   - Entry 3: lid=345678, fid=901234 (different values - correct!)
+
+2. **No Duplicate Entries**: The old csv-adborg format used fid as a placeholder for lid, causing:
+   - lid = fid (same value)
+   - Inconsistency with AniDB API which expects proper lid values
+   - Duplicate entries and data integrity issues
+
+3. **Simple XML Structure**: Easy to parse with QXmlStreamReader
+
+### Database State After Import
+
+#### mylist table:
+| lid    | fid    | eid    | aid  | gid  | state | viewed | storage |
+|--------|--------|--------|------|------|-------|--------|---------|
+| 123456 | 789012 | 297776 | 5178 | 1412 | 1     | 1      | HDD     |
+| 234567 | 890123 | 298777 | 5179 | 1413 | 2     | 1      | CD/DVD  |
+| 345678 | 901234 | 299778 | 5180 | 1414 | 1     | 0      |         |
+
+**Important**: Notice how lid and fid are always different! This is the correct behavior and matches the AniDB API specification.
+
+### Data Fields Explained
+
+- **lid** - MyList ID (unique identifier assigned by AniDB for this mylist entry)
+- **fid** - File ID (unique identifier for the file itself)
+- **eid** - Episode ID
+- **aid** - Anime ID
+- **gid** - Group ID (release group)
+- **date** - Date added to mylist (Unix timestamp)
+- **state** - Storage state (0=unknown, 1=HDD, 2=CD/DVD, 3=deleted)
+- **viewdate** - When watched (Unix timestamp, 0=not watched)
+- **storage** - Storage location/note
+- **source** - Source type (BluRay, Web, etc.)
+- **other** - Other notes
+- **filestate** - File state
+
+### Viewed Status Logic
+
+The `viewed` field in the database is determined by the `viewdate` attribute:
+- If viewdate is present and not "0" → viewed = 1
+- If viewdate is "0" or empty → viewed = 0
+
+Example:
+- Entry 1: viewdate="1640995200" → viewed = 1 ✓
+- Entry 2: viewdate="1641081600" → viewed = 1 ✓
+- Entry 3: viewdate="0" → viewed = 0 ✓
+
+## Migration from csv-adborg
+
+If you previously imported using csv-adborg format, you should:
+
+1. Clear your mylist table or re-import to get proper lid values
+2. Request a new export from AniDB using xml-plain-cs template
+3. Import the new file
+
+The xml-plain-cs format ensures data integrity and compatibility with the AniDB API.
+
+## UI Display
+
+```
+MyList Tab (Tree View):
+├─ Naruto: Shippuden the Movie [from anime_titles table]
+│  └─ Episode 1 - Complete Movie [from episode API]
+│     State: HDD
+│     Viewed: Yes
+│     Storage: HDD
+│     Mylist ID: 123456
+│     File ID: 789012
+```
+
+Note: Episode names are fetched via the Episode API when needed, as they're not included in the mylist export.
