@@ -1263,29 +1263,43 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	QXmlStreamReader xml(&xmlFile);
 	db.transaction();
 	
-	// Parse XML structure: <mylistexport><mylist lid="..." fid="..." .../></mylistexport>
+	// Parse XML structure: <MyList><Anime><Ep><File LId="..." Id="..."/></Ep></Anime></MyList>
+	// LId is the mylist ID (lid), Id is the file ID (fid)
+	QString currentAid;
+	QString currentEid;
+	
 	while(!xml.atEnd() && !xml.hasError())
 	{
 		QXmlStreamReader::TokenType token = xml.readNext();
 		
 		if(token == QXmlStreamReader::StartElement)
 		{
-			if(xml.name() == QString("mylist"))
+			if(xml.name() == QString("Anime"))
 			{
-				// Extract attributes from mylist element
+				// Get anime ID from Anime element
+				QXmlStreamAttributes attributes = xml.attributes();
+				currentAid = attributes.value("Id").toString();
+			}
+			else if(xml.name() == QString("Ep"))
+			{
+				// Get episode ID from Ep element
+				QXmlStreamAttributes attributes = xml.attributes();
+				currentEid = attributes.value("Id").toString();
+			}
+			else if(xml.name() == QString("File"))
+			{
+				// Get file information from File element
 				QXmlStreamAttributes attributes = xml.attributes();
 				
-				QString lid = attributes.value("lid").toString();
-				QString fid = attributes.value("fid").toString();
-				QString eid = attributes.value("eid").toString();
-				QString aid = attributes.value("aid").toString();
-				QString gid = attributes.value("gid").toString();
-				QString state = attributes.value("state").toString();
-				QString viewdate = attributes.value("viewdate").toString();
-				QString storage = attributes.value("storage").toString();
+				QString lid = attributes.value("LId").toString();  // MyList ID
+				QString fid = attributes.value("Id").toString();   // File ID
+				QString gid = attributes.value("GroupId").toString();
+				QString storage = attributes.value("Storage").toString();
+				QString viewdate = attributes.value("ViewDate").toString();
+				QString myState = attributes.value("MyState").toString();
 				
 				// Validate required fields
-				if(lid.isEmpty() || aid.isEmpty())
+				if(lid.isEmpty() || currentAid.isEmpty())
 					continue;
 				
 				// Determine viewed status from viewdate
@@ -1298,12 +1312,12 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				QString q = QString("INSERT OR REPLACE INTO `mylist` "
 					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
 					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
-					.arg(lid)  // Now using proper lid from XML
-					.arg(fid.isEmpty() ? "0" : fid)
-					.arg(eid.isEmpty() ? "0" : eid)
-					.arg(aid)
+					.arg(lid)  // LId from File element
+					.arg(fid.isEmpty() ? "0" : fid)  // Id from File element
+					.arg(currentEid.isEmpty() ? "0" : currentEid)  // Id from Ep element
+					.arg(currentAid)  // Id from Anime element
 					.arg(gid.isEmpty() ? "0" : gid)
-					.arg(state.isEmpty() ? "0" : state)
+					.arg(myState.isEmpty() ? "0" : myState)  // MyState as state
 					.arg(viewed)
 					.arg(storage_escaped);
 				

@@ -77,22 +77,34 @@ To import your complete mylist with all entries:
 
 ### xml-plain-cs Format (Recommended)
 
-The xml-plain-cs template provides proper mylist ID (lid) values, preventing duplicate entries and maintaining consistency with the AniDB API:
+The xml-plain-cs template provides proper mylist ID (lid) values in a hierarchical XML structure, preventing duplicate entries and maintaining consistency with the AniDB API:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<mylistexport>
-  <mylist lid="123456" fid="789012" eid="345678" aid="901234" gid="567890" 
-          state="1" viewdate="1640995200" storage="/path/to/file"/>
-  <mylist lid="234567" fid="890123" eid="456789" aid="123456" gid="678901" 
-          state="2" viewdate="1641081600" storage="HDD"/>
-</mylistexport>
+<?xml version="1.0" encoding="utf-8"?>
+<MyList>
+<User Id="71837" Name="viperx"/>
+<Anime Id="1135" Name=".hack//Gift">
+  <Ep Id="12814" EpNo="1" Name="OVA">
+    <File Id="54357" LId="16588092" GroupId="925" 
+          Storage="a005" ViewDate="2006-08-18T22:00:00Z" MyState="2"/>
+  </Ep>
+</Anime>
+</MyList>
 ```
 
+**Key Structure:**
+- Hierarchical: `MyList > Anime > Ep > File`
+- **`LId` in File element** = MyList ID (lid) - unique identifier
+- **`Id` in File element** = File ID (fid) - different from LId
+- **`Id` in Ep element** = Episode ID (eid)
+- **`Id` in Anime element** = Anime ID (aid)
+
 **Key Benefits:**
-- Contains proper `lid` (MyList ID) values - unique identifier for each entry
-- `lid` and `fid` are different values (unlike old csv-adborg format which used fid as lid)
+- Contains proper `LId` (MyList ID) values in File elements
+- `LId` and file `Id` are different values (unlike old csv-adborg format which used fid as lid)
 - Prevents duplicate entries and maintains data integrity
+- Fully compatible with AniDB API responses
+- Includes rich metadata (anime names, episode names, etc.) all in one export
 - Fully compatible with AniDB API responses
 
 ## Data Fields

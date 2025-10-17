@@ -52,17 +52,28 @@ void TestMylistXMLParser::initTestCase()
 
 QString TestMylistXMLParser::createSampleXMLExport()
 {
-    // Create a sample XML file in xml-plain-cs format
+    // Create a sample XML file in xml-plain-cs format (hierarchical structure)
     QString xmlContent = 
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<mylistexport>\n"
-        "  <mylist lid=\"123456\" fid=\"789012\" eid=\"345678\" aid=\"901234\" gid=\"567890\" "
-        "state=\"1\" viewdate=\"1640995200\" storage=\"/path/to/file\"/>\n"
-        "  <mylist lid=\"234567\" fid=\"890123\" eid=\"456789\" aid=\"123456\" gid=\"678901\" "
-        "state=\"2\" viewdate=\"1641081600\" storage=\"HDD\"/>\n"
-        "  <mylist lid=\"345678\" fid=\"901234\" eid=\"567890\" aid=\"234567\" gid=\"789012\" "
-        "state=\"1\" viewdate=\"0\" storage=\"\"/>\n"
-        "</mylistexport>\n";
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        "<MyList>\n"
+        "<User Id=\"12345\" Name=\"testuser\"/>\n"
+        "<Anime Id=\"1135\" Eps=\"1\">\n"
+        "  <Ep Id=\"12814\" EpNo=\"1\">\n"
+        "    <File Id=\"54357\" LId=\"16588092\" GroupId=\"925\" Storage=\"a005\" "
+        "ViewDate=\"2006-08-18T22:00:00Z\" MyState=\"2\"/>\n"
+        "  </Ep>\n"
+        "</Anime>\n"
+        "<Anime Id=\"222\" Eps=\"4\">\n"
+        "  <Ep Id=\"2614\" EpNo=\"1\">\n"
+        "    <File Id=\"47082\" LId=\"21080811\" GroupId=\"925\" Storage=\"a040\" "
+        "ViewDate=\"2007-02-10T23:58:00Z\" MyState=\"2\"/>\n"
+        "  </Ep>\n"
+        "  <Ep Id=\"2615\" EpNo=\"2\">\n"
+        "    <File Id=\"47083\" LId=\"21080812\" GroupId=\"925\" Storage=\"\" "
+        "ViewDate=\"\" MyState=\"2\"/>\n"
+        "  </Ep>\n"
+        "</Anime>\n"
+        "</MyList>\n";
     
     // Create temporary directory and files
     QTemporaryDir tempDir;
@@ -127,27 +138,39 @@ void TestMylistXMLParser::testXMLParsing()
     
     db.transaction();
     
+    // Parse XML structure: <MyList><Anime><Ep><File LId="..." Id="..."/></Ep></Anime></MyList>
+    QString currentAid;
+    QString currentEid;
+    
     while(!xml.atEnd() && !xml.hasError())
     {
         QXmlStreamReader::TokenType token = xml.readNext();
         
         if(token == QXmlStreamReader::StartElement)
         {
-            if(xml.name() == QString("mylist"))
+            if(xml.name() == QString("Anime"))
+            {
+                QXmlStreamAttributes attributes = xml.attributes();
+                currentAid = attributes.value("Id").toString();
+            }
+            else if(xml.name() == QString("Ep"))
+            {
+                QXmlStreamAttributes attributes = xml.attributes();
+                currentEid = attributes.value("Id").toString();
+            }
+            else if(xml.name() == QString("File"))
             {
                 QXmlStreamAttributes attributes = xml.attributes();
                 
-                QString lid = attributes.value("lid").toString();
-                QString fid = attributes.value("fid").toString();
-                QString eid = attributes.value("eid").toString();
-                QString aid = attributes.value("aid").toString();
-                QString gid = attributes.value("gid").toString();
-                QString state = attributes.value("state").toString();
-                QString viewdate = attributes.value("viewdate").toString();
-                QString storage = attributes.value("storage").toString();
+                QString lid = attributes.value("LId").toString();
+                QString fid = attributes.value("Id").toString();
+                QString gid = attributes.value("GroupId").toString();
+                QString storage = attributes.value("Storage").toString();
+                QString viewdate = attributes.value("ViewDate").toString();
+                QString myState = attributes.value("MyState").toString();
                 
                 QVERIFY(!lid.isEmpty());
-                QVERIFY(!aid.isEmpty());
+                QVERIFY(!currentAid.isEmpty());
                 
                 QString viewed = (!viewdate.isEmpty() && viewdate != "0") ? "1" : "0";
                 QString storage_escaped = QString(storage).replace("'", "''");
@@ -157,10 +180,10 @@ void TestMylistXMLParser::testXMLParsing()
                     "VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
                     .arg(lid)
                     .arg(fid.isEmpty() ? "0" : fid)
-                    .arg(eid.isEmpty() ? "0" : eid)
-                    .arg(aid)
+                    .arg(currentEid.isEmpty() ? "0" : currentEid)
+                    .arg(currentAid)
                     .arg(gid.isEmpty() ? "0" : gid)
-                    .arg(state.isEmpty() ? "0" : state)
+                    .arg(myState.isEmpty() ? "0" : myState)
                     .arg(viewed)
                     .arg(storage_escaped);
                 
@@ -184,23 +207,23 @@ void TestMylistXMLParser::testXMLParsing()
     
     // First entry - should have viewed=1 because viewdate is set
     QVERIFY(query.next());
-    QCOMPARE(query.value(0).toInt(), 123456);  // lid
-    QCOMPARE(query.value(1).toInt(), 789012);  // fid
-    QCOMPARE(query.value(2).toInt(), 345678);  // eid
-    QCOMPARE(query.value(3).toInt(), 901234);  // aid
-    QCOMPARE(query.value(4).toInt(), 1);       // viewed
+    QCOMPARE(query.value(0).toInt(), 16588092);  // lid (LId from File)
+    QCOMPARE(query.value(1).toInt(), 54357);     // fid (Id from File)
+    QCOMPARE(query.value(2).toInt(), 12814);     // eid (Id from Ep)
+    QCOMPARE(query.value(3).toInt(), 1135);      // aid (Id from Anime)
+    QCOMPARE(query.value(4).toInt(), 1);         // viewed
     
     // Second entry - should have viewed=1 because viewdate is set
     QVERIFY(query.next());
-    QCOMPARE(query.value(0).toInt(), 234567);  // lid
-    QCOMPARE(query.value(1).toInt(), 890123);  // fid
-    QCOMPARE(query.value(4).toInt(), 1);       // viewed
+    QCOMPARE(query.value(0).toInt(), 21080811);  // lid
+    QCOMPARE(query.value(1).toInt(), 47082);     // fid
+    QCOMPARE(query.value(4).toInt(), 1);         // viewed
     
-    // Third entry - should have viewed=0 because viewdate is 0
+    // Third entry - should have viewed=0 because viewdate is empty
     QVERIFY(query.next());
-    QCOMPARE(query.value(0).toInt(), 345678);  // lid
-    QCOMPARE(query.value(1).toInt(), 901234);  // fid
-    QCOMPARE(query.value(4).toInt(), 0);       // viewed (not viewed because viewdate=0)
+    QCOMPARE(query.value(0).toInt(), 21080812);  // lid
+    QCOMPARE(query.value(1).toInt(), 47083);     // fid
+    QCOMPARE(query.value(4).toInt(), 0);         // viewed (not viewed because viewdate is empty)
     
     // Verify no more entries
     QVERIFY(!query.next());

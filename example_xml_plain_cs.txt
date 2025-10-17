@@ -3,68 +3,131 @@
 
 ## File: mylist.xml (from xml-plain-cs template)
 
-<?xml version="1.0" encoding="UTF-8"?>
-<mylistexport>
-  <mylist lid="123456" fid="789012" eid="297776" aid="5178" gid="1412" date="1609459200" 
-          state="1" viewdate="1640995200" storage="HDD" source="BluRay" other="" filestate="1"/>
-  <mylist lid="234567" fid="890123" eid="298777" aid="5179" gid="1413" date="1609545600" 
-          state="2" viewdate="1641081600" storage="CD/DVD" source="Web" other="" filestate="1"/>
-  <mylist lid="345678" fid="901234" eid="299778" aid="5180" gid="1414" date="1609632000" 
-          state="1" viewdate="0" storage="" source="" other="" filestate="1"/>
-</mylistexport>
+<?xml version="1.0" encoding="utf-8"?>
+<MyList>
+<User Id="71837"
+Name="viperx"
+Date="2025-10-17T11:00:00Z"
+AnimeCount="396"
+EpCount="6659"
+FileCount="6874"
+/>
+<Anime Id="1135"
+Eps="1"
+EpsTotal="1"
+YearStart="2003"
+YearEnd="2003"
+Name=".hack//Gift"
+MyState="2"
+MyStateString="external storage (cd/dvd/...)"
+>
+  <Ep Id="12814"
+  EpNo="1"
+  Name="OVA"
+  Length="30"
+  Aired="2003-11-16T00:00:00Z"
+  StateIsWatched="1"
+  StateHasFile="1"
+  MyState="2"
+  >
+    <File Id="54357"
+    LId="16588092"
+    SizePlain="237276403"
+    FileType="mkv"
+    GroupId="925"
+    GroupName="Baka-Anime"
+    GroupShortName="B-A"
+    Storage="a005"
+    ViewDate="2006-08-18T22:00:00Z"
+    MyState="2"
+    />
+  </Ep>
+</Anime>
+<Anime Id="222"
+Eps="4"
+Name=".hack//Liminality"
+>
+  <Ep Id="2614"
+  EpNo="1"
+  Name="In the Case of Mai Minase"
+  >
+    <File Id="47082"
+    LId="21080811"
+    SizePlain="305133103"
+    GroupId="925"
+    Storage="a040"
+    ViewDate="2007-02-10T23:58:00Z"
+    MyState="2"
+    />
+  </Ep>
+</Anime>
+</MyList>
 
 ## What Gets Parsed
 
+### Key Structure of xml-plain-cs Format:
+
+**Hierarchical XML Structure:**
+- `<MyList>` - Root element
+  - `<User>` - User information
+  - `<Anime>` - Anime elements (contain anime metadata)
+    - `<Ep>` - Episode elements (contain episode metadata)
+      - `<File>` - File elements **(this is where mylist data is!)**
+
+**Important: MyList ID (lid) is in the File element!**
+- `LId` attribute = MyList ID (lid) - unique identifier for the mylist entry
+- `Id` attribute = File ID (fid) - unique identifier for the file
+
 ### Key Benefits Over Old csv-adborg Format:
 
-1. **Proper LID Values**: Each entry has a unique mylist ID (lid) that is different from the file ID (fid)
-   - Entry 1: lid=123456, fid=789012 (different values - correct!)
-   - Entry 2: lid=234567, fid=890123 (different values - correct!)
-   - Entry 3: lid=345678, fid=901234 (different values - correct!)
+1. **Proper LID Values**: Each File element has a `LId` attribute that is different from the `Id` (fid)
+   - File 1: LId=16588092, Id=54357 (different values - correct!)
+   - File 2: LId=21080811, Id=47082 (different values - correct!)
 
 2. **No Duplicate Entries**: The old csv-adborg format used fid as a placeholder for lid, causing:
    - lid = fid (same value)
    - Inconsistency with AniDB API which expects proper lid values
    - Duplicate entries and data integrity issues
 
-3. **Simple XML Structure**: Easy to parse with QXmlStreamReader
+3. **Hierarchical Structure**: Data is organized logically: MyList > Anime > Ep > File
 
 ### Database State After Import
 
 #### mylist table:
-| lid    | fid    | eid    | aid  | gid  | state | viewed | storage |
-|--------|--------|--------|------|------|-------|--------|---------|
-| 123456 | 789012 | 297776 | 5178 | 1412 | 1     | 1      | HDD     |
-| 234567 | 890123 | 298777 | 5179 | 1413 | 2     | 1      | CD/DVD  |
-| 345678 | 901234 | 299778 | 5180 | 1414 | 1     | 0      |         |
+| lid      | fid   | eid   | aid  | gid | state | viewed | storage |
+|----------|-------|-------|------|-----|-------|--------|---------|
+| 16588092 | 54357 | 12814 | 1135 | 925 | 2     | 1      | a005    |
+| 21080811 | 47082 | 2614  | 222  | 925 | 2     | 1      | a040    |
 
 **Important**: Notice how lid and fid are always different! This is the correct behavior and matches the AniDB API specification.
 
 ### Data Fields Explained
 
-- **lid** - MyList ID (unique identifier assigned by AniDB for this mylist entry)
-- **fid** - File ID (unique identifier for the file itself)
-- **eid** - Episode ID
-- **aid** - Anime ID
-- **gid** - Group ID (release group)
-- **date** - Date added to mylist (Unix timestamp)
-- **state** - Storage state (0=unknown, 1=HDD, 2=CD/DVD, 3=deleted)
-- **viewdate** - When watched (Unix timestamp, 0=not watched)
-- **storage** - Storage location/note
-- **source** - Source type (BluRay, Web, etc.)
-- **other** - Other notes
-- **filestate** - File state
+**From `<File>` element:**
+- **LId** - MyList ID (unique identifier assigned by AniDB for this mylist entry)
+- **Id** - File ID (unique identifier for the file itself)
+- **GroupId** - Group ID (release group)
+- **Storage** - Storage location/note
+- **ViewDate** - When watched (ISO 8601 format, empty=not watched)
+- **MyState** - Storage state (0=unknown, 1=HDD, 2=CD/DVD, 3=deleted)
+
+**From `<Ep>` element:**
+- **Id** - Episode ID (eid)
+- **EpNo** - Episode number
+
+**From `<Anime>` element:**
+- **Id** - Anime ID (aid)
+- **Name** - Anime title
 
 ### Viewed Status Logic
 
-The `viewed` field in the database is determined by the `viewdate` attribute:
-- If viewdate is present and not "0" → viewed = 1
-- If viewdate is "0" or empty → viewed = 0
+The `viewed` field in the database is determined by the `ViewDate` attribute:
+- If ViewDate is present and not empty → viewed = 1
+- If ViewDate is empty or "0" → viewed = 0
 
 Example:
-- Entry 1: viewdate="1640995200" → viewed = 1 ✓
-- Entry 2: viewdate="1641081600" → viewed = 1 ✓
-- Entry 3: viewdate="0" → viewed = 0 ✓
+- File 1: ViewDate="2006-08-18T22:00:00Z" → viewed = 1 ✓
+- File 2: ViewDate="2007-02-10T23:58:00Z" → viewed = 1 ✓
 
 ## Migration from csv-adborg
 
@@ -80,13 +143,13 @@ The xml-plain-cs format ensures data integrity and compatibility with the AniDB 
 
 ```
 MyList Tab (Tree View):
-├─ Naruto: Shippuden the Movie [from anime_titles table]
-│  └─ Episode 1 - Complete Movie [from episode API]
-│     State: HDD
+├─ .hack//Gift [from anime data]
+│  └─ Episode 1 - OVA [from episode data]
+│     State: CD/DVD
 │     Viewed: Yes
-│     Storage: HDD
-│     Mylist ID: 123456
-│     File ID: 789012
+│     Storage: a005
+│     Mylist ID: 16588092
+│     File ID: 54357
 ```
 
-Note: Episode names are fetched via the Episode API when needed, as they're not included in the mylist export.
+Note: The xml-plain-cs format includes rich metadata about anime, episodes, and files all in one export.
