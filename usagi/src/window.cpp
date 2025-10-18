@@ -1388,9 +1388,38 @@ int Window::parseMylistExport(const QString &tarGzPath)
 		{
 			if(xml.name() == QString("Anime"))
 			{
-				// Get anime ID from Anime element
+				// Get anime ID and total episodes from Anime element
 				QXmlStreamAttributes attributes = xml.attributes();
 				currentAid = attributes.value("Id").toString();
+				QString epsTotal = attributes.value("EpsTotal").toString();
+				
+				// Store or update anime table with eptotal if we have valid data
+				if(!currentAid.isEmpty() && !epsTotal.isEmpty())
+				{
+					// Insert anime record if it doesn't exist, then update eptotal
+					// This preserves existing anime data if it already exists from FILE command
+					QString animeInsertQuery = QString("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (%1)")
+						.arg(currentAid);
+					
+					QSqlQuery animeQueryExec(db);
+					if(!animeQueryExec.exec(animeInsertQuery))
+					{
+						logOutput->append(QString("Warning: Failed to insert anime record (aid=%1): %2")
+							.arg(currentAid).arg(animeQueryExec.lastError().text()));
+					}
+					
+					// Update eptotal only if it's currently 0 or NULL (not set by FILE command)
+					QString animeUpdateQuery = QString("UPDATE `anime` SET `eptotal` = %1 "
+						"WHERE `aid` = %2 AND (eptotal IS NULL OR eptotal = 0)")
+						.arg(epsTotal)
+						.arg(currentAid);
+					
+					if(!animeQueryExec.exec(animeUpdateQuery))
+					{
+						logOutput->append(QString("Warning: Failed to update anime eptotal (aid=%1): %2")
+							.arg(currentAid).arg(animeQueryExec.lastError().text()));
+					}
+				}
 			}
 			else if(xml.name() == QString("Ep"))
 			{
