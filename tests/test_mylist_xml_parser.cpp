@@ -50,6 +50,27 @@ void TestMylistXMLParser::initTestCase()
     
     QVERIFY(query.exec(createTable));
     
+    // Create anime table
+    QString createAnimeTable = 
+        "CREATE TABLE IF NOT EXISTS `anime` ("
+        "`aid` INTEGER PRIMARY KEY, "
+        "`eptotal` INTEGER, "
+        "`eplast` INTEGER, "
+        "`year` TEXT, "
+        "`type` TEXT, "
+        "`relaidlist` TEXT, "
+        "`relaidtype` TEXT, "
+        "`category` TEXT, "
+        "`nameromaji` TEXT, "
+        "`namekanji` TEXT, "
+        "`nameenglish` TEXT, "
+        "`nameother` TEXT, "
+        "`nameshort` TEXT, "
+        "`synonyms` TEXT"
+        ")";
+    
+    QVERIFY(query.exec(createAnimeTable));
+    
     // Create episode table
     QString createEpisodeTable = 
         "CREATE TABLE IF NOT EXISTS `episode` ("
@@ -72,13 +93,13 @@ QString TestMylistXMLParser::createSampleXMLExport()
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
         "<MyList>\n"
         "<User Id=\"12345\" Name=\"testuser\"/>\n"
-        "<Anime Id=\"1135\" Eps=\"1\">\n"
+        "<Anime Id=\"1135\" Eps=\"1\" EpsTotal=\"1\">\n"
         "  <Ep Id=\"12814\" EpNo=\"1\" Name=\"OVA\">\n"
         "    <File Id=\"54357\" LId=\"16588092\" GroupId=\"925\" Storage=\"a005\" "
         "ViewDate=\"2006-08-18T22:00:00Z\" MyState=\"2\"/>\n"
         "  </Ep>\n"
         "</Anime>\n"
-        "<Anime Id=\"222\" Eps=\"4\">\n"
+        "<Anime Id=\"222\" Eps=\"4\" EpsTotal=\"4\">\n"
         "  <Ep Id=\"2614\" EpNo=\"1\" Name=\"First Episode\">\n"
         "    <File Id=\"47082\" LId=\"21080811\" GroupId=\"925\" Storage=\"a040\" "
         "ViewDate=\"2007-02-10T23:58:00Z\" MyState=\"2\"/>\n"
@@ -169,6 +190,28 @@ void TestMylistXMLParser::testXMLParsing()
             {
                 QXmlStreamAttributes attributes = xml.attributes();
                 currentAid = attributes.value("Id").toString();
+                QString epsTotal = attributes.value("EpsTotal").toString();
+                
+                // Store or update anime table with eptotal if we have valid data
+                if(!currentAid.isEmpty() && !epsTotal.isEmpty())
+                {
+                    // Insert anime record if it doesn't exist
+                    QString animeInsertQuery = QString("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (%1)")
+                        .arg(currentAid);
+                    
+                    QSqlQuery animeQueryExec(db);
+                    QVERIFY2(animeQueryExec.exec(animeInsertQuery), 
+                        QString("Failed to insert anime: %1").arg(animeQueryExec.lastError().text()).toUtf8().constData());
+                    
+                    // Update eptotal only if it's currently 0 or NULL
+                    QString animeUpdateQuery = QString("UPDATE `anime` SET `eptotal` = %1 "
+                        "WHERE `aid` = %2 AND (eptotal IS NULL OR eptotal = 0)")
+                        .arg(epsTotal)
+                        .arg(currentAid);
+                    
+                    QVERIFY2(animeQueryExec.exec(animeUpdateQuery), 
+                        QString("Failed to update anime: %1").arg(animeQueryExec.lastError().text()).toUtf8().constData());
+                }
             }
             else if(xml.name() == QString("Ep"))
             {
@@ -290,6 +333,22 @@ void TestMylistXMLParser::testXMLParsing()
     QCOMPARE(query.value(2).toString(), QString("OVA"));
     
     // Verify no more episode entries
+    QVERIFY(!query.next());
+    
+    // Verify anime data was stored correctly with eptotal
+    QVERIFY(query.exec("SELECT aid, eptotal FROM anime ORDER BY aid"));
+    
+    // First anime - aid 222, eptotal 4
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 222);
+    QCOMPARE(query.value(1).toInt(), 4);
+    
+    // Second anime - aid 1135, eptotal 1
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 1135);
+    QCOMPARE(query.value(1).toInt(), 1);
+    
+    // Verify no more anime entries
     QVERIFY(!query.next());
     
     // Clean up

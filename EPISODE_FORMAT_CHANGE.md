@@ -132,7 +132,9 @@ From `epno.h` and `epno.cpp`:
    - No other episode types exist: Shows "A/B" instead of "A/B+0"
    - No eptotal available: Shows "A+C" or just "A" if no other types
 
-4. **Display Only Change**: This change only affects the display format in the anime parent rows. Individual episode child rows remain unchanged.
+4. **EpsTotal from MyList Export**: When importing mylist via XML export, the `EpsTotal` value is extracted from the `<Anime>` element and stored in the anime table. This ensures the total episode count is available even if the anime data hasn't been fetched via the FILE API command.
+
+5. **Display Only Change**: This change only affects the display format in the anime parent rows. Individual episode child rows remain unchanged.
 
 ## Files Modified
 
