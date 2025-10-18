@@ -1105,6 +1105,11 @@ void Window::loadMylistFromDatabase()
 	QMap<int, int> animeEpisodeCount;  // aid -> count of episodes in mylist
 	QMap<int, int> animeViewedCount;   // aid -> count of viewed episodes
 	QMap<int, int> animeEpTotal;       // aid -> total primary type episodes (eptotal)
+	// Track normal (type 1) vs other types separately
+	QMap<int, int> animeNormalEpisodeCount;    // aid -> count of normal episodes (type 1) in mylist
+	QMap<int, int> animeOtherEpisodeCount;     // aid -> count of other type episodes (types 2-6) in mylist
+	QMap<int, int> animeNormalViewedCount;     // aid -> count of normal episodes viewed
+	QMap<int, int> animeOtherViewedCount;      // aid -> count of other type episodes viewed
 	int totalEntries = 0;
 	
 	while(q.next())
@@ -1158,13 +1163,10 @@ void Window::loadMylistFromDatabase()
 			animeEpisodeCount[aid] = 0;
 			animeViewedCount[aid] = 0;
 			animeEpTotal[aid] = epTotal;
-		}
-		
-		// Update statistics for this anime
-		animeEpisodeCount[aid]++;
-		if(viewed)
-		{
-			animeViewedCount[aid]++;
+			animeNormalEpisodeCount[aid] = 0;
+			animeOtherEpisodeCount[aid] = 0;
+			animeNormalViewedCount[aid] = 0;
+			animeOtherViewedCount[aid] = 0;
 		}
 		
 		// Create episode item as child of anime
@@ -1172,6 +1174,7 @@ void Window::loadMylistFromDatabase()
 		episodeItem->setText(0, ""); // Empty for episode child
 		
 		// Column 1: Episode number using epno type
+		int episodeType = 1;  // Default to normal episode
 		if(!epno.isEmpty())
 		{
 			// Create epno object from string
@@ -1182,12 +1185,41 @@ void Window::loadMylistFromDatabase()
 			
 			// Display formatted episode number (with leading zeros removed)
 			episodeItem->setText(1, episodeNumber.toDisplayString());
+			
+			// Get the episode type (1 = normal, 2-6 = other types)
+			episodeType = episodeNumber.type();
 		}
 		else
 		{
 			// Fallback to EID if episode number not available
 			episodeItem->setText(1, "Loading...");
 			episodesNeedingData.insert(eid);  // Track this episode for lazy loading
+		}
+		
+		// Update statistics for this anime based on episode type
+		animeEpisodeCount[aid]++;
+		if(episodeType == 1)
+		{
+			// Normal episode (type 1)
+			animeNormalEpisodeCount[aid]++;
+			if(viewed)
+			{
+				animeNormalViewedCount[aid]++;
+			}
+		}
+		else
+		{
+			// Other types (types 2-6: special, credit, trailer, parody, other)
+			animeOtherEpisodeCount[aid]++;
+			if(viewed)
+			{
+				animeOtherViewedCount[aid]++;
+			}
+		}
+		
+		if(viewed)
+		{
+			animeViewedCount[aid]++;
 		}
 		
 		// Column 2: Episode title
@@ -1230,20 +1262,51 @@ void Window::loadMylistFromDatabase()
 		int episodesInMylist = animeEpisodeCount[aid];
 		int viewedEpisodes = animeViewedCount[aid];
 		int totalEpisodes = animeEpTotal[aid];
+		int normalEpisodes = animeNormalEpisodeCount[aid];
+		int otherEpisodes = animeOtherEpisodeCount[aid];
+		int normalViewed = animeNormalViewedCount[aid];
+		int otherViewed = animeOtherViewedCount[aid];
 		
-		// Column 1 (Episode): show in_mylist/eptotal
+		// Column 1 (Episode): show format "A/B+C"
+		// A = normal episodes in mylist, B = total normal episodes, C = other types in mylist
+		QString episodeText;
 		if(totalEpisodes > 0)
 		{
-			animeItem->setText(1, QString("%1/%2").arg(episodesInMylist).arg(totalEpisodes));
+			if(otherEpisodes > 0)
+			{
+				episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(totalEpisodes).arg(otherEpisodes);
+			}
+			else
+			{
+				episodeText = QString("%1/%2").arg(normalEpisodes).arg(totalEpisodes);
+			}
 		}
 		else
 		{
-			// If eptotal is not available, just show count in mylist
-			animeItem->setText(1, QString::number(episodesInMylist));
+			// If eptotal is not available, show count in mylist with other types
+			if(otherEpisodes > 0)
+			{
+				episodeText = QString("%1+%2").arg(normalEpisodes).arg(otherEpisodes);
+			}
+			else
+			{
+				episodeText = QString::number(normalEpisodes);
+			}
 		}
+		animeItem->setText(1, episodeText);
 		
-		// Column 4 (Viewed): show viewed/in_mylist
-		animeItem->setText(4, QString("%1/%2").arg(viewedEpisodes).arg(episodesInMylist));
+		// Column 4 (Viewed): show format "A/B+C"
+		// A = normal episodes viewed, B = total normal episodes in mylist, C = other types viewed
+		QString viewedText;
+		if(otherEpisodes > 0)
+		{
+			viewedText = QString("%1/%2+%3").arg(normalViewed).arg(normalEpisodes).arg(otherViewed);
+		}
+		else
+		{
+			viewedText = QString("%1/%2").arg(normalViewed).arg(normalEpisodes);
+		}
+		animeItem->setText(4, viewedText);
 	}
 	
 	// Keep anime items collapsed by default
