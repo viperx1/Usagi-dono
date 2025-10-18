@@ -25,12 +25,44 @@
 #include <QXmlStreamReader>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
+#include "epno.h"
 //#include "hasherthread.h"
 
 class hashes_ : public QTableWidget
 {
 public:
 	bool event(QEvent *e);
+};
+
+// Custom tree widget item that can sort episodes using epno type
+class EpisodeTreeWidgetItem : public QTreeWidgetItem
+{
+public:
+    EpisodeTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent) {}
+    
+    void setEpno(const epno& ep) { m_epno = ep; }
+    epno getEpno() const { return m_epno; }
+    
+    bool operator<(const QTreeWidgetItem &other) const override
+    {
+        int column = treeWidget()->sortColumn();
+        
+        // If sorting by episode number column (column 1) and both items have epno data
+        if(column == 1)
+        {
+            const EpisodeTreeWidgetItem *otherEpisode = dynamic_cast<const EpisodeTreeWidgetItem*>(&other);
+            if(otherEpisode && m_epno.isValid() && otherEpisode->m_epno.isValid())
+            {
+                return m_epno < otherEpisode->m_epno;
+            }
+        }
+        
+        // Default comparison for other columns
+        return QTreeWidgetItem::operator<(other);
+    }
+    
+private:
+    epno m_epno;
 };
 
 class Window : public QWidget

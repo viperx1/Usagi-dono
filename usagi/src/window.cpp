@@ -980,7 +980,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 		return;
 	}
 	
-	QString epno = q.value(0).toString();
+	QString epnoStr = q.value(0).toString();
 	QString episodeName = q.value(1).toString();
 	
 	// Find the episode item in the tree by iterating through anime items
@@ -1003,43 +1003,25 @@ void Window::updateEpisodeInTree(int eid, int aid)
 				{
 					// Found the episode item - update its fields
 					
-					// Update episode number (Column 1)
-					QString episodeNumber;
-					if(!epno.isEmpty())
+					// Update episode number (Column 1) using epno type
+					if(!epnoStr.isEmpty())
 					{
-						// Parse episode number to determine type
-						QString epnoUpper = epno.toUpper();
-						if(epnoUpper.startsWith("S"))
+						::epno episodeNumber(epnoStr);
+						
+						// Store epno object if this is an EpisodeTreeWidgetItem
+						EpisodeTreeWidgetItem *epItem = dynamic_cast<EpisodeTreeWidgetItem*>(episodeItem);
+						if(epItem)
 						{
-							episodeNumber = QString("Special %1").arg(epno.mid(1));
+							epItem->setEpno(episodeNumber);
 						}
-						else if(epnoUpper.startsWith("C"))
-						{
-							episodeNumber = QString("Credit %1").arg(epno.mid(1));
-						}
-						else if(epnoUpper.startsWith("T"))
-						{
-							episodeNumber = QString("Trailer %1").arg(epno.mid(1));
-						}
-						else if(epnoUpper.startsWith("P"))
-						{
-							episodeNumber = QString("Parody %1").arg(epno.mid(1));
-						}
-						else if(epnoUpper.startsWith("O"))
-						{
-							episodeNumber = QString("Other %1").arg(epno.mid(1));
-						}
-						else
-						{
-							// Regular episode number
-							episodeNumber = epno;
-						}
+						
+						// Display formatted episode number (with leading zeros removed)
+						episodeItem->setText(1, episodeNumber.toDisplayString());
 					}
 					else
 					{
-						episodeNumber = "Unknown";
+						episodeItem->setText(1, "Unknown");
 					}
-					episodeItem->setText(1, episodeNumber);
 					
 					// Update episode name (Column 2)
 					if(!episodeName.isEmpty())
@@ -1055,7 +1037,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 					episodesNeedingData.remove(eid);
 					
 					logOutput->append(QString("Updated episode in tree: EID %1, epno: %2, name: %3")
-						.arg(eid).arg(episodeNumber).arg(episodeName));
+						.arg(eid).arg(episodeItem->text(1)).arg(episodeName));
 					return;
 				}
 			}
@@ -1170,48 +1152,27 @@ void Window::loadMylistFromDatabase()
 		}
 		
 		// Create episode item as child of anime
-		QTreeWidgetItem *episodeItem = new QTreeWidgetItem(animeItem);
+		EpisodeTreeWidgetItem *episodeItem = new EpisodeTreeWidgetItem(animeItem);
 		episodeItem->setText(0, ""); // Empty for episode child
 		
-		// Column 1: Episode number or type
-		QString episodeNumber;
+		// Column 1: Episode number using epno type
 		if(!epno.isEmpty())
 		{
-			// Parse episode number to determine type
-			QString epnoUpper = epno.toUpper();
-			if(epnoUpper.startsWith("S"))
-			{
-				episodeNumber = QString("Special %1").arg(epno.mid(1));
-			}
-			else if(epnoUpper.startsWith("C"))
-			{
-				episodeNumber = QString("Credit %1").arg(epno.mid(1));
-			}
-			else if(epnoUpper.startsWith("T"))
-			{
-				episodeNumber = QString("Trailer %1").arg(epno.mid(1));
-			}
-			else if(epnoUpper.startsWith("P"))
-			{
-				episodeNumber = QString("Parody %1").arg(epno.mid(1));
-			}
-			else if(epnoUpper.startsWith("O"))
-			{
-				episodeNumber = QString("Other %1").arg(epno.mid(1));
-			}
-			else
-			{
-				// Regular episode number
-				episodeNumber = epno;
-			}
+			// Create epno object from string
+			::epno episodeNumber(epno);
+			
+			// Store epno object in the item for sorting
+			episodeItem->setEpno(episodeNumber);
+			
+			// Display formatted episode number (with leading zeros removed)
+			episodeItem->setText(1, episodeNumber.toDisplayString());
 		}
 		else
 		{
 			// Fallback to EID if episode number not available
-			episodeNumber = "Loading...";
+			episodeItem->setText(1, "Loading...");
 			episodesNeedingData.insert(eid);  // Track this episode for lazy loading
 		}
-		episodeItem->setText(1, episodeNumber);
 		
 		// Column 2: Episode title
 		if(episodeName.isEmpty())

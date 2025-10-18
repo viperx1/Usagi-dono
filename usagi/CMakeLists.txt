@@ -42,6 +42,7 @@ set(SOURCES
     src/anidbapi_settings.cpp
     src/Qt-AES-master/qaesencryption.cpp
     src/crashlog.cpp
+    src/epno.cpp
 )
 
 # Header files
@@ -54,6 +55,7 @@ set(HEADERS
     src/hash/ed2k.h
     src/Qt-AES-master/qaesencryption.h
     src/crashlog.h
+    src/epno.h
 )
 
 # Create executable
