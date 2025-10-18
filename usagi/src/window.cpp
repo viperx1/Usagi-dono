@@ -1416,7 +1416,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					
 					// Update eptotal and eps only if they're currently 0 or NULL (not set by FILE command)
 					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
-						"WHERE `aid` = :aid AND (eptotal IS NULL OR eptotal = 0)");
+						"WHERE `aid` = :aid AND ((eptotal IS NULL OR eptotal = 0) OR (eps IS NULL OR eps = 0))");
 					animeQueryExec.bindValue(":eptotal", epsTotal.toInt());
 					// QVariant() creates a NULL value for the database when eps is not available
 					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant() : eps.toInt());
