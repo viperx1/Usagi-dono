@@ -1418,6 +1418,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
 						"WHERE `aid` = :aid AND (eptotal IS NULL OR eptotal = 0)");
 					animeQueryExec.bindValue(":eptotal", epsTotal.toInt());
+					// QVariant() creates a NULL value for the database when eps is not available
 					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant() : eps.toInt());
 					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
