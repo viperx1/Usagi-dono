@@ -1,0 +1,75 @@
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
+║                                    USAGI - MyList Tab (Updated)                                   ║
+╠═══════════════════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                                   ║
+║  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐ ║
+║  │ Anime                    │ Episode   │ Episode Title       │ State  │ Viewed │ Storage      │ ║
+║  ├─────────────────────────────────────────────────────────────────────────────────────────────┤ ║
+║  │ ▼ Cowboy Bebop           │ 5/26      │                     │        │ 3/5    │              │ ║
+║  │   │                      │ 1         │ Asteroid Blues      │ HDD    │ Yes    │ /anime/CB... │ ║
+║  │   │                      │ 2         │ Stray Dog Strut     │ HDD    │ Yes    │ /anime/CB... │ ║
+║  │   │                      │ 5         │ Ballad of Fallen... │ HDD    │ Yes    │ /anime/CB... │ ║
+║  │   │                      │ 10        │ Ganymede Elegy      │ HDD    │ No     │ /anime/CB... │ ║
+║  │   │                      │ 13        │ Jupiter Jazz (Part1)│ HDD    │ No     │ /anime/CB... │ ║
+║  │ ▼ Death Note             │ 37/37     │                     │        │ 37/37  │              │ ║
+║  │   │                      │ 1         │ Rebirth             │ HDD    │ Yes    │ /anime/DN... │ ║
+║  │   │                      │ 2         │ Confrontation       │ HDD    │ Yes    │ /anime/DN... │ ║
+║  │   │                      │ ...       │ ...                 │ ...    │ ...    │ ...          │ ║
+║  │   │                      │ 37        │ New World           │ HDD    │ Yes    │ /anime/DN... │ ║
+║  │ ▼ Attack on Titan        │ 12/25     │                     │        │ 8/12   │              │ ║
+║  │   │                      │ 1         │ To You, in 2000 ... │ HDD    │ Yes    │ /anime/AOT...│ ║
+║  │   │                      │ 2         │ That Day: The Fall..│ HDD    │ Yes    │ /anime/AOT...│ ║
+║  │   │                      │ ...       │ ...                 │ ...    │ ...    │ ...          │ ║
+║  │   │                      │ 12        │ Scream              │ HDD    │ No     │ /anime/AOT...│ ║
+║  └─────────────────────────────────────────────────────────────────────────────────────────────┘ ║
+║                                                                                                   ║
+║  [ Load MyList from Database ]                                                                   ║
+║                                                                                                   ║
+╚═══════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+NEW Features (Issue Implementation):
+
+  ✅ DEFAULT SORTING BY EPISODE COLUMN
+     • MyList now sorts by episode column (instead of anime name) in ascending order
+     • Makes it easy to see which anime have fewer/more episodes collected
+     • Example order: "5/26" → "12/25" → "37/37"
+
+  ✅ AGGREGATE STATISTICS IN ANIME ROWS
+     • Episode column shows: in_mylist/eptotal format
+       - "5/26" = 5 episodes in mylist out of 26 total regular episodes
+       - "37/37" = Complete series (all episodes in mylist)
+       - "12/25" = Partial collection (12 out of 25 episodes)
+     
+     • Viewed column shows: viewed/in_mylist format
+       - "3/5" = 3 episodes watched out of 5 in collection
+       - "37/37" = All collected episodes watched (100% complete)
+       - "8/12" = 8 episodes watched out of 12 in collection (66% progress)
+
+  • Quick Progress Tracking
+     - At a glance, see both collection completeness and watch progress
+     - Example: "Attack on Titan: 12/25, 8/12" means:
+       → 12 episodes in collection out of 25 total (48% collected)
+       → 8 episodes watched out of 12 collected (66% watched)
+
+Existing Features (Unchanged):
+  • Hierarchical tree view: Anime titles as parents, episodes as children
+  • Expand/collapse anime to show/hide episodes (▼ = expanded, ▶ = collapsed)
+  • Sortable columns: Click column headers to sort (now defaults to Episode column)
+  • Alternating row colors for better readability
+  • Real-time data: Shows current state from local database
+  • Episode names: Displayed when available in database
+  • Episode numbers: Use epno type for proper sorting (1, 2, 10 not 1, 10, 2)
+  • State indicators: HDD, CD/DVD, Deleted, Unknown
+  • Viewed status: Yes/No for each episode (individual items)
+  • Storage paths: Full file location for easy access
+
+Implementation Details:
+  1. Episode column sorting uses custom EpisodeTreeWidgetItem for episode children
+  2. Anime rows display aggregate text-based values that sort alphabetically
+  3. Statistics are calculated once during database load for performance
+  4. Handles edge case where eptotal is not available (shows just count)
+  5. No API calls needed for display (follows AniDB guidelines)
+
+Visual Legend:
+  • Anime rows (parents): Show aggregate statistics (in_mylist/eptotal, viewed/in_mylist)
+  • Episode rows (children): Show individual episode details (epno, title, state, viewed, etc.)
