@@ -300,3 +300,50 @@ endif()
 
 add_test(NAME test_epno COMMAND test_epno -v2)
 
+# Test 9: Episode column format verification
+add_executable(test_episode_column_format test_episode_column_format.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_episode_column_format PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_episode_column_format PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_episode_column_format PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_episode_column_format COMMAND test_episode_column_format -v2)
+
+# Test 10: MyList 221 response fix verification
+add_executable(test_mylist_221_fix test_mylist_221_fix.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_mylist_221_fix PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_mylist_221_fix PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_mylist_221_fix PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_mylist_221_fix COMMAND test_mylist_221_fix -v2)
+
