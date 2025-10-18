@@ -1404,22 +1404,21 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				{
 					// Insert anime record if it doesn't exist, then update eptotal and eps
 					// This preserves existing anime data if it already exists from FILE command
-					QString animeInsertQuery = QString("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (%1)")
-						.arg(currentAid);
-					
 					QSqlQuery animeQueryExec(db);
-					if(!animeQueryExec.exec(animeInsertQuery))
+					animeQueryExec.prepare("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (:aid)");
+					animeQueryExec.bindValue(":aid", currentAid.toInt());
+					
+					if(!animeQueryExec.exec())
 					{
 						logOutput->append(QString("Warning: Failed to insert anime record (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
 					
 					// Update eptotal and eps only if they're currently 0 or NULL (not set by FILE command)
-					QString animeUpdateQuery = QString("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
+					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
 						"WHERE `aid` = :aid AND (eptotal IS NULL OR eptotal = 0)");
-					animeQueryExec.prepare(animeUpdateQuery);
 					animeQueryExec.bindValue(":eptotal", epsTotal.toInt());
-					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant(QVariant::Int) : eps.toInt());
+					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant() : eps.toInt());
 					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
 					if(!animeQueryExec.exec())
