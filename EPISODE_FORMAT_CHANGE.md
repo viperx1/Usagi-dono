@@ -19,7 +19,7 @@ Issue: "mylist" - Change the format in "episode" column in "anime" row
 
 **Viewed Column Format: "A/B+C"**
 - A = normal episodes (type 1) viewed
-- B = total normal episodes (type 1) in mylist
+- B = total normal episodes (type 1) in mylist (not from eptotal, but from your actual mylist)
 - C = other type episodes (types 2-6) viewed
 
 ### Code Changes
