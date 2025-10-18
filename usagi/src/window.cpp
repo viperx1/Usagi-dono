@@ -1415,13 +1415,14 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					}
 					
 					// Update eptotal and eps only if they're currently 0 or NULL (not set by FILE command)
-					QString animeUpdateQuery = QString("UPDATE `anime` SET `eptotal` = %1, `eps` = %2 "
-						"WHERE `aid` = %3 AND (eptotal IS NULL OR eptotal = 0)")
-						.arg(epsTotal)
-						.arg(eps.isEmpty() ? "NULL" : eps)
-						.arg(currentAid);
+					QString animeUpdateQuery = QString("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
+						"WHERE `aid` = :aid AND (eptotal IS NULL OR eptotal = 0)");
+					animeQueryExec.prepare(animeUpdateQuery);
+					animeQueryExec.bindValue(":eptotal", epsTotal.toInt());
+					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant(QVariant::Int) : eps.toInt());
+					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
-					if(!animeQueryExec.exec(animeUpdateQuery))
+					if(!animeQueryExec.exec())
 					{
 						logOutput->append(QString("Warning: Failed to update anime episode counts (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));

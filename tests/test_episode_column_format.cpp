@@ -32,7 +32,7 @@ private:
 
 QString TestEpisodeColumnFormat::formatEpisodeColumn(int normalEpisodes, int totalNormalEpisodes, int otherEpisodes)
 {
-    // This replicates the logic from window.cpp lines 1274-1299
+    // This replicates the logic from Window::loadMylistFromDatabase() episode column formatting
     QString episodeText;
     if(totalNormalEpisodes > 0)
     {
