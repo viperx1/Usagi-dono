@@ -6,6 +6,9 @@
  * 
  * This test verifies that the episode column displays the correct format
  * based on episode counts from mylist.
+ * 
+ * Note: totalNormalEpisodes is from the anime's Eps attribute (normal episodes only),
+ * not EpsTotal (which includes all episode types including specials).
  */
 
 #include <QtTest/QtTest>
@@ -18,32 +21,33 @@ class TestEpisodeColumnFormat : public QObject
 private slots:
     void testFormatWithAllData();
     void testFormatWithOnlyNormalEpisodes();
-    void testFormatWithoutEpTotal();
+    void testFormatWithoutEps();
     void testFormatWithOnlyOtherEpisodes();
     void testFormatWithNoEpisodes();
+    void testMovieWithSpecials();
     
 private:
-    QString formatEpisodeColumn(int normalEpisodes, int totalEpisodes, int otherEpisodes);
+    QString formatEpisodeColumn(int normalEpisodes, int totalNormalEpisodes, int otherEpisodes);
 };
 
-QString TestEpisodeColumnFormat::formatEpisodeColumn(int normalEpisodes, int totalEpisodes, int otherEpisodes)
+QString TestEpisodeColumnFormat::formatEpisodeColumn(int normalEpisodes, int totalNormalEpisodes, int otherEpisodes)
 {
-    // This replicates the logic from window.cpp lines 1270-1295
+    // This replicates the logic from Window::loadMylistFromDatabase() episode column formatting
     QString episodeText;
-    if(totalEpisodes > 0)
+    if(totalNormalEpisodes > 0)
     {
         if(otherEpisodes > 0)
         {
-            episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(totalEpisodes).arg(otherEpisodes);
+            episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(totalNormalEpisodes).arg(otherEpisodes);
         }
         else
         {
-            episodeText = QString("%1/%2").arg(normalEpisodes).arg(totalEpisodes);
+            episodeText = QString("%1/%2").arg(normalEpisodes).arg(totalNormalEpisodes);
         }
     }
     else
     {
-        // If eptotal is not available, show count in mylist with other types
+        // If eps is not available, show count in mylist with other types
         if(otherEpisodes > 0)
         {
             episodeText = QString("%1+%2").arg(normalEpisodes).arg(otherEpisodes);
@@ -91,22 +95,42 @@ void TestEpisodeColumnFormat::testFormatWithOnlyNormalEpisodes()
     QCOMPARE(result, QString("1/1"));
 }
 
-void TestEpisodeColumnFormat::testFormatWithoutEpTotal()
+void TestEpisodeColumnFormat::testFormatWithoutEps()
 {
-    // Scenario: Ongoing series where eptotal is not available (0)
+    // Scenario: Ongoing series where eps is not available (0)
     // 50 normal episodes plus 5 other types in mylist
     QString result = formatEpisodeColumn(50, 0, 5);
     QCOMPARE(result, QString("50+5"));
     
     // Scenario: Unknown total, only normal episodes
-    // 15 normal episodes, no other types, eptotal unknown
+    // 15 normal episodes, no other types, eps unknown
     result = formatEpisodeColumn(15, 0, 0);
     QCOMPARE(result, QString("15"));
     
     // Scenario: Only specials/OVAs collected
-    // 0 normal episodes, 3 other types, eptotal unknown
+    // 0 normal episodes, 3 other types, eps unknown
     result = formatEpisodeColumn(0, 0, 3);
     QCOMPARE(result, QString("0+3"));
+}
+
+void TestEpisodeColumnFormat::testMovieWithSpecials()
+{
+    // Scenario: Movie (Evangelion Shin Gekijouban: Ha)
+    // Has 1 normal episode (the movie), user owns it, no specials in mylist
+    // Anime has Eps=1 (normal), EpsSpecial=20, EpsTotal=23
+    // Should show "1/1" not "1/23"
+    QString result = formatEpisodeColumn(1, 1, 0);
+    QCOMPARE(result, QString("1/1"));
+    
+    // Scenario: Movie with specials in mylist
+    // 1 normal episode out of 1 total, plus 2 specials
+    result = formatEpisodeColumn(1, 1, 2);
+    QCOMPARE(result, QString("1/1+2"));
+    
+    // Scenario: OVA series with single main episode
+    // 1 normal episode out of 1, plus 5 specials
+    result = formatEpisodeColumn(1, 1, 5);
+    QCOMPARE(result, QString("1/1+5"));
 }
 
 void TestEpisodeColumnFormat::testFormatWithOnlyOtherEpisodes()

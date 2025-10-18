@@ -1086,7 +1086,8 @@ void Window::loadMylistFromDatabase()
 	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
 					"e.name as episode_name, e.epno, "
-					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title "
+					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
+					"a.eps "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
@@ -1105,6 +1106,7 @@ void Window::loadMylistFromDatabase()
 	QMap<int, int> animeEpisodeCount;  // aid -> count of episodes in mylist
 	QMap<int, int> animeViewedCount;   // aid -> count of viewed episodes
 	QMap<int, int> animeEpTotal;       // aid -> total primary type episodes (eptotal)
+	QMap<int, int> animeEps;           // aid -> total normal episodes (eps)
 	// Track normal (type 1) vs other types separately
 	QMap<int, int> animeNormalEpisodeCount;    // aid -> count of normal episodes (type 1) in mylist
 	QMap<int, int> animeOtherEpisodeCount;     // aid -> count of other type episodes (types 2-6) in mylist
@@ -1126,6 +1128,7 @@ void Window::loadMylistFromDatabase()
 		QString episodeName = q.value(9).toString();
 		QString epno = q.value(10).toString();  // Episode number from database
 		QString animeTitle = q.value(11).toString();  // From anime_titles table
+		int eps = q.value(12).toInt();  // Normal episode count from database
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -1163,6 +1166,7 @@ void Window::loadMylistFromDatabase()
 			animeEpisodeCount[aid] = 0;
 			animeViewedCount[aid] = 0;
 			animeEpTotal[aid] = epTotal;
+			animeEps[aid] = eps;
 			animeNormalEpisodeCount[aid] = 0;
 			animeOtherEpisodeCount[aid] = 0;
 			animeNormalViewedCount[aid] = 0;
@@ -1262,28 +1266,29 @@ void Window::loadMylistFromDatabase()
 		int episodesInMylist = animeEpisodeCount[aid];
 		int viewedEpisodes = animeViewedCount[aid];
 		int totalEpisodes = animeEpTotal[aid];
+		int totalNormalEpisodes = animeEps[aid];
 		int normalEpisodes = animeNormalEpisodeCount[aid];
 		int otherEpisodes = animeOtherEpisodeCount[aid];
 		int normalViewed = animeNormalViewedCount[aid];
 		int otherViewed = animeOtherViewedCount[aid];
 		
 		// Column 1 (Episode): show format "A/B+C"
-		// A = normal episodes in mylist, B = total normal episodes, C = other types in mylist
+		// A = normal episodes in mylist, B = total normal episodes (from Eps), C = other types in mylist
 		QString episodeText;
-		if(totalEpisodes > 0)
+		if(totalNormalEpisodes > 0)
 		{
 			if(otherEpisodes > 0)
 			{
-				episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(totalEpisodes).arg(otherEpisodes);
+				episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(totalNormalEpisodes).arg(otherEpisodes);
 			}
 			else
 			{
-				episodeText = QString("%1/%2").arg(normalEpisodes).arg(totalEpisodes);
+				episodeText = QString("%1/%2").arg(normalEpisodes).arg(totalNormalEpisodes);
 			}
 		}
 		else
 		{
-			// If eptotal is not available, show count in mylist with other types
+			// If eps is not available, show count in mylist with other types
 			if(otherEpisodes > 0)
 			{
 				episodeText = QString("%1+%2").arg(normalEpisodes).arg(otherEpisodes);
@@ -1388,35 +1393,38 @@ int Window::parseMylistExport(const QString &tarGzPath)
 		{
 			if(xml.name() == QString("Anime"))
 			{
-				// Get anime ID and total episodes from Anime element
+				// Get anime ID and episode counts from Anime element
 				QXmlStreamAttributes attributes = xml.attributes();
 				currentAid = attributes.value("Id").toString();
 				QString epsTotal = attributes.value("EpsTotal").toString();
+				QString eps = attributes.value("Eps").toString();
 				
-				// Store or update anime table with eptotal if we have valid data
+				// Store or update anime table with episode counts if we have valid data
 				if(!currentAid.isEmpty() && !epsTotal.isEmpty())
 				{
-					// Insert anime record if it doesn't exist, then update eptotal
+					// Insert anime record if it doesn't exist, then update eptotal and eps
 					// This preserves existing anime data if it already exists from FILE command
-					QString animeInsertQuery = QString("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (%1)")
-						.arg(currentAid);
-					
 					QSqlQuery animeQueryExec(db);
-					if(!animeQueryExec.exec(animeInsertQuery))
+					animeQueryExec.prepare("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (:aid)");
+					animeQueryExec.bindValue(":aid", currentAid.toInt());
+					
+					if(!animeQueryExec.exec())
 					{
 						logOutput->append(QString("Warning: Failed to insert anime record (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
 					
-					// Update eptotal only if it's currently 0 or NULL (not set by FILE command)
-					QString animeUpdateQuery = QString("UPDATE `anime` SET `eptotal` = %1 "
-						"WHERE `aid` = %2 AND (eptotal IS NULL OR eptotal = 0)")
-						.arg(epsTotal)
-						.arg(currentAid);
+					// Update eptotal and eps only if they're currently 0 or NULL (not set by FILE command)
+					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
+						"WHERE `aid` = :aid AND (eptotal IS NULL OR eptotal = 0)");
+					animeQueryExec.bindValue(":eptotal", epsTotal.toInt());
+					// QVariant() creates a NULL value for the database when eps is not available
+					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant() : eps.toInt());
+					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
-					if(!animeQueryExec.exec(animeUpdateQuery))
+					if(!animeQueryExec.exec())
 					{
-						logOutput->append(QString("Warning: Failed to update anime eptotal (aid=%1): %2")
+						logOutput->append(QString("Warning: Failed to update anime episode counts (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
 				}
