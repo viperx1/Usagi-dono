@@ -129,6 +129,17 @@ The implementation is **verified to be correct** through code analysis and unit 
 
 This matches the issue requirement exactly.
 
+### Bug Fix (2025-10-18)
+
+A bug was identified and fixed where movies with specials (e.g., "Evangelion Shin Gekijouban: Ha") would show "1" instead of "1/1" in the episode column. The issue was in the mylist XML export parser at `window.cpp` line 1419. The UPDATE statement would only update `eps` if `eptotal` was NULL/0, preventing the correct `eps` value from being stored when `eptotal` was already set from a FILE command.
+
+**Fix:** Updated the WHERE clause to also update when `eps IS NULL OR eps = 0`:
+```sql
+WHERE `aid` = :aid AND ((eptotal IS NULL OR eptotal = 0) OR (eps IS NULL OR eps = 0))
+```
+
+See `tests/test_evangelion_ha_fix.cpp` for verification tests.
+
 ### Verification Method
 
 This conclusion is based on:
