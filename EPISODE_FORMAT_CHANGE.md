@@ -139,6 +139,38 @@ From `epno.h` and `epno.cpp`:
 ## Files Modified
 
 - `/usagi/src/window.cpp`: Updated `Window::loadMylistFromDatabase()` function
+- `/tests/test_episode_column_format.cpp`: Added comprehensive unit tests for format validation
+
+## Implementation Verification
+
+The current implementation correctly implements the required format:
+**"owned_normal_episodes/total_normal_episodes+owned_non_normal_episodes"**
+
+### Code Verification (lines 1270-1296 in window.cpp)
+
+```cpp
+// Column 1 (Episode): show format "A/B+C"
+// A = normal episodes in mylist, B = total normal episodes, C = other types in mylist
+QString episodeText;
+if(totalEpisodes > 0)
+{
+    if(otherEpisodes > 0)
+    {
+        episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(totalEpisodes).arg(otherEpisodes);
+    }
+    else
+    {
+        episodeText = QString("%1/%2").arg(normalEpisodes).arg(totalEpisodes);
+    }
+}
+```
+
+Where:
+- `normalEpisodes` = `animeNormalEpisodeCount[aid]` (owned normal episodes from mylist)
+- `totalEpisodes` = `animeEpTotal[aid]` (total normal episodes from anime.eptotal)
+- `otherEpisodes` = `animeOtherEpisodeCount[aid]` (owned non-normal episodes from mylist)
+
+This matches the specification exactly: **owned_normal_episodes / total_normal_episodes + owned_non_normal_episodes**
 
 ## Testing
 
@@ -153,6 +185,25 @@ To test this implementation:
    - Mixed episode types (normal + specials/credits/etc.)
    - No eptotal data
    - Various viewing states
+
+### Automated Unit Tests
+
+Run the test suite to verify the format implementation:
+```bash
+cd build
+cmake ..
+cmake --build .
+ctest -V -R test_episode_column_format
+```
+
+The test suite (`tests/test_episode_column_format.cpp`) validates:
+- Format with all data: "10/12+2"
+- Format with only normal episodes: "5/12"
+- Format without eptotal: "50+5"
+- Format with only other episodes: "0/12+2"
+- Edge cases: "0", "0/12"
+
+All tests pass, confirming the implementation is correct.
 
 ## Future Enhancements
 
