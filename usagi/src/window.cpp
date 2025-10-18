@@ -1101,6 +1101,10 @@ void Window::loadMylistFromDatabase()
 	}
 	
 	QMap<int, QTreeWidgetItem*> animeItems; // aid -> tree item
+	// Track statistics per anime
+	QMap<int, int> animeEpisodeCount;  // aid -> count of episodes in mylist
+	QMap<int, int> animeViewedCount;   // aid -> count of viewed episodes
+	QMap<int, int> animeEpTotal;       // aid -> total primary type episodes (eptotal)
 	int totalEntries = 0;
 	
 	while(q.next())
@@ -1149,6 +1153,18 @@ void Window::loadMylistFromDatabase()
 			animeItem->setData(0, Qt::UserRole, aid); // Store aid
 			animeItems[aid] = animeItem;
 			mylistTreeWidget->addTopLevelItem(animeItem);
+			
+			// Initialize counters for this anime
+			animeEpisodeCount[aid] = 0;
+			animeViewedCount[aid] = 0;
+			animeEpTotal[aid] = epTotal;
+		}
+		
+		// Update statistics for this anime
+		animeEpisodeCount[aid]++;
+		if(viewed)
+		{
+			animeViewedCount[aid]++;
 		}
 		
 		// Create episode item as child of anime
@@ -1205,14 +1221,39 @@ void Window::loadMylistFromDatabase()
 		totalEntries++;
 	}
 	
+	// Update anime rows with aggregate statistics
+	for(QMap<int, QTreeWidgetItem*>::iterator it = animeItems.begin(); it != animeItems.end(); ++it)
+	{
+		int aid = it.key();
+		QTreeWidgetItem *animeItem = it.value();
+		
+		int episodesInMylist = animeEpisodeCount[aid];
+		int viewedEpisodes = animeViewedCount[aid];
+		int totalEpisodes = animeEpTotal[aid];
+		
+		// Column 1 (Episode): show in_mylist/eptotal
+		if(totalEpisodes > 0)
+		{
+			animeItem->setText(1, QString("%1/%2").arg(episodesInMylist).arg(totalEpisodes));
+		}
+		else
+		{
+			// If eptotal is not available, just show count in mylist
+			animeItem->setText(1, QString::number(episodesInMylist));
+		}
+		
+		// Column 4 (Viewed): show viewed/in_mylist
+		animeItem->setText(4, QString("%1/%2").arg(viewedEpisodes).arg(episodesInMylist));
+	}
+	
 	// Keep anime items collapsed by default
 	// (User can expand manually if needed)
 	
 	logOutput->append(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
 	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
 	
-	// Set default sort order to ascending by anime name (column 0)
-	mylistTreeWidget->sortByColumn(0, Qt::AscendingOrder);
+	// Set default sort order to ascending by episode column (column 1)
+	mylistTreeWidget->sortByColumn(1, Qt::AscendingOrder);
 }
 
 int Window::parseMylistExport(const QString &tarGzPath)
