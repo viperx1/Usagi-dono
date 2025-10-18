@@ -965,7 +965,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 {
 	// Query the database for the updated episode data
 	QSqlDatabase db = QSqlDatabase::database();
-	QString query = QString("SELECT epno, name, type FROM episode WHERE eid = %1").arg(eid);
+	QString query = QString("SELECT epno, name FROM episode WHERE eid = %1").arg(eid);
 	QSqlQuery q(db);
 	
 	if(!q.exec(query))
@@ -980,9 +980,8 @@ void Window::updateEpisodeInTree(int eid, int aid)
 		return;
 	}
 	
-	QString epno = q.value(0).toString();
+	QString epnoStr = q.value(0).toString();
 	QString episodeName = q.value(1).toString();
-	int eptype = q.value(2).toInt();
 	
 	// Find the episode item in the tree by iterating through anime items
 	int topLevelCount = mylistTreeWidget->topLevelItemCount();
@@ -1004,70 +1003,25 @@ void Window::updateEpisodeInTree(int eid, int aid)
 				{
 					// Found the episode item - update its fields
 					
-					// Update episode number (Column 1)
-					QString episodeNumber;
-					if(!epno.isEmpty())
+					// Update episode number (Column 1) using epno type
+					if(!epnoStr.isEmpty())
 					{
-						// Remove leading zeros from the numeric part
-						QString numericPart;
+						::epno episodeNumber(epnoStr);
 						
-						// Parse episode number based on type field
-						if(eptype == 2)  // Special
+						// Store epno object if this is an EpisodeTreeWidgetItem
+						EpisodeTreeWidgetItem *epItem = dynamic_cast<EpisodeTreeWidgetItem*>(episodeItem);
+						if(epItem)
 						{
-							numericPart = epno.mid(1);  // Remove 'S' prefix
-						}
-						else if(eptype == 3)  // Credit
-						{
-							numericPart = epno.mid(1);  // Remove 'C' prefix
-						}
-						else if(eptype == 4)  // Trailer
-						{
-							numericPart = epno.mid(1);  // Remove 'T' prefix
-						}
-						else if(eptype == 5)  // Parody
-						{
-							numericPart = epno.mid(1);  // Remove 'P' prefix
-						}
-						else if(eptype == 6)  // Other
-						{
-							numericPart = epno.mid(1);  // Remove 'O' prefix
-						}
-						else  // Regular episode (type == 1 or 0)
-						{
-							numericPart = epno;
+							epItem->setEpno(episodeNumber);
 						}
 						
-						// Remove leading zeros by converting to int and back to string
-						bool ok;
-						int epNum = numericPart.toInt(&ok);
-						if(ok)
-						{
-							numericPart = QString::number(epNum);
-						}
-						
-						// Build display string based on type
-						if(eptype == 2)
-							episodeNumber = QString("Special %1").arg(numericPart);
-						else if(eptype == 3)
-							episodeNumber = QString("Credit %1").arg(numericPart);
-						else if(eptype == 4)
-							episodeNumber = QString("Trailer %1").arg(numericPart);
-						else if(eptype == 5)
-							episodeNumber = QString("Parody %1").arg(numericPart);
-						else if(eptype == 6)
-							episodeNumber = QString("Other %1").arg(numericPart);
-						else
-							episodeNumber = numericPart;  // Regular episode - just the number
-						
-						// Store the type and numeric value for sorting
-						episodeItem->setData(1, Qt::UserRole, eptype);  // Store type for sorting
-						episodeItem->setData(1, Qt::UserRole + 1, epNum);  // Store numeric value for sorting
+						// Display formatted episode number (with leading zeros removed)
+						episodeItem->setText(1, episodeNumber.toDisplayString());
 					}
 					else
 					{
-						episodeNumber = "Unknown";
+						episodeItem->setText(1, "Unknown");
 					}
-					episodeItem->setText(1, episodeNumber);
 					
 					// Update episode name (Column 2)
 					if(!episodeName.isEmpty())
@@ -1083,7 +1037,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 					episodesNeedingData.remove(eid);
 					
 					logOutput->append(QString("Updated episode in tree: EID %1, epno: %2, name: %3")
-						.arg(eid).arg(episodeNumber).arg(episodeName));
+						.arg(eid).arg(episodeItem->text(1)).arg(episodeName));
 					return;
 				}
 			}
@@ -1131,12 +1085,12 @@ void Window::loadMylistFromDatabase()
 	QSqlDatabase db = QSqlDatabase::database();
 	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
-					"e.name as episode_name, e.epno, e.type, "
+					"e.name as episode_name, e.epno, "
 					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
-					"ORDER BY a.nameromaji, e.type, CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(e.epno, 'S', ''), 'C', ''), 'T', ''), 'P', ''), 'O', '') AS INTEGER)";
+					"ORDER BY a.nameromaji, m.eid";
 	
 	QSqlQuery q(db);
 	
@@ -1162,8 +1116,7 @@ void Window::loadMylistFromDatabase()
 		int epTotal = q.value(8).toInt();
 		QString episodeName = q.value(9).toString();
 		QString epno = q.value(10).toString();  // Episode number from database
-		int eptype = q.value(11).toInt();  // Episode type (1=regular, 2=special, etc.)
-		QString animeTitle = q.value(12).toString();  // From anime_titles table
+		QString animeTitle = q.value(11).toString();  // From anime_titles table
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -1199,81 +1152,27 @@ void Window::loadMylistFromDatabase()
 		}
 		
 		// Create episode item as child of anime
-		QTreeWidgetItem *episodeItem = new QTreeWidgetItem(animeItem);
+		EpisodeTreeWidgetItem *episodeItem = new EpisodeTreeWidgetItem(animeItem);
 		episodeItem->setText(0, ""); // Empty for episode child
 		
-		// Column 1: Episode number or type
-		QString episodeNumber;
+		// Column 1: Episode number using epno type
 		if(!epno.isEmpty())
 		{
-			// Remove leading zeros from the numeric part
-			QString numericPart;
-			QString prefix;
+			// Create epno object from string
+			::epno episodeNumber(epno);
 			
-			// Parse episode number based on type field
-			if(eptype == 2)  // Special
-			{
-				prefix = "S";
-				numericPart = epno.mid(1);  // Remove 'S' prefix
-			}
-			else if(eptype == 3)  // Credit
-			{
-				prefix = "C";
-				numericPart = epno.mid(1);  // Remove 'C' prefix
-			}
-			else if(eptype == 4)  // Trailer
-			{
-				prefix = "T";
-				numericPart = epno.mid(1);  // Remove 'T' prefix
-			}
-			else if(eptype == 5)  // Parody
-			{
-				prefix = "P";
-				numericPart = epno.mid(1);  // Remove 'P' prefix
-			}
-			else if(eptype == 6)  // Other
-			{
-				prefix = "O";
-				numericPart = epno.mid(1);  // Remove 'O' prefix
-			}
-			else  // Regular episode (type == 1 or 0)
-			{
-				numericPart = epno;
-			}
+			// Store epno object in the item for sorting
+			episodeItem->setEpno(episodeNumber);
 			
-			// Remove leading zeros by converting to int and back to string
-			bool ok;
-			int epNum = numericPart.toInt(&ok);
-			if(ok)
-			{
-				numericPart = QString::number(epNum);
-			}
-			
-			// Build display string based on type
-			if(eptype == 2)
-				episodeNumber = QString("Special %1").arg(numericPart);
-			else if(eptype == 3)
-				episodeNumber = QString("Credit %1").arg(numericPart);
-			else if(eptype == 4)
-				episodeNumber = QString("Trailer %1").arg(numericPart);
-			else if(eptype == 5)
-				episodeNumber = QString("Parody %1").arg(numericPart);
-			else if(eptype == 6)
-				episodeNumber = QString("Other %1").arg(numericPart);
-			else
-				episodeNumber = numericPart;  // Regular episode - just the number
-			
-			// Store the type and numeric value for sorting
-			episodeItem->setData(1, Qt::UserRole, eptype);  // Store type for sorting
-			episodeItem->setData(1, Qt::UserRole + 1, epNum);  // Store numeric value for sorting
+			// Display formatted episode number (with leading zeros removed)
+			episodeItem->setText(1, episodeNumber.toDisplayString());
 		}
 		else
 		{
 			// Fallback to EID if episode number not available
-			episodeNumber = "Loading...";
+			episodeItem->setText(1, "Loading...");
 			episodesNeedingData.insert(eid);  // Track this episode for lazy loading
 		}
-		episodeItem->setText(1, episodeNumber);
 		
 		// Column 2: Episode title
 		if(episodeName.isEmpty())

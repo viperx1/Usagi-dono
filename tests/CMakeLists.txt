@@ -273,26 +273,30 @@ endif()
 
 add_test(NAME test_export_template_verification COMMAND test_export_template_verification -v2)
 
-# Test 8: Episode sorting and display
-add_executable(test_episode_sorting test_episode_sorting.cpp)
+# Test 8: Episode number type (epno)
+add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
-    target_compile_definitions(test_episode_sorting PRIVATE QT_STATIC QT_STATICPLUGIN)
+    target_compile_definitions(test_epno PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
-target_link_libraries(test_episode_sorting PRIVATE
+target_link_libraries(test_epno PRIVATE
     Qt6::Core
     Qt6::Test
 )
 
+target_include_directories(test_epno PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
 # Force console subsystem for LLVM MinGW on Windows
 if(WIN32)
-    target_link_options(test_episode_sorting PRIVATE
+    target_link_options(test_epno PRIVATE
         "-Wl,--subsystem,console"
     )
 endif()
 
-add_test(NAME test_episode_sorting COMMAND test_episode_sorting -v2)
+add_test(NAME test_epno COMMAND test_epno -v2)
 
