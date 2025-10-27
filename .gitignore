@@ -46,3 +46,4 @@ anime/
 *.tgz
 mylist.csv
 changelog.txt
+_codeql_build_dir/
