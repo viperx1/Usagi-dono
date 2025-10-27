@@ -43,6 +43,7 @@ set(SOURCES
     src/Qt-AES-master/qaesencryption.cpp
     src/crashlog.cpp
     src/epno.cpp
+    src/aired.cpp
 )
 
 # Header files
@@ -56,6 +57,7 @@ set(HEADERS
     src/Qt-AES-master/qaesencryption.h
     src/crashlog.h
     src/epno.h
+    src/aired.h
 )
 
 # Create executable

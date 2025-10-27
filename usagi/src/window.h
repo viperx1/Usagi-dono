@@ -26,6 +26,7 @@
 #include "hash/ed2k.h"
 #include "anidbapi.h"
 #include "epno.h"
+#include "aired.h"
 //#include "hasherthread.h"
 
 class hashes_ : public QTableWidget

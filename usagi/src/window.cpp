@@ -101,8 +101,8 @@ Window::Window()
 
     // page mylist
     mylistTreeWidget = new QTreeWidget(this);
-    mylistTreeWidget->setColumnCount(7);
-    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID");
+    mylistTreeWidget->setColumnCount(9);
+    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID" << "Type" << "Aired");
     mylistTreeWidget->setColumnWidth(0, 300);
     mylistTreeWidget->setColumnWidth(1, 80);
     mylistTreeWidget->setColumnWidth(2, 250);
@@ -110,6 +110,8 @@ Window::Window()
     mylistTreeWidget->setColumnWidth(4, 80);
     mylistTreeWidget->setColumnWidth(5, 200);
     mylistTreeWidget->setColumnWidth(6, 80);
+    mylistTreeWidget->setColumnWidth(7, 100);
+    mylistTreeWidget->setColumnWidth(8, 180);
     mylistTreeWidget->setAlternatingRowColors(true);
     mylistTreeWidget->setSortingEnabled(true);
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -1087,7 +1089,7 @@ void Window::loadMylistFromDatabase()
 					"a.nameromaji, a.nameenglish, a.eptotal, "
 					"e.name as episode_name, e.epno, "
 					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
-					"a.eps "
+					"a.eps, a.typename, a.startdate, a.enddate "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
@@ -1129,6 +1131,9 @@ void Window::loadMylistFromDatabase()
 		QString epno = q.value(10).toString();  // Episode number from database
 		QString animeTitle = q.value(11).toString();  // From anime_titles table
 		int eps = q.value(12).toInt();  // Normal episode count from database
+		QString typeName = q.value(13).toString();  // Type name from database
+		QString startDate = q.value(14).toString();  // Start date from database
+		QString endDate = q.value(15).toString();  // End date from database
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -1159,6 +1164,20 @@ void Window::loadMylistFromDatabase()
 			animeItem = new QTreeWidgetItem(mylistTreeWidget);
 			animeItem->setText(0, animeName);
 			animeItem->setData(0, Qt::UserRole, aid); // Store aid
+			
+			// Set Type column (column 7) for anime parent item
+			if(!typeName.isEmpty())
+			{
+				animeItem->setText(7, typeName);
+			}
+			
+			// Set Aired column (column 8) for anime parent item
+			if(!startDate.isEmpty())
+			{
+				aired airedDates(startDate, endDate);
+				animeItem->setText(8, airedDates.toDisplayString());
+			}
+			
 			animeItems[aid] = animeItem;
 			mylistTreeWidget->addTopLevelItem(animeItem);
 			
@@ -1398,6 +1417,9 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				currentAid = attributes.value("Id").toString();
 				QString epsTotal = attributes.value("EpsTotal").toString();
 				QString eps = attributes.value("Eps").toString();
+				QString typeName = attributes.value("TypeName").toString();
+				QString startDate = attributes.value("StartDate").toString();
+				QString endDate = attributes.value("EndDate").toString();
 				
 				// Store or update anime table with episode counts if we have valid data
 				if(!currentAid.isEmpty() && !epsTotal.isEmpty())
@@ -1415,16 +1437,35 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					}
 					
 					// Update eptotal and eps only if they're currently 0 or NULL (not set by FILE command)
-					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
+					// Always update typename, startdate, enddate from mylist export
+					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps, "
+						"`typename` = :typename, `startdate` = :startdate, `enddate` = :enddate "
 						"WHERE `aid` = :aid AND ((eptotal IS NULL OR eptotal = 0) OR (eps IS NULL OR eps = 0))");
 					animeQueryExec.bindValue(":eptotal", epsTotal.toInt());
 					// QVariant() creates a NULL value for the database when eps is not available
 					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant() : eps.toInt());
+					animeQueryExec.bindValue(":typename", typeName.isEmpty() ? QVariant() : typeName);
+					animeQueryExec.bindValue(":startdate", startDate.isEmpty() ? QVariant() : startDate);
+					animeQueryExec.bindValue(":enddate", endDate.isEmpty() ? QVariant() : endDate);
 					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
 					if(!animeQueryExec.exec())
 					{
 						logOutput->append(QString("Warning: Failed to update anime episode counts (aid=%1): %2")
+							.arg(currentAid).arg(animeQueryExec.lastError().text()));
+					}
+					
+					// Also update typename, startdate, enddate even if eptotal/eps are already set
+					animeQueryExec.prepare("UPDATE `anime` SET `typename` = :typename, "
+						"`startdate` = :startdate, `enddate` = :enddate WHERE `aid` = :aid");
+					animeQueryExec.bindValue(":typename", typeName.isEmpty() ? QVariant() : typeName);
+					animeQueryExec.bindValue(":startdate", startDate.isEmpty() ? QVariant() : startDate);
+					animeQueryExec.bindValue(":enddate", endDate.isEmpty() ? QVariant() : endDate);
+					animeQueryExec.bindValue(":aid", currentAid.toInt());
+					
+					if(!animeQueryExec.exec())
+					{
+						logOutput->append(QString("Warning: Failed to update anime metadata (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
 				}
