@@ -66,6 +66,46 @@ private:
     epno m_epno;
 };
 
+// Custom tree widget item for anime items that can sort by aired dates
+class AnimeTreeWidgetItem : public QTreeWidgetItem
+{
+public:
+    AnimeTreeWidgetItem(QTreeWidget *parent) : QTreeWidgetItem(parent) {}
+    
+    void setAired(const aired& airedDates) { m_aired = airedDates; }
+    aired getAired() const { return m_aired; }
+    
+    bool operator<(const QTreeWidgetItem &other) const override
+    {
+        int column = treeWidget()->sortColumn();
+        
+        // If sorting by Aired column (column 8) and both items have aired data
+        if(column == 8)
+        {
+            const AnimeTreeWidgetItem *otherAnime = dynamic_cast<const AnimeTreeWidgetItem*>(&other);
+            if(otherAnime && m_aired.isValid() && otherAnime->m_aired.isValid())
+            {
+                return m_aired < otherAnime->m_aired;
+            }
+            // If one has aired data and the other doesn't, put the one with data first
+            else if(m_aired.isValid() && otherAnime && !otherAnime->m_aired.isValid())
+            {
+                return true; // this item comes before other
+            }
+            else if(!m_aired.isValid() && otherAnime && otherAnime->m_aired.isValid())
+            {
+                return false; // other item comes before this
+            }
+        }
+        
+        // Default comparison for other columns
+        return QTreeWidgetItem::operator<(other);
+    }
+    
+private:
+    aired m_aired;
+};
+
 class Window : public QWidget
 {
     Q_OBJECT
