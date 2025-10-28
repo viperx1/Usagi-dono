@@ -71,13 +71,14 @@ Hunter x Hunter (2011)      | 100/148+2    |        | 85/100+1
 - Viewed 85 out of 100 normal episodes in mylist
 - Viewed 1 out of 2 special episodes
 
-### Scenario 5: Anime Without Episode Total (eptotal = 0)
+### Scenario 5: Anime Without Episode Total (eps = 0)
 ```
-Ongoing Series              | 50+5         |        | 40/50+4
+Ongoing Series              | 50/?+5       |        | 40/50+4
 ```
 - Has 50 normal episodes in mylist
 - Has 5 other type episodes
 - Total episode count not available (ongoing or unknown)
+- Episode column uses "?" to indicate unknown total: "50/?+5"
 - Viewed 40 out of 50 normal episodes
 - Viewed 4 out of 5 other type episodes
 

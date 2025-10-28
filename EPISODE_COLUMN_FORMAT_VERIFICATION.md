@@ -82,9 +82,9 @@ This correctly counts:
 | Complete series with specials | 12 | 12 | 2 | `12/12+2` | All 12 normal + 2 specials |
 | Partial series with OVAs | 10 | 26 | 3 | `10/26+3` | 10 of 26 normal + 3 other types |
 | Only normal episodes | 5 | 12 | 0 | `5/12` | 5 of 12 normal, no extras |
-| Ongoing series (no eptotal) | 50 | 0 | 5 | `50+5` | 50 normal + 5 other (total unknown) |
+| Ongoing series (no eps) | 50 | 0 | 5 | `50/?+5` | 50 normal + 5 other (unknown total, marked with ?) |
 | Only specials collected | 0 | 12 | 2 | `0/12+2` | 0 of 12 normal, but 2 specials |
-| Minimal collection | 15 | 0 | 0 | `15` | 15 normal, no total, no extras |
+| Minimal collection | 15 | 0 | 0 | `15/?` | 15 normal, unknown total (marked with ?) |
 
 ## Test Coverage
 
@@ -100,16 +100,16 @@ The test file validates the formatting logic with comprehensive scenarios:
    - Tests: `5/12`, `26/26`, `1/1`
    - Validates format with no other episode types
 
-3. **testFormatWithoutEpTotal()**
-   - Tests: `50+5`, `15`, `0+3`
-   - Validates format when eptotal is not available
+3. **testFormatWithoutEps()**
+   - Tests: `50/?+5`, `15/?`, `0/?+3`
+   - Validates format when eps is not available (uses "?" to indicate unknown total)
 
 4. **testFormatWithOnlyOtherEpisodes()**
    - Tests: `0/12+2`, `0/6+6`
    - Validates format when only specials/OVAs are collected
 
 5. **testFormatWithNoEpisodes()**
-   - Tests: `0`, `0/12`
+   - Tests: `0/?`, `0/12`
    - Validates edge cases with empty collections
 
 ### Running Tests

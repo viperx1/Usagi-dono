@@ -99,16 +99,16 @@ From `epno.h` and `epno.cpp`:
 - Episode column: "24/24+6" (3+2+1 = 6 other types)
 - Viewed column: "20/24+3" (2+1+0 = 3 other types viewed)
 
-### Scenario 4: Anime without eptotal data
+### Scenario 4: Anime without eps data
 **Input:**
 - 8 normal episodes in mylist
 - 1 special episode
-- eptotal: 0 (not available)
+- eps: 0 (not available)
 - 5 normal viewed
 - 1 special viewed
 
 **Expected Output:**
-- Episode column: "8+1"
+- Episode column: "8/?+1" (uses "?" to indicate unknown total when eps is unavailable)
 - Viewed column: "5/8+1"
 
 ### Scenario 5: All episodes viewed
@@ -199,9 +199,9 @@ ctest -V -R test_episode_column_format
 The test suite (`tests/test_episode_column_format.cpp`) validates:
 - Format with all data: "10/12+2"
 - Format with only normal episodes: "5/12"
-- Format without eptotal: "50+5"
+- Format without eps data: "50/?+5" (uses "?" to indicate unknown total)
 - Format with only other episodes: "0/12+2"
-- Edge cases: "0", "0/12"
+- Edge cases: "0/?", "0/12"
 
 All tests pass, confirming the implementation is correct.
 
