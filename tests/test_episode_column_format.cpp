@@ -33,7 +33,7 @@ private:
 QString TestEpisodeColumnFormat::formatEpisodeColumn(int normalEpisodes, int totalNormalEpisodes, int otherEpisodes)
 {
     // This replicates the logic from Window::loadMylistFromDatabase() episode column formatting
-    // When totalNormalEpisodes is not available (0), use normalEpisodes as denominator
+    // When totalNormalEpisodes is not available (0), show "?" to indicate unknown total
     QString episodeText;
     if(totalNormalEpisodes > 0)
     {
@@ -48,14 +48,14 @@ QString TestEpisodeColumnFormat::formatEpisodeColumn(int normalEpisodes, int tot
     }
     else
     {
-        // If eps is not available, use normalEpisodes as denominator to maintain "x/y+z" or "x/y" format
+        // If eps is not available, show "?" to indicate unknown total instead of using same value
         if(otherEpisodes > 0)
         {
-            episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(normalEpisodes).arg(otherEpisodes);
+            episodeText = QString("%1/?+%2").arg(normalEpisodes).arg(otherEpisodes);
         }
         else
         {
-            episodeText = QString("%1/%2").arg(normalEpisodes).arg(normalEpisodes);
+            episodeText = QString("%1/?").arg(normalEpisodes);
         }
     }
     return episodeText;
@@ -100,21 +100,21 @@ void TestEpisodeColumnFormat::testFormatWithoutEps()
 {
     // Scenario: Ongoing series where eps is not available (0)
     // 50 normal episodes plus 5 other types in mylist
-    // Should display "50/50+5" to maintain "x/y+z" format
+    // Should display "50/?+5" to indicate unknown total
     QString result = formatEpisodeColumn(50, 0, 5);
-    QCOMPARE(result, QString("50/50+5"));
+    QCOMPARE(result, QString("50/?+5"));
     
     // Scenario: Unknown total, only normal episodes
     // 15 normal episodes, no other types, eps unknown
-    // Should display "15/15" to maintain "x/y" format
+    // Should display "15/?" to indicate unknown total
     result = formatEpisodeColumn(15, 0, 0);
-    QCOMPARE(result, QString("15/15"));
+    QCOMPARE(result, QString("15/?"));
     
     // Scenario: Only specials/OVAs collected
     // 0 normal episodes, 3 other types, eps unknown
-    // Should display "0/0+3" to maintain "x/y+z" format
+    // Should display "0/?+3" to indicate unknown total
     result = formatEpisodeColumn(0, 0, 3);
-    QCOMPARE(result, QString("0/0+3"));
+    QCOMPARE(result, QString("0/?+3"));
 }
 
 void TestEpisodeColumnFormat::testMovieWithSpecials()
@@ -153,9 +153,9 @@ void TestEpisodeColumnFormat::testFormatWithOnlyOtherEpisodes()
 void TestEpisodeColumnFormat::testFormatWithNoEpisodes()
 {
     // Edge case: No episodes at all (shouldn't normally happen)
-    // Should display "0/0" to maintain "x/y" format
+    // Should display "0/?" to indicate unknown total
     QString result = formatEpisodeColumn(0, 0, 0);
-    QCOMPARE(result, QString("0/0"));
+    QCOMPARE(result, QString("0/?"));
     
     // Edge case: Only eptotal available, no mylist entries yet
     result = formatEpisodeColumn(0, 12, 0);

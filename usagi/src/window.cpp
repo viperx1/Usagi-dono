@@ -1293,7 +1293,7 @@ void Window::loadMylistFromDatabase()
 		
 		// Column 1 (Episode): show format "A/B+C"
 		// A = normal episodes in mylist, B = total normal episodes (from Eps), C = other types in mylist
-		// When Eps is not available, use normalEpisodes as denominator to maintain "x/y" format
+		// When Eps is not available, show "?" to indicate unknown total
 		QString episodeText;
 		if(totalNormalEpisodes > 0)
 		{
@@ -1308,14 +1308,14 @@ void Window::loadMylistFromDatabase()
 		}
 		else
 		{
-			// If eps is not available, use normalEpisodes as denominator to maintain "x/y+z" or "x/y" format
+			// If eps is not available, show "?" to indicate unknown total instead of using same value
 			if(otherEpisodes > 0)
 			{
-				episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(normalEpisodes).arg(otherEpisodes);
+				episodeText = QString("%1/?+%2").arg(normalEpisodes).arg(otherEpisodes);
 			}
 			else
 			{
-				episodeText = QString("%1/%2").arg(normalEpisodes).arg(normalEpisodes);
+				episodeText = QString("%1/?").arg(normalEpisodes);
 			}
 		}
 		animeItem->setText(1, episodeText);

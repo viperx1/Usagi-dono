@@ -108,7 +108,7 @@ From `epno.h` and `epno.cpp`:
 - 1 special viewed
 
 **Expected Output:**
-- Episode column: "8/8+1" (uses normalEpisodes as denominator when eps is unavailable)
+- Episode column: "8/?+1" (uses "?" to indicate unknown total when eps is unavailable)
 - Viewed column: "5/8+1"
 
 ### Scenario 5: All episodes viewed
@@ -199,9 +199,9 @@ ctest -V -R test_episode_column_format
 The test suite (`tests/test_episode_column_format.cpp`) validates:
 - Format with all data: "10/12+2"
 - Format with only normal episodes: "5/12"
-- Format without eps data: "50/50+5" (uses normalEpisodes as denominator)
+- Format without eps data: "50/?+5" (uses "?" to indicate unknown total)
 - Format with only other episodes: "0/12+2"
-- Edge cases: "0/0", "0/12"
+- Edge cases: "0/?", "0/12"
 
 All tests pass, confirming the implementation is correct.
 
