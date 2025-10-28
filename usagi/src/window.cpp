@@ -1455,8 +1455,19 @@ int Window::parseMylistExport(const QString &tarGzPath)
 						logOutput->append(QString("Warning: Failed to update anime episode counts (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
+				}
+				
+				// Update typename, startdate, enddate even if eptotal/eps are missing or already set
+				// This runs independently of the epsTotal check above
+				if(!currentAid.isEmpty())
+				{
+					QSqlQuery animeQueryExec(db);
+					// Insert anime record if it doesn't exist
+					animeQueryExec.prepare("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (:aid)");
+					animeQueryExec.bindValue(":aid", currentAid.toInt());
+					animeQueryExec.exec();  // Ignore errors since record may already exist
 					
-					// Also update typename, startdate, enddate even if eptotal/eps are already set
+					// Update typename, startdate, enddate
 					animeQueryExec.prepare("UPDATE `anime` SET `typename` = :typename, "
 						"`startdate` = :startdate, `enddate` = :enddate WHERE `aid` = :aid");
 					animeQueryExec.bindValue(":typename", typeName.isEmpty() ? QVariant() : typeName);
