@@ -57,7 +57,7 @@ Window::Window()
 	pageApiTesterParent = new QWidget;
 	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
 
-    layout->addWidget(tabwidget, 0, Qt::AlignTop);
+    layout->addWidget(tabwidget, 1);
 
 	// tabs
     tabwidget->addTab(pageHasherParent, "Hasher");
