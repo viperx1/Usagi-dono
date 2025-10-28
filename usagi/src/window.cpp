@@ -1424,11 +1424,10 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				QString startDate = attributes.value("StartDate").toString();
 				QString endDate = attributes.value("EndDate").toString();
 				
-				// Store or update anime table with episode counts if we have valid data
-				if(!currentAid.isEmpty() && !epsTotal.isEmpty())
+				// Ensure anime record exists in database
+				// This runs for all anime, regardless of whether we have eptotal or typename data
+				if(!currentAid.isEmpty())
 				{
-					// Insert anime record if it doesn't exist, then update eptotal and eps
-					// This preserves existing anime data if it already exists from FILE command
 					QSqlQuery animeQueryExec(db);
 					animeQueryExec.prepare("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (:aid)");
 					animeQueryExec.bindValue(":aid", currentAid.toInt());
@@ -1438,18 +1437,19 @@ int Window::parseMylistExport(const QString &tarGzPath)
 						logOutput->append(QString("Warning: Failed to insert anime record (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
-					
+				}
+				
+				// Update anime episode counts if we have valid data
+				if(!currentAid.isEmpty() && !epsTotal.isEmpty())
+				{
 					// Update eptotal and eps only if they're currently 0 or NULL (not set by FILE command)
-					// Always update typename, startdate, enddate from mylist export
-					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps, "
-						"`typename` = :typename, `startdate` = :startdate, `enddate` = :enddate "
+					// typename, startdate, enddate are handled separately below
+					QSqlQuery animeQueryExec(db);
+					animeQueryExec.prepare("UPDATE `anime` SET `eptotal` = :eptotal, `eps` = :eps "
 						"WHERE `aid` = :aid AND ((eptotal IS NULL OR eptotal = 0) OR (eps IS NULL OR eps = 0))");
 					animeQueryExec.bindValue(":eptotal", epsTotal.toInt());
 					// QVariant() creates a NULL value for the database when eps is not available
 					animeQueryExec.bindValue(":eps", eps.isEmpty() ? QVariant() : eps.toInt());
-					animeQueryExec.bindValue(":typename", typeName.isEmpty() ? QVariant() : typeName);
-					animeQueryExec.bindValue(":startdate", startDate.isEmpty() ? QVariant() : startDate);
-					animeQueryExec.bindValue(":enddate", endDate.isEmpty() ? QVariant() : endDate);
 					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
 					if(!animeQueryExec.exec())
@@ -1459,17 +1459,12 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					}
 				}
 				
-				// Update typename, startdate, enddate even if eptotal/eps are missing or already set
-				// This runs independently of the epsTotal check above
+				// Always update typename, startdate, enddate from mylist export
+				// This runs independently of the eptotal/eps check above
 				if(!currentAid.isEmpty())
 				{
 					QSqlQuery animeQueryExec(db);
-					// Insert anime record if it doesn't exist
-					animeQueryExec.prepare("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (:aid)");
-					animeQueryExec.bindValue(":aid", currentAid.toInt());
-					animeQueryExec.exec();  // Ignore errors since record may already exist
-					
-					// Update typename, startdate, enddate
+					// Always update typename, startdate, enddate (even if already set)
 					animeQueryExec.prepare("UPDATE `anime` SET `typename` = :typename, "
 						"`startdate` = :startdate, `enddate` = :enddate WHERE `aid` = :aid");
 					animeQueryExec.bindValue(":typename", typeName.isEmpty() ? QVariant() : typeName);
