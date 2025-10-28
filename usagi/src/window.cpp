@@ -1165,19 +1165,6 @@ void Window::loadMylistFromDatabase()
 			animeItem->setText(0, animeName);
 			animeItem->setData(0, Qt::UserRole, aid); // Store aid
 			
-			// Set Type column (column 7) for anime parent item
-			if(!typeName.isEmpty())
-			{
-				animeItem->setText(7, typeName);
-			}
-			
-			// Set Aired column (column 8) for anime parent item
-			if(!startDate.isEmpty())
-			{
-				aired airedDates(startDate, endDate);
-				animeItem->setText(8, airedDates.toDisplayString());
-			}
-			
 			animeItems[aid] = animeItem;
 			mylistTreeWidget->addTopLevelItem(animeItem);
 			
@@ -1190,6 +1177,21 @@ void Window::loadMylistFromDatabase()
 			animeOtherEpisodeCount[aid] = 0;
 			animeNormalViewedCount[aid] = 0;
 			animeOtherViewedCount[aid] = 0;
+		}
+		
+		// Set Type column (column 7) for anime parent item
+		// Update on every row since all episodes have the same data
+		if(!typeName.isEmpty() && animeItem->text(7).isEmpty())
+		{
+			animeItem->setText(7, typeName);
+		}
+		
+		// Set Aired column (column 8) for anime parent item
+		// Update on every row since all episodes have the same data
+		if(!startDate.isEmpty() && animeItem->text(8).isEmpty())
+		{
+			aired airedDates(startDate, endDate);
+			animeItem->setText(8, airedDates.toDisplayString());
 		}
 		
 		// Create episode item as child of anime
