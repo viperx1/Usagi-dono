@@ -454,3 +454,31 @@ endif()
 
 add_test(NAME test_mylist_columns_fix COMMAND test_mylist_columns_fix -v2)
 
+# Test 15: MyList aired sorting
+add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_mylist_aired_sorting PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_mylist_aired_sorting PRIVATE
+    Qt6::Core
+    Qt6::Widgets
+    Qt6::Test
+)
+target_include_directories(test_mylist_aired_sorting PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_mylist_aired_sorting PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_mylist_aired_sorting COMMAND test_mylist_aired_sorting -v2)
+
+

@@ -1154,14 +1154,14 @@ void Window::loadMylistFromDatabase()
 		}
 		
 		// Get or create the anime parent item
-		QTreeWidgetItem *animeItem;
+		AnimeTreeWidgetItem *animeItem;
 		if(animeItems.contains(aid))
 		{
-			animeItem = animeItems[aid];
+			animeItem = static_cast<AnimeTreeWidgetItem*>(animeItems[aid]);
 		}
 		else
 		{
-			animeItem = new QTreeWidgetItem(mylistTreeWidget);
+			animeItem = new AnimeTreeWidgetItem(mylistTreeWidget);
 			animeItem->setText(0, animeName);
 			animeItem->setData(0, Qt::UserRole, aid); // Store aid
 			
@@ -1192,6 +1192,8 @@ void Window::loadMylistFromDatabase()
 		{
 			aired airedDates(startDate, endDate);
 			animeItem->setText(8, airedDates.toDisplayString());
+			// Store the aired object for proper sorting by date
+			animeItem->setAired(airedDates);
 		}
 		
 		// Create episode item as child of anime
