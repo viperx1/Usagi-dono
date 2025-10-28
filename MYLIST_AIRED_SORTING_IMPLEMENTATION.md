@@ -69,7 +69,15 @@ public:
             {
                 return m_aired < otherAnime->m_aired;
             }
-            // Handle invalid dates...
+            // If one has aired data and the other doesn't, put the one with data first
+            else if(m_aired.isValid() && otherAnime && !otherAnime->m_aired.isValid())
+            {
+                return true; // this item comes before other
+            }
+            else if(!m_aired.isValid() && otherAnime && otherAnime->m_aired.isValid())
+            {
+                return false; // other item comes before this
+            }
         }
         
         // Default comparison for other columns
