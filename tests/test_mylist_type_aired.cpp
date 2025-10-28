@@ -126,7 +126,7 @@ void TestMylistTypeAired::testUpdateWithExistingEpisodeCounts()
     // This test simulates the bug scenario:
     // 1. User had an old database with eptotal/eps already set
     // 2. Upgraded to new version with typename/startdate/enddate columns (NULL)
-    // 3. Loads mylist XML which should update typename/startdate/enddate
+    // 3. Simulates the UPDATE query that runs when loading mylist XML
     
     // Insert anime with eptotal/eps set but typename/startdate/enddate as NULL
     QSqlQuery query(db);
