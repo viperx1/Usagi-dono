@@ -126,11 +126,24 @@ if(viewed)
 ```
 
 ### Sorting Behavior
-The episode column sorting uses the custom `EpisodeTreeWidgetItem` class for episode items, which properly sorts by episode type and number. For anime items (parents), the text-based comparison is used (e.g., "12/24" vs "5/26").
+
+The mylist tree supports custom sorting for specific columns:
+
+#### Episode Column (Column 1)
+Uses the custom `EpisodeTreeWidgetItem` class for episode items, which properly sorts by episode type and number using the `epno` class. For anime items (parents), text-based comparison is used (e.g., "12/24" vs "5/26").
+
+#### Aired Column (Column 8)
+Uses the custom `AnimeTreeWidgetItem` class for anime items, which properly sorts by actual air dates instead of string comparison. The `aired` class provides date-based comparison:
+- Primary sort: Start date (chronological order)
+- Secondary sort: End date (when start dates are equal)
+- Items with invalid/empty dates are sorted to the end
+
+Users can click the "Aired" column header to toggle between ascending (oldest first) and descending (newest first) sort order.
 
 ## Files Modified
 
 - `usagi/src/window.cpp` - Modified `loadMylistFromDatabase()` function
+- `usagi/src/window.h` - Added `AnimeTreeWidgetItem` class for date-based sorting
 
 ## Future Enhancements
 
@@ -139,3 +152,4 @@ Potential improvements for future consideration:
 2. Add a column showing completion percentage explicitly
 3. Allow users to customize the default sort column in settings
 4. Update aggregate statistics when episodes are added/removed dynamically
+5. Add separate sorting options for air end date (currently sorts by start date primarily)
