@@ -490,6 +490,9 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     target_compile_definitions(test_directorywatcher PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
+# Link Qt libraries
+# Note: For static Qt builds, order matters. Qt6::Concurrent depends on Qt6::Core,
+# so Qt6::Concurrent must come before Qt6::Core in the link order.
 target_link_libraries(test_directorywatcher PRIVATE
     Qt6::Test
     Qt6::Sql
