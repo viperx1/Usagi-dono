@@ -39,7 +39,6 @@ private:
     bool m_isWatching;
     
     void scanDirectory();
-    bool isValidVideoFile(const QString &filePath) const;
     void loadProcessedFiles();
     void saveProcessedFile(const QString &filePath);
 };

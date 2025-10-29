@@ -2,7 +2,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QDirIterator>
-#include <QSettings>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QDebug>
 
 DirectoryWatcher::DirectoryWatcher(QObject *parent)
@@ -100,7 +101,7 @@ void DirectoryWatcher::scanDirectory()
         return;
     }
     
-    // Scan for video files in the directory
+    // Scan for all files in the directory (no extension filtering - let API decide)
     QDirIterator it(m_watchedDirectory, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
     
     while (it.hasNext()) {
@@ -112,16 +113,9 @@ void DirectoryWatcher::scanDirectory()
             continue;
         }
         
-        // Check if it's a valid video file
-        if (!isValidVideoFile(filePath)) {
+        // Skip empty files
+        if (fileInfo.size() == 0) {
             continue;
-        }
-        
-        // Check if file is stable (not currently being written)
-        // We check the file size twice with a small delay
-        qint64 size1 = fileInfo.size();
-        if (size1 == 0) {
-            continue; // Skip empty files
         }
         
         // Mark as processed to avoid duplicate processing
@@ -134,48 +128,36 @@ void DirectoryWatcher::scanDirectory()
     }
 }
 
-bool DirectoryWatcher::isValidVideoFile(const QString &filePath) const
-{
-    QFileInfo fileInfo(filePath);
-    QString suffix = fileInfo.suffix().toLower();
-    
-    // Common video file extensions
-    QStringList videoExtensions;
-    videoExtensions << "mkv" << "mp4" << "avi" << "mov" << "wmv" 
-                   << "flv" << "webm" << "m4v" << "mpg" << "mpeg"
-                   << "ogv" << "3gp" << "ts" << "m2ts";
-    
-    return videoExtensions.contains(suffix);
-}
-
 void DirectoryWatcher::loadProcessedFiles()
 {
-    QSettings settings("settings.dat", QSettings::IniFormat);
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
     
-    int size = settings.beginReadArray("watchedFiles");
-    for (int i = 0; i < size; ++i) {
-        settings.setArrayIndex(i);
-        QString filePath = settings.value("path").toString();
+    // Query all watched files from database
+    query.exec("SELECT value FROM settings WHERE name LIKE 'watched_file_%'");
+    
+    while (query.next()) {
+        QString filePath = query.value(0).toString();
         if (!filePath.isEmpty()) {
             m_processedFiles.insert(filePath);
         }
     }
-    settings.endArray();
     
-    qDebug() << "DirectoryWatcher: Loaded" << m_processedFiles.size() << "processed files";
+    qDebug() << "DirectoryWatcher: Loaded" << m_processedFiles.size() << "processed files from database";
 }
 
 void DirectoryWatcher::saveProcessedFile(const QString &filePath)
 {
-    QSettings settings("settings.dat", QSettings::IniFormat);
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
     
-    // Get current array size
-    int size = settings.beginReadArray("watchedFiles");
-    settings.endArray();
+    // Create a unique key for this file using hash of the path
+    QString key = QString("watched_file_%1").arg(QString::number(qHash(filePath)));
     
-    // Add new entry
-    settings.beginWriteArray("watchedFiles");
-    settings.setArrayIndex(size);
-    settings.setValue("path", filePath);
-    settings.endArray();
+    // Insert or replace the file path in the database
+    QString sql = QString("INSERT OR REPLACE INTO settings (name, value) VALUES ('%1', '%2')")
+        .arg(key)
+        .arg(QString(filePath).replace("'", "''"));  // Escape single quotes
+    
+    query.exec(sql);
 }

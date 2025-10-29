@@ -1711,14 +1711,9 @@ void Window::onWatcherNewFileDetected(const QString &filePath)
 	
 	// Auto-hash and add to mylist if user is logged in
 	if (adbapi->LoggedIn()) {
-		// Ensure "Add to MyList" is checked
-		bool previousAddToMylist = addtomylist->isChecked();
-		bool previousMarkWatched = markwatched->isChecked();
-		int previousState = hasherFileState->currentIndex();
-		
-		// Set to unwatched, HDD state
+		// Set to "no change" for watched state (file might already be in database with watched state)
 		addtomylist->setChecked(true);
-		markwatched->setChecked(false);  // unwatched
+		markwatched->setCheckState(Qt::Unchecked);  // no change
 		hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 		
 		// Create a single-item list for hashing
@@ -1730,10 +1725,7 @@ void Window::onWatcherNewFileDetected(const QString &filePath)
 		buttonclear->setEnabled(false);
 		emit hashFiles(files);
 		
-		logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD unwatched)");
-		
-		// Note: We don't restore the previous settings here because the user might have
-		// set them specifically. The directory watcher should use its own settings.
+		logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD, watched state preserved)");
 	} else {
 		logOutput->append("File added to hasher. Login to auto-hash and add to MyList.");
 	}

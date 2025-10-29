@@ -86,14 +86,14 @@ void TestDirectoryWatcher::testVideoFileValidation()
     
     watcher.startWatching(tempDir.path());
     
-    // Create a valid video file
+    // Create a video file
     QString videoFile = tempDir.path() + "/video.mp4";
     QFile vf(videoFile);
     QVERIFY(vf.open(QIODevice::WriteOnly));
     vf.write("video content");
     vf.close();
     
-    // Create an invalid file (not a video)
+    // Create a text file - should also be detected (no extension filtering)
     QString textFile = tempDir.path() + "/document.txt";
     QFile tf(textFile);
     QVERIFY(tf.open(QIODevice::WriteOnly));
@@ -103,20 +103,23 @@ void TestDirectoryWatcher::testVideoFileValidation()
     // Wait for signals
     QTest::qWait(3000);
     
-    // Verify only video file was detected
-    QVERIFY(spy.count() >= 1);
+    // Verify both files were detected (no extension filtering)
+    QVERIFY(spy.count() >= 2);
     
-    // Check that the detected file is the video file
+    // Check that both files were detected
     bool foundVideo = false;
+    bool foundText = false;
     for (int i = 0; i < spy.count(); ++i) {
         QString detectedFile = spy.at(i).first().toString();
         if (detectedFile == videoFile) {
             foundVideo = true;
         }
-        // Ensure text file was not detected
-        QVERIFY(detectedFile != textFile);
+        if (detectedFile == textFile) {
+            foundText = true;
+        }
     }
     QVERIFY(foundVideo);
+    QVERIFY(foundText);
 }
 
 void TestDirectoryWatcher::testInvalidDirectory()
