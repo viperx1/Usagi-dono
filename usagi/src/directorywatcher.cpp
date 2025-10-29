@@ -10,15 +10,22 @@ DirectoryWatcher::DirectoryWatcher(QObject *parent)
     : QObject(parent)
     , m_watcher(new QFileSystemWatcher(this))
     , m_debounceTimer(new QTimer(this))
+    , m_initialScanTimer(new QTimer(this))
     , m_isWatching(false)
 {
     // Set up debounce timer to avoid processing files immediately after detection
     m_debounceTimer->setSingleShot(true);
     m_debounceTimer->setInterval(2000); // Wait 2 seconds after file change
     
+    // Set up initial scan timer to defer initial directory scan
+    m_initialScanTimer->setSingleShot(true);
+    m_initialScanTimer->setInterval(100); // Short delay to avoid UI freeze
+    
     connect(m_watcher, &QFileSystemWatcher::directoryChanged,
             this, &DirectoryWatcher::onDirectoryChanged);
     connect(m_debounceTimer, &QTimer::timeout,
+            this, &DirectoryWatcher::checkForNewFiles);
+    connect(m_initialScanTimer, &QTimer::timeout,
             this, &DirectoryWatcher::checkForNewFiles);
 }
 
@@ -44,8 +51,8 @@ void DirectoryWatcher::startWatching(const QString &directory)
     // Load previously processed files
     loadProcessedFiles();
     
-    // Do initial scan
-    scanDirectory();
+    // Defer initial scan to avoid UI freeze
+    m_initialScanTimer->start();
     
     qDebug() << "DirectoryWatcher: Started watching" << directory;
 }
@@ -64,6 +71,7 @@ void DirectoryWatcher::stopWatching()
     m_watchedDirectory.clear();
     m_isWatching = false;
     m_debounceTimer->stop();
+    m_initialScanTimer->stop();
     
     qDebug() << "DirectoryWatcher: Stopped watching";
 }

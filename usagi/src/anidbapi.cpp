@@ -676,12 +676,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag);
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
-        QString q;
         notifyMylistAdd(Tag, 320);
-        q = QString("DELETE from `packets` WHERE `tag` = '%1'").arg(Tag);
-        Debug("Database delete query: " + q + " Tag: " + Tag);
-        QSqlQuery query;
-        query.exec(q);
+        // Do not delete packets table entries - they are used for tracking
+        // QString q;
+        // q = QString("DELETE from `packets` WHERE `tag` = '%1'").arg(Tag);
+        // Debug("Database delete query: " + q + " Tag: " + Tag);
+        // QSqlQuery query;
+        // query.exec(q);
     }
 	else if(ReplyID == "270"){ // 270 NOTIFICATION - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
 		// Parse notification message
