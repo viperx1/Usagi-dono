@@ -6,16 +6,57 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
-#include <QtConcurrent>
-#include <QFutureWatcher>
 #include <QMutexLocker>
 
+// DirectoryScanWorker implementation
+DirectoryScanWorker::DirectoryScanWorker(const QString &directory, const QSet<QString> &processedFiles, QObject *parent)
+    : QObject(parent)
+    , m_directory(directory)
+    , m_processedFiles(processedFiles)
+{
+}
+
+void DirectoryScanWorker::scan()
+{
+    QStringList newFiles;
+    
+    if (m_directory.isEmpty() || !QDir(m_directory).exists()) {
+        emit scanComplete(newFiles);
+        return;
+    }
+    
+    // Scan for all files in the directory (no extension filtering - let API decide)
+    QDirIterator it(m_directory, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+    
+    while (it.hasNext()) {
+        QString filePath = it.next();
+        QFileInfo fileInfo(filePath);
+        
+        // Skip if already processed
+        if (m_processedFiles.contains(filePath)) {
+            continue;
+        }
+        
+        // Skip empty files
+        if (fileInfo.size() == 0) {
+            continue;
+        }
+        
+        newFiles.append(filePath);
+    }
+    
+    emit scanComplete(newFiles);
+}
+
+// DirectoryWatcher implementation
 DirectoryWatcher::DirectoryWatcher(QObject *parent)
     : QObject(parent)
     , m_watcher(new QFileSystemWatcher(this))
     , m_debounceTimer(new QTimer(this))
     , m_initialScanTimer(new QTimer(this))
     , m_isWatching(false)
+    , m_scanThread(nullptr)
+    , m_scanInProgress(false)
 {
     // Set up debounce timer to avoid processing files immediately after detection
     m_debounceTimer->setSingleShot(true);
@@ -36,6 +77,16 @@ DirectoryWatcher::DirectoryWatcher(QObject *parent)
 DirectoryWatcher::~DirectoryWatcher()
 {
     stopWatching();
+    
+    // Clean up scan thread if it exists
+    if (m_scanThread) {
+        if (m_scanThread->isRunning()) {
+            m_scanThread->quit();
+            m_scanThread->wait();
+        }
+        delete m_scanThread;
+        m_scanThread = nullptr;
+    }
 }
 
 void DirectoryWatcher::startWatching(const QString &directory)
@@ -114,69 +165,47 @@ void DirectoryWatcher::scanDirectory()
     }
     
     // Check if a scan is already in progress
-    if (m_scanFuture.isRunning()) {
+    if (m_scanInProgress) {
         qDebug() << "DirectoryWatcher: Scan already in progress, skipping";
         return;
     }
     
     qDebug() << "DirectoryWatcher: Starting background directory scan";
     
-    // Run scan in background thread
-    m_scanFuture = QtConcurrent::run([this]() {
-        return this->scanDirectoryInBackground();
-    });
-    
-    // Set up a watcher for the future to handle completion
-    QFutureWatcher<QStringList> *watcher = new QFutureWatcher<QStringList>(this);
-    connect(watcher, &QFutureWatcher<QStringList>::finished, this, [this, watcher]() {
-        // Check if future is valid and not cancelled before getting result
-        if (watcher->future().isValid() && !watcher->future().isCanceled()) {
-            QStringList newFiles = watcher->result();
-            onScanComplete(newFiles);
-        }
-        watcher->deleteLater();
-    });
-    watcher->setFuture(m_scanFuture);
-}
-
-QStringList DirectoryWatcher::scanDirectoryInBackground()
-{
-    QStringList newFiles;
-    QString directory;
-    QSet<QString> processedFilesCopy;
+    m_scanInProgress = true;
     
     // Copy data under mutex protection
+    QSet<QString> processedFilesCopy;
     {
         QMutexLocker locker(&m_mutex);
-        directory = m_watchedDirectory;
         processedFilesCopy = m_processedFiles;
     }
     
-    if (directory.isEmpty() || !QDir(directory).exists()) {
-        return newFiles;
+    // Clean up old thread if it exists
+    if (m_scanThread) {
+        if (m_scanThread->isRunning()) {
+            m_scanThread->quit();
+            m_scanThread->wait();
+        }
+        delete m_scanThread;
     }
     
-    // Scan for all files in the directory (no extension filtering - let API decide)
-    QDirIterator it(directory, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+    // Create new thread and worker
+    m_scanThread = new QThread(this);
+    DirectoryScanWorker *worker = new DirectoryScanWorker(m_watchedDirectory, processedFilesCopy);
+    worker->moveToThread(m_scanThread);
     
-    while (it.hasNext()) {
-        QString filePath = it.next();
-        QFileInfo fileInfo(filePath);
-        
-        // Skip if already processed
-        if (processedFilesCopy.contains(filePath)) {
-            continue;
-        }
-        
-        // Skip empty files
-        if (fileInfo.size() == 0) {
-            continue;
-        }
-        
-        newFiles.append(filePath);
-    }
+    // Connect signals
+    connect(m_scanThread, &QThread::started, worker, &DirectoryScanWorker::scan);
+    connect(worker, &DirectoryScanWorker::scanComplete, this, [this](const QStringList &newFiles) {
+        m_scanInProgress = false;
+        onScanComplete(newFiles);
+    });
+    connect(worker, &DirectoryScanWorker::scanComplete, m_scanThread, &QThread::quit);
+    connect(m_scanThread, &QThread::finished, worker, &QObject::deleteLater);
     
-    return newFiles;
+    // Start the thread
+    m_scanThread->start();
 }
 
 void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
