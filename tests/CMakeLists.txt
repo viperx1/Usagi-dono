@@ -494,6 +494,7 @@ target_link_libraries(test_directorywatcher PRIVATE
     Qt6::Core
     Qt6::Test
     Qt6::Sql
+    Qt6::Concurrent
 )
 target_include_directories(test_directorywatcher PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src

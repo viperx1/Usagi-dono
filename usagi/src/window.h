@@ -240,7 +240,7 @@ public slots:
     // Directory watcher slots
     void onWatcherEnabledChanged(int state);
     void onWatcherBrowseClicked();
-    void onWatcherNewFileDetected(const QString &filePath);
+    void onWatcherNewFilesDetected(const QStringList &filePaths);
 
 signals:
 	void hashFiles(QStringList);

@@ -130,7 +130,7 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 # ⚙️ QT SETUP
 # ==========================================================
 
-find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
+find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Concurrent Test REQUIRED)
 
 # Check if Qt is statically linked and add necessary definitions BEFORE any compilation
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -140,7 +140,7 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     
     # Also add to Qt targets' interface to ensure MOC sees it
-    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
+    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Concurrent Qt6::Test)
         if(TARGET ${qt_target})
             target_compile_definitions(${qt_target} INTERFACE QT_STATIC QT_STATICPLUGIN)
         endif()
@@ -176,7 +176,7 @@ if(WIN32)
     
     # Clean up Qt target interface options
     # Qt6 imported targets might have MSVC-style flags in their INTERFACE_LINK_OPTIONS and INTERFACE_COMPILE_OPTIONS
-    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
+    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Concurrent Qt6::Test)
         if(TARGET ${qt_target})
             # Clean up compile options (removes -Xclang --dependent-lib=msvcrt, -D_DLL, -D_MT)
             get_target_property(qt_compile_options ${qt_target} INTERFACE_COMPILE_OPTIONS)

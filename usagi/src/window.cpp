@@ -273,8 +273,8 @@ Window::Window()
     
     // Initialize directory watcher
     directoryWatcher = new DirectoryWatcher(this);
-    connect(directoryWatcher, &DirectoryWatcher::newFileDetected, 
-            this, &Window::onWatcherNewFileDetected);
+    connect(directoryWatcher, &DirectoryWatcher::newFilesDetected, 
+            this, &Window::onWatcherNewFilesDetected);
     
     // Load directory watcher settings from database
     bool watcherEnabledSetting = adbapi->getWatcherEnabled();
@@ -1729,37 +1729,39 @@ void Window::onWatcherBrowseClicked()
 	}
 }
 
-void Window::onWatcherNewFileDetected(const QString &filePath)
+void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 {
+	if (filePaths.isEmpty()) {
+		return;
+	}
+	
 	// Log the detection
-	logOutput->append("New file detected: " + filePath);
+	logOutput->append(QString("Detected %1 new file(s)").arg(filePaths.size()));
 	
-	// Add file to hasher table
-	QFileInfo fileInfo(filePath);
-	hashesinsertrow(fileInfo, Qt::Unchecked);
+	// Add all files to hasher table
+	for (const QString &filePath : filePaths) {
+		QFileInfo fileInfo(filePath);
+		hashesinsertrow(fileInfo, Qt::Unchecked);
+	}
 	
-	// Auto-hash and add to mylist if user is logged in and hasher is not busy
+	// Auto-hash and add to mylist if user is logged in
 	if (adbapi->LoggedIn()) {
 		if (!hasherThread.isRunning()) {
-			// Set to "no change" for watched state (file might already be in database with watched state)
+			// Set settings for auto-hash
 			addtomylist->setChecked(true);
-			markwatched->setCheckState(Qt::Unchecked);  // no change
+			markwatched->setCheckState(Qt::Unchecked);  // unwatched
 			hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 			
-			// Create a single-item list for hashing
-			QStringList files;
-			files.append(filePath);
-			
-			// Start hashing
+			// Start hashing all detected files
 			buttonstart->setEnabled(false);
 			buttonclear->setEnabled(false);
-			emit hashFiles(files);
+			emit hashFiles(filePaths);
 			
-			logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD, watched state preserved)");
+			logOutput->append(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filePaths.size()));
 		} else {
-			logOutput->append("File added to hasher. Hasher is busy - click Start to hash queued files.");
+			logOutput->append("Files added to hasher. Hasher is busy - click Start to hash queued files.");
 		}
 	} else {
-		logOutput->append("File added to hasher. Login to auto-hash and add to MyList.");
+		logOutput->append("Files added to hasher. Login to auto-hash and add to MyList.");
 	}
 }

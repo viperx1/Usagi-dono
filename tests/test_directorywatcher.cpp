@@ -61,7 +61,7 @@ void TestDirectoryWatcher::testNewFileDetection()
     QVERIFY(tempDir.isValid());
     
     DirectoryWatcher watcher;
-    QSignalSpy spy(&watcher, &DirectoryWatcher::newFileDetected);
+    QSignalSpy spy(&watcher, &DirectoryWatcher::newFilesDetected);
     
     watcher.startWatching(tempDir.path());
     
@@ -77,7 +77,8 @@ void TestDirectoryWatcher::testNewFileDetection()
     
     // Verify signal was emitted
     QVERIFY(spy.count() >= 1);
-    QCOMPARE(spy.first().first().toString(), testFilePath);
+    QStringList files = spy.first().first().toStringList();
+    QVERIFY(files.contains(testFilePath));
 }
 
 void TestDirectoryWatcher::testVideoFileValidation()
@@ -86,7 +87,7 @@ void TestDirectoryWatcher::testVideoFileValidation()
     QVERIFY(tempDir.isValid());
     
     DirectoryWatcher watcher;
-    QSignalSpy spy(&watcher, &DirectoryWatcher::newFileDetected);
+    QSignalSpy spy(&watcher, &DirectoryWatcher::newFilesDetected);
     
     watcher.startWatching(tempDir.path());
     
@@ -107,23 +108,18 @@ void TestDirectoryWatcher::testVideoFileValidation()
     // Wait for signals
     QTest::qWait(3000);
     
-    // Verify both files were detected (no extension filtering)
-    QVERIFY(spy.count() >= 2);
+    // Verify signal was emitted with both files
+    QVERIFY(spy.count() >= 1);
+    
+    // Get all detected files from all signal emissions
+    QStringList allFiles;
+    for (int i = 0; i < spy.count(); ++i) {
+        allFiles.append(spy.at(i).first().toStringList());
+    }
     
     // Check that both files were detected
-    bool foundVideo = false;
-    bool foundText = false;
-    for (int i = 0; i < spy.count(); ++i) {
-        QString detectedFile = spy.at(i).first().toString();
-        if (detectedFile == videoFile) {
-            foundVideo = true;
-        }
-        if (detectedFile == textFile) {
-            foundText = true;
-        }
-    }
-    QVERIFY(foundVideo);
-    QVERIFY(foundText);
+    QVERIFY(allFiles.contains(videoFile));
+    QVERIFY(allFiles.contains(textFile));
 }
 
 void TestDirectoryWatcher::testInvalidDirectory()
@@ -143,7 +139,7 @@ void TestDirectoryWatcher::testProcessedFilesTracking()
     QVERIFY(tempDir.isValid());
     
     DirectoryWatcher watcher;
-    QSignalSpy spy(&watcher, &DirectoryWatcher::newFileDetected);
+    QSignalSpy spy(&watcher, &DirectoryWatcher::newFilesDetected);
     
     // Create a video file before starting watcher
     QString testFilePath = tempDir.path() + "/existing_video.mkv";
@@ -170,7 +166,7 @@ void TestDirectoryWatcher::testProcessedFilesTracking()
     
     // Create new watcher instance (simulating app restart)
     DirectoryWatcher watcher2;
-    QSignalSpy spy2(&watcher2, &DirectoryWatcher::newFileDetected);
+    QSignalSpy spy2(&watcher2, &DirectoryWatcher::newFilesDetected);
     watcher2.startWatching(tempDir.path());
     
     // Wait a bit
