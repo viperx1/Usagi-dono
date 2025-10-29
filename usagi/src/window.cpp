@@ -281,14 +281,30 @@ Window::Window()
     QString watcherDir = adbapi->getWatcherDirectory();
     bool watcherAutoStartSetting = adbapi->getWatcherAutoStart();
     
+    // Block signals while setting UI values to prevent premature slot activation
+    watcherEnabled->blockSignals(true);
+    watcherDirectory->blockSignals(true);
+    watcherAutoStart->blockSignals(true);
+    
     watcherEnabled->setChecked(watcherEnabledSetting);
     watcherDirectory->setText(watcherDir);
     watcherAutoStart->setChecked(watcherAutoStartSetting);
+    
+    // Restore signal connections
+    watcherEnabled->blockSignals(false);
+    watcherDirectory->blockSignals(false);
+    watcherAutoStart->blockSignals(false);
     
     // Auto-start directory watcher if enabled
     if (watcherEnabledSetting && watcherAutoStartSetting && !watcherDir.isEmpty()) {
         directoryWatcher->startWatching(watcherDir);
         watcherStatusLabel->setText("Status: Watching " + watcherDir);
+    } else if (watcherEnabledSetting && !watcherDir.isEmpty()) {
+        // If watcher is enabled but auto-start is not, just update status
+        watcherStatusLabel->setText("Status: Enabled (not auto-started)");
+    } else if (watcherEnabledSetting && watcherDir.isEmpty()) {
+        // If watcher is enabled but no directory is set
+        watcherStatusLabel->setText("Status: Enabled (no directory set)");
     }
 
     // end
