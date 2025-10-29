@@ -7,8 +7,27 @@
 #include <QStringList>
 #include <QSet>
 #include <QTimer>
-#include <QFuture>
+#include <QThread>
 #include <QMutex>
+
+// Worker class for background directory scanning
+class DirectoryScanWorker : public QObject
+{
+    Q_OBJECT
+    
+public:
+    DirectoryScanWorker(const QString &directory, const QSet<QString> &processedFiles, QObject *parent = nullptr);
+    
+public slots:
+    void scan();
+    
+signals:
+    void scanComplete(const QStringList &newFiles);
+    
+private:
+    QString m_directory;
+    QSet<QString> m_processedFiles;
+};
 
 class DirectoryWatcher : public QObject
 {
@@ -42,11 +61,11 @@ private:
     QTimer *m_debounceTimer;
     QTimer *m_initialScanTimer;
     bool m_isWatching;
-    QFuture<QStringList> m_scanFuture;
+    QThread *m_scanThread;
+    bool m_scanInProgress;
     QMutex m_mutex;
     
     void scanDirectory();
-    QStringList scanDirectoryInBackground();
     void loadProcessedFiles();
     void saveProcessedFile(const QString &filePath);
 };
