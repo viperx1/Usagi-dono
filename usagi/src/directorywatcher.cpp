@@ -133,8 +133,8 @@ void DirectoryWatcher::loadProcessedFiles()
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
     
-    // Query all watched files from database
-    query.exec("SELECT value FROM settings WHERE name LIKE 'watched_file_%'");
+    // Query all files from local_files table
+    query.exec("SELECT path FROM local_files");
     
     while (query.next()) {
         QString filePath = query.value(0).toString();
@@ -151,13 +151,13 @@ void DirectoryWatcher::saveProcessedFile(const QString &filePath)
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
     
-    // Create a unique key for this file using hash of the path
-    QString key = QString("watched_file_%1").arg(QString::number(qHash(filePath)));
+    QFileInfo fileInfo(filePath);
+    QString filename = fileInfo.fileName();
     
-    // Insert or replace the file path in the database
-    QString sql = QString("INSERT OR REPLACE INTO settings (name, value) VALUES ('%1', '%2')")
-        .arg(key)
-        .arg(QString(filePath).replace("'", "''"));  // Escape single quotes
+    // Insert into local_files table with status=0 (not checked)
+    QString sql = QString("INSERT OR IGNORE INTO local_files (path, filename, status) VALUES ('%1', '%2', 0)")
+        .arg(QString(filePath).replace("'", "''"))
+        .arg(QString(filename).replace("'", "''"));
     
     query.exec(sql);
 }

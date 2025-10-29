@@ -724,6 +724,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString msg320 = "320-4";
                 qDebug() << msg320;
                 getNotifyLogAppend(msg320);
+                
+                // Update status in local_files to 2 (not in anidb)
+                QString localPath = hashes->item(i, 2)->text();
+                adbapi->UpdateLocalFileStatus(localPath, 2);
+                
                 return;
             }
             else if(code == 311 || code == 210)
