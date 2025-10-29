@@ -481,4 +481,29 @@ endif()
 
 add_test(NAME test_mylist_aired_sorting COMMAND test_mylist_aired_sorting -v2)
 
+# Test 16: Directory watcher
+add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_directorywatcher PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_directorywatcher PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_directorywatcher PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_directorywatcher PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_directorywatcher COMMAND test_directorywatcher -v2)
 

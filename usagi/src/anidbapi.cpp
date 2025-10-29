@@ -60,6 +60,10 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `typename` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `startdate` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `enddate` TEXT");
+		// Create local_files table for directory watcher feature
+		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0)");
+		// Add local_file column to mylist if it doesn't exist (references local_files.id)
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
 		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT);");
@@ -1420,6 +1424,102 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 				//q = QString("INSERT INTO `mylist` ")
 			}
 		}
+	}
+}
+
+void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
+{
+	// Get the original MYLISTADD command from packets table using the tag
+	QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = '%1'").arg(tag);
+	QSqlQuery query(db);
+	
+	if(query.exec(q) && query.next())
+	{
+		QString mylistAddCmd = query.value(0).toString();
+		
+		// Parse size and ed2k from the MYLISTADD command
+		QStringList params = mylistAddCmd.split("&");
+		QString size, ed2k;
+		
+		for(const QString& param : params)
+		{
+			if(param.contains("size="))
+				size = param.mid(param.indexOf("size=") + 5).split("&").first();
+			else if(param.contains("ed2k="))
+				ed2k = param.mid(param.indexOf("ed2k=") + 5).split("&").first();
+		}
+		
+		// Find the lid using the file info
+		q = QString("SELECT m.lid FROM mylist m "
+					"INNER JOIN file f ON m.fid = f.fid "
+					"WHERE f.size = '%1' AND f.ed2k = '%2'")
+			.arg(size).arg(ed2k);
+		QSqlQuery lidQuery(db);
+		
+		if(lidQuery.exec(q) && lidQuery.next())
+		{
+			QString lid = lidQuery.value(0).toString();
+			
+			// Get the local_file id from local_files table
+			q = QString("SELECT id FROM local_files WHERE path = '%1'")
+				.arg(QString(localPath).replace("'", "''"));
+			QSqlQuery localFileQuery(db);
+			
+			if(localFileQuery.exec(q) && localFileQuery.next())
+			{
+				QString localFileId = localFileQuery.value(0).toString();
+				
+				// Update the local_file reference in mylist table
+				q = QString("UPDATE `mylist` SET `local_file` = %1 WHERE `lid` = %2")
+					.arg(localFileId)
+					.arg(lid);
+				QSqlQuery updateQuery(db);
+				
+				if(updateQuery.exec(q))
+				{
+					Debug(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
+					
+					// Update status in local_files table to 1 (in anidb)
+					q = QString("UPDATE `local_files` SET `status` = 1 WHERE `id` = %1").arg(localFileId);
+					QSqlQuery statusQuery(db);
+					statusQuery.exec(q);
+				}
+				else
+				{
+					Debug("Failed to update local_file: " + updateQuery.lastError().text());
+				}
+			}
+			else
+			{
+				Debug("Could not find local_file entry for path=" + localPath);
+			}
+		}
+		else
+		{
+			Debug("Could not find mylist entry for tag=" + tag);
+		}
+	}
+	else
+	{
+		Debug("Could not find packet for tag=" + tag);
+	}
+}
+
+void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
+{
+	// Update the status in local_files table
+	QString q = QString("UPDATE `local_files` SET `status` = %1 WHERE `path` = '%2'")
+		.arg(status)
+		.arg(QString(localPath).replace("'", "''"));
+	QSqlQuery query(db);
+	
+	if(query.exec(q))
+	{
+		Debug(QString("Updated local_files status for path=%1 to status=%2").arg(localPath).arg(status));
+	}
+	else
+	{
+		Debug("Failed to update local_files status: " + query.lastError().text());
 	}
 }
 

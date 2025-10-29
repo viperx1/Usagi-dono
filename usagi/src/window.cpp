@@ -207,6 +207,14 @@ Window::Window()
     editPassword->setEchoMode(QLineEdit::Password);
     buttonSaveSettings = new QPushButton("Save");
     buttonRequestMylistExport = new QPushButton("Request MyList Export");
+    
+    // Directory watcher UI
+    QLabel *watcherLabel = new QLabel("Directory Watcher:");
+    watcherEnabled = new QCheckBox("Enable Directory Watcher");
+    watcherDirectory = new QLineEdit;
+    watcherBrowseButton = new QPushButton("Browse...");
+    watcherAutoStart = new QCheckBox("Auto-start on application launch");
+    watcherStatusLabel = new QLabel("Status: Not watching");
 
     pageSettings->addWidget(labelLogin, 0, 0);
     pageSettings->addWidget(editLogin, 0, 1);
@@ -215,13 +223,24 @@ Window::Window()
     pageSettings->setRowStretch(2, 1000);
     pageSettings->addWidget(buttonSaveSettings, 3, 0);
     pageSettings->addWidget(buttonRequestMylistExport, 4, 0);
+    
+    // Add directory watcher controls
+    pageSettings->addWidget(watcherLabel, 5, 0, 1, 2);
+    pageSettings->addWidget(watcherEnabled, 6, 0, 1, 2);
+    pageSettings->addWidget(new QLabel("Watch Directory:"), 7, 0);
+    pageSettings->addWidget(watcherDirectory, 7, 1);
+    pageSettings->addWidget(watcherBrowseButton, 7, 2);
+    pageSettings->addWidget(watcherAutoStart, 8, 0, 1, 2);
+    pageSettings->addWidget(watcherStatusLabel, 9, 0, 1, 2);
 
-    pageSettings->setColumnStretch(2, 100);
-    pageSettings->setRowStretch(5, 100);
+    pageSettings->setColumnStretch(1, 100);
+    pageSettings->setRowStretch(10, 100);
 
 	// page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
     connect(buttonRequestMylistExport, SIGNAL(clicked()), this, SLOT(requestMylistExportManually()));
+    connect(watcherEnabled, SIGNAL(stateChanged(int)), this, SLOT(onWatcherEnabledChanged(int)));
+    connect(watcherBrowseButton, SIGNAL(clicked()), this, SLOT(onWatcherBrowseClicked()));
 
     // page log
     logOutput = new QTextEdit;
@@ -250,6 +269,27 @@ Window::Window()
 	connect(adbapi, SIGNAL(notifyEpisodeUpdated(int,int)), this, SLOT(getNotifyEpisodeUpdated(int,int)));
 	connect(mylistTreeWidget, SIGNAL(itemExpanded(QTreeWidgetItem*)), this, SLOT(onMylistItemExpanded(QTreeWidgetItem*)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
+    
+    // Initialize directory watcher
+    directoryWatcher = new DirectoryWatcher(this);
+    connect(directoryWatcher, &DirectoryWatcher::newFileDetected, 
+            this, &Window::onWatcherNewFileDetected);
+    
+    // Load directory watcher settings
+    QSettings settings("settings.dat", QSettings::IniFormat);
+    bool watcherEnabledSetting = settings.value("watcherEnabled", false).toBool();
+    QString watcherDir = settings.value("watcherDirectory", "").toString();
+    bool watcherAutoStartSetting = settings.value("watcherAutoStart", false).toBool();
+    
+    watcherEnabled->setChecked(watcherEnabledSetting);
+    watcherDirectory->setText(watcherDir);
+    watcherAutoStart->setChecked(watcherAutoStartSetting);
+    
+    // Auto-start directory watcher if enabled
+    if (watcherEnabledSetting && watcherAutoStartSetting && !watcherDir.isEmpty()) {
+        directoryWatcher->startWatching(watcherDir);
+        watcherStatusLabel->setText("Status: Watching " + watcherDir);
+    }
 
     // end
     this->setLayout(layout);
@@ -263,6 +303,10 @@ Window::Window()
 
 Window::~Window()
 {
+    // Stop directory watcher on cleanup
+    if (directoryWatcher) {
+        directoryWatcher->stopWatching();
+    }
 }
 
 void Window::Button1Click() // add files
@@ -610,6 +654,15 @@ void Window::saveSettings()
 	qDebug()<<editLogin->text()<<editPassword->text();
 	adbapi->setUsername(editLogin->text());
 	adbapi->setPassword(editPassword->text());
+	
+	// Save directory watcher settings
+	QSettings settings("settings.dat", QSettings::IniFormat);
+	settings.setValue("watcherEnabled", watcherEnabled->isChecked());
+	settings.setValue("watcherDirectory", watcherDirectory->text());
+	settings.setValue("watcherAutoStart", watcherAutoStart->isChecked());
+	settings.sync();
+	
+	logOutput->append("Settings saved");
 }
 
 void Window::apitesterProcess()
@@ -655,6 +708,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString msg310 = "310-2";
                 qDebug() << msg310;
                 getNotifyLogAppend(msg310);
+                
+                // Store local file path for already existing entry
+                QString localPath = hashes->item(i, 2)->text();
+                adbapi->UpdateLocalPath(tag, localPath);
+                
                 // Refresh mylist widget to ensure it's up to date
                 loadMylistFromDatabase();
                 return;
@@ -666,6 +724,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString msg320 = "320-4";
                 qDebug() << msg320;
                 getNotifyLogAppend(msg320);
+                
+                // Update status in local_files to 2 (not in anidb)
+                QString localPath = hashes->item(i, 2)->text();
+                adbapi->UpdateLocalFileStatus(localPath, 2);
+                
                 return;
             }
             else if(code == 311 || code == 210)
@@ -675,6 +738,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString msg311 = "311/210-3";
                 qDebug() << msg311;
                 getNotifyLogAppend(msg311);
+				
+				// Store local file path for newly added entry
+				QString localPath = hashes->item(i, 2)->text();
+				adbapi->UpdateLocalPath(tag, localPath);
+				
 				if(renameto->checkState() > 0)
 				{
 					// TODO: rename
@@ -1609,4 +1677,71 @@ void Window::requestMylistExportManually()
 	logOutput->append("Manually requesting MyList export...");
 	mylistStatusLabel->setText("MyList Status: Requesting export...");
 	adbapi->MylistExport("xml-plain-cs");
+}
+
+void Window::onWatcherEnabledChanged(int state)
+{
+	if (state == Qt::Checked) {
+		QString dir = watcherDirectory->text();
+		if (!dir.isEmpty() && QDir(dir).exists()) {
+			directoryWatcher->startWatching(dir);
+			watcherStatusLabel->setText("Status: Watching " + dir);
+			logOutput->append("Directory watcher started: " + dir);
+		} else {
+			watcherStatusLabel->setText("Status: Invalid directory");
+			watcherEnabled->setChecked(false);
+		}
+	} else {
+		directoryWatcher->stopWatching();
+		watcherStatusLabel->setText("Status: Not watching");
+		logOutput->append("Directory watcher stopped");
+	}
+}
+
+void Window::onWatcherBrowseClicked()
+{
+	QString dir = QFileDialog::getExistingDirectory(this, "Select Directory to Watch",
+		watcherDirectory->text().isEmpty() ? QDir::homePath() : watcherDirectory->text());
+	
+	if (!dir.isEmpty()) {
+		watcherDirectory->setText(dir);
+		
+		// If watcher is enabled, restart with new directory
+		if (watcherEnabled->isChecked()) {
+			directoryWatcher->startWatching(dir);
+			watcherStatusLabel->setText("Status: Watching " + dir);
+			logOutput->append("Directory watcher changed to: " + dir);
+		}
+	}
+}
+
+void Window::onWatcherNewFileDetected(const QString &filePath)
+{
+	// Log the detection
+	logOutput->append("New file detected: " + filePath);
+	
+	// Add file to hasher table
+	QFileInfo fileInfo(filePath);
+	hashesinsertrow(fileInfo, Qt::Unchecked);
+	
+	// Auto-hash and add to mylist if user is logged in
+	if (adbapi->LoggedIn()) {
+		// Set to "no change" for watched state (file might already be in database with watched state)
+		addtomylist->setChecked(true);
+		markwatched->setCheckState(Qt::Unchecked);  // no change
+		hasherFileState->setCurrentIndex(1);  // Internal (HDD)
+		
+		// Create a single-item list for hashing
+		QStringList files;
+		files.append(filePath);
+		
+		// Start hashing
+		buttonstart->setEnabled(false);
+		buttonclear->setEnabled(false);
+		emit hashFiles(files);
+		
+		logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD, watched state preserved)");
+	} else {
+		logOutput->append("File added to hasher. Login to auto-hash and add to MyList.");
+	}
 }
