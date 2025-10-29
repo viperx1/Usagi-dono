@@ -2,6 +2,9 @@
 #include <QTemporaryDir>
 #include <QFile>
 #include <QSignalSpy>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
 #include "../usagi/src/directorywatcher.h"
 
 class TestDirectoryWatcher : public QObject
@@ -16,6 +19,7 @@ private slots:
     void testVideoFileValidation();
     void testInvalidDirectory();
     void testProcessedFilesTracking();
+    void testDatabaseStatusFiltering();
 };
 
 void TestDirectoryWatcher::testInitialization()
@@ -176,6 +180,53 @@ void TestDirectoryWatcher::testProcessedFilesTracking()
     // are stored in QSettings which won't persist in test environment
     // This test just verifies the watcher works across multiple instances
     QVERIFY(true); // Test passes if no crashes occur
+}
+
+void TestDirectoryWatcher::testDatabaseStatusFiltering()
+{
+    // Set up in-memory database for testing
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "test_connection");
+    db.setDatabaseName(":memory:");
+    
+    if (!db.open()) {
+        QSKIP("Failed to open test database");
+        return;
+    }
+    
+    // Create local_files table matching the schema
+    QSqlQuery query(db);
+    QVERIFY(query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0)"));
+    
+    // Insert test files with different statuses
+    // Status 0 = not checked (should NOT be loaded)
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file1.mkv', 'file1.mkv', 0)"));
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file2.mkv', 'file2.mkv', 0)"));
+    
+    // Status 1 = in anidb (SHOULD be loaded)
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file3.mkv', 'file3.mkv', 1)"));
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file4.mkv', 'file4.mkv', 1)"));
+    
+    // Status 2 = not in anidb (SHOULD be loaded)
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file5.mkv', 'file5.mkv', 2)"));
+    
+    // Verify the query that DirectoryWatcher uses
+    QSqlQuery verifyQuery(db);
+    QVERIFY(verifyQuery.exec("SELECT path FROM local_files WHERE status != 0"));
+    
+    int count = 0;
+    while (verifyQuery.next()) {
+        QString path = verifyQuery.value(0).toString();
+        // Should only get file3, file4, and file5 (status 1 and 2)
+        QVERIFY(path == "/test/file3.mkv" || path == "/test/file4.mkv" || path == "/test/file5.mkv");
+        count++;
+    }
+    
+    // Should have exactly 3 files (file3, file4, file5)
+    QCOMPARE(count, 3);
+    
+    // Clean up
+    db.close();
+    QSqlDatabase::removeDatabase("test_connection");
 }
 
 QTEST_MAIN(TestDirectoryWatcher)

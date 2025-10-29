@@ -29,9 +29,11 @@ Available in the Settings tab:
 All directory watcher settings are saved to `settings.dat` and persist across application restarts.
 
 ### Processed Files Tracking
-The directory watcher keeps track of files it has already processed to avoid duplicate processing:
-- Processed file paths are saved to `settings.dat`
-- Files are only processed once, even if the application is restarted
+The directory watcher keeps track of files it has already hashed to avoid duplicate processing:
+- Hashed file paths are stored in the database (`local_files` table with status != 0)
+- Files that have been hashed (status 1 = in AniDB, status 2 = not in AniDB) are skipped on subsequent scans
+- Files with status 0 (not yet hashed) will be re-detected and processed
+- This ensures only new, unhashed files trigger the auto-hash functionality
 
 ## Usage
 
@@ -71,9 +73,8 @@ The directory watcher keeps track of files it has already processed to avoid dup
 
 **Private Methods**:
 - `scanDirectory()`: Scan the watched directory for new files
-- `isValidVideoFile(const QString &filePath)`: Check if a file is a video file
-- `loadProcessedFiles()`: Load previously processed files from settings
-- `saveProcessedFile(const QString &filePath)`: Save a processed file to settings
+- `loadProcessedFiles()`: Load previously hashed files from database (status != 0)
+- `saveProcessedFile(const QString &filePath)`: Save a file to database with status=0
 
 ### Integration with Window
 
