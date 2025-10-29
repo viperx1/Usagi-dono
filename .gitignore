@@ -47,3 +47,6 @@ anime/
 mylist.csv
 changelog.txt
 _codeql_build_dir/
+
+# User settings
+settings.dat
