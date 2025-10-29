@@ -693,9 +693,6 @@ void Window::getNotifyMylistAdd(QString tag, int code)
     getNotifyLogAppend(logMsg);
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
-        QString itemLogMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " hashes->item(i, 5)->text() == tag " + hashes->item(i, 5)->text() + " == " + tag;
-        qDebug() << itemLogMsg;
-        getNotifyLogAppend(itemLogMsg);
         if(hashes->item(i, 5)->text() == tag || hashes->item(i, 6)->text() == tag)
 		{
 			QColor green_light; green_light.setRgb(0, 255, 0);

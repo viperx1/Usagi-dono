@@ -676,10 +676,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag);
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
-        QString q;
         notifyMylistAdd(Tag, 320);
-        q = QString("DELETE from `packets` WHERE `tag` = '%1'").arg(Tag);
-        Debug("Database delete query: " + q + " Tag: " + Tag);
+        // Mark packet as processed and received reply instead of deleting
+        QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID).arg(Tag);
+        Debug("Database update query: " + q + " Tag: " + Tag);
         QSqlQuery query;
         query.exec(q);
     }

@@ -36,6 +36,7 @@ private:
     QString m_watchedDirectory;
     QSet<QString> m_processedFiles;
     QTimer *m_debounceTimer;
+    QTimer *m_initialScanTimer;
     bool m_isWatching;
     
     void scanDirectory();
