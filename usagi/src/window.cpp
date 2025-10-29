@@ -302,6 +302,9 @@ Window::Window()
     } else if (watcherEnabledSetting && !watcherDir.isEmpty()) {
         // If watcher is enabled but auto-start is not, just update status
         watcherStatusLabel->setText("Status: Enabled (not auto-started)");
+    } else if (watcherEnabledSetting && watcherDir.isEmpty()) {
+        // If watcher is enabled but no directory is set
+        watcherStatusLabel->setText("Status: Enabled (no directory set)");
     }
 
     // end
