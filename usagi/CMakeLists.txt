@@ -44,6 +44,7 @@ set(SOURCES
     src/crashlog.cpp
     src/epno.cpp
     src/aired.cpp
+    src/directorywatcher.cpp
 )
 
 # Header files
@@ -58,6 +59,7 @@ set(HEADERS
     src/crashlog.h
     src/epno.h
     src/aired.h
+    src/directorywatcher.h
 )
 
 # Create executable

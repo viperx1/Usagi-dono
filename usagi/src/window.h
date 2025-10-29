@@ -27,6 +27,7 @@
 #include "anidbapi.h"
 #include "epno.h"
 #include "aired.h"
+#include "directorywatcher.h"
 //#include "hasherthread.h"
 
 class hashes_ : public QTableWidget
@@ -172,6 +173,13 @@ private:
     QLineEdit *editPassword;
     QPushButton *buttonSaveSettings;
     QPushButton *buttonRequestMylistExport;
+    
+    // Directory watcher settings
+    QCheckBox *watcherEnabled;
+    QLineEdit *watcherDirectory;
+    QPushButton *watcherBrowseButton;
+    QCheckBox *watcherAutoStart;
+    QLabel *watcherStatusLabel;
 
 	// page notify
 	QTextEdit *notifyOutput;
@@ -187,6 +195,9 @@ private:
 	// page apitester
 	QLineEdit *apitesterInput;
 	QTextEdit *apitesterOutput;
+	
+	// Directory watcher
+	DirectoryWatcher *directoryWatcher;
 
 
 public slots:
@@ -225,6 +236,12 @@ public slots:
     bool isMylistFirstRunComplete();
     void setMylistFirstRunComplete();
     void requestMylistExportManually();
+    
+    // Directory watcher slots
+    void onWatcherEnabledChanged(int state);
+    void onWatcherBrowseClicked();
+    void onWatcherNewFileDetected(const QString &filePath);
+
 signals:
 	void hashFiles(QStringList);
 	void notifyStopHasher();
