@@ -677,12 +677,11 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
         notifyMylistAdd(Tag, 320);
-        // Do not delete packets table entries - they are used for tracking
-        // QString q;
-        // q = QString("DELETE from `packets` WHERE `tag` = '%1'").arg(Tag);
-        // Debug("Database delete query: " + q + " Tag: " + Tag);
-        // QSqlQuery query;
-        // query.exec(q);
+        // Issue fix: Do not delete packets table entries - they are used for tracking
+        // API requests and should be preserved even when no matching file is found
+        // Previous code (now removed):
+        // - Would delete packet tracking entry on "NO SUCH FILE" response
+        // - This caused loss of request tracking information
     }
 	else if(ReplyID == "270"){ // 270 NOTIFICATION - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
 		// Parse notification message
