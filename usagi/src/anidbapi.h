@@ -41,6 +41,11 @@ private:
 	QString username;
 	QString password;
 	QString lastdirectory;
+	
+	// Directory watcher settings
+	bool watcherEnabled;
+	QString watcherDirectory;
+	bool watcherAutoStart;
     /* Settings End === */
 
 	int protover; // AniDB API version = 3
@@ -209,6 +214,14 @@ public:
 	void setUsername(QString);
 	void setPassword(QString);
 	void setLastDirectory(QString);
+	
+	// Directory watcher settings
+	bool getWatcherEnabled();
+	QString getWatcherDirectory();
+	bool getWatcherAutoStart();
+	void setWatcherEnabled(bool enabled);
+	void setWatcherDirectory(QString directory);
+	void setWatcherAutoStart(bool autoStart);
     /* Settings End === */
 	
 	/* === Anime Titles Start */
