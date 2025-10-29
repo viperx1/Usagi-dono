@@ -110,11 +110,12 @@ void DirectoryWatcher::scanDirectory()
         return;
     }
     
-    // Check if database is available before scanning
+    // Check if database is available (but continue scanning even if not available)
     QSqlDatabase db = QSqlDatabase::database();
-    if (!db.isValid() || !db.isOpen()) {
-        qDebug() << "DirectoryWatcher: Database not available, skipping scan";
-        return;
+    bool dbAvailable = db.isValid() && db.isOpen();
+    
+    if (!dbAvailable) {
+        qDebug() << "DirectoryWatcher: Database not available, processed files will not be persisted";
     }
     
     // Scan for all files in the directory (no extension filtering - let API decide)
@@ -137,7 +138,11 @@ void DirectoryWatcher::scanDirectory()
         
         // Mark as processed to avoid duplicate processing
         m_processedFiles.insert(filePath);
-        saveProcessedFile(filePath);
+        
+        // Save to database if available
+        if (dbAvailable) {
+            saveProcessedFile(filePath);
+        }
         
         newFiles.append(filePath);
         
