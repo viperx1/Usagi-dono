@@ -49,3 +49,43 @@ QString AniDBApi::getLastDirectory()
 {
 	return AniDBApi::lastdirectory;
 }
+
+// Directory watcher settings
+bool AniDBApi::getWatcherEnabled()
+{
+	return AniDBApi::watcherEnabled;
+}
+
+QString AniDBApi::getWatcherDirectory()
+{
+	return AniDBApi::watcherDirectory;
+}
+
+bool AniDBApi::getWatcherAutoStart()
+{
+	return AniDBApi::watcherAutoStart;
+}
+
+void AniDBApi::setWatcherEnabled(bool enabled)
+{
+	AniDBApi::watcherEnabled = enabled;
+	QSqlQuery query;
+	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'watcherEnabled', '%1');").arg(enabled ? "1" : "0");
+	query.exec(q);
+}
+
+void AniDBApi::setWatcherDirectory(QString directory)
+{
+	AniDBApi::watcherDirectory = directory;
+	QSqlQuery query;
+	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'watcherDirectory', '%1');").arg(directory);
+	query.exec(q);
+}
+
+void AniDBApi::setWatcherAutoStart(bool autoStart)
+{
+	AniDBApi::watcherAutoStart = autoStart;
+	QSqlQuery query;
+	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'watcherAutoStart', '%1');").arg(autoStart ? "1" : "0");
+	query.exec(q);
+}

@@ -220,18 +220,19 @@ Window::Window()
     pageSettings->addWidget(editLogin, 0, 1);
     pageSettings->addWidget(labelPassword, 1, 0);
     pageSettings->addWidget(editPassword, 1, 1);
-    pageSettings->setRowStretch(2, 1000);
-    pageSettings->addWidget(buttonSaveSettings, 3, 0);
-    pageSettings->addWidget(buttonRequestMylistExport, 4, 0);
     
-    // Add directory watcher controls
-    pageSettings->addWidget(watcherLabel, 5, 0, 1, 2);
-    pageSettings->addWidget(watcherEnabled, 6, 0, 1, 2);
-    pageSettings->addWidget(new QLabel("Watch Directory:"), 7, 0);
-    pageSettings->addWidget(watcherDirectory, 7, 1);
-    pageSettings->addWidget(watcherBrowseButton, 7, 2);
-    pageSettings->addWidget(watcherAutoStart, 8, 0, 1, 2);
-    pageSettings->addWidget(watcherStatusLabel, 9, 0, 1, 2);
+    // Add directory watcher controls right after login/password
+    pageSettings->addWidget(watcherLabel, 2, 0, 1, 2);
+    pageSettings->addWidget(watcherEnabled, 3, 0, 1, 2);
+    pageSettings->addWidget(new QLabel("Watch Directory:"), 4, 0);
+    pageSettings->addWidget(watcherDirectory, 4, 1);
+    pageSettings->addWidget(watcherBrowseButton, 4, 2);
+    pageSettings->addWidget(watcherAutoStart, 5, 0, 1, 2);
+    pageSettings->addWidget(watcherStatusLabel, 6, 0, 1, 2);
+    
+    pageSettings->setRowStretch(7, 1000);
+    pageSettings->addWidget(buttonSaveSettings, 8, 0);
+    pageSettings->addWidget(buttonRequestMylistExport, 9, 0);
 
     pageSettings->setColumnStretch(1, 100);
     pageSettings->setRowStretch(10, 100);
@@ -275,11 +276,10 @@ Window::Window()
     connect(directoryWatcher, &DirectoryWatcher::newFileDetected, 
             this, &Window::onWatcherNewFileDetected);
     
-    // Load directory watcher settings
-    QSettings settings("settings.dat", QSettings::IniFormat);
-    bool watcherEnabledSetting = settings.value("watcherEnabled", false).toBool();
-    QString watcherDir = settings.value("watcherDirectory", "").toString();
-    bool watcherAutoStartSetting = settings.value("watcherAutoStart", false).toBool();
+    // Load directory watcher settings from database
+    bool watcherEnabledSetting = adbapi->getWatcherEnabled();
+    QString watcherDir = adbapi->getWatcherDirectory();
+    bool watcherAutoStartSetting = adbapi->getWatcherAutoStart();
     
     watcherEnabled->setChecked(watcherEnabledSetting);
     watcherDirectory->setText(watcherDir);
@@ -655,12 +655,10 @@ void Window::saveSettings()
 	adbapi->setUsername(editLogin->text());
 	adbapi->setPassword(editPassword->text());
 	
-	// Save directory watcher settings
-	QSettings settings("settings.dat", QSettings::IniFormat);
-	settings.setValue("watcherEnabled", watcherEnabled->isChecked());
-	settings.setValue("watcherDirectory", watcherDirectory->text());
-	settings.setValue("watcherAutoStart", watcherAutoStart->isChecked());
-	settings.sync();
+	// Save directory watcher settings to database
+	adbapi->setWatcherEnabled(watcherEnabled->isChecked());
+	adbapi->setWatcherDirectory(watcherDirectory->text());
+	adbapi->setWatcherAutoStart(watcherAutoStart->isChecked());
 	
 	logOutput->append("Settings saved");
 }
@@ -1684,9 +1682,12 @@ void Window::onWatcherEnabledChanged(int state)
 			directoryWatcher->startWatching(dir);
 			watcherStatusLabel->setText("Status: Watching " + dir);
 			logOutput->append("Directory watcher started: " + dir);
+		} else if (dir.isEmpty()) {
+			watcherStatusLabel->setText("Status: Enabled (no directory set)");
+			logOutput->append("Directory watcher enabled but no directory specified");
 		} else {
-			watcherStatusLabel->setText("Status: Invalid directory");
-			watcherEnabled->setChecked(false);
+			watcherStatusLabel->setText("Status: Enabled (invalid directory)");
+			logOutput->append("Directory watcher enabled but directory is invalid: " + dir);
 		}
 	} else {
 		directoryWatcher->stopWatching();

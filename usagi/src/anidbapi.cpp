@@ -77,6 +77,12 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	}
 //	QStringList names = QStringList()<<"username"<<"password";
 	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Reading settings from database");
+	
+	// Initialize directory watcher settings with defaults
+	watcherEnabled = false;
+	watcherDirectory = QString();
+	watcherAutoStart = false;
+	
 	while(query.next())
 	{
 		if(query.value(0).toString() == "username")
@@ -94,6 +100,18 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		if(query.value(0).toString() == "last_anime_titles_update")
 		{
 			lastAnimeTitlesUpdate = QDateTime::fromSecsSinceEpoch(query.value(1).toLongLong());
+		}
+		if(query.value(0).toString() == "watcherEnabled")
+		{
+			watcherEnabled = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "watcherDirectory")
+		{
+			watcherDirectory = query.value(1).toString();
+		}
+		if(query.value(0).toString() == "watcherAutoStart")
+		{
+			watcherAutoStart = (query.value(1).toString() == "1");
 		}
 	}
 
