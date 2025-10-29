@@ -1716,6 +1716,9 @@ void Window::onWatcherNewFileDetected(const QString &filePath)
 		markwatched->setCheckState(Qt::Unchecked);  // no change
 		hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 		
+		// Store complete file path in storage field for later file access
+		storage->setText(filePath);
+		
 		// Create a single-item list for hashing
 		QStringList files;
 		files.append(filePath);
@@ -1725,7 +1728,7 @@ void Window::onWatcherNewFileDetected(const QString &filePath)
 		buttonclear->setEnabled(false);
 		emit hashFiles(files);
 		
-		logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD, watched state preserved)");
+		logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD, watched state preserved, file path: " + filePath + ")");
 	} else {
 		logOutput->append("File added to hasher. Login to auto-hash and add to MyList.");
 	}
