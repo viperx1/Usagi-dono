@@ -1749,7 +1749,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		if (!hasherThread.isRunning()) {
 			// Set settings for auto-hash
 			addtomylist->setChecked(true);
-			markwatched->setCheckState(Qt::Unchecked);  // unwatched
+			markwatched->setCheckState(Qt::Unchecked);  // not watched
 			hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 			
 			// Start hashing all detected files

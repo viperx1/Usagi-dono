@@ -129,9 +129,12 @@ void DirectoryWatcher::scanDirectory()
     // Set up a watcher for the future to handle completion
     QFutureWatcher<QStringList> *watcher = new QFutureWatcher<QStringList>(this);
     connect(watcher, &QFutureWatcher<QStringList>::finished, this, [this, watcher]() {
-        QStringList newFiles = watcher->result();
+        // Check if future is valid and not cancelled before getting result
+        if (watcher->future().isValid() && !watcher->future().isCanceled()) {
+            QStringList newFiles = watcher->result();
+            onScanComplete(newFiles);
+        }
         watcher->deleteLater();
-        onScanComplete(newFiles);
     });
     watcher->setFuture(m_scanFuture);
 }
