@@ -4,6 +4,7 @@
 #include <QDirIterator>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QDebug>
 
 DirectoryWatcher::DirectoryWatcher(QObject *parent)
@@ -109,9 +110,20 @@ void DirectoryWatcher::scanDirectory()
         return;
     }
     
+    // Check if database is available (but continue scanning even if not available)
+    // Note: If database is unavailable, files will only be tracked in memory during this session
+    // and will be re-detected on application restart
+    QSqlDatabase db = QSqlDatabase::database();
+    bool dbAvailable = db.isValid() && db.isOpen();
+    
+    if (!dbAvailable) {
+        qDebug() << "DirectoryWatcher: Database not available, processed files will not be persisted";
+    }
+    
     // Scan for all files in the directory (no extension filtering - let API decide)
     QDirIterator it(m_watchedDirectory, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
     
+    QStringList newFiles;
     while (it.hasNext()) {
         QString filePath = it.next();
         QFileInfo fileInfo(filePath);
@@ -128,21 +140,39 @@ void DirectoryWatcher::scanDirectory()
         
         // Mark as processed to avoid duplicate processing
         m_processedFiles.insert(filePath);
-        saveProcessedFile(filePath);
+        
+        // Save to database if available
+        if (dbAvailable) {
+            saveProcessedFile(filePath);
+        }
+        
+        newFiles.append(filePath);
         
         // Emit signal for new file
         emit newFileDetected(filePath);
-        qDebug() << "DirectoryWatcher: New file detected:" << filePath;
+    }
+    
+    // Log summary instead of individual files to avoid spam
+    if (!newFiles.isEmpty()) {
+        qDebug() << "DirectoryWatcher: Detected" << newFiles.size() << "new file(s)";
     }
 }
 
 void DirectoryWatcher::loadProcessedFiles()
 {
     QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid() || !db.isOpen()) {
+        qDebug() << "DirectoryWatcher: Database not available, cannot load processed files";
+        return;
+    }
+    
     QSqlQuery query(db);
     
     // Query all files from local_files table
-    query.exec("SELECT path FROM local_files");
+    if (!query.exec("SELECT path FROM local_files")) {
+        qDebug() << "DirectoryWatcher: Failed to query local_files table:" << query.lastError().text();
+        return;
+    }
     
     while (query.next()) {
         QString filePath = query.value(0).toString();
@@ -157,15 +187,23 @@ void DirectoryWatcher::loadProcessedFiles()
 void DirectoryWatcher::saveProcessedFile(const QString &filePath)
 {
     QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid() || !db.isOpen()) {
+        qDebug() << "DirectoryWatcher: Database not available, cannot save processed file";
+        return;
+    }
+    
     QSqlQuery query(db);
     
     QFileInfo fileInfo(filePath);
     QString filename = fileInfo.fileName();
     
     // Insert into local_files table with status=0 (not checked)
-    QString sql = QString("INSERT OR IGNORE INTO local_files (path, filename, status) VALUES ('%1', '%2', 0)")
-        .arg(QString(filePath).replace("'", "''"))
-        .arg(QString(filename).replace("'", "''"));
+    // Use parameterized query to prevent SQL injection
+    query.prepare("INSERT OR IGNORE INTO local_files (path, filename, status) VALUES (?, ?, 0)");
+    query.addBindValue(filePath);
+    query.addBindValue(filename);
     
-    query.exec(sql);
+    if (!query.exec()) {
+        qDebug() << "DirectoryWatcher: Failed to save processed file:" << query.lastError().text();
+    }
 }
