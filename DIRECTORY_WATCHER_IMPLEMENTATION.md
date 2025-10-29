@@ -17,10 +17,10 @@ Created a new standalone class that encapsulates all directory monitoring functi
 **Key Features:**
 - Uses Qt's `QFileSystemWatcher` for cross-platform directory monitoring
 - Monitors directory and all subdirectories recursively
-- Supports common video file formats (mkv, mp4, avi, mov, wmv, flv, webm, m4v, mpg, mpeg, ogv, 3gp, ts, m2ts)
+- Supports all file types (no extension filtering - API decides what to process)
 - Implements 2-second debounce timer to avoid processing incomplete file copies
-- Tracks processed files to prevent duplicate processing
-- Persists processed files list to settings file
+- Tracks hashed files (status != 0) to prevent duplicate processing
+- Persists file tracking in database (`local_files` table)
 
 **Public API:**
 ```cpp
