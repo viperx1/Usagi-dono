@@ -111,6 +111,8 @@ void DirectoryWatcher::scanDirectory()
     }
     
     // Check if database is available (but continue scanning even if not available)
+    // Note: If database is unavailable, files will only be tracked in memory during this session
+    // and will be re-detected on application restart
     QSqlDatabase db = QSqlDatabase::database();
     bool dbAvailable = db.isValid() && db.isOpen();
     
@@ -196,11 +198,12 @@ void DirectoryWatcher::saveProcessedFile(const QString &filePath)
     QString filename = fileInfo.fileName();
     
     // Insert into local_files table with status=0 (not checked)
-    QString sql = QString("INSERT OR IGNORE INTO local_files (path, filename, status) VALUES ('%1', '%2', 0)")
-        .arg(QString(filePath).replace("'", "''"))
-        .arg(QString(filename).replace("'", "''"));
+    // Use parameterized query to prevent SQL injection
+    query.prepare("INSERT OR IGNORE INTO local_files (path, filename, status) VALUES (?, ?, 0)");
+    query.addBindValue(filePath);
+    query.addBindValue(filename);
     
-    if (!query.exec(sql)) {
+    if (!query.exec()) {
         qDebug() << "DirectoryWatcher: Failed to save processed file:" << query.lastError().text();
     }
 }
