@@ -4,8 +4,11 @@
 #include <QObject>
 #include <QFileSystemWatcher>
 #include <QString>
+#include <QStringList>
 #include <QSet>
 #include <QTimer>
+#include <QFuture>
+#include <QMutex>
 
 class DirectoryWatcher : public QObject
 {
@@ -24,12 +27,13 @@ public:
     QString watchedDirectory() const;
     
 signals:
-    // Emitted when a new file is detected and ready to be hashed
-    void newFileDetected(const QString &filePath);
+    // Emitted when new files are detected and ready to be hashed
+    void newFilesDetected(const QStringList &filePaths);
     
 private slots:
     void onDirectoryChanged(const QString &path);
     void checkForNewFiles();
+    void onScanComplete(const QStringList &newFiles);
     
 private:
     QFileSystemWatcher *m_watcher;
@@ -38,8 +42,11 @@ private:
     QTimer *m_debounceTimer;
     QTimer *m_initialScanTimer;
     bool m_isWatching;
+    QFuture<QStringList> m_scanFuture;
+    QMutex m_mutex;
     
     void scanDirectory();
+    QStringList scanDirectoryInBackground();
     void loadProcessedFiles();
     void saveProcessedFile(const QString &filePath);
 };

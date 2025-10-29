@@ -87,6 +87,7 @@ target_link_libraries(usagi PRIVATE
     Qt6::Sql
     Qt6::Gui
     Qt6::Core
+    Qt6::Concurrent
     z
 )
 

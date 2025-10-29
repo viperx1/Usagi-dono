@@ -6,6 +6,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
+#include <QtConcurrent>
+#include <QFutureWatcher>
+#include <QMutexLocker>
 
 DirectoryWatcher::DirectoryWatcher(QObject *parent)
     : QObject(parent)
@@ -110,26 +113,58 @@ void DirectoryWatcher::scanDirectory()
         return;
     }
     
-    // Check if database is available (but continue scanning even if not available)
-    // Note: If database is unavailable, files will only be tracked in memory during this session
-    // and will be re-detected on application restart
-    QSqlDatabase db = QSqlDatabase::database();
-    bool dbAvailable = db.isValid() && db.isOpen();
+    // Check if a scan is already in progress
+    if (m_scanFuture.isRunning()) {
+        qDebug() << "DirectoryWatcher: Scan already in progress, skipping";
+        return;
+    }
     
-    if (!dbAvailable) {
-        qDebug() << "DirectoryWatcher: Database not available, processed files will not be persisted";
+    qDebug() << "DirectoryWatcher: Starting background directory scan";
+    
+    // Run scan in background thread
+    m_scanFuture = QtConcurrent::run([this]() {
+        return this->scanDirectoryInBackground();
+    });
+    
+    // Set up a watcher for the future to handle completion
+    QFutureWatcher<QStringList> *watcher = new QFutureWatcher<QStringList>(this);
+    connect(watcher, &QFutureWatcher<QStringList>::finished, this, [this, watcher]() {
+        // Check if future is valid and not cancelled before getting result
+        if (watcher->future().isValid() && !watcher->future().isCanceled()) {
+            QStringList newFiles = watcher->result();
+            onScanComplete(newFiles);
+        }
+        watcher->deleteLater();
+    });
+    watcher->setFuture(m_scanFuture);
+}
+
+QStringList DirectoryWatcher::scanDirectoryInBackground()
+{
+    QStringList newFiles;
+    QString directory;
+    QSet<QString> processedFilesCopy;
+    
+    // Copy data under mutex protection
+    {
+        QMutexLocker locker(&m_mutex);
+        directory = m_watchedDirectory;
+        processedFilesCopy = m_processedFiles;
+    }
+    
+    if (directory.isEmpty() || !QDir(directory).exists()) {
+        return newFiles;
     }
     
     // Scan for all files in the directory (no extension filtering - let API decide)
-    QDirIterator it(m_watchedDirectory, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+    QDirIterator it(directory, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
     
-    QStringList newFiles;
     while (it.hasNext()) {
         QString filePath = it.next();
         QFileInfo fileInfo(filePath);
         
         // Skip if already processed
-        if (m_processedFiles.contains(filePath)) {
+        if (processedFilesCopy.contains(filePath)) {
             continue;
         }
         
@@ -138,24 +173,39 @@ void DirectoryWatcher::scanDirectory()
             continue;
         }
         
-        // Mark as processed to avoid duplicate processing
-        m_processedFiles.insert(filePath);
-        
-        // Save to database if available
-        if (dbAvailable) {
-            saveProcessedFile(filePath);
-        }
-        
         newFiles.append(filePath);
-        
-        // Emit signal for new file
-        emit newFileDetected(filePath);
     }
     
-    // Log summary instead of individual files to avoid spam
-    if (!newFiles.isEmpty()) {
-        qDebug() << "DirectoryWatcher: Detected" << newFiles.size() << "new file(s)";
+    return newFiles;
+}
+
+void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
+{
+    if (newFiles.isEmpty()) {
+        qDebug() << "DirectoryWatcher: No new files detected";
+        return;
     }
+    
+    qDebug() << "DirectoryWatcher: Detected" << newFiles.size() << "new file(s)";
+    
+    // Mark files as processed
+    {
+        QMutexLocker locker(&m_mutex);
+        for (const QString &filePath : newFiles) {
+            m_processedFiles.insert(filePath);
+        }
+    }
+    
+    // Save to database if available
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isValid() && db.isOpen()) {
+        for (const QString &filePath : newFiles) {
+            saveProcessedFile(filePath);
+        }
+    }
+    
+    // Emit batch signal with all new files
+    emit newFilesDetected(newFiles);
 }
 
 void DirectoryWatcher::loadProcessedFiles()
