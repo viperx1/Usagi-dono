@@ -345,13 +345,12 @@ MD4::MD4()
 char * MD4::HexDigest()
 {
 	unsigned int i;
-	std::string hash;
 	std::stringstream ss;
 
 	for(i = 0; i < 16; i++)
 	{
 		ss << std::setfill('0') << std::setw(2) << std::hex << (int)digest[i];
 	}
-	hash = ss.str();
-	return (char *)hash.c_str();
+	hexDigestCache = ss.str();
+	return (char *)hexDigestCache.c_str();
 }
