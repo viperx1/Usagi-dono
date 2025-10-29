@@ -708,6 +708,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString msg310 = "310-2";
                 qDebug() << msg310;
                 getNotifyLogAppend(msg310);
+                
+                // Store local file path for already existing entry
+                QString localPath = hashes->item(i, 2)->text();
+                adbapi->UpdateLocalPath(tag, localPath);
+                
                 // Refresh mylist widget to ensure it's up to date
                 loadMylistFromDatabase();
                 return;
@@ -728,6 +733,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString msg311 = "311/210-3";
                 qDebug() << msg311;
                 getNotifyLogAppend(msg311);
+				
+				// Store local file path for newly added entry
+				QString localPath = hashes->item(i, 2)->text();
+				adbapi->UpdateLocalPath(tag, localPath);
+				
 				if(renameto->checkState() > 0)
 				{
 					// TODO: rename
@@ -1716,9 +1726,6 @@ void Window::onWatcherNewFileDetected(const QString &filePath)
 		markwatched->setCheckState(Qt::Unchecked);  // no change
 		hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 		
-		// Store complete file path in storage field for later file access
-		storage->setText(filePath);
-		
 		// Create a single-item list for hashing
 		QStringList files;
 		files.append(filePath);
@@ -1728,7 +1735,7 @@ void Window::onWatcherNewFileDetected(const QString &filePath)
 		buttonclear->setEnabled(false);
 		emit hashFiles(files);
 		
-		logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD, watched state preserved, file path: " + filePath + ")");
+		logOutput->append("Auto-hashing new file: " + fileInfo.fileName() + " (will be added to MyList as HDD, watched state preserved)");
 	} else {
 		logOutput->append("File added to hasher. Login to auto-hash and add to MyList.");
 	}

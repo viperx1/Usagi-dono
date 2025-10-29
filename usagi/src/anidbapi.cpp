@@ -60,6 +60,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `typename` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `startdate` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `enddate` TEXT");
+		// Add local_path column to mylist if it doesn't exist (for directory watcher feature)
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_path` TEXT");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
 		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT);");
@@ -1420,6 +1422,65 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 				//q = QString("INSERT INTO `mylist` ")
 			}
 		}
+	}
+}
+
+void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
+{
+	// Get the original MYLISTADD command from packets table using the tag
+	QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = '%1'").arg(tag);
+	QSqlQuery query(db);
+	
+	if(query.exec(q) && query.next())
+	{
+		QString mylistAddCmd = query.value(0).toString();
+		
+		// Parse size and ed2k from the MYLISTADD command
+		QStringList params = mylistAddCmd.split("&");
+		QString size, ed2k;
+		
+		for(const QString& param : params)
+		{
+			if(param.contains("size="))
+				size = param.mid(param.indexOf("size=") + 5).split("&").first();
+			else if(param.contains("ed2k="))
+				ed2k = param.mid(param.indexOf("ed2k=") + 5).split("&").first();
+		}
+		
+		// Find the lid using the file info
+		q = QString("SELECT m.lid FROM mylist m "
+					"INNER JOIN file f ON m.fid = f.fid "
+					"WHERE f.size = '%1' AND f.ed2k = '%2'")
+			.arg(size).arg(ed2k);
+		QSqlQuery lidQuery(db);
+		
+		if(lidQuery.exec(q) && lidQuery.next())
+		{
+			QString lid = lidQuery.value(0).toString();
+			
+			// Update the local_path in mylist table
+			q = QString("UPDATE `mylist` SET `local_path` = '%1' WHERE `lid` = %2")
+				.arg(QString(localPath).replace("'", "''"))
+				.arg(lid);
+			QSqlQuery updateQuery(db);
+			
+			if(updateQuery.exec(q))
+			{
+				Debug(QString("Updated local_path for lid=%1: %2").arg(lid).arg(localPath));
+			}
+			else
+			{
+				Debug("Failed to update local_path: " + updateQuery.lastError().text());
+			}
+		}
+		else
+		{
+			Debug("Could not find mylist entry for tag=" + tag);
+		}
+	}
+	else
+	{
+		Debug("Could not find packet for tag=" + tag);
 	}
 }
 
