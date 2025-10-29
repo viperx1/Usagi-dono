@@ -23,6 +23,8 @@
    documentation and/or software.
  */
 
+#include <string>
+
 class MD4
 {
 private:
@@ -74,6 +76,7 @@ protected:
 	MD4_CTX context; //make private ~_~
     void memcpy(POINTER, POINTER, unsigned int);
     unsigned char digest[16];
+    std::string hexDigestCache; // Cache for hex digest string
 
 public:
 	void String(char *);

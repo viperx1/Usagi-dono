@@ -80,14 +80,16 @@ if(WIN32)
 endif()
 
 # Link Qt libraries
-# For static Qt, we may need to list Core at the end again to resolve symbols
+# For static Qt builds, order matters: Qt6::Concurrent depends on Qt6::Core,
+# so Qt6::Concurrent must come before Qt6::Core in the link order.
+# Qt6::Core is listed again at the end (line 111) to resolve circular dependencies.
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
     Qt6::Gui
-    Qt6::Core
     Qt6::Concurrent
+    Qt6::Core
     z
 )
 
