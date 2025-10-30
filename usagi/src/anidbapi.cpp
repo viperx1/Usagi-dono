@@ -1574,12 +1574,12 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 {
 	// Update the status in local_files table
-	QString q = QString("UPDATE `local_files` SET `status` = %1 WHERE `path` = '%2'")
-		.arg(status)
-		.arg(QString(localPath).replace("'", "''"));
 	QSqlQuery query(db);
+	query.prepare("UPDATE `local_files` SET `status` = ? WHERE `path` = ?");
+	query.addBindValue(status);
+	query.addBindValue(localPath);
 	
-	if(query.exec(q))
+	if(query.exec())
 	{
 		Debug(QString("Updated local_files status for path=%1 to status=%2").arg(localPath).arg(status));
 	}
