@@ -432,8 +432,9 @@ void Window::setupHashingProgress(const QStringList &files)
 	completedHashParts = 0;
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
-	progressTotal->setFormat("Hashing: %v/%m parts - ETA: calculating...");
+	progressTotal->setFormat("%p%");
 	hashingTimer.start();
+	lastEtaUpdate.start();
 }
 
 void Window::ButtonHasherStartClick()
@@ -515,8 +516,8 @@ void Window::getNotifyPartsDone(int total, int done)
 	completedHashParts++;
 	progressTotal->setValue(completedHashParts);
 	
-	// Calculate and display ETA
-	if (completedHashParts > 0 && totalHashParts > 0) {
+	// Calculate and display ETA - throttled to once per second to prevent UI freeze
+	if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
 		qint64 elapsedMs = hashingTimer.elapsed();
 		double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
 		int remainingParts = totalHashParts - completedHashParts;
@@ -536,10 +537,11 @@ void Window::getNotifyPartsDone(int total, int done)
 				etaStr = QString("%1s").arg(etaSec);
 			}
 			
-			progressTotal->setFormat(QString("Hashing: %v/%m parts - ETA: %1").arg(etaStr));
+			progressTotal->setFormat(QString("%p% - ETA: %1").arg(etaStr));
 		} else {
-			progressTotal->setFormat("Hashing: %v/%m parts - ETA: calculating...");
+			progressTotal->setFormat("%p% - ETA: calculating...");
 		}
+		lastEtaUpdate.restart();
 	}
 }
 

@@ -117,6 +117,7 @@ private:
     QTimer *startupTimer;
     QElapsedTimer waitforlogout;
     QElapsedTimer hashingTimer;
+    QElapsedTimer lastEtaUpdate;
     int totalHashParts;
     int completedHashParts;
 	// main layout
