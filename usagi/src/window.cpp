@@ -97,6 +97,10 @@ Window::Window()
     QBoxLayout *progress = new QBoxLayout(QBoxLayout::TopToBottom);
     progressFile = new QProgressBar;
     progressTotal = new QProgressBar;
+    progressTotalLabel = new QLabel;
+    QBoxLayout *progressTotalLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    progressTotalLayout->addWidget(progressTotal);
+    progressTotalLayout->addWidget(progressTotalLabel);
 
     pageHasher->addWidget(hashes, 0, Qt::AlignTop);
     pageHasher->addLayout(pageHasherSettings);
@@ -199,7 +203,7 @@ Window::Window()
 
 	// page hasher - progress
 	progress->addWidget(progressFile);
-	progress->addWidget(progressTotal);
+	progress->addLayout(progressTotalLayout);
 
     // page settings
     labelLogin = new QLabel("Login:");
@@ -432,8 +436,10 @@ void Window::setupHashingProgress(const QStringList &files)
 	completedHashParts = 0;
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
-	progressTotal->setFormat("Hashing: %v/%m parts - ETA: calculating...");
+	progressTotal->setFormat("ETA: calculating...");
+	progressTotalLabel->setText("0%");
 	hashingTimer.start();
+	lastEtaUpdate.start();
 }
 
 void Window::ButtonHasherStartClick()
@@ -458,7 +464,8 @@ void Window::ButtonHasherStopClick()
 	buttonclear->setEnabled(1);
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(1);
-	progressTotal->setFormat("%p%");
+	progressTotal->setFormat("");
+	progressTotalLabel->setText("");
 	progressFile->setValue(0);
 	progressFile->setMaximum(1);
 	emit notifyStopHasher();
@@ -515,8 +522,12 @@ void Window::getNotifyPartsDone(int total, int done)
 	completedHashParts++;
 	progressTotal->setValue(completedHashParts);
 	
-	// Calculate and display ETA
-	if (completedHashParts > 0 && totalHashParts > 0) {
+	// Update percentage label
+	int percentage = totalHashParts > 0 ? (completedHashParts * 100 / totalHashParts) : 0;
+	progressTotalLabel->setText(QString("%1%").arg(percentage));
+	
+	// Calculate and display ETA - throttled to once per second to prevent UI freeze
+	if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
 		qint64 elapsedMs = hashingTimer.elapsed();
 		double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
 		int remainingParts = totalHashParts - completedHashParts;
@@ -536,10 +547,11 @@ void Window::getNotifyPartsDone(int total, int done)
 				etaStr = QString("%1s").arg(etaSec);
 			}
 			
-			progressTotal->setFormat(QString("Hashing: %v/%m parts - ETA: %1").arg(etaStr));
+			progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
 		} else {
-			progressTotal->setFormat("Hashing: %v/%m parts - ETA: calculating...");
+			progressTotal->setFormat("ETA: calculating...");
 		}
+		lastEtaUpdate.restart();
 	}
 }
 
@@ -606,7 +618,8 @@ void Window::hasherFinished()
 {
 	buttonstart->setEnabled(1);
 	buttonclear->setEnabled(1);
-	progressTotal->setFormat("%p%");
+	progressTotal->setFormat("");
+	progressTotalLabel->setText("");
 }
 
 bool Window::eventFilter(QObject *obj, QEvent *event)

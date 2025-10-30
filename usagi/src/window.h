@@ -117,6 +117,7 @@ private:
     QTimer *startupTimer;
     QElapsedTimer waitforlogout;
     QElapsedTimer hashingTimer;
+    QElapsedTimer lastEtaUpdate;
     int totalHashParts;
     int completedHashParts;
 	// main layout
@@ -152,6 +153,7 @@ private:
 	QPushButton *buttonclear;
 	QProgressBar *progressFile;
 	QProgressBar *progressTotal;
+	QLabel *progressTotalLabel;
 	QCheckBox *addtomylist;
 	QCheckBox *markwatched;
 	QLineEdit *storage;
