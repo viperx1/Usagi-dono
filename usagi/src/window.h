@@ -116,6 +116,9 @@ private:
     QTimer *safeclose;
     QTimer *startupTimer;
     QElapsedTimer waitforlogout;
+    QElapsedTimer hashingTimer;
+    int totalHashParts;
+    int completedHashParts;
 	// main layout
     QBoxLayout *layout;
     QTabWidget *tabwidget;
@@ -252,6 +255,9 @@ public:
 	int parseMylistExport(const QString &tarGzPath);
     Window();
 	~Window();
+private:
+    int calculateTotalHashParts(const QStringList &files);
+    void setupHashingProgress(const QStringList &files);
 };
 
 #endif // WINDOW_H

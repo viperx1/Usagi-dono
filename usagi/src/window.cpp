@@ -407,31 +407,45 @@ void Window::Button3Click()
 	hashes->setUpdatesEnabled(1);
 }
 
-void Window::ButtonHasherStartClick()
+int Window::calculateTotalHashParts(const QStringList &files)
 {
 	QFileInfo file;
 	int totalparts = 0;
+	for(const QString &filepath : files)
+	{
+		file.setFile(filepath);
+		double a = file.size();
+		double b = a/102400;
+		double c = ceil(b);
+		totalparts += c;
+	}
+	return totalparts;
+}
+
+void Window::setupHashingProgress(const QStringList &files)
+{
+	totalHashParts = calculateTotalHashParts(files);
+	completedHashParts = 0;
+	progressTotal->setValue(0);
+	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts - 1 : 1);
+	progressTotal->setFormat("Hashing: %v/%m parts - ETA: calculating...");
+	hashingTimer.start();
+}
+
+void Window::ButtonHasherStartClick()
+{
 	QStringList files;
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
 		if(hashes->item(i, 1)->text() == "0")
 		{
 			files.append(hashes->item(i, 2)->text());
-			file.setFile(files.back());
-			double a = file.size();
-			double b = a/102400;
-			double c = ceil(b);
-			totalparts += c;
 		}
-//		logOutput->append(QString::number(totalparts));
 	}
-	progressTotal->setValue(0);
-	progressTotal->setMaximum(totalparts-1);
-//	logOutput->append(QString::number(totalparts));
+	setupHashingProgress(files);
 	buttonstart->setEnabled(0);
 	buttonclear->setEnabled(0);
 	emit hashFiles(files);
-//	adbapi->Auth();
 }
 
 void Window::ButtonHasherStopClick()
@@ -440,6 +454,7 @@ void Window::ButtonHasherStopClick()
 	buttonclear->setEnabled(1);
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(1);
+	progressTotal->setFormat("%p%");
 	progressFile->setValue(0);
 	progressFile->setMaximum(1);
 	emit notifyStopHasher();
@@ -493,8 +508,35 @@ void Window::getNotifyPartsDone(int total, int done)
 {
 	progressFile->setMaximum(total);
 	progressFile->setValue(done);
-	progressTotal->setValue(progressTotal->value()+1);
-//	logOutput->append(QString::number(progressTotal->value()));
+	completedHashParts++;
+	progressTotal->setValue(completedHashParts);
+	
+	// Calculate and display ETA
+	if (completedHashParts > 0 && totalHashParts > 0) {
+		qint64 elapsedMs = hashingTimer.elapsed();
+		double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
+		int remainingParts = totalHashParts - completedHashParts;
+		
+		if (remainingParts > 0 && partsPerMs > 0) {
+			qint64 etaMs = static_cast<qint64>(remainingParts / partsPerMs);
+			int etaSec = etaMs / 1000;
+			int etaMin = etaSec / 60;
+			int etaHour = etaMin / 60;
+			
+			QString etaStr;
+			if (etaHour > 0) {
+				etaStr = QString("%1h %2m").arg(etaHour).arg(etaMin % 60);
+			} else if (etaMin > 0) {
+				etaStr = QString("%1m %2s").arg(etaMin).arg(etaSec % 60);
+			} else {
+				etaStr = QString("%1s").arg(etaSec);
+			}
+			
+			progressTotal->setFormat(QString("Hashing: %v/%m parts - ETA: %1").arg(etaStr));
+		} else {
+			progressTotal->setFormat("Hashing: %v/%m parts - ETA: calculating...");
+		}
+	}
 }
 
 void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
@@ -1752,6 +1794,9 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			markwatched->setCheckState(Qt::Unchecked);  // no change (tristate: Unchecked=no change, PartiallyChecked=unwatched, Checked=watched)
 			hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 		}
+		
+		// Setup progress tracking before starting hasher
+		setupHashingProgress(filePaths);
 		
 		// Start hashing all detected files
 		buttonstart->setEnabled(false);
