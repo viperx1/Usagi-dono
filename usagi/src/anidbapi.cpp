@@ -1036,8 +1036,10 @@ QString AniDBApi::Auth()
 	QString q;
 	q = QString("INSERT OR REPLACE INTO `packets` (`tag`, `str`) VALUES ('0', '%1');").arg(msg);
 	QSqlQuery query(db);
-	query.exec(q);
-	Debug("Auth database query error: " + query.lastError().text());
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Auth] Database query error: " + query.lastError().text());
+	}
 
 //	Send(msg, "AUTH", "xxx");
 
@@ -1063,7 +1065,11 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 	QString q;
 	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
-	query.exec(q);
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB MylistAdd] Database insert error: " + query.lastError().text());
+		return "0";
+	}
 
 /*	q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = 0").arg(msg);
 	query.exec(q);
@@ -1095,7 +1101,11 @@ QString AniDBApi::File(qint64 size, QString ed2k)
 	Debug(msg);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
-	query.exec(q);
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB File] Database insert error: " + query.lastError().text());
+		return "0";
+	}
 //	Send(a, "", "zzz");
 	return GetTag(msg);
 }
@@ -1412,18 +1422,35 @@ unsigned long AniDBApi::LocalIdentify(int size, QString ed2khash)
 	std::bitset<2> ret;
 	QString q = QString("SELECT `fid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'").arg(size).arg(ed2khash);
 	QSqlQuery query(db);
-	query.exec(q);
-	query.next();
-	if(query.value(0).toInt() > 0)
+	if(!query.exec(q))
 	{
-		ret[0] = 1;
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB LocalIdentify] Database query error: " + query.lastError().text());
+		return ret.to_ulong();
 	}
-	q = QString("SELECT `lid` FROM `mylist` WHERE `fid` = '%1'").arg(query.value(0).toInt());
-	query.exec(q);
-	query.next();
-	if(query.value(0).toInt() > 0)
+	
+	int fid = 0;
+	if(query.next())
 	{
-		ret[1] = 1;
+		fid = query.value(0).toInt();
+		if(fid > 0)
+		{
+			ret[0] = 1;
+		}
+	}
+	
+	q = QString("SELECT `lid` FROM `mylist` WHERE `fid` = '%1'").arg(fid);
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB LocalIdentify] Database query error: " + query.lastError().text());
+		return ret.to_ulong();
+	}
+	
+	if(query.next())
+	{
+		if(query.value(0).toInt() > 0)
+		{
+			ret[1] = 1;
+		}
 	}
 //	}
 	return ret.to_ulong();
@@ -1433,13 +1460,23 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 {
 	QString q = QString("SELECT `fid`,`lid` FROM `file` WHERE `size` = %1 AND `ed2k` = %2").arg(size).arg(ed2khash);
 	QSqlQuery query(db);
-	query.exec(q);
-	if(query.size() > 0)
+	if(!query.exec(q))
 	{
-		if(query.value(0).toInt() > 0)
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB UpdateFile] Database query error: " + query.lastError().text());
+		return;
+	}
+	
+	if(query.next())
+	{
+		int lid = query.value(0).toInt();
+		if(lid > 0)
 		{
-			q = QString("UPDATE `mylist` SET `viewed` = '%1', `state` = '%2', `storage` = '%3' WHERE `lid` = %4").arg(viewed).arg(state).arg(storage).arg(query.value(0).toString());
-			query.exec(q);
+			q = QString("UPDATE `mylist` SET `viewed` = '%1', `state` = '%2', `storage` = '%3' WHERE `lid` = %4").arg(viewed).arg(state).arg(storage).arg(lid);
+			if(!query.exec(q))
+			{
+				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB UpdateFile] Database update error: " + query.lastError().text());
+				return;
+			}
 			if(query.numRowsAffected() == 1)
 			{
 				MylistAdd(size, ed2khash, viewed, state, storage, 1);
@@ -1553,9 +1590,17 @@ QString AniDBApi::GetTag(QString str)
 {
 	QString q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = '0' ORDER BY `tag` ASC LIMIT 1").arg(str);
 	QSqlQuery query(db);
-	query.exec(q);
-	query.next();
-	return (query.isValid())?query.value(0).toString():"0";
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB GetTag] Database query error: " + query.lastError().text());
+		return "0";
+	}
+	
+	if(query.next())
+	{
+		return query.value(0).toString();
+	}
+	return "0";
 }
 
 // Anime Titles Download Implementation
