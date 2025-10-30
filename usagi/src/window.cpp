@@ -1744,32 +1744,26 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		hashesinsertrow(fileInfo, Qt::Unchecked);
 	}
 	
-	// Auto-hash files if auto-start is enabled or user is logged in
-	bool shouldAutoHash = watcherAutoStart->isChecked() || adbapi->LoggedIn();
-	
-	if (shouldAutoHash) {
-		if (!hasherThread.isRunning()) {
-			// Set settings for auto-hash if logged in
-			if (adbapi->LoggedIn()) {
-				addtomylist->setChecked(true);
-				markwatched->setCheckState(Qt::Unchecked);  // not watched
-				hasherFileState->setCurrentIndex(1);  // Internal (HDD)
-			}
-			
-			// Start hashing all detected files
-			buttonstart->setEnabled(false);
-			buttonclear->setEnabled(false);
-			emit hashFiles(filePaths);
-			
-			if (adbapi->LoggedIn()) {
-				logOutput->append(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filePaths.size()));
-			} else {
-				logOutput->append(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filePaths.size()));
-			}
+	// Directory watcher always auto-starts the hasher for detected files
+	if (!hasherThread.isRunning()) {
+		// Set settings for auto-hash if logged in
+		if (adbapi->LoggedIn()) {
+			addtomylist->setChecked(true);
+			markwatched->setCheckState(Qt::Unchecked);  // not watched
+			hasherFileState->setCurrentIndex(1);  // Internal (HDD)
+		}
+		
+		// Start hashing all detected files
+		buttonstart->setEnabled(false);
+		buttonclear->setEnabled(false);
+		emit hashFiles(filePaths);
+		
+		if (adbapi->LoggedIn()) {
+			logOutput->append(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filePaths.size()));
 		} else {
-			logOutput->append("Files added to hasher. Hasher is busy - click Start to hash queued files.");
+			logOutput->append(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filePaths.size()));
 		}
 	} else {
-		logOutput->append("Files added to hasher. Enable auto-start or login to auto-hash files.");
+		logOutput->append("Files added to hasher. Hasher is busy - click Start to hash queued files.");
 	}
 }
