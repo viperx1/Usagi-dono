@@ -702,7 +702,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         // Mark packet as processed and received reply instead of deleting
         QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID).arg(Tag);
         Debug("Database update query: " + q + " Tag: " + Tag);
-        QSqlQuery query;
+        QSqlQuery query(db);
         query.exec(q);
     }
 	else if(ReplyID == "270"){ // 270 NOTIFICATION - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
@@ -1062,7 +1062,7 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 	QString msg = buildMylistAddCommand(size, ed2khash, viewed, state, storage, edit);
 	QString q;
 	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 
 /*	q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = 0").arg(msg);
@@ -1117,7 +1117,7 @@ QString AniDBApi::Mylist(int lid)
 		msg = buildMylistStatsCommand();
 	}
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1131,7 +1131,7 @@ QString AniDBApi::PushAck(int nid)
 	}
 	QString msg = buildPushAckCommand(nid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1146,7 +1146,7 @@ QString AniDBApi::NotifyEnable()
 	// Request notification list to enable push notifications
 	QString msg = buildNotifyListCommand();
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1160,7 +1160,7 @@ QString AniDBApi::NotifyGet(int nid)
 	}
 	QString msg = buildNotifyGetCommand(nid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1179,7 +1179,7 @@ QString AniDBApi::MylistExport(QString template_name)
 	
 	QString msg = buildMylistExportCommand(template_name);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1194,7 +1194,7 @@ QString AniDBApi::Episode(int eid)
 	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Requesting EPISODE data for EID: " + QString::number(eid));
 	QString msg = buildEpisodeCommand(eid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1316,7 +1316,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 
 	lastSentPacket = a;
 
-	QSqlQuery query;
+	QSqlQuery query(db);
     query.exec(QString("UPDATE `packets` SET `processed` = 1, `sendtime` = '%2' WHERE `tag` = '%1'").arg(tag).arg(QDateTime::currentDateTime().toSecsSinceEpoch()));
 
 	Recv();
