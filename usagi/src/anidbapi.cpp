@@ -1546,9 +1546,10 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 					Debug(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 					
 					// Update status in local_files table to 2 (in anidb)
-					q = QString("UPDATE `local_files` SET `status` = 2 WHERE `id` = %1").arg(localFileId);
 					QSqlQuery statusQuery(db);
-					statusQuery.exec(q);
+					statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
+					statusQuery.addBindValue(localFileId);
+					statusQuery.exec();
 				}
 				else
 				{
