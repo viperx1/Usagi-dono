@@ -70,13 +70,16 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `settings`(`id` INTEGER PRIMARY KEY, `name` TEXT UNIQUE, `value` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `notifications`(`nid` INTEGER PRIMARY KEY, `type` TEXT, `from_user_id` INTEGER, `from_user_name` TEXT, `date` INTEGER, `message_type` INTEGER, `title` TEXT, `body` TEXT, `received_at` INTEGER, `acknowledged` BOOL DEFAULT 0);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
-		query.exec("SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC");
+		
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Committing database transaction");
 		db.commit();
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Database transaction committed");
 	}
 //	QStringList names = QStringList()<<"username"<<"password";
 	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Reading settings from database");
+	
+	// Execute SELECT query after transaction commit to read settings
+	query.exec("SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC");
 	
 	// Initialize directory watcher settings with defaults
 	watcherEnabled = false;
@@ -604,7 +607,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// resend with tag and &edit=1
 		QString q;
 		q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
-		QSqlQuery query(q);
+		QSqlQuery query(db);
+		query.exec(q);
 		if(query.isSelect())
 		{
 			if(query.next())
@@ -698,7 +702,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         // Mark packet as processed and received reply instead of deleting
         QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID).arg(Tag);
         Debug("Database update query: " + q + " Tag: " + Tag);
-        QSqlQuery query;
+        QSqlQuery query(db);
         query.exec(q);
     }
 	else if(ReplyID == "270"){ // 270 NOTIFICATION - {int4 nid}|{int2 type}|{int4 fromuid}|{int4 date}|{str title}|{str body}
@@ -1031,7 +1035,8 @@ QString AniDBApi::Auth()
 	QString msg = buildAuthCommand(AniDBApi::username, AniDBApi::password, AniDBApi::protover, AniDBApi::client, AniDBApi::clientver, AniDBApi::enc);
 	QString q;
 	q = QString("INSERT OR REPLACE INTO `packets` (`tag`, `str`) VALUES ('0', '%1');").arg(msg);
-	QSqlQuery query(q);
+	QSqlQuery query(db);
+	query.exec(q);
 	Debug("Auth database query error: " + query.lastError().text());
 
 //	Send(msg, "AUTH", "xxx");
@@ -1057,7 +1062,7 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 	QString msg = buildMylistAddCommand(size, ed2khash, viewed, state, storage, edit);
 	QString q;
 	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 
 /*	q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = 0").arg(msg);
@@ -1089,7 +1094,8 @@ QString AniDBApi::File(qint64 size, QString ed2k)
 	QString msg = buildFileCommand(size, ed2k, fmask, amask);
 	Debug(msg);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query(q);
+	QSqlQuery query(db);
+	query.exec(q);
 //	Send(a, "", "zzz");
 	return GetTag(msg);
 }
@@ -1111,7 +1117,7 @@ QString AniDBApi::Mylist(int lid)
 		msg = buildMylistStatsCommand();
 	}
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1125,7 +1131,7 @@ QString AniDBApi::PushAck(int nid)
 	}
 	QString msg = buildPushAckCommand(nid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1140,7 +1146,7 @@ QString AniDBApi::NotifyEnable()
 	// Request notification list to enable push notifications
 	QString msg = buildNotifyListCommand();
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1154,7 +1160,7 @@ QString AniDBApi::NotifyGet(int nid)
 	}
 	QString msg = buildNotifyGetCommand(nid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1173,7 +1179,7 @@ QString AniDBApi::MylistExport(QString template_name)
 	
 	QString msg = buildMylistExportCommand(template_name);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1188,7 +1194,7 @@ QString AniDBApi::Episode(int eid)
 	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Requesting EPISODE data for EID: " + QString::number(eid));
 	QString msg = buildEpisodeCommand(eid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
-	QSqlQuery query;
+	QSqlQuery query(db);
 	query.exec(q);
 	return GetTag(msg);
 }
@@ -1310,7 +1316,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 
 	lastSentPacket = a;
 
-	QSqlQuery query;
+	QSqlQuery query(db);
     query.exec(QString("UPDATE `packets` SET `processed` = 1, `sendtime` = '%2' WHERE `tag` = '%1'").arg(tag).arg(QDateTime::currentDateTime().toSecsSinceEpoch()));
 
 	Recv();
@@ -1373,7 +1379,8 @@ int AniDBApi::SendPacket()
         }*/
         QString q = "SELECT `tag`,`str` FROM `packets` WHERE `processed` = 0 AND `got_reply` = 0 ORDER BY `tag` ASC LIMIT 1";
         QString tag, str;
-        QSqlQuery query(q);
+        QSqlQuery query(db);
+        query.exec(q);
 
         if(query.isSelect())
         {
@@ -1425,7 +1432,8 @@ unsigned long AniDBApi::LocalIdentify(int size, QString ed2khash)
 void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QString storage)
 {
 	QString q = QString("SELECT `fid`,`lid` FROM `file` WHERE `size` = %1 AND `ed2k` = %2").arg(size).arg(ed2khash);
-	QSqlQuery query(q);
+	QSqlQuery query(db);
+	query.exec(q);
 	if(query.size() > 0)
 	{
 		if(query.value(0).toInt() > 0)
