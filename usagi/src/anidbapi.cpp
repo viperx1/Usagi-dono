@@ -1065,7 +1065,11 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 	QString q;
 	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
-	query.exec(q);
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB MylistAdd] Database insert error: " + query.lastError().text());
+		return "0";
+	}
 
 /*	q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = 0").arg(msg);
 	query.exec(q);
@@ -1097,7 +1101,11 @@ QString AniDBApi::File(qint64 size, QString ed2k)
 	Debug(msg);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
-	query.exec(q);
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB File] Database insert error: " + query.lastError().text());
+		return "0";
+	}
 //	Send(a, "", "zzz");
 	return GetTag(msg);
 }
@@ -1582,9 +1590,17 @@ QString AniDBApi::GetTag(QString str)
 {
 	QString q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = '0' ORDER BY `tag` ASC LIMIT 1").arg(str);
 	QSqlQuery query(db);
-	query.exec(q);
-	query.next();
-	return (query.isValid())?query.value(0).toString():"0";
+	if(!query.exec(q))
+	{
+		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB GetTag] Database query error: " + query.lastError().text());
+		return "0";
+	}
+	
+	if(query.next())
+	{
+		return query.value(0).toString();
+	}
+	return "0";
 }
 
 // Anime Titles Download Implementation
