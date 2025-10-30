@@ -432,7 +432,7 @@ void Window::setupHashingProgress(const QStringList &files)
 	completedHashParts = 0;
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
-	progressTotal->setFormat("%p%");
+	progressTotal->setFormat("%p% - ETA: calculating...");
 	hashingTimer.start();
 	lastEtaUpdate.start();
 }
