@@ -198,30 +198,30 @@ void TestDirectoryWatcher::testDatabaseStatusFiltering()
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file1.mkv', 'file1.mkv', 0)"));
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file2.mkv', 'file2.mkv', 0)"));
     
-    // Status 1 = hashed but not checked by API (SHOULD be loaded)
+    // Status 1 = hashed but not checked by API (should NOT be loaded - needs API checking)
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file3.mkv', 'file3.mkv', 1, 'abc123')"));
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file4.mkv', 'file4.mkv', 1, 'def456')"));
     
-    // Status 2 = in anidb (SHOULD be loaded)
+    // Status 2 = in anidb (SHOULD be loaded - fully processed)
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file5.mkv', 'file5.mkv', 2, 'ghi789')"));
     
-    // Status 3 = not in anidb (SHOULD be loaded)
+    // Status 3 = not in anidb (SHOULD be loaded - fully processed)
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file6.mkv', 'file6.mkv', 3, 'jkl012')"));
     
     // Verify the query that DirectoryWatcher uses
     QSqlQuery verifyQuery(db);
-    QVERIFY(verifyQuery.exec("SELECT path FROM local_files WHERE status >= 1"));
+    QVERIFY(verifyQuery.exec("SELECT path FROM local_files WHERE status >= 2"));
     
     int count = 0;
     while (verifyQuery.next()) {
         QString path = verifyQuery.value(0).toString();
-        // Should only get file3, file4, file5, and file6 (status >= 1)
-        QVERIFY(path == "/test/file3.mkv" || path == "/test/file4.mkv" || path == "/test/file5.mkv" || path == "/test/file6.mkv");
+        // Should only get file5 and file6 (status >= 2)
+        QVERIFY(path == "/test/file5.mkv" || path == "/test/file6.mkv");
         count++;
     }
     
-    // Should have exactly 4 files (file3, file4, file5, file6)
-    QCOMPARE(count, 4);
+    // Should have exactly 2 files (file5, file6)
+    QCOMPARE(count, 2);
     
     // Clean up
     db.close();
