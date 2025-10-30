@@ -1749,7 +1749,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		// Set settings for auto-hash if logged in
 		if (adbapi->LoggedIn()) {
 			addtomylist->setChecked(true);
-			markwatched->setCheckState(Qt::Unchecked);  // not watched
+			markwatched->setCheckState(Qt::Unchecked);  // no change (tristate: Unchecked=no change, PartiallyChecked=unwatched, Checked=watched)
 			hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 		}
 		

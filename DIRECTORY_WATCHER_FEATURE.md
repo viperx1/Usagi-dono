@@ -1,7 +1,7 @@
 # Directory Watcher Feature
 
 ## Overview
-The Directory Watcher feature automatically monitors a specified directory for new video files, hashes them, and adds them to MyList with the "HDD unwatched" state.
+The Directory Watcher feature automatically monitors a specified directory for new video files, hashes them, and adds them to MyList with the "HDD" state (watched status not changed).
 
 ## Features
 
@@ -15,7 +15,7 @@ The Directory Watcher feature automatically monitors a specified directory for n
 - The file is automatically hashed by the directory watcher
 - After hashing, if the user is logged in, the file is automatically added to MyList with:
   - State: Internal (HDD)
-  - Viewed: No (unwatched)
+  - Watched status: No change (keeps existing watched status from AniDB)
 - If the user is not logged in, files are hashed but not added to MyList (can be added manually later)
 
 ### Configuration Options
@@ -104,7 +104,7 @@ The directory watcher is integrated into the main Window class:
    - The hasher is automatically started:
      - If user is logged in:
        - "Add to MyList" is enabled
-       - "Mark watched" is disabled (unwatched)
+       - "Mark watched" is set to "no change" (tristate checkbox: keeps existing watched status)
        - File state is set to "Internal (HDD)"
      - File is hashed via `hashFiles()` signal
 4. After hashing completes:
