@@ -1,7 +1,7 @@
 # Directory Watcher Feature
 
 ## Overview
-The Directory Watcher feature automatically monitors a specified directory for new video files, hashes them, and adds them to MyList with the "HDD unwatched" state.
+The Directory Watcher feature automatically monitors a specified directory for new video files, hashes them, and adds them to MyList with the "HDD" state (watched status not changed).
 
 ## Features
 
@@ -12,11 +12,11 @@ The Directory Watcher feature automatically monitors a specified directory for n
 
 ### Automatic Hashing and MyList Addition
 - When a new file is detected, it's automatically added to the hasher table
-- If auto-start is enabled OR the user is logged in, the file is automatically hashed
+- The file is automatically hashed by the directory watcher
 - After hashing, if the user is logged in, the file is automatically added to MyList with:
   - State: Internal (HDD)
-  - Viewed: No (unwatched)
-- If auto-start is enabled but user is not logged in, files are hashed but not added to MyList (can be added manually later)
+  - Watched status: No change (keeps existing watched status from AniDB)
+- If the user is not logged in, files are hashed but not added to MyList (can be added manually later)
 
 ### Configuration Options
 Available in the Settings tab:
@@ -24,7 +24,7 @@ Available in the Settings tab:
 1. **Enable Directory Watcher**: Toggle to start/stop monitoring
 2. **Watch Directory**: Path to the directory to monitor
 3. **Browse Button**: Select directory via file dialog
-4. **Auto-start on application launch**: Start monitoring and enable automatic hashing when the application starts
+4. **Auto-start on application launch**: Start directory watcher when the application starts
 
 ### Persistent Settings
 All directory watcher settings are saved to `settings.dat` and persist across application restarts.
@@ -49,8 +49,7 @@ The directory watcher keeps track of files it has already hashed to avoid duplic
 ### Monitoring
 - When the directory watcher is enabled, it will display "Status: Watching [directory path]"
 - New video files added to the watched directory will automatically appear in the Log tab
-- Files will be added to the Hasher tab
-- If auto-start is enabled OR you're logged in, files will be automatically hashed
+- Files will be added to the Hasher tab and automatically hashed
 - If you're logged in, hashed files will be automatically added to MyList
 
 ### Viewing Results
@@ -102,10 +101,10 @@ The directory watcher is integrated into the main Window class:
    - `newFilesDetected` signal is emitted
    - `onWatcherNewFilesDetected` slot is called
    - File is added to the hasher table via `hashesinsertrow()`
-   - If auto-start is enabled OR user is logged in:
+   - The hasher is automatically started:
      - If user is logged in:
        - "Add to MyList" is enabled
-       - "Mark watched" is disabled (unwatched)
+       - "Mark watched" is set to "no change" (tristate checkbox: keeps existing watched status)
        - File state is set to "Internal (HDD)"
      - File is hashed via `hashFiles()` signal
 4. After hashing completes:
@@ -178,12 +177,12 @@ Potential improvements for future versions:
 - Check the Log tab for error messages
 
 ### Files detected but not hashed
-- Ensure "Auto-start on application launch" is enabled OR you're logged in to AniDB
-- Check the Hasher tab to see if files are queued
-- If hasher is busy, wait for current batch to complete or click Start to begin hashing
+- Files detected by the directory watcher are automatically hashed
+- If the hasher is busy, files will be queued and processed after the current batch completes
+- Check the Hasher tab to see the queue status
 
 ### Files not appearing in MyList
-- Ensure "Add to MyList" was enabled when the file was hashed
+- Ensure you are logged in to AniDB (files are only added to MyList when logged in)
 - Check that the file was successfully hashed (no errors in Log)
 - Verify the file exists in AniDB (may need manual FILE command)
 - Try refreshing MyList manually
