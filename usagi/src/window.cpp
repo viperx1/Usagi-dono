@@ -22,6 +22,10 @@ Window::Window()
 	notificationsCheckedWithoutExport = 0;
 	isCheckingNotifications = false;
 	
+	// Initialize hashing progress tracking
+	totalHashParts = 0;
+	completedHashParts = 0;
+	
     safeclose = new QTimer;
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
@@ -602,6 +606,7 @@ void Window::hasherFinished()
 {
 	buttonstart->setEnabled(1);
 	buttonclear->setEnabled(1);
+	progressTotal->setFormat("%p%");
 }
 
 bool Window::eventFilter(QObject *obj, QEvent *event)
