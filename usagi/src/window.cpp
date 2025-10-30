@@ -801,9 +801,9 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 qDebug() << msg320;
                 getNotifyLogAppend(msg320);
                 
-                // Update status in local_files to 2 (not in anidb)
+                // Update status in local_files to 3 (not in anidb)
                 QString localPath = hashes->item(i, 2)->text();
-                adbapi->UpdateLocalFileStatus(localPath, 2);
+                adbapi->UpdateLocalFileStatus(localPath, 3);
                 
                 return;
             }

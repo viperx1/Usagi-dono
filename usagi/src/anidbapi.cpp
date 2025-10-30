@@ -1593,13 +1593,13 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 {
 	// Update the ed2k_hash and status in local_files table
 	// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
-	QString q = QString("UPDATE `local_files` SET `ed2k_hash` = '%1', `status` = %2 WHERE `path` = '%3'")
-		.arg(QString(ed2kHash).replace("'", "''"))
-		.arg(status)
-		.arg(QString(localPath).replace("'", "''"));
 	QSqlQuery query(db);
+	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `status` = ? WHERE `path` = ?");
+	query.addBindValue(ed2kHash);
+	query.addBindValue(status);
+	query.addBindValue(localPath);
 	
-	if(query.exec(q))
+	if(query.exec())
 	{
 		Debug(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
 	}
