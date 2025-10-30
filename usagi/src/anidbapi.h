@@ -194,6 +194,7 @@ public:
 	void UpdateFile(int size, QString ed2khash, int viewed, int state, QString storage);
 	void UpdateLocalPath(QString tag, QString localPath);
 	void UpdateLocalFileStatus(QString localPath, int status);
+	void updateLocalFileHash(QString localPath, QString ed2kHash, int status);
 
 	/* === Socket Start */
 	int CreateSocket();

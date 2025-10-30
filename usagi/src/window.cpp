@@ -568,6 +568,11 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			QTableWidgetItem *itemprogress = new QTableWidgetItem(QTableWidgetItem(QString("1")));
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
+			
+			// Store the hash in local_files table with status=1 (hashed but not checked by API)
+			QString filePath = hashes->item(i, 2)->text();
+			adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
+			
 			if(addtomylist->checkState() > 0)
 			{
 				std::bitset<2> li(adbapi->LocalIdentify(data.size, data.hexdigest));
