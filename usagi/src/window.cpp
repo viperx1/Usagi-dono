@@ -431,7 +431,7 @@ void Window::setupHashingProgress(const QStringList &files)
 	totalHashParts = calculateTotalHashParts(files);
 	completedHashParts = 0;
 	progressTotal->setValue(0);
-	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts - 1 : 1);
+	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
 	progressTotal->setFormat("Hashing: %v/%m parts - ETA: calculating...");
 	hashingTimer.start();
 }
