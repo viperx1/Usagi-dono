@@ -153,6 +153,7 @@ private:
 	QPushButton *buttonclear;
 	QProgressBar *progressFile;
 	QProgressBar *progressTotal;
+	QLabel *progressTotalLabel;
 	QCheckBox *addtomylist;
 	QCheckBox *markwatched;
 	QLineEdit *storage;
