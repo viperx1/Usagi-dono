@@ -189,36 +189,39 @@ void TestDirectoryWatcher::testDatabaseStatusFiltering()
         return;
     }
     
-    // Create local_files table matching the schema
+    // Create local_files table matching the schema with ed2k_hash column
     QSqlQuery query(db);
-    QVERIFY(query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0)"));
+    QVERIFY(query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT)"));
     
     // Insert test files with different statuses
-    // Status 0 = not checked (should NOT be loaded)
+    // Status 0 = not hashed (should NOT be loaded)
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file1.mkv', 'file1.mkv', 0)"));
     QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file2.mkv', 'file2.mkv', 0)"));
     
-    // Status 1 = in anidb (SHOULD be loaded)
-    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file3.mkv', 'file3.mkv', 1)"));
-    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file4.mkv', 'file4.mkv', 1)"));
+    // Status 1 = hashed but not checked by API (SHOULD be loaded)
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file3.mkv', 'file3.mkv', 1, 'abc123')"));
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file4.mkv', 'file4.mkv', 1, 'def456')"));
     
-    // Status 2 = not in anidb (SHOULD be loaded)
-    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status) VALUES ('/test/file5.mkv', 'file5.mkv', 2)"));
+    // Status 2 = in anidb (SHOULD be loaded)
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file5.mkv', 'file5.mkv', 2, 'ghi789')"));
+    
+    // Status 3 = not in anidb (SHOULD be loaded)
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, status, ed2k_hash) VALUES ('/test/file6.mkv', 'file6.mkv', 3, 'jkl012')"));
     
     // Verify the query that DirectoryWatcher uses
     QSqlQuery verifyQuery(db);
-    QVERIFY(verifyQuery.exec("SELECT path FROM local_files WHERE status != 0"));
+    QVERIFY(verifyQuery.exec("SELECT path FROM local_files WHERE status >= 1"));
     
     int count = 0;
     while (verifyQuery.next()) {
         QString path = verifyQuery.value(0).toString();
-        // Should only get file3, file4, and file5 (status 1 and 2)
-        QVERIFY(path == "/test/file3.mkv" || path == "/test/file4.mkv" || path == "/test/file5.mkv");
+        // Should only get file3, file4, file5, and file6 (status >= 1)
+        QVERIFY(path == "/test/file3.mkv" || path == "/test/file4.mkv" || path == "/test/file5.mkv" || path == "/test/file6.mkv");
         count++;
     }
     
-    // Should have exactly 3 files (file3, file4, file5)
-    QCOMPARE(count, 3);
+    // Should have exactly 4 files (file3, file4, file5, file6)
+    QCOMPARE(count, 4);
     
     // Clean up
     db.close();

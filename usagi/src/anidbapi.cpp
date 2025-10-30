@@ -61,7 +61,10 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `startdate` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `enddate` TEXT");
 		// Create local_files table for directory watcher feature
-		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0)");
+		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
+		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT)");
+		// Add ed2k_hash column to local_files if it doesn't exist (for existing databases)
+		query.exec("ALTER TABLE `local_files` ADD COLUMN `ed2k_hash` TEXT");
 		// Add local_file column to mylist if it doesn't exist (references local_files.id)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
@@ -1542,10 +1545,11 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 				{
 					Debug(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 					
-					// Update status in local_files table to 1 (in anidb)
-					q = QString("UPDATE `local_files` SET `status` = 1 WHERE `id` = %1").arg(localFileId);
+					// Update status in local_files table to 2 (in anidb)
 					QSqlQuery statusQuery(db);
-					statusQuery.exec(q);
+					statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
+					statusQuery.addBindValue(localFileId);
+					statusQuery.exec();
 				}
 				else
 				{
@@ -1571,18 +1575,38 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 {
 	// Update the status in local_files table
-	QString q = QString("UPDATE `local_files` SET `status` = %1 WHERE `path` = '%2'")
-		.arg(status)
-		.arg(QString(localPath).replace("'", "''"));
 	QSqlQuery query(db);
+	query.prepare("UPDATE `local_files` SET `status` = ? WHERE `path` = ?");
+	query.addBindValue(status);
+	query.addBindValue(localPath);
 	
-	if(query.exec(q))
+	if(query.exec())
 	{
 		Debug(QString("Updated local_files status for path=%1 to status=%2").arg(localPath).arg(status));
 	}
 	else
 	{
 		Debug("Failed to update local_files status: " + query.lastError().text());
+	}
+}
+
+void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int status)
+{
+	// Update the ed2k_hash and status in local_files table
+	// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
+	QSqlQuery query(db);
+	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `status` = ? WHERE `path` = ?");
+	query.addBindValue(ed2kHash);
+	query.addBindValue(status);
+	query.addBindValue(localPath);
+	
+	if(query.exec())
+	{
+		Debug(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
+	}
+	else
+	{
+		Debug("Failed to update local_files hash and status: " + query.lastError().text());
 	}
 }
 

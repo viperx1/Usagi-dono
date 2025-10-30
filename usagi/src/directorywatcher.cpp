@@ -247,9 +247,9 @@ void DirectoryWatcher::loadProcessedFiles()
     
     QSqlQuery query(db);
     
-    // Query only files that have been hashed (status != 0)
-    // Status 0 = not checked, Status 1 = in anidb, Status 2 = not in anidb
-    if (!query.exec("SELECT path FROM local_files WHERE status != 0")) {
+    // Query only files that have been hashed (status >= 1)
+    // Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
+    if (!query.exec("SELECT path FROM local_files WHERE status >= 1")) {
         qDebug() << "DirectoryWatcher: Failed to query local_files table:" << query.lastError().text();
         return;
     }
