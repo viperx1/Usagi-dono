@@ -255,7 +255,6 @@ signals:
 	void notifyExportAlreadyInQueue(QString tag);
 	void notifyExportNoSuchTemplate(QString tag);
 	void notifyEpisodeUpdated(int eid, int aid);
-	void notifyFileChecked(QString tag, int code);
 };
 
 #endif // ANIDBAPI_H

@@ -225,7 +225,6 @@ public slots:
 
     void ButtonLoginClick();
 	void getNotifyMylistAdd(QString, int);
-	void getNotifyFileChecked(QString, int);
     void getNotifyLoggedIn(QString, int);
     void getNotifyLoggedOut(QString, int);
 	void getNotifyMessageReceived(int nid, QString message);

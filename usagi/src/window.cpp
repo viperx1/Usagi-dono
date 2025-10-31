@@ -148,7 +148,6 @@ Window::Window()
     connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
     connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
 	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
-	connect(adbapi, SIGNAL(notifyFileChecked(QString,int)), this, SLOT(getNotifyFileChecked(QString,int)));
 	connect(markwatched, SIGNAL(stateChanged(int)), this, SLOT(markwatchedStateChanged(int)));
 
     // page hasher - hashes
@@ -574,24 +573,21 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			QString filePath = hashes->item(i, 2)->text();
 			adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
 			
-			// Always check file against API to populate local database
-			std::bitset<2> li(adbapi->LocalIdentify(data.size, data.hexdigest));
-			hashes->item(i, 3)->setText(QString((li[0])?"1":"0")); // LF - Local File
-			if(li[0] == 0)
-			{
-				// File not in local database, check against AniDB API
-				tag = adbapi->File(data.size, data.hexdigest);
-				hashes->item(i, 5)->setText(tag);
-			}
-			else
-			{
-				hashes->item(i, 5)->setText("0");
-			}
-			
-			// Only add to MyList if the checkbox is checked
 			if(addtomylist->checkState() > 0)
 			{
-				hashes->item(i, 4)->setText(QString((li[1])?"1":"0")); // LL - Local List
+				std::bitset<2> li(adbapi->LocalIdentify(data.size, data.hexdigest));
+				hashes->item(i, 3)->setText(QString((li[0])?"1":"0")); // LF
+				if(li[0] == 0)
+				{
+					tag = adbapi->File(data.size, data.hexdigest);
+					hashes->item(i, 5)->setText(tag);
+				}
+				else
+				{
+					hashes->item(i, 5)->setText("0");
+				}
+
+				hashes->item(i, 4)->setText(QString((li[1])?"1":"0")); // LL
 				if(li[1] == 0)
 				{
 					tag = adbapi->MylistAdd(data.size, data.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
@@ -601,6 +597,9 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 				{
 					hashes->item(i, 6)->setText("0");
 				}
+//				adbapi->File(data.size, data.hexdigest);
+//				QTableWidgetItem *itemtag = new QTableWidgetItem(QTableWidgetItem(tag));
+//				hashes->setItem(i, 3, itemtag);
 			}
 		}
 	}
@@ -764,30 +763,6 @@ void myAniDBApi::Debug(QString msg)
 	// Also emit signal to update Log tab in UI
 	emit notifyLogAppend(msg);
 //	window->logAppend(msg);
-}
-
-void Window::getNotifyFileChecked(QString tag, int code)
-{
-	QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyFileChecked() tag=" + tag + " code=" + QString::number(code);
-	qDebug() << logMsg;
-	getNotifyLogAppend(logMsg);
-	
-	for(int i=0; i<hashes->rowCount(); i++)
-	{
-		if(hashes->item(i, 5)->text() == tag)
-		{
-			QString localPath = hashes->item(i, 2)->text();
-			if(code == 220) // FILE found in AniDB
-			{
-				// Update status to 2 (in anidb)
-				adbapi->UpdateLocalFileStatus(localPath, 2);
-				getNotifyLogAppend(QString("File found in AniDB: %1").arg(localPath));
-			}
-			// Note: code 320 (NO SUCH FILE) is handled by getNotifyMylistAdd for UI updates
-			// The status update is done there to keep all UI-related changes together
-			return;
-		}
-	}
 }
 
 void Window::getNotifyMylistAdd(QString tag, int code)

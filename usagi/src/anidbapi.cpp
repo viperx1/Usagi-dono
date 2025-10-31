@@ -422,9 +422,6 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Debug("Database query error: " + query.lastError().text());
 		}
 		
-		// Emit signal that file was found in AniDB
-		emit notifyFileChecked(Tag, 220);
-		
 		// Parse anime/episode data if available (indices 27+)
 		// Anime data fields based on amask: eptotal|eplast|year|type|relaidlist|relaidtype|category|
 		//   nameromaji|namekanji|nameenglish|nameother|nameshort|synonyms|
@@ -704,7 +701,6 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag);
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
-        emit notifyFileChecked(Tag, 320);
         notifyMylistAdd(Tag, 320);
         // Mark packet as processed and received reply instead of deleting
         QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID).arg(Tag);
