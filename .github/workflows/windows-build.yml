@@ -65,6 +65,13 @@ jobs:
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
             2>&1 | tee build/configure_log.txt
 
+      - name: Check for zlib
+        shell: bash
+        run: |
+          echo "Searching for zlib..."
+          find / -type f \( -iname "zlib.h" -o -iname "libz.*" -o -iname "zlib*.a" \) 2>/dev/null | sort
+          echo "zlib presence check complete!"
+        
       - name: Build
         run: cmake --build build --config Release 2>&1 | tee build/build_log.txt
         shell: bash
