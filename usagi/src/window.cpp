@@ -148,6 +148,7 @@ Window::Window()
     connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
     connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
 	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
+	connect(adbapi, SIGNAL(notifyFileChecked(QString,int)), this, SLOT(getNotifyFileChecked(QString,int)));
 	connect(markwatched, SIGNAL(stateChanged(int)), this, SLOT(markwatchedStateChanged(int)));
 
     // page hasher - hashes
@@ -763,6 +764,35 @@ void myAniDBApi::Debug(QString msg)
 	// Also emit signal to update Log tab in UI
 	emit notifyLogAppend(msg);
 //	window->logAppend(msg);
+}
+
+void Window::getNotifyFileChecked(QString tag, int code)
+{
+	QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyFileChecked() tag=" + tag + " code=" + QString::number(code);
+	qDebug() << logMsg;
+	getNotifyLogAppend(logMsg);
+	
+	for(int i=0; i<hashes->rowCount(); i++)
+	{
+		if(hashes->item(i, 5)->text() == tag)
+		{
+			QString localPath = hashes->item(i, 2)->text();
+			if(code == 220) // FILE found in AniDB
+			{
+				// Update status to 2 (in anidb)
+				adbapi->UpdateLocalFileStatus(localPath, 2);
+				getNotifyLogAppend(QString("File found in AniDB: %1").arg(localPath));
+			}
+			else if(code == 320) // NO SUCH FILE
+			{
+				// Update status to 3 (not in anidb) - already handled in getNotifyMylistAdd
+				// but we update here too for consistency
+				adbapi->UpdateLocalFileStatus(localPath, 3);
+				getNotifyLogAppend(QString("File not found in AniDB: %1").arg(localPath));
+			}
+			return;
+		}
+	}
 }
 
 void Window::getNotifyMylistAdd(QString tag, int code)
