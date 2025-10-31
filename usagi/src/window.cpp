@@ -573,21 +573,24 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			QString filePath = hashes->item(i, 2)->text();
 			adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
 			
+			// Always check file against API to populate local database
+			std::bitset<2> li(adbapi->LocalIdentify(data.size, data.hexdigest));
+			hashes->item(i, 3)->setText(QString((li[0])?"1":"0")); // LF - Local File
+			if(li[0] == 0)
+			{
+				// File not in local database, check against AniDB API
+				tag = adbapi->File(data.size, data.hexdigest);
+				hashes->item(i, 5)->setText(tag);
+			}
+			else
+			{
+				hashes->item(i, 5)->setText("0");
+			}
+			
+			// Only add to MyList if the checkbox is checked
 			if(addtomylist->checkState() > 0)
 			{
-				std::bitset<2> li(adbapi->LocalIdentify(data.size, data.hexdigest));
-				hashes->item(i, 3)->setText(QString((li[0])?"1":"0")); // LF
-				if(li[0] == 0)
-				{
-					tag = adbapi->File(data.size, data.hexdigest);
-					hashes->item(i, 5)->setText(tag);
-				}
-				else
-				{
-					hashes->item(i, 5)->setText("0");
-				}
-
-				hashes->item(i, 4)->setText(QString((li[1])?"1":"0")); // LL
+				hashes->item(i, 4)->setText(QString((li[1])?"1":"0")); // LL - Local List
 				if(li[1] == 0)
 				{
 					tag = adbapi->MylistAdd(data.size, data.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
@@ -597,9 +600,6 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 				{
 					hashes->item(i, 6)->setText("0");
 				}
-//				adbapi->File(data.size, data.hexdigest);
-//				QTableWidgetItem *itemtag = new QTableWidgetItem(QTableWidgetItem(tag));
-//				hashes->setItem(i, 3, itemtag);
 			}
 		}
 	}
