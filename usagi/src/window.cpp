@@ -783,13 +783,8 @@ void Window::getNotifyFileChecked(QString tag, int code)
 				adbapi->UpdateLocalFileStatus(localPath, 2);
 				getNotifyLogAppend(QString("File found in AniDB: %1").arg(localPath));
 			}
-			else if(code == 320) // NO SUCH FILE
-			{
-				// Update status to 3 (not in anidb) - already handled in getNotifyMylistAdd
-				// but we update here too for consistency
-				adbapi->UpdateLocalFileStatus(localPath, 3);
-				getNotifyLogAppend(QString("File not found in AniDB: %1").arg(localPath));
-			}
+			// Note: code 320 (NO SUCH FILE) is handled by getNotifyMylistAdd for UI updates
+			// The status update is done there to keep all UI-related changes together
 			return;
 		}
 	}
