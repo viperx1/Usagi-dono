@@ -1,6 +1,7 @@
 // API definition available at https://wiki.anidb.net/UDP_API_Definition
 #include "anidbapi.h"
 #include "logger.h"
+#include <cmath>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
@@ -171,6 +172,48 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 
 AniDBApi::~AniDBApi()
 {
+}
+
+int AniDBApi::ed2khash(QString filepath)
+{
+	// Check if we already have a hash for this file in the database
+	QString existingHash = getLocalFileHash(filepath);
+	
+	if (!existingHash.isEmpty())
+	{
+		// We have an existing hash, reuse it
+		Debug(QString("Reusing existing hash for file: %1").arg(filepath));
+		
+		// Get file info to populate the struct
+		QFileInfo fileinfo(filepath);
+		
+		// Calculate the number of parts for this file (same as in ed2k.cpp)
+		qint64 fileSize = fileinfo.size();
+		qint64 numParts = ceil(static_cast<double>(fileSize) / 102400.0);
+		if (numParts == 0) numParts = 1; // At least 1 part for empty files
+		
+		// Emit progress signals for all parts to update the UI correctly
+		for (int i = 1; i <= numParts; i++) {
+			emit notifyPartsDone(numParts, i);
+		}
+		
+		// Populate the hash data structure with the existing hash
+		ed2kfilestruct hash;
+		hash.filename = fileinfo.fileName();
+		hash.size = fileSize;
+		hash.hexdigest = existingHash;
+		
+		// Emit the signal as if we just computed the hash
+		emit notifyFileHashed(hash);
+		
+		// Set ed2khashstr for compatibility
+		ed2khashstr = QString("ed2k://|file|%1|%2|%3|/").arg(hash.filename).arg(hash.size).arg(existingHash);
+		
+		return 1; // Success
+	}
+	
+	// No existing hash, compute it using the parent class method
+	return ed2k::ed2khash(filepath);
 }
 
 int AniDBApi::CreateSocket()
@@ -1604,6 +1647,26 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 	else
 	{
 		Debug("Failed to update local_files hash and status: " + query.lastError().text());
+	}
+}
+
+QString AniDBApi::getLocalFileHash(QString localPath)
+{
+	// Retrieve the ed2k_hash from local_files table for the given path
+	QSqlQuery query(db);
+	query.prepare("SELECT `ed2k_hash` FROM `local_files` WHERE `path` = ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
+	query.addBindValue(localPath);
+	
+	if(query.exec() && query.next())
+	{
+		QString hash = query.value(0).toString();
+		Debug(QString("Retrieved existing hash for path=%1").arg(localPath));
+		return hash;
+	}
+	else
+	{
+		Debug(QString("No existing hash found for path=%1").arg(localPath));
+		return QString();
 	}
 }
 

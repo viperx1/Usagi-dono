@@ -25,7 +25,7 @@ public:
 	void Init();
 	void Update(unsigned char *input, unsigned int inputLen);
 	void Final();
-	int ed2khash(QString);
+	virtual int ed2khash(QString);
 	std::string HexDigest();
 	QString FileName();
     qint64 FileSize();
