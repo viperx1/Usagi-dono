@@ -249,7 +249,6 @@ public:
 	QString GetSID();
 	QString GetRequestedExportTemplate(); // Get the template name that was requested for export
     QString GetTag(QString);
-	virtual void Debug(QString msg);
 	virtual int LoginStatus();
 	bool LoggedIn();
 //	int SetUserData(QString username, QString password);
