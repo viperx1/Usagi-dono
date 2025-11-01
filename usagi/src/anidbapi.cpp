@@ -38,7 +38,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		db = QSqlDatabase::addDatabase("QSQLITE");
 	}
 
-	QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+	QString path = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
 	QDir().mkpath(path); // make sure it exists
 	QString dbPath = path + "/usagi.sqlite";
 	
