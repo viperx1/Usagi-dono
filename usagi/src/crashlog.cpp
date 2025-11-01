@@ -716,7 +716,7 @@ void CrashLog::install()
 
 QString CrashLog::getLogFilePath()
 {
-    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     QDir dir;
     if (!dir.exists(logDir))
     {
@@ -729,7 +729,7 @@ QString CrashLog::getLogFilePath()
 
 void CrashLog::logMessage(const QString &message)
 {
-    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     QDir dir;
     if (!dir.exists(logDir))
     {
