@@ -103,8 +103,8 @@ DirectoryWatcher::~DirectoryWatcher()
 
 void DirectoryWatcher::startWatching(const QString &directory)
 {
-    QElapsedTimer timer;
-    timer.start();
+    QElapsedTimer totalTimer;
+    totalTimer.start();
     
     if (directory.isEmpty() || !QDir(directory).exists()) {
         Logger::log("DirectoryWatcher: Invalid directory: " + directory);
@@ -113,6 +113,9 @@ void DirectoryWatcher::startWatching(const QString &directory)
     
     // Stop watching current directory if any
     stopWatching();
+    
+    QElapsedTimer timer;
+    timer.start();
     
     m_watchedDirectory = directory;
     m_watcher->addPath(directory);
@@ -130,7 +133,7 @@ void DirectoryWatcher::startWatching(const QString &directory)
     // Defer initial scan to avoid UI freeze
     m_initialScanTimer->start();
     
-    qint64 totalTime = setupTime + loadTime;
+    qint64 totalTime = totalTimer.elapsed();
     Logger::log(QString("DirectoryWatcher: Started watching %1 (total startup: %2 ms) [directorywatcher.cpp]")
                 .arg(directory).arg(totalTime));
 }
@@ -289,13 +292,11 @@ void DirectoryWatcher::loadProcessedFiles()
     Logger::log(QString("DirectoryWatcher: Database query execution: %1 ms [directorywatcher.cpp]").arg(queryTime));
     
     timer.restart();
-    int rowCount = 0;
     while (query.next()) {
         QString filePath = query.value(0).toString();
         if (!filePath.isEmpty()) {
             m_processedFiles.insert(filePath);
         }
-        rowCount++;
     }
     
     qint64 rowProcessTime = timer.elapsed();
