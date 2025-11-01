@@ -2,6 +2,7 @@
 #include "anidbapi.h"
 #include "logger.h"
 #include <cmath>
+#include <QThread>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
@@ -1683,15 +1684,37 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 
 QString AniDBApi::getLocalFileHash(QString localPath)
 {
-	// Check if database is valid and open before using it
-	if (!db.isValid() || !db.isOpen())
+	// Get the database connection for this thread
+	// SQLite connections are not thread-safe, so we need a separate connection per thread
+	QSqlDatabase threadDb;
+	QString connectionName = QString("hash_query_thread_%1").arg((quintptr)QThread::currentThreadId());
+	
+	if (QSqlDatabase::contains(connectionName))
+	{
+		threadDb = QSqlDatabase::database(connectionName);
+	}
+	else
+	{
+		// Create a new connection for this thread
+		threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+		threadDb.setDatabaseName(db.databaseName());
+		
+		if (!threadDb.open())
+		{
+			Logger::log(QString("Failed to open thread-local database connection: %1").arg(threadDb.lastError().text()));
+			return QString();
+		}
+	}
+	
+	// Check if database is valid and open
+	if (!threadDb.isValid() || !threadDb.isOpen())
 	{
 		Logger::log(QString("Database not available, cannot retrieve hash for path=%1").arg(localPath));
 		return QString();
 	}
 	
 	// Retrieve the ed2k_hash from local_files table for the given path
-	QSqlQuery query(db);
+	QSqlQuery query(threadDb);
 	query.prepare("SELECT `ed2k_hash` FROM `local_files` WHERE `path` = ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
 	query.addBindValue(localPath);
 	
