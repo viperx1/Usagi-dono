@@ -1420,7 +1420,7 @@ int AniDBApi::SendPacket()
 	return 0;
 }
 
-unsigned long AniDBApi::LocalIdentify(int size, QString ed2khash)
+std::bitset<2> AniDBApi::LocalIdentify(int size, QString ed2khash)
 {
 	std::bitset<2> ret;
 	QString q = QString("SELECT `fid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'").arg(size).arg(ed2khash);
@@ -1428,7 +1428,7 @@ unsigned long AniDBApi::LocalIdentify(int size, QString ed2khash)
 	if(!query.exec(q))
 	{
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB LocalIdentify] Database query error: " + query.lastError().text());
-		return ret.to_ulong();
+		return ret;
 	}
 	
 	int fid = 0;
@@ -1437,7 +1437,7 @@ unsigned long AniDBApi::LocalIdentify(int size, QString ed2khash)
 		fid = query.value(0).toInt();
 		if(fid > 0)
 		{
-			ret[0] = 1;
+			ret[LI_FILE_IN_DB] = 1;  // File exists in local 'file' table
 		}
 	}
 	
@@ -1445,18 +1445,18 @@ unsigned long AniDBApi::LocalIdentify(int size, QString ed2khash)
 	if(!query.exec(q))
 	{
 		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB LocalIdentify] Database query error: " + query.lastError().text());
-		return ret.to_ulong();
+		return ret;
 	}
 	
 	if(query.next())
 	{
 		if(query.value(0).toInt() > 0)
 		{
-			ret[1] = 1;
+			ret[LI_FILE_IN_MYLIST] = 1;  // File exists in local 'mylist' table
 		}
 	}
 //	}
-	return ret.to_ulong();
+	return ret;
 }
 
 void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QString storage)

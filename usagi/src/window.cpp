@@ -576,8 +576,8 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			if(addtomylist->checkState() > 0)
 			{
 				std::bitset<2> li(adbapi->LocalIdentify(data.size, data.hexdigest));
-				hashes->item(i, 3)->setText(QString((li[0])?"1":"0")); // LF
-				if(li[0] == 0)
+				hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
+				if(li[AniDBApi::LI_FILE_IN_DB] == 0)
 				{
 					tag = adbapi->File(data.size, data.hexdigest);
 					hashes->item(i, 5)->setText(tag);
@@ -587,8 +587,8 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 					hashes->item(i, 5)->setText("0");
 				}
 
-				hashes->item(i, 4)->setText(QString((li[1])?"1":"0")); // LL
-				if(li[1] == 0)
+				hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
+				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
 				{
 					tag = adbapi->MylistAdd(data.size, data.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
 					hashes->item(i, 6)->setText(tag);
