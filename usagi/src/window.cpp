@@ -154,8 +154,8 @@ Window::Window()
 	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
 	connect(markwatched, SIGNAL(stateChanged(int)), this, SLOT(markwatchedStateChanged(int)));
 	
-	// Connect unified Logger to log tab
-	connect(Logger::instance(), SIGNAL(logMessage(QString)), this, SLOT(getNotifyLogAppend(QString)));
+	// Connect unified Logger to log tab using modern Qt5+ syntax for type safety
+	connect(Logger::instance(), &Logger::logMessage, this, &Window::getNotifyLogAppend);
 
     // page hasher - hashes
 	hashes->setColumnCount(9);
