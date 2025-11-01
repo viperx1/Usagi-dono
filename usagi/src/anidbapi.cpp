@@ -190,9 +190,8 @@ int AniDBApi::ed2khash(QString filepath)
 		// Verify the file still exists before reusing the hash
 		if (!fileinfo.exists())
 		{
-			Debug(QString("File no longer exists: %1 - will attempt to compute hash and handle error").arg(filepath));
+			Debug(QString("File no longer exists: %1 - delegating to base class which will return error code 2").arg(filepath));
 			// Fall through to let the base class handle the missing file case
-			// The base ed2k::ed2khash() will return error code 2 for missing files
 		}
 		else
 		{
@@ -201,6 +200,8 @@ int AniDBApi::ed2khash(QString filepath)
 			qint64 numParts = calculateHashParts(fileSize);
 			
 			// Emit progress signals for all parts to update the UI correctly
+			// This mirrors the behavior of the base class which emits one signal per chunk read
+			// The tight loop is acceptable because we're saving the time of actually hashing the file
 			for (int i = 1; i <= numParts; i++) {
 				emit notifyPartsDone(numParts, i);
 			}

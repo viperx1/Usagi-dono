@@ -42,8 +42,10 @@ void TestHashReuse::testHashReuse()
     query.addBindValue(filePath);
     query.addBindValue(QFileInfo(filePath).fileName());
     
-    // Extract just the hash from the ed2k link
-    QString hashOnly = firstHash.section('|', 4, 4);
+    // Extract just the hash from the ed2k link format: ed2k://|file|name|size|hash|/
+    // The hash is at position 4 (0-indexed: protocol, file, name, size, hash)
+    const int ED2K_HASH_FIELD_INDEX = 4;
+    QString hashOnly = firstHash.section('|', ED2K_HASH_FIELD_INDEX, ED2K_HASH_FIELD_INDEX);
     query.addBindValue(hashOnly);
     QVERIFY(query.exec());
     
