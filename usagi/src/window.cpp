@@ -703,8 +703,8 @@ void Window::getNotifyLogAppend(QString str)
 	a = QString("%1: %2").arg(t.toString()).arg(str);
 	logOutput->append(a);
 	
-	// Note: Logger already writes to persistent log file via CrashLog::logMessage
-	// This slot only needs to update the UI with timestamp
+	// Note: This slot updates the UI log tab with timestamp
+	// CrashLog is kept separate for emergency crash situations only
 }
 
 void Window::getNotifyLoginChagned(QString login)

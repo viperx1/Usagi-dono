@@ -1,5 +1,4 @@
 #include "logger.h"
-#include "crashlog.h"
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>
@@ -58,10 +57,7 @@ void Logger::log(const QString &msg, const QString &file, int line)
     // 1. Output to console (for development and debugging)
     qDebug().noquote() << fullMessage;
     
-    // 2. Write to persistent log file
-    CrashLog::logMessage(fullMessage);
-    
-    // 3. Emit signal for UI log tab (with timestamp)
+    // 2. Emit signal for UI log tab (with timestamp)
     // The timestamp will be added by the receiving slot to maintain consistency
     emit instance()->logMessage(fullMessage);
 }

@@ -2,19 +2,12 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include "../usagi/src/logger.h"
-#include "../usagi/src/crashlog.h"
 
 class TestLogger : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void initTestCase()
-    {
-        // Initialize crash log system (required for Logger to work)
-        CrashLog::install();
-    }
-
     void testLoggerSingleton()
     {
         // Test that Logger::instance() returns the same instance

@@ -9,9 +9,10 @@ The Usagi-dono application uses a unified logging system implemented in `logger.
 The unified Logger provides:
 
 1. **Console Output**: Messages are output to the console using `qDebug()` for development and debugging
-2. **Persistent Log File**: Messages are written to a persistent log file via `CrashLog::logMessage()`
-3. **UI Log Tab**: Messages are displayed in the application's Log tab through Qt signal/slot mechanism
-4. **File/Line Context**: Optional file and line number information for better debugging
+2. **UI Log Tab**: Messages are displayed in the application's Log tab through Qt signal/slot mechanism
+3. **File/Line Context**: Optional file and line number information for better debugging
+
+**Note**: CrashLog is intentionally kept separate and is only used for emergency crash situations, not for regular logging.
 
 ## Usage
 
@@ -63,17 +64,17 @@ The Logger is implemented as a singleton with the following components:
 
 1. Call `Logger::log(msg)` from anywhere in the code
 2. Logger outputs to console via `qDebug()`
-3. Logger writes to persistent file via `CrashLog::logMessage()`
-4. Logger emits `logMessage` signal
-5. Window receives signal and updates the Log tab UI with timestamp
+3. Logger emits `logMessage` signal
+4. Window receives signal and updates the Log tab UI with timestamp
 
 ### Integration
 
 The Logger is automatically integrated with:
 
 - **Window class**: Connected to receive log messages and display in UI
-- **CrashLog**: Uses CrashLog for persistent file logging
 - **All source files**: Every major source file includes at least one test log call
+
+**CrashLog Separation**: CrashLog is intentionally kept separate from the unified logging system. It is only used for emergency crash situations and diagnostic information, not for regular application logging.
 
 ## Migration from Old System
 

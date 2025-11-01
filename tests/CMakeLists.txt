@@ -566,12 +566,10 @@ add_test(NAME test_hash_storage COMMAND test_hash_storage -v2)
 set(LOGGER_TEST_SOURCES
     test_logger.cpp
     ../usagi/src/logger.cpp
-    ../usagi/src/crashlog.cpp
 )
 
 set(LOGGER_TEST_HEADERS
     ../usagi/src/logger.h
-    ../usagi/src/crashlog.h
 )
 
 add_executable(test_logger ${LOGGER_TEST_SOURCES} ${LOGGER_TEST_HEADERS})
@@ -589,11 +587,6 @@ target_link_libraries(test_logger PRIVATE
     Qt6::Test
     Qt6::Gui
 )
-
-# Link dbghelp on Windows for crash log functionality
-if(WIN32)
-    target_link_libraries(test_logger PRIVATE dbghelp)
-endif()
 
 target_include_directories(test_logger PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src

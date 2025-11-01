@@ -9,8 +9,9 @@
  * 
  * This class provides a centralized logging mechanism that:
  * - Outputs to console (qDebug) for development
- * - Writes to persistent log file via CrashLog
  * - Emits signal to update the Log tab in the UI
+ * 
+ * Note: CrashLog is intentionally kept separate for emergency crash situations only.
  * 
  * Usage:
  *   Logger::log("Your message here");
@@ -23,7 +24,7 @@ class Logger : public QObject
 public:
     /**
      * Main unified logging function
-     * Logs a message to console, persistent file, and UI log tab
+     * Logs a message to console and UI log tab
      * 
      * @param msg The message to log
      * @param file Optional source file name for context (default: empty)
