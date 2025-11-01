@@ -1687,6 +1687,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	// Get the database connection for this thread
 	// SQLite connections are not thread-safe, so we need a separate connection per thread
 	QSqlDatabase threadDb;
+	// Cast to quintptr ensures thread ID can be safely converted to string on all platforms
 	QString connectionName = QString("hash_query_thread_%1").arg((quintptr)QThread::currentThreadId());
 	
 	if (QSqlDatabase::contains(connectionName))
@@ -1695,6 +1696,13 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	}
 	else
 	{
+		// Verify the main database connection is valid before cloning it
+		if (!db.isValid() || db.databaseName().isEmpty())
+		{
+			Logger::log("Main database connection is invalid, cannot create thread-local connection");
+			return QString();
+		}
+		
 		// Create a new connection for this thread
 		threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
 		threadDb.setDatabaseName(db.databaseName());

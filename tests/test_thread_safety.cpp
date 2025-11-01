@@ -4,6 +4,7 @@
 #include <QSqlError>
 #include <QTemporaryFile>
 #include <QThread>
+#include <QScopedPointer>
 #include "../usagi/src/anidbapi.h"
 
 class TestThreadSafety : public QObject
@@ -57,7 +58,8 @@ void TestThreadSafety::testGetLocalFileHashFromWorkerThread()
     
     // Create a worker thread and access the database from it
     // This should not crash if thread-safety is implemented correctly
-    HashWorkerThread *worker = new HashWorkerThread(&api, testPath);
+    // Using QScopedPointer for automatic cleanup
+    QScopedPointer<HashWorkerThread> worker(new HashWorkerThread(&api, testPath));
     worker->start();
     
     // Wait for the worker thread to complete
@@ -67,7 +69,7 @@ void TestThreadSafety::testGetLocalFileHashFromWorkerThread()
     QVERIFY(worker->success);
     QCOMPARE(worker->retrievedHash, testHash);
     
-    delete worker;
+    // worker is automatically deleted by QScopedPointer
 }
 
 QTEST_MAIN(TestThreadSafety)
