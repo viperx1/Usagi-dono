@@ -187,32 +187,41 @@ int AniDBApi::ed2khash(QString filepath)
 		// Get file info to populate the struct
 		QFileInfo fileinfo(filepath);
 		
-		// Calculate the number of parts for this file (same as in ed2k.cpp)
-		qint64 fileSize = fileinfo.size();
-		qint64 numParts = ceil(static_cast<double>(fileSize) / 102400.0);
-		if (numParts == 0) numParts = 1; // At least 1 part for empty files
-		
-		// Emit progress signals for all parts to update the UI correctly
-		for (int i = 1; i <= numParts; i++) {
-			emit notifyPartsDone(numParts, i);
+		// Verify the file still exists before reusing the hash
+		if (!fileinfo.exists())
+		{
+			Debug(QString("File no longer exists, computing hash will fail: %1").arg(filepath));
+			// Fall through to compute hash, which will properly return error code 2
 		}
-		
-		// Populate the hash data structure with the existing hash
-		ed2kfilestruct hash;
-		hash.filename = fileinfo.fileName();
-		hash.size = fileSize;
-		hash.hexdigest = existingHash;
-		
-		// Emit the signal as if we just computed the hash
-		emit notifyFileHashed(hash);
-		
-		// Set ed2khashstr for compatibility
-		ed2khashstr = QString("ed2k://|file|%1|%2|%3|/").arg(hash.filename).arg(hash.size).arg(existingHash);
-		
-		return 1; // Success
+		else
+		{
+			// Calculate the number of parts for this file (same as in ed2k.cpp)
+			qint64 fileSize = fileinfo.size();
+			qint64 numParts = ceil(static_cast<double>(fileSize) / 102400.0);
+			if (numParts == 0) numParts = 1; // At least 1 part for empty files
+			
+			// Emit progress signals for all parts to update the UI correctly
+			for (int i = 1; i <= numParts; i++) {
+				emit notifyPartsDone(numParts, i);
+			}
+			
+			// Populate the hash data structure with the existing hash
+			ed2kfilestruct hash;
+			hash.filename = fileinfo.fileName();
+			hash.size = fileSize;
+			hash.hexdigest = existingHash;
+			
+			// Emit the signal as if we just computed the hash
+			emit notifyFileHashed(hash);
+			
+			// Set ed2khashstr for compatibility
+			ed2khashstr = QString("ed2k://|file|%1|%2|%3|/").arg(hash.filename).arg(hash.size).arg(existingHash);
+			
+			return 1; // Success
+		}
 	}
 	
-	// No existing hash, compute it using the parent class method
+	// No existing hash, or file doesn't exist - compute it using the parent class method
 	return ed2k::ed2khash(filepath);
 }
 
