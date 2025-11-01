@@ -10,6 +10,14 @@ ed2k::ed2k()
 {
 }
 
+qint64 ed2k::calculateHashParts(qint64 fileSize)
+{
+	// Calculate number of 102400-byte parts needed for this file
+	qint64 numParts = ceil(static_cast<double>(fileSize) / 102400.0);
+	if (numParts == 0) numParts = 1; // At least 1 part for empty files
+	return numParts;
+}
+
 void ed2k::Init()
 {
 	MD4::Init(&context1);

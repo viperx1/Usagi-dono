@@ -20,12 +20,14 @@ private:
     qint64 fileSize;
 	QString fileName;
 	bool dohash;
+protected:
+	static qint64 calculateHashParts(qint64 fileSize);
 public:
 	QString ed2khashstr;
 	void Init();
 	void Update(unsigned char *input, unsigned int inputLen);
 	void Final();
-	int ed2khash(QString);
+	virtual int ed2khash(QString);
 	std::string HexDigest();
 	QString FileName();
     qint64 FileSize();

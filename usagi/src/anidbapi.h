@@ -170,6 +170,9 @@ public:
 	AniDBApi(QString client_, int clientver_);
 	~AniDBApi();
 
+	/* === Hash function override === */
+	int ed2khash(QString filepath) override;
+
 	/* === Api Start */
 	QString Auth();
 	QString Logout();
@@ -210,6 +213,7 @@ public:
 	void UpdateLocalPath(QString tag, QString localPath);
 	void UpdateLocalFileStatus(QString localPath, int status);
 	void updateLocalFileHash(QString localPath, QString ed2kHash, int status);
+	QString getLocalFileHash(QString localPath);
 
 	/* === Socket Start */
 	int CreateSocket();
