@@ -340,6 +340,16 @@ Window::~Window()
     }
 }
 
+bool Window::validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName)
+{
+	if(!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Error: Database connection is not valid or not open in " + methodName);
+		return false;
+	}
+	return true;
+}
+
 void Window::Button1Click() // add files
 {
     QStringList files = QFileDialog::getOpenFileNames(0, 0, adbapi->getLastDirectory());
@@ -1107,9 +1117,8 @@ void Window::updateEpisodeInTree(int eid, int aid)
 	QSqlDatabase db = QSqlDatabase::database();
 	
 	// Validate database connection
-	if(!db.isValid() || !db.isOpen())
+	if(!validateDatabaseConnection(db, "updateEpisodeInTree"))
 	{
-		Logger::log("Error: Database connection is not valid or not open in updateEpisodeInTree");
 		return;
 	}
 	
@@ -1233,9 +1242,8 @@ void Window::loadMylistFromDatabase()
 	QSqlDatabase db = QSqlDatabase::database();
 	
 	// Validate database connection before proceeding
-	if(!db.isValid() || !db.isOpen())
+	if(!validateDatabaseConnection(db, "loadMylistFromDatabase"))
 	{
-		Logger::log("Error: Database connection is not valid or not open in loadMylistFromDatabase");
 		mylistStatusLabel->setText("MyList Status: Database Error");
 		return;
 	}
@@ -1510,9 +1518,8 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	QSqlDatabase db = QSqlDatabase::database();
 	
 	// Validate database connection
-	if(!db.isValid() || !db.isOpen())
+	if(!validateDatabaseConnection(db, "parseMylistExport"))
 	{
-		Logger::log("Error: Database connection is not valid or not open in parseMylistExport");
 		return 0;
 	}
 	
@@ -1746,9 +1753,8 @@ bool Window::isMylistFirstRunComplete()
 	QSqlDatabase db = QSqlDatabase::database();
 	
 	// Validate database connection
-	if(!db.isValid() || !db.isOpen())
+	if(!validateDatabaseConnection(db, "isMylistFirstRunComplete"))
 	{
-		Logger::log("Error: Database connection is not valid or not open in isMylistFirstRunComplete");
 		return false;  // Default to false if database is not available
 	}
 	
@@ -1769,9 +1775,8 @@ void Window::setMylistFirstRunComplete()
 	QSqlDatabase db = QSqlDatabase::database();
 	
 	// Validate database connection
-	if(!db.isValid() || !db.isOpen())
+	if(!validateDatabaseConnection(db, "setMylistFirstRunComplete"))
 	{
-		Logger::log("Error: Database connection is not valid or not open in setMylistFirstRunComplete");
 		return;
 	}
 	
