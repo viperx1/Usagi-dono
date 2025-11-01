@@ -1,5 +1,6 @@
 // API definition available at https://wiki.anidb.net/UDP_API_Definition
 #include "anidbapi.h"
+#include "logger.h"
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
@@ -1364,10 +1365,9 @@ int AniDBApi::Recv()
 
 void AniDBApi::Debug(QString msg)
 {
-	// Use qDebug instead of QMessageBox for non-blocking output
-	// QMessageBox blocks and is not suitable for automated tests
-	qDebug() << "AniDBApi:" << msg;
-	// QMessageBox(QMessageBox::NoIcon, "", msg).exec();
+	// Use unified logging system
+	Logger::log(msg);
+}
 }
 
 

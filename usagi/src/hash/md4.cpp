@@ -29,12 +29,20 @@
 #include <iomanip>
 #include <sstream>
 #include "md4.h"
+#include "../logger.h"
 
+// Static flag to log only once
+static bool s_md4Logged = false;
 
 
 // F, G and H are basic MD4 functions.
 MD4::UINT4 MD4::F(UINT4 x, UINT4 y, UINT4 z)
 {
+	// Log only once when first MD4 function is called
+	if (!s_md4Logged) {
+		Logger::log("MD4 hashing system initialized [md4.cpp]");
+		s_md4Logged = true;
+	}
 	return (((x) & (y)) | ((~x) & (z)));
 }
 

@@ -1,6 +1,7 @@
 #include <QtWidgets/QApplication>
 #include "window.h"
 #include "crashlog.h"
+#include "logger.h"
 //#include "main.h"
 
 // Import static plugins for Qt static builds
@@ -23,6 +24,9 @@ int main(int argc, char *argv[])
     
     // Install crash log handler
     CrashLog::install();
+    
+    // Test unified logging system
+    Logger::log("Usagi-dono application starting [main.cpp]");
     
     app.addLibraryPath(".\\plugins");
     window = new Window;

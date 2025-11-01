@@ -561,3 +561,42 @@ endif()
 
 add_test(NAME test_hash_storage COMMAND test_hash_storage -v2)
 
+
+# Test 18: Logger unified logging system
+set(LOGGER_TEST_SOURCES
+    test_logger.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(LOGGER_TEST_HEADERS
+    ../usagi/src/logger.h
+)
+
+add_executable(test_logger ${LOGGER_TEST_SOURCES} ${LOGGER_TEST_HEADERS})
+
+target_compile_definitions(test_logger PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_logger PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_logger PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Gui
+)
+
+target_include_directories(test_logger PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_logger PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_logger COMMAND test_logger -v2)

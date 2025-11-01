@@ -1,9 +1,18 @@
 #include "aired.h"
+#include "logger.h"
 #include <QDateTime>
+
+// Static flag to log only once
+static bool s_airedLogged = false;
 
 aired::aired()
     : m_startDate(), m_endDate()
 {
+    // Log only once when first aired object is created
+    if (!s_airedLogged) {
+        Logger::log("aired date system initialized [aired.cpp]");
+        s_airedLogged = true;
+    }
 }
 
 aired::aired(const QString& startDateStr, const QString& endDateStr)
