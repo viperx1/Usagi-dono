@@ -283,12 +283,15 @@ void DirectoryWatcher::loadProcessedFiles()
     // Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
     // Files with status=1 need to be detected so they can be checked against API
     timer.restart();
-    if (!query.exec("SELECT path FROM local_files WHERE status >= 2")) {
-        Logger::log("DirectoryWatcher: Failed to query local_files table: " + query.lastError().text());
+    bool querySuccess = query.exec("SELECT path FROM local_files WHERE status >= 2");
+    qint64 queryTime = timer.elapsed();
+    
+    if (!querySuccess) {
+        Logger::log(QString("DirectoryWatcher: Failed to query local_files table (query time: %1 ms): %2")
+                    .arg(queryTime).arg(query.lastError().text()));
         return;
     }
     
-    qint64 queryTime = timer.elapsed();
     Logger::log(QString("DirectoryWatcher: Database query execution: %1 ms [directorywatcher.cpp]").arg(queryTime));
     
     timer.restart();
