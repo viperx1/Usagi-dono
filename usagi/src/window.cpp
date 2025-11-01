@@ -492,8 +492,7 @@ void Window::ButtonLoginClick()
 {
     bool loggedin = adbapi->LoggedIn();
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " loggedin=" + (loggedin ? "true" : "false");
-    qDebug() << logMsg;
-    getNotifyLogAppend(logMsg);
+    Logger::log(logMsg);
     if(loggedin == true)
     {
         adbapi->Logout();
@@ -739,7 +738,7 @@ void Window::closeEvent(QCloseEvent *event)
 
 void Window::saveSettings()
 {
-	qDebug()<<editLogin->text()<<editPassword->text();
+	Logger::log("Saving settings - username: " + editLogin->text());
 	adbapi->setUsername(editLogin->text());
 	adbapi->setPassword(editPassword->text());
 	
@@ -772,8 +771,7 @@ void myAniDBApi::Debug(QString msg)
 void Window::getNotifyMylistAdd(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyMylistAdd() tag=" + tag + " code=" + QString::number(code);
-    qDebug() << logMsg;
-    getNotifyLogAppend(logMsg);
+    Logger::log(logMsg);
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
         if(hashes->item(i, 5)->text() == tag || hashes->item(i, 6)->text() == tag)
@@ -786,8 +784,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 hashes->item(i, 0)->setBackground(green_light.toRgb());
                 hashes->item(i, 1)->setText("2");
                 QString msg310 = "310-2";
-                qDebug() << msg310;
-                getNotifyLogAppend(msg310);
+                Logger::log(msg310);
                 
                 // Store local file path for already existing entry
                 QString localPath = hashes->item(i, 2)->text();
@@ -802,8 +799,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 hashes->item(i, 0)->setBackground(red.toRgb());
                 hashes->item(i, 1)->setText("4"); // no such file
                 QString msg320 = "320-4";
-                qDebug() << msg320;
-                getNotifyLogAppend(msg320);
+                Logger::log(msg320);
                 
                 // Update status in local_files to 3 (not in anidb)
                 QString localPath = hashes->item(i, 2)->text();
@@ -816,8 +812,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 hashes->item(i, 0)->setBackground(green_dark.toRgb());
 				hashes->item(i, 1)->setText("3");
                 QString msg311 = "311/210-3";
-                qDebug() << msg311;
-                getNotifyLogAppend(msg311);
+                Logger::log(msg311);
 				
 				// Store local file path for newly added entry
 				QString localPath = hashes->item(i, 2)->text();
@@ -838,8 +833,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 void Window::getNotifyLoggedIn(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] Login notification received - Tag: " + tag + " Code: " + QString::number(code);
-    qDebug() << logMsg;
-    getNotifyLogAppend(logMsg);
+    Logger::log(logMsg);
     loginbutton->setText(QString("Logout - logged in with tag %1 and code %2").arg(tag).arg(code));
 	
 	// Enable notifications after successful login
@@ -850,17 +844,13 @@ void Window::getNotifyLoggedIn(QString tag, int code)
 void Window::getNotifyLoggedOut(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] getNotifyLoggedOut";
-    qDebug() << logMsg;
-    getNotifyLogAppend(logMsg);
+    Logger::log(logMsg);
     loginbutton->setText(QString("Login - logged out with tag %1 and code %2").arg(tag).arg(code));
 }
 
 void Window::getNotifyMessageReceived(int nid, QString message)
 {
-	QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] Notification received: " + QString::number(nid) + " " + message;
-	qDebug() << logMsg;
-	getNotifyLogAppend(logMsg);
-	Logger::log(QString("Notification %1 received").arg(nid));
+	Logger::log(QString("Notification %1 received: %2").arg(nid).arg(message));
 	
 	// Prevent downloading multiple exports simultaneously
 	static bool isDownloadingExport = false;
