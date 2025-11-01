@@ -660,3 +660,27 @@ endif()
 
 add_test(NAME test_hash_reuse COMMAND test_hash_reuse -v2)
 
+# Test 20: Database connection validation
+add_executable(test_database_validation test_database_validation.cpp)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_database_validation PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_database_validation PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_database_validation PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_database_validation COMMAND test_database_validation -v2)
+
