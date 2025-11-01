@@ -1662,6 +1662,13 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 
 QString AniDBApi::getLocalFileHash(QString localPath)
 {
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		Logger::log(QString("Database not available, cannot retrieve hash for path=%1").arg(localPath));
+		return QString();
+	}
+	
 	// Retrieve the ed2k_hash from local_files table for the given path
 	QSqlQuery query(db);
 	query.prepare("SELECT `ed2k_hash` FROM `local_files` WHERE `path` = ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
