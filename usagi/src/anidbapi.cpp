@@ -1368,14 +1368,6 @@ int AniDBApi::Recv()
 	return 0;
 }
 
-void AniDBApi::Debug(QString msg)
-{
-	// Use unified logging system
-	Logger::log(msg);
-}
-}
-
-
 int AniDBApi::LoginStatus()
 {
 	return 1;
