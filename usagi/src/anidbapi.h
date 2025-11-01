@@ -190,7 +190,7 @@ public:
 	QString buildEpisodeCommand(int eid);
 	/* Api End === */
 
-	unsigned long LocalIdentify(int size, QString ed2khash);
+	std::bitset<2> LocalIdentify(int size, QString ed2khash);
 	void UpdateFile(int size, QString ed2khash, int viewed, int state, QString storage);
 	void UpdateLocalPath(QString tag, QString localPath);
 	void UpdateLocalFileStatus(QString localPath, int status);
