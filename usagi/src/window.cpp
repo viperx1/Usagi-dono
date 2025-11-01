@@ -1105,6 +1105,14 @@ void Window::updateEpisodeInTree(int eid, int aid)
 {
 	// Query the database for the updated episode data
 	QSqlDatabase db = QSqlDatabase::database();
+	
+	// Validate database connection
+	if(!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Error: Database connection is not valid or not open in updateEpisodeInTree");
+		return;
+	}
+	
 	QString query = QString("SELECT epno, name FROM episode WHERE eid = %1").arg(eid);
 	QSqlQuery q(db);
 	
@@ -1223,6 +1231,15 @@ void Window::loadMylistFromDatabase()
 	// Query the database for mylist entries joined with anime and episode data
 	// Also try to get anime name from anime_titles table if anime table is empty
 	QSqlDatabase db = QSqlDatabase::database();
+	
+	// Validate database connection before proceeding
+	if(!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Error: Database connection is not valid or not open in loadMylistFromDatabase");
+		mylistStatusLabel->setText("MyList Status: Database Error");
+		return;
+	}
+	
 	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
 					"e.name as episode_name, e.epno, "
@@ -1492,6 +1509,13 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	int count = 0;
 	QSqlDatabase db = QSqlDatabase::database();
 	
+	// Validate database connection
+	if(!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Error: Database connection is not valid or not open in parseMylistExport");
+		return 0;
+	}
+	
 	// Extract tar.gz to temporary directory
 	QString tempDir = QDir::tempPath() + "/usagi_mylist_" + QString::number(QDateTime::currentMSecsSinceEpoch());
 	QDir().mkpath(tempDir);
@@ -1720,6 +1744,14 @@ bool Window::isMylistFirstRunComplete()
 {
 	// Check if mylist first run has been completed
 	QSqlDatabase db = QSqlDatabase::database();
+	
+	// Validate database connection
+	if(!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Error: Database connection is not valid or not open in isMylistFirstRunComplete");
+		return false;  // Default to false if database is not available
+	}
+	
 	QSqlQuery query(db);
 	query.exec("SELECT `value` FROM `settings` WHERE `name` = 'mylist_first_run_complete'");
 	
@@ -1735,6 +1767,14 @@ void Window::setMylistFirstRunComplete()
 {
 	// Mark mylist first run as complete
 	QSqlDatabase db = QSqlDatabase::database();
+	
+	// Validate database connection
+	if(!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Error: Database connection is not valid or not open in setMylistFirstRunComplete");
+		return;
+	}
+	
 	QSqlQuery query(db);
 	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'mylist_first_run_complete', '1')");
 	query.exec(q);
