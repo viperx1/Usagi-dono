@@ -65,7 +65,7 @@ void TestHashReuse::testProgressSignalsEmitted()
     QTemporaryFile tempFile;
     QVERIFY(tempFile.open());
     
-    // Write 200KB of data (should result in 2 parts: 102400 + 102400)
+    // Write 200KB of data (should result in 2 parts of 102400 bytes each)
     QByteArray testData(200 * 1024, 'X');
     tempFile.write(testData);
     tempFile.close();

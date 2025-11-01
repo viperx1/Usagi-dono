@@ -20,6 +20,8 @@ private:
     qint64 fileSize;
 	QString fileName;
 	bool dohash;
+protected:
+	static qint64 calculateHashParts(qint64 fileSize);
 public:
 	QString ed2khashstr;
 	void Init();
