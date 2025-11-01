@@ -4,12 +4,8 @@
 #include "logger.h"
 //#include "main.h"
 
-// Import static plugins for Qt static builds
-#ifdef QT_STATIC
-#include <QtPlugin>
-Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
-Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
-#endif
+// Note: Qt static plugins are imported via qt_import_plugins() in CMakeLists.txt
+// Manual Q_IMPORT_PLUGIN() is not needed and causes conflicts
 
 //myAniDBApi *adbapi;
 Window *window;
