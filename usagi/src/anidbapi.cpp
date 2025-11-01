@@ -1545,6 +1545,13 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 
 void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 {
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		Debug("Database not available, cannot update local path");
+		return;
+	}
+	
 	// Get the original MYLISTADD command from packets table using the tag
 	QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = '%1'").arg(tag);
 	QSqlQuery query(db);
@@ -1624,6 +1631,13 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 
 void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 {
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		Debug("Database not available, cannot update local file status");
+		return;
+	}
+	
 	// Update the status in local_files table
 	QSqlQuery query(db);
 	query.prepare("UPDATE `local_files` SET `status` = ? WHERE `path` = ?");
@@ -1642,6 +1656,13 @@ void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 
 void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int status)
 {
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		Debug("Database not available, cannot update local file hash");
+		return;
+	}
+	
 	// Update the ed2k_hash and status in local_files table
 	// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 	QSqlQuery query(db);
