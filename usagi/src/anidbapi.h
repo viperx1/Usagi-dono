@@ -148,13 +148,6 @@ private:
         fFILENAME =			0x00000001
 	};
 
-	// LocalIdentify return bitset indices
-	enum LocalIdentifyBits
-	{
-		LI_FILE_IN_DB = 0,		// Bit 0: File exists in local 'file' table (has valid fid)
-		LI_FILE_IN_MYLIST = 1	// Bit 1: File exists in local 'mylist' table (has valid lid)
-	};
-
 	//wxDatagramSocket *Socket; // UDP socket
 	//wxIPV4address addrLocal; // local address/port
 	//wxIPV4address addrPeer; // remote address/port
@@ -168,6 +161,12 @@ protected:
     bool banned;
 	QString bannedfor;
 public:
+	// LocalIdentify return bitset indices
+	enum LocalIdentifyBits
+	{
+		LI_FILE_IN_DB = 0,		// Bit 0: File exists in local 'file' table (has valid fid)
+		LI_FILE_IN_MYLIST = 1	// Bit 1: File exists in local 'mylist' table (has valid lid)
+	};
 	AniDBApi(QString client_, int clientver_);
 	~AniDBApi();
 
