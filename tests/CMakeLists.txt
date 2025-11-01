@@ -30,11 +30,13 @@ set(HASH_TEST_SOURCES
     test_hash.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/logger.cpp
 )
 
 set(HASH_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/hash/ed2k.h
+    ../usagi/src/logger.h
 )
 
 add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
@@ -113,6 +115,7 @@ set(ANIDBAPI_TEST_SOURCES
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
 )
 
 set(ANIDBAPI_TEST_HEADERS
@@ -120,6 +123,7 @@ set(ANIDBAPI_TEST_HEADERS
     ../usagi/src/hash/ed2k.h
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
 )
 
 add_executable(test_anidbapi ${ANIDBAPI_TEST_SOURCES} ${ANIDBAPI_TEST_HEADERS})
@@ -162,6 +166,7 @@ set(ANIME_TITLES_TEST_SOURCES
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
 )
 
 set(ANIME_TITLES_TEST_HEADERS
@@ -169,6 +174,7 @@ set(ANIME_TITLES_TEST_HEADERS
     ../usagi/src/hash/ed2k.h
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
 )
 
 add_executable(test_anime_titles ${ANIME_TITLES_TEST_SOURCES} ${ANIME_TITLES_TEST_HEADERS})
@@ -274,7 +280,7 @@ endif()
 add_test(NAME test_export_template_verification COMMAND test_export_template_verification -v2)
 
 # Test 8: Episode number type (epno)
-add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp)
+add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -372,7 +378,7 @@ endif()
 add_test(NAME test_evangelion_ha_fix COMMAND test_evangelion_ha_fix -v2)
 
 # Test 12: Aired date type
-add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp)
+add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -399,7 +405,7 @@ endif()
 add_test(NAME test_aired COMMAND test_aired -v2)
 
 # Test 13: MyList Type and Aired columns integration
-add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp)
+add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -427,7 +433,7 @@ endif()
 add_test(NAME test_mylist_type_aired COMMAND test_mylist_type_aired -v2)
 
 # Test 14: Mylist columns fix test (Type and Aired columns)
-add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp)
+add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -455,7 +461,7 @@ endif()
 add_test(NAME test_mylist_columns_fix COMMAND test_mylist_columns_fix -v2)
 
 # Test 15: MyList aired sorting
-add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp)
+add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -482,7 +488,7 @@ endif()
 add_test(NAME test_mylist_aired_sorting COMMAND test_mylist_aired_sorting -v2)
 
 # Test 16: Directory watcher
-add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp)
+add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -520,6 +526,7 @@ set(HASH_STORAGE_TEST_SOURCES
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
 )
 
 set(HASH_STORAGE_TEST_HEADERS
@@ -527,6 +534,7 @@ set(HASH_STORAGE_TEST_HEADERS
     ../usagi/src/hash/ed2k.h
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
 )
 
 add_executable(test_hash_storage ${HASH_STORAGE_TEST_SOURCES} ${HASH_STORAGE_TEST_HEADERS})
