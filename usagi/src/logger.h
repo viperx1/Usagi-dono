@@ -45,7 +45,6 @@ signals:
     
 private:
     Logger();
-    static Logger* s_instance;
 };
 
 /**

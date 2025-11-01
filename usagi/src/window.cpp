@@ -704,8 +704,7 @@ void Window::getNotifyLogAppend(QString str)
 	logOutput->append(a);
 	
 	// Note: Logger already writes to persistent log file via CrashLog::logMessage
-	// So we don't need to duplicate that here if the message came from Logger
-	// However, myAniDBApi still emits notifyLogAppend signal, so we keep this for backward compatibility
+	// This slot only needs to update the UI with timestamp
 }
 
 void Window::getNotifyLoginChagned(QString login)

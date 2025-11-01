@@ -2,9 +2,11 @@
 #include "crashlog.h"
 #include <QDebug>
 #include <QDateTime>
+#include <QMutex>
 
-// Static instance pointer
-Logger* Logger::s_instance = nullptr;
+// Static instance pointer and mutex for thread safety
+static Logger* s_instance = nullptr;
+static QMutex s_instanceMutex;
 
 Logger::Logger() : QObject(nullptr)
 {
@@ -12,9 +14,14 @@ Logger::Logger() : QObject(nullptr)
 
 Logger* Logger::instance()
 {
+    // Double-checked locking pattern for thread-safe singleton
     if (!s_instance)
     {
-        s_instance = new Logger();
+        QMutexLocker locker(&s_instanceMutex);
+        if (!s_instance)
+        {
+            s_instance = new Logger();
+        }
     }
     return s_instance;
 }
