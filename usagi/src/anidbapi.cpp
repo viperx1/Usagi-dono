@@ -1437,7 +1437,7 @@ std::bitset<2> AniDBApi::LocalIdentify(int size, QString ed2khash)
 		fid = query.value(0).toInt();
 		if(fid > 0)
 		{
-			ret[0] = 1;
+			ret[LI_FILE_IN_DB] = 1;  // File exists in local 'file' table
 		}
 	}
 	
@@ -1452,7 +1452,7 @@ std::bitset<2> AniDBApi::LocalIdentify(int size, QString ed2khash)
 	{
 		if(query.value(0).toInt() > 0)
 		{
-			ret[1] = 1;
+			ret[LI_FILE_IN_MYLIST] = 1;  // File exists in local 'mylist' table
 		}
 	}
 //	}

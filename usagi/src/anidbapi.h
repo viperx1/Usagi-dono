@@ -148,6 +148,13 @@ private:
         fFILENAME =			0x00000001
 	};
 
+	// LocalIdentify return bitset indices
+	enum LocalIdentifyBits
+	{
+		LI_FILE_IN_DB = 0,		// Bit 0: File exists in local 'file' table (has valid fid)
+		LI_FILE_IN_MYLIST = 1	// Bit 1: File exists in local 'mylist' table (has valid lid)
+	};
+
 	//wxDatagramSocket *Socket; // UDP socket
 	//wxIPV4address addrLocal; // local address/port
 	//wxIPV4address addrPeer; // remote address/port
@@ -190,6 +197,15 @@ public:
 	QString buildEpisodeCommand(int eid);
 	/* Api End === */
 
+	/**
+	 * Check if a file exists in the local database.
+	 * 
+	 * @param size File size in bytes
+	 * @param ed2khash ED2K hash of the file
+	 * @return std::bitset<2> where:
+	 *         - bit[LI_FILE_IN_DB] (0): true if file exists in local 'file' table
+	 *         - bit[LI_FILE_IN_MYLIST] (1): true if file exists in local 'mylist' table
+	 */
 	std::bitset<2> LocalIdentify(int size, QString ed2khash);
 	void UpdateFile(int size, QString ed2khash, int viewed, int state, QString storage);
 	void UpdateLocalPath(QString tag, QString localPath);
