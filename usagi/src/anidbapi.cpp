@@ -182,7 +182,7 @@ int AniDBApi::ed2khash(QString filepath)
 	if (!existingHash.isEmpty())
 	{
 		// We have an existing hash, reuse it
-		Debug(QString("Reusing existing hash for file: %1").arg(filepath));
+		Logger::log(QString("Reusing existing hash for file: %1").arg(filepath));
 		
 		// Get file info to populate the struct
 		QFileInfo fileinfo(filepath);
@@ -190,7 +190,7 @@ int AniDBApi::ed2khash(QString filepath)
 		// Verify the file still exists before reusing the hash
 		if (!fileinfo.exists())
 		{
-			Debug(QString("File no longer exists: %1 - delegating to base class which will return error code 2").arg(filepath));
+			Logger::log(QString("File no longer exists: %1 - delegating to base class which will return error code 2").arg(filepath));
 			// Fall through to let the base class handle the missing file case
 		}
 		else
@@ -1670,12 +1670,12 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	if(query.exec() && query.next())
 	{
 		QString hash = query.value(0).toString();
-		Debug(QString("Retrieved existing hash for path=%1").arg(localPath));
+		Logger::log(QString("Retrieved existing hash for path=%1").arg(localPath));
 		return hash;
 	}
 	else
 	{
-		Debug(QString("No existing hash found for path=%1").arg(localPath));
+		Logger::log(QString("No existing hash found for path=%1").arg(localPath));
 		return QString();
 	}
 }
