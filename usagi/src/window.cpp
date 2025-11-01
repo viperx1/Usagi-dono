@@ -2,6 +2,7 @@
 #include "window.h"
 #include "hasherthread.h"
 #include "crashlog.h"
+#include "logger.h"
 
 HasherThread hasherThread;
 myAniDBApi *adbapi;
@@ -16,6 +17,9 @@ Window::Window()
 //	settings = new QSettings("settings.dat", QSettings::IniFormat);
 //	adbapi->SetUsername(settings->value("username").toString());
 //	adbapi->SetPassword(settings->value("password").toString());
+	
+	// Test unified logging system
+	Logger::log("Window constructor initializing [window.cpp]");
 	
 	// Initialize notification tracking
 	expectedNotificationsToCheck = 0;
@@ -149,6 +153,9 @@ Window::Window()
     connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
 	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
 	connect(markwatched, SIGNAL(stateChanged(int)), this, SLOT(markwatchedStateChanged(int)));
+	
+	// Connect unified Logger to log tab
+	connect(Logger::instance(), SIGNAL(logMessage(QString)), this, SLOT(getNotifyLogAppend(QString)));
 
     // page hasher - hashes
 	hashes->setColumnCount(9);
@@ -696,8 +703,9 @@ void Window::getNotifyLogAppend(QString str)
 	a = QString("%1: %2").arg(t.toString()).arg(str);
 	logOutput->append(a);
 	
-	// Also write to persistent log file
-	CrashLog::logMessage(str);
+	// Note: Logger already writes to persistent log file via CrashLog::logMessage
+	// So we don't need to duplicate that here if the message came from Logger
+	// However, myAniDBApi still emits notifyLogAppend signal, so we keep this for backward compatibility
 }
 
 void Window::getNotifyLoginChagned(QString login)
@@ -741,7 +749,7 @@ void Window::saveSettings()
 	adbapi->setWatcherDirectory(watcherDirectory->text());
 	adbapi->setWatcherAutoStart(watcherAutoStart->isChecked());
 	
-	logOutput->append("Settings saved");
+	Logger::log("Settings saved");
 }
 
 void Window::apitesterProcess()
@@ -758,11 +766,8 @@ void Window::apitesterProcess()
 
 void myAniDBApi::Debug(QString msg)
 {
-	// Output to console (for development and debugging)
-	qDebug() << msg;
-	// Also emit signal to update Log tab in UI
-	emit notifyLogAppend(msg);
-//	window->logAppend(msg);
+	// Use unified logging system
+	Logger::log(msg);
 }
 
 void Window::getNotifyMylistAdd(QString tag, int code)
@@ -840,7 +845,7 @@ void Window::getNotifyLoggedIn(QString tag, int code)
 	
 	// Enable notifications after successful login
 	adbapi->NotifyEnable();
-	logOutput->append("Notifications enabled");
+	Logger::log("Notifications enabled");
 }
 
 void Window::getNotifyLoggedOut(QString tag, int code)
@@ -856,7 +861,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] Notification received: " + QString::number(nid) + " " + message;
 	qDebug() << logMsg;
 	getNotifyLogAppend(logMsg);
-	logOutput->append(QString("Notification %1 received").arg(nid));
+	Logger::log(QString("Notification %1 received").arg(nid));
 	
 	// Prevent downloading multiple exports simultaneously
 	static bool isDownloadingExport = false;
@@ -893,7 +898,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		// If a template was requested, verify the message mentions it
 		if(!expectedTemplate.isEmpty() && !message.contains(expectedTemplate, Qt::CaseInsensitive))
 		{
-			logOutput->append(QString("MyList export link found but template mismatch: expected '%1', skipping").arg(expectedTemplate));
+			Logger::log(QString("MyList export link found but template mismatch: expected '%1', skipping").arg(expectedTemplate));
 			
 			// Track notifications checked without finding correct export
 			if(isCheckingNotifications)
@@ -906,7 +911,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					// Only auto-request export on first run
 					if(!isMylistFirstRunComplete())
 					{
-						logOutput->append(QString("Checked %1 notifications with no matching export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
+						Logger::log(QString("Checked %1 notifications with no matching export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
 						mylistStatusLabel->setText("MyList Status: Requesting export (first run)...");
 						
 						// Request MYLISTEXPORT with xml-plain-cs template (default)
@@ -916,7 +921,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					}
 					else
 					{
-						logOutput->append(QString("Checked %1 notifications with no matching export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
+						Logger::log(QString("Checked %1 notifications with no matching export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
 						mylistStatusLabel->setText("MyList Status: No export found - request manually in Settings");
 					}
 					
@@ -930,7 +935,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		}
 		
 		isDownloadingExport = true;
-		logOutput->append(QString("MyList export link found: %1").arg(exportUrl));
+		Logger::log(QString("MyList export link found: %1").arg(exportUrl));
 		mylistStatusLabel->setText("MyList Status: Downloading export...");
 		
 		// Reset notification checking state since we found an export
@@ -959,7 +964,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					file.write(reply->readAll());
 					file.close();
 					
-					logOutput->append(QString("Export downloaded to: %1").arg(tempPath));
+					Logger::log(QString("Export downloaded to: %1").arg(tempPath));
 					mylistStatusLabel->setText("MyList Status: Parsing export...");
 					
 					// Parse the xml-plain-cs file
@@ -967,7 +972,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					
 					if(count > 0)
 					{
-						logOutput->append(QString("Successfully imported %1 mylist entries").arg(count));
+						Logger::log(QString("Successfully imported %1 mylist entries").arg(count));
 						mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(count));
 						loadMylistFromDatabase();  // Refresh the display
 						
@@ -976,7 +981,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					}
 					else
 					{
-						logOutput->append("No entries imported from notification export");
+						Logger::log("No entries imported from notification export");
 						mylistStatusLabel->setText("MyList Status: Import failed");
 					}
 					
@@ -985,13 +990,13 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 				}
 				else
 				{
-					logOutput->append("Error: Cannot save export file");
+					Logger::log("Error: Cannot save export file");
 					mylistStatusLabel->setText("MyList Status: Download failed");
 				}
 			}
 			else
 			{
-				logOutput->append(QString("Error downloading export: %1").arg(reply->errorString()));
+				Logger::log(QString("Error downloading export: %1").arg(reply->errorString()));
 				mylistStatusLabel->setText("MyList Status: Download failed");
 			}
 			
@@ -1004,7 +1009,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	}
 	else
 	{
-		logOutput->append("No mylist export link found in notification");
+		Logger::log("No mylist export link found in notification");
 		
 		// Track notifications checked without finding export
 		if(isCheckingNotifications)
@@ -1017,7 +1022,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 				// Only auto-request export on first run
 				if(!isMylistFirstRunComplete())
 				{
-					logOutput->append(QString("Checked %1 notifications with no export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
+					Logger::log(QString("Checked %1 notifications with no export link found - requesting new export (first run)").arg(expectedNotificationsToCheck));
 					mylistStatusLabel->setText("MyList Status: Requesting export (first run)...");
 					
 					// Request MYLISTEXPORT with xml-plain-cs template
@@ -1025,7 +1030,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 				}
 				else
 				{
-					logOutput->append(QString("Checked %1 notifications with no export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
+					Logger::log(QString("Checked %1 notifications with no export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
 					mylistStatusLabel->setText("MyList Status: No export found - request manually in Settings");
 				}
 				
@@ -1044,13 +1049,13 @@ void Window::getNotifyCheckStarting(int count)
 	isCheckingNotifications = true;
 	expectedNotificationsToCheck = count;
 	notificationsCheckedWithoutExport = 0;
-	logOutput->append(QString("Starting to check %1 notifications for mylist export link").arg(count));
+	Logger::log(QString("Starting to check %1 notifications for mylist export link").arg(count));
 }
 
 void Window::getNotifyExportQueued(QString tag)
 {
 	// 217 EXPORT QUEUED - Export request accepted
-	logOutput->append(QString("MyList export queued successfully (Tag: %1)").arg(tag));
+	Logger::log(QString("MyList export queued successfully (Tag: %1)").arg(tag));
 	mylistStatusLabel->setText("MyList Status: Export queued - waiting for notification...");
 	// AniDB will send a notification when the export is ready
 	// The notification will contain the download link
@@ -1059,7 +1064,7 @@ void Window::getNotifyExportQueued(QString tag)
 void Window::getNotifyExportAlreadyInQueue(QString tag)
 {
 	// 318 EXPORT ALREADY IN QUEUE - Cannot queue another export
-	logOutput->append(QString("MyList export already in queue (Tag: %1) - waiting for current export to complete").arg(tag));
+	Logger::log(QString("MyList export already in queue (Tag: %1) - waiting for current export to complete").arg(tag));
 	mylistStatusLabel->setText("MyList Status: Export already queued - waiting...");
 	// No need to take action - wait for the existing export notification
 }
@@ -1067,7 +1072,7 @@ void Window::getNotifyExportAlreadyInQueue(QString tag)
 void Window::getNotifyExportNoSuchTemplate(QString tag)
 {
 	// 317 EXPORT NO SUCH TEMPLATE - Invalid template name
-	logOutput->append(QString("ERROR: MyList export template not found (Tag: %1)").arg(tag));
+	Logger::log(QString("ERROR: MyList export template not found (Tag: %1)").arg(tag));
 	mylistStatusLabel->setText("MyList Status: Export failed - invalid template");
 	// This should not happen with "xml-plain-cs" template, but log for debugging
 }
@@ -1093,7 +1098,7 @@ void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 		// Check if this episode needs data and hasn't been requested yet
 		if(episodesNeedingData.contains(eid))
 		{
-			logOutput->append(QString("Requesting episode data for EID %1 (AID %2)").arg(eid).arg(aid));
+			Logger::log(QString("Requesting episode data for EID %1 (AID %2)").arg(eid).arg(aid));
 			adbapi->Episode(eid);
 			episodesNeedingData.remove(eid);  // Remove from tracking set to avoid duplicate requests
 		}
@@ -1103,7 +1108,7 @@ void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 void Window::getNotifyEpisodeUpdated(int eid, int aid)
 {
 	// Episode data was updated in the database, update only the specific episode item
-	logOutput->append(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
+	Logger::log(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
 	updateEpisodeInTree(eid, aid);
 }
 
@@ -1116,13 +1121,13 @@ void Window::updateEpisodeInTree(int eid, int aid)
 	
 	if(!q.exec(query))
 	{
-		logOutput->append("Error querying episode data: " + q.lastError().text());
+		Logger::log("Error querying episode data: " + q.lastError().text());
 		return;
 	}
 	
 	if(!q.next())
 	{
-		logOutput->append(QString("No episode data found for EID %1").arg(eid));
+		Logger::log(QString("No episode data found for EID %1").arg(eid));
 		return;
 	}
 	
@@ -1182,7 +1187,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 					// Remove from tracking set since data has been loaded
 					episodesNeedingData.remove(eid);
 					
-					logOutput->append(QString("Updated episode in tree: EID %1, epno: %2, name: %3")
+					Logger::log(QString("Updated episode in tree: EID %1, epno: %2, name: %3")
 						.arg(eid).arg(episodeItem->text(1)).arg(episodeName));
 					return;
 				}
@@ -1191,7 +1196,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 	}
 	
 	// If we get here, the episode item wasn't found in the tree
-	logOutput->append(QString("Episode item not found in tree for EID %1 (AID %2)").arg(eid).arg(aid));
+	Logger::log(QString("Episode item not found in tree for EID %1 (AID %2)").arg(eid).arg(aid));
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
@@ -1243,7 +1248,7 @@ void Window::loadMylistFromDatabase()
 	
 	if(!q.exec(query))
 	{
-		logOutput->append("Error loading mylist: " + q.lastError().text());
+		Logger::log("Error loading mylist: " + q.lastError().text());
 		return;
 	}
 	
@@ -1485,7 +1490,7 @@ void Window::loadMylistFromDatabase()
 	// Keep anime items collapsed by default
 	// (User can expand manually if needed)
 	
-	logOutput->append(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
+	Logger::log(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
 	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
 	
 	// Set default sort order to ascending by episode column (column 1)
@@ -1509,14 +1514,14 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	if(!tarProcess.waitForFinished(30000))  // 30 second timeout
 	{
-		logOutput->append("Error: Failed to extract tar.gz file (timeout)");
+		Logger::log("Error: Failed to extract tar.gz file (timeout)");
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
 	
 	if(tarProcess.exitCode() != 0)
 	{
-		logOutput->append("Error: Failed to extract tar.gz file: " + tarProcess.readAllStandardError());
+		Logger::log("Error: Failed to extract tar.gz file: " + tarProcess.readAllStandardError());
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
@@ -1527,7 +1532,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	if(xmlFiles.isEmpty())
 	{
-		logOutput->append("Error: No XML file found in tar.gz");
+		Logger::log("Error: No XML file found in tar.gz");
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
@@ -1538,7 +1543,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	if(!xmlFile.open(QIODevice::ReadOnly | QIODevice::Text))
 	{
-		logOutput->append("Error: Cannot open XML file");
+		Logger::log("Error: Cannot open XML file");
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
@@ -1580,7 +1585,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					
 					if(!animeQueryExec.exec())
 					{
-						logOutput->append(QString("Warning: Failed to insert anime record (aid=%1): %2")
+						Logger::log(QString("Warning: Failed to insert anime record (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
 				}
@@ -1600,7 +1605,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					
 					if(!animeQueryExec.exec())
 					{
-						logOutput->append(QString("Warning: Failed to update anime episode counts (aid=%1): %2")
+						Logger::log(QString("Warning: Failed to update anime episode counts (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
 				}
@@ -1620,7 +1625,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					
 					if(!animeQueryExec.exec())
 					{
-						logOutput->append(QString("Warning: Failed to update anime metadata (aid=%1): %2")
+						Logger::log(QString("Warning: Failed to update anime metadata (aid=%1): %2")
 							.arg(currentAid).arg(animeQueryExec.lastError().text()));
 					}
 				}
@@ -1655,7 +1660,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					QSqlQuery episodeQueryExec(db);
 					if(!episodeQueryExec.exec(episodeQuery))
 					{
-						logOutput->append(QString("Warning: Failed to insert episode data (eid=%1): %2")
+						Logger::log(QString("Warning: Failed to insert episode data (eid=%1): %2")
 							.arg(currentEid).arg(episodeQueryExec.lastError().text()));
 					}
 				}
@@ -1702,7 +1707,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				}
 				else
 				{
-					logOutput->append(QString("Error inserting mylist entry (lid=%1): %2").arg(lid).arg(query.lastError().text()));
+					Logger::log(QString("Error inserting mylist entry (lid=%1): %2").arg(lid).arg(query.lastError().text()));
 				}
 			}
 		}
@@ -1710,7 +1715,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	if(xml.hasError())
 	{
-		logOutput->append(QString("XML parsing error: %1").arg(xml.errorString()));
+		Logger::log(QString("XML parsing error: %1").arg(xml.errorString()));
 	}
 	
 	xmlFile.close();
@@ -1744,13 +1749,13 @@ void Window::setMylistFirstRunComplete()
 	QSqlQuery query(db);
 	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'mylist_first_run_complete', '1')");
 	query.exec(q);
-	logOutput->append("MyList first run marked as complete");
+	Logger::log("MyList first run marked as complete");
 }
 
 void Window::requestMylistExportManually()
 {
 	// Manual mylist export request from Settings
-	logOutput->append("Manually requesting MyList export...");
+	Logger::log("Manually requesting MyList export...");
 	mylistStatusLabel->setText("MyList Status: Requesting export...");
 	adbapi->MylistExport("xml-plain-cs");
 }
@@ -1762,18 +1767,18 @@ void Window::onWatcherEnabledChanged(int state)
 		if (!dir.isEmpty() && QDir(dir).exists()) {
 			directoryWatcher->startWatching(dir);
 			watcherStatusLabel->setText("Status: Watching " + dir);
-			logOutput->append("Directory watcher started: " + dir);
+			Logger::log("Directory watcher started: " + dir);
 		} else if (dir.isEmpty()) {
 			watcherStatusLabel->setText("Status: Enabled (no directory set)");
-			logOutput->append("Directory watcher enabled but no directory specified");
+			Logger::log("Directory watcher enabled but no directory specified");
 		} else {
 			watcherStatusLabel->setText("Status: Enabled (invalid directory)");
-			logOutput->append("Directory watcher enabled but directory is invalid: " + dir);
+			Logger::log("Directory watcher enabled but directory is invalid: " + dir);
 		}
 	} else {
 		directoryWatcher->stopWatching();
 		watcherStatusLabel->setText("Status: Not watching");
-		logOutput->append("Directory watcher stopped");
+		Logger::log("Directory watcher stopped");
 	}
 }
 
@@ -1789,7 +1794,7 @@ void Window::onWatcherBrowseClicked()
 		if (watcherEnabled->isChecked()) {
 			directoryWatcher->startWatching(dir);
 			watcherStatusLabel->setText("Status: Watching " + dir);
-			logOutput->append("Directory watcher changed to: " + dir);
+			Logger::log("Directory watcher changed to: " + dir);
 		}
 	}
 }
@@ -1801,7 +1806,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	}
 	
 	// Log the detection
-	logOutput->append(QString("Detected %1 new file(s)").arg(filePaths.size()));
+	Logger::log(QString("Detected %1 new file(s)").arg(filePaths.size()));
 	
 	// Add all files to hasher table
 	for (const QString &filePath : filePaths) {
@@ -1827,11 +1832,11 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		emit hashFiles(filePaths);
 		
 		if (adbapi->LoggedIn()) {
-			logOutput->append(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filePaths.size()));
+			Logger::log(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filePaths.size()));
 		} else {
-			logOutput->append(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filePaths.size()));
+			Logger::log(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filePaths.size()));
 		}
 	} else {
-		logOutput->append("Files added to hasher. Hasher is busy - click Start to hash queued files.");
+		Logger::log("Files added to hasher. Hasher is busy - click Start to hash queued files.");
 	}
 }

@@ -1,0 +1,56 @@
+#include "logger.h"
+#include "crashlog.h"
+#include <QDebug>
+#include <QDateTime>
+
+// Static instance pointer
+Logger* Logger::s_instance = nullptr;
+
+Logger::Logger() : QObject(nullptr)
+{
+}
+
+Logger* Logger::instance()
+{
+    if (!s_instance)
+    {
+        s_instance = new Logger();
+    }
+    return s_instance;
+}
+
+void Logger::log(const QString &msg, const QString &file, int line)
+{
+    // Build the full message with optional file/line info
+    QString fullMessage;
+    if (!file.isEmpty() && line > 0)
+    {
+        // Extract just the filename from the full path
+        QString filename = file;
+        int lastSlash = filename.lastIndexOf('/');
+        if (lastSlash == -1)
+        {
+            lastSlash = filename.lastIndexOf('\\');
+        }
+        if (lastSlash >= 0)
+        {
+            filename = filename.mid(lastSlash + 1);
+        }
+        
+        fullMessage = QString("[%1:%2] %3").arg(filename).arg(line).arg(msg);
+    }
+    else
+    {
+        fullMessage = msg;
+    }
+    
+    // 1. Output to console (for development and debugging)
+    qDebug().noquote() << fullMessage;
+    
+    // 2. Write to persistent log file
+    CrashLog::logMessage(fullMessage);
+    
+    // 3. Emit signal for UI log tab (with timestamp)
+    // The timestamp will be added by the receiving slot to maintain consistency
+    emit instance()->logMessage(fullMessage);
+}

@@ -1,4 +1,5 @@
 #include "ed2k.h"
+#include "../logger.h"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -127,5 +128,6 @@ void ed2k::getNotifyStopHasher()
 
 void ed2k::Debug(QString msg)
 {
-	std::cout << "debug" << std::endl;
+	// Use unified logging system
+	Logger::log(msg);
 }

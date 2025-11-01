@@ -1,7 +1,17 @@
 #include "anidbapi.h"
+#include "logger.h"
+
+// Static flag to log only once
+static bool s_settingsLogged = false;
 
 void AniDBApi::setUsername(QString username)
 {
+	// Log only once when first settings method is called
+	if (!s_settingsLogged) {
+		Logger::log("AniDB settings system initialized [anidbapi_settings.cpp]");
+		s_settingsLogged = true;
+	}
+	
 	if(username.length() > 0)
 	{
 		AniDBApi::username = username;

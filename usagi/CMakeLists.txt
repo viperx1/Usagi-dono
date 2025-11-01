@@ -45,6 +45,7 @@ set(SOURCES
     src/epno.cpp
     src/aired.cpp
     src/directorywatcher.cpp
+    src/logger.cpp
 )
 
 # Header files
@@ -60,6 +61,7 @@ set(HEADERS
     src/epno.h
     src/aired.h
     src/directorywatcher.h
+    src/logger.h
 )
 
 # Create executable

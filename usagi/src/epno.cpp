@@ -1,8 +1,17 @@
 #include "epno.h"
+#include "logger.h"
+
+// Static flag to log only once
+static bool s_epnoLogged = false;
 
 epno::epno()
     : m_type(0), m_number(0), m_rawString("")
 {
+    // Log only once when first epno object is created
+    if (!s_epnoLogged) {
+        Logger::log("epno type system initialized [epno.cpp]");
+        s_epnoLogged = true;
+    }
 }
 
 epno::epno(const QString& epnoString)

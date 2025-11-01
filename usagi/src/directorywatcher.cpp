@@ -1,4 +1,5 @@
 #include "directorywatcher.h"
+#include "logger.h"
 #include <QDir>
 #include <QFileInfo>
 #include <QDirIterator>
@@ -18,6 +19,7 @@ DirectoryScanWorker::DirectoryScanWorker(const QString &directory, const QSet<QS
 
 void DirectoryScanWorker::scan()
 {
+    Logger::log("DirectoryScanWorker starting directory scan [directorywatcher.cpp]");
     QStringList newFiles;
     
     if (m_directory.isEmpty() || !QDir(m_directory).exists()) {
