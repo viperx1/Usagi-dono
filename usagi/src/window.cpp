@@ -158,7 +158,7 @@ Window::Window()
 	connect(Logger::instance(), &Logger::logMessage, this, &Window::getNotifyLogAppend);
 
     // page hasher - hashes
-	hashes->setColumnCount(9);
+	hashes->setColumnCount(10);
     hashes->setRowCount(0);
     hashes->setRowHeight(0, 20);
     hashes->verticalHeader()->setDefaultSectionSize(20);
@@ -167,8 +167,9 @@ Window::Window()
     hashes->verticalHeader()->hide();
     hashes->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     hashes->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-	hashes->setHorizontalHeaderLabels((QStringList() << "Filename" << "Progress" << "path" << "LF" << "LL" << "RF" << "RL" << "Ren" << "FP"));
+	hashes->setHorizontalHeaderLabels((QStringList() << "Filename" << "Progress" << "path" << "LF" << "LL" << "RF" << "RL" << "Ren" << "FP" << "Hash"));
     hashes->setColumnWidth(0, 600);
+    hashes->setColumnWidth(9, 250); // Hash column width
 //	hashes->setCellWidget(3, 3, button2);
 //	hashes->setColumnHidden(2, 1);
 //	hashes->setColumnHidden(3, 1);
@@ -461,18 +462,101 @@ void Window::setupHashingProgress(const QStringList &files)
 
 void Window::ButtonHasherStartClick()
 {
-	QStringList files;
+	QStringList filesToHash;
+	QList<int> rowsWithHashes; // Rows that already have hashes
+	
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
 		if(hashes->item(i, 1)->text() == "0")
 		{
-			files.append(hashes->item(i, 2)->text());
+			QString filePath = hashes->item(i, 2)->text();
+			QString existingHash = hashes->item(i, 9)->text(); // Check hash column
+			
+			if (!existingHash.isEmpty())
+			{
+				// File already has a hash - process it immediately
+				rowsWithHashes.append(i);
+			}
+			else
+			{
+				// File needs to be hashed
+				filesToHash.append(filePath);
+			}
 		}
 	}
-	setupHashingProgress(files);
-	buttonstart->setEnabled(0);
-	buttonclear->setEnabled(0);
-	emit hashFiles(files);
+	
+	// Process files with existing hashes immediately
+	for (int rowIndex : rowsWithHashes)
+	{
+		QString filename = hashes->item(rowIndex, 0)->text();
+		QString filePath = hashes->item(rowIndex, 2)->text();
+		QString hexdigest = hashes->item(rowIndex, 9)->text();
+		
+		Logger::log(QString("Processing already-hashed file immediately: %1").arg(filename));
+		
+		// Get file size
+		QFileInfo fileInfo(filePath);
+		qint64 fileSize = fileInfo.size();
+		
+		// Mark as hashed in UI
+		QColor yellow; yellow.setRgb(255, 255, 0);
+		hashes->item(rowIndex, 0)->setBackground(yellow.toRgb());
+		hashes->item(rowIndex, 1)->setText("1");
+		
+		// Update hash in database with status=1
+		adbapi->updateLocalFileHash(filePath, hexdigest, 1);
+		
+		// If adding to mylist, perform API calls immediately
+		if (addtomylist->checkState() > 0)
+		{
+			// Perform LocalIdentify
+			std::bitset<2> li = adbapi->LocalIdentify(fileSize, hexdigest);
+			
+			// Update UI with LocalIdentify results
+			hashes->item(rowIndex, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
+			
+			QString tag;
+			if(li[AniDBApi::LI_FILE_IN_DB] == 0)
+			{
+				tag = adbapi->File(fileSize, hexdigest);
+				hashes->item(rowIndex, 5)->setText(tag);
+			}
+			else
+			{
+				hashes->item(rowIndex, 5)->setText("0");
+			}
+
+			hashes->item(rowIndex, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
+			if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
+			{
+				tag = adbapi->MylistAdd(fileSize, hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
+				hashes->item(rowIndex, 6)->setText(tag);
+			}
+			else
+			{
+				hashes->item(rowIndex, 6)->setText("0");
+			}
+		}
+	}
+	
+	// Start hashing for files without existing hashes
+	if (!filesToHash.isEmpty())
+	{
+		setupHashingProgress(filesToHash);
+		buttonstart->setEnabled(0);
+		buttonclear->setEnabled(0);
+		emit hashFiles(filesToHash);
+	}
+	else if (rowsWithHashes.isEmpty())
+	{
+		// No files to process at all
+		Logger::log("No files to process");
+	}
+	else
+	{
+		// Only had pre-hashed files, all done
+		Logger::log(QString("Processed %1 already-hashed file(s) immediately").arg(rowsWithHashes.size()));
+	}
 }
 
 void Window::ButtonHasherStopClick()
@@ -1261,6 +1345,11 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
 	QTableWidgetItem *item7 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
 	QTableWidgetItem *item8 = new QTableWidgetItem(QTableWidgetItem(QString(ren > 0 ? "1" : "0")));
 	QTableWidgetItem *item9 = new QTableWidgetItem(QTableWidgetItem(QString("0")));
+	
+	// Check if file already has a hash in the database
+	QString existingHash = adbapi->getLocalFileHash(file.absoluteFilePath());
+	QTableWidgetItem *item10 = new QTableWidgetItem(QTableWidgetItem(existingHash.isEmpty() ? QString("") : existingHash));
+	
 	hashes->insertRow(hashes->rowCount());
 	hashes->setItem(hashes->rowCount()-1, 0, item1);
 	hashes->setItem(hashes->rowCount()-1, 1, item2);
@@ -1271,7 +1360,7 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
 	hashes->setItem(hashes->rowCount()-1, 6, item7);
 	hashes->setItem(hashes->rowCount()-1, 7, item8);
 	hashes->setItem(hashes->rowCount()-1, 8, item9);
-//	hashes->setItem(hashes->rowCount()-1, 9, item10);
+	hashes->setItem(hashes->rowCount()-1, 9, item10);
 }
 
 void Window::loadMylistFromDatabase()
@@ -1884,7 +1973,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	// Log the detection
 	Logger::log(QString("Detected %1 new file(s)").arg(filePaths.size()));
 	
-	// Add all files to hasher table
+	// Add all files to hasher table (will populate hashes if they exist)
 	for (const QString &filePath : filePaths) {
 		QFileInfo fileInfo(filePath);
 		hashesinsertrow(fileInfo, Qt::Unchecked);
@@ -1899,18 +1988,87 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			hasherFileState->setCurrentIndex(1);  // Internal (HDD)
 		}
 		
-		// Setup progress tracking before starting hasher
-		setupHashingProgress(filePaths);
+		// Separate files with existing hashes from those that need hashing
+		QStringList filesToHash;
+		QList<QPair<int, QString>> filesWithHashes; // row index, file path
 		
-		// Start hashing all detected files
-		buttonstart->setEnabled(false);
-		buttonclear->setEnabled(false);
-		emit hashFiles(filePaths);
+		for (int i = hashes->rowCount() - filePaths.size(); i < hashes->rowCount(); i++) {
+			QString filePath = hashes->item(i, 2)->text();
+			QString existingHash = hashes->item(i, 9)->text();
+			
+			if (!existingHash.isEmpty()) {
+				filesWithHashes.append(qMakePair(i, filePath));
+			} else {
+				filesToHash.append(filePath);
+			}
+		}
 		
-		if (adbapi->LoggedIn()) {
-			Logger::log(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filePaths.size()));
-		} else {
-			Logger::log(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filePaths.size()));
+		// Process files with existing hashes immediately
+		for (const auto& pair : filesWithHashes) {
+			int rowIndex = pair.first;
+			QString filePath = pair.second;
+			QString filename = hashes->item(rowIndex, 0)->text();
+			QString hexdigest = hashes->item(rowIndex, 9)->text();
+			
+			Logger::log(QString("Processing already-hashed file immediately: %1").arg(filename));
+			
+			// Get file size
+			QFileInfo fileInfo(filePath);
+			qint64 fileSize = fileInfo.size();
+			
+			// Mark as hashed in UI
+			QColor yellow; yellow.setRgb(255, 255, 0);
+			hashes->item(rowIndex, 0)->setBackground(yellow.toRgb());
+			hashes->item(rowIndex, 1)->setText("1");
+			
+			// Update hash in database with status=1
+			adbapi->updateLocalFileHash(filePath, hexdigest, 1);
+			
+			// If adding to mylist (logged in), perform API calls immediately
+			if (adbapi->LoggedIn()) {
+				// Perform LocalIdentify
+				std::bitset<2> li = adbapi->LocalIdentify(fileSize, hexdigest);
+				
+				// Update UI with LocalIdentify results
+				hashes->item(rowIndex, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0"));
+				
+				QString tag;
+				if(li[AniDBApi::LI_FILE_IN_DB] == 0) {
+					tag = adbapi->File(fileSize, hexdigest);
+					hashes->item(rowIndex, 5)->setText(tag);
+				} else {
+					hashes->item(rowIndex, 5)->setText("0");
+				}
+
+				hashes->item(rowIndex, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0"));
+				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0) {
+					tag = adbapi->MylistAdd(fileSize, hexdigest, Qt::Unchecked, 1, storage->text());
+					hashes->item(rowIndex, 6)->setText(tag);
+				} else {
+					hashes->item(rowIndex, 6)->setText("0");
+				}
+			}
+		}
+		
+		// Start hashing for files without existing hashes
+		if (!filesToHash.isEmpty()) {
+			// Setup progress tracking before starting hasher
+			setupHashingProgress(filesToHash);
+			
+			// Start hashing all detected files that need hashing
+			buttonstart->setEnabled(false);
+			buttonclear->setEnabled(false);
+			emit hashFiles(filesToHash);
+			
+			if (adbapi->LoggedIn()) {
+				Logger::log(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filesToHash.size()));
+			} else {
+				Logger::log(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filesToHash.size()));
+			}
+		}
+		
+		if (!filesWithHashes.isEmpty()) {
+			Logger::log(QString("Processed %1 already-hashed file(s) immediately").arg(filesWithHashes.size()));
 		}
 	} else {
 		Logger::log("Files added to hasher. Hasher is busy - click Start to hash queued files.");
