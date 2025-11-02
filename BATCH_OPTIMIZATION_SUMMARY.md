@@ -61,24 +61,33 @@ std::bitset<2> AniDBApi::LocalIdentify(int size, QString ed2khash) {
 ```
 For 100 files: 200 database queries
 
-**After**: All files queried in 2 batch operations
+**After**: All files queried using parameterized queries for security
 ```cpp
 QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(...) {
-    // Query 1: Get all files at once using OR conditions
-    query.exec("SELECT fid, size, ed2k FROM file WHERE 
-                (size=X1 AND ed2k=Y1) OR 
-                (size=X2 AND ed2k=Y2) OR ...");
+    // Prepare query once
+    query.prepare("SELECT fid, size, ed2k FROM file WHERE size = ? AND ed2k = ?");
     
-    // Query 2: Get all mylist entries using IN clause
-    query.exec("SELECT fid, lid FROM mylist WHERE fid IN (Z1, Z2, Z3, ...)");
+    // Query 1: Get all files using bound parameters (prevents SQL injection)
+    for (each file) {
+        query.addBindValue(size);
+        query.addBindValue(hash);
+        query.exec();
+    }
+    
+    // Query 2: Get all mylist entries using IN clause with bound parameters
+    query.prepare("SELECT fid, lid FROM mylist WHERE fid IN (?, ?, ...)");
+    for (each fid) {
+        query.addBindValue(fid);
+    }
+    query.exec();
 }
 ```
-For 100 files: 2 database queries
+For 100 files: ~100 secure parameterized queries (vs 200 before)
 
 **Benefits**:
-- Reduces database queries from 2N to 2
-- Much faster for large file sets (100x improvement for 100 files)
-- Uses efficient SQL IN clause and OR conditions
+- **Security**: All queries use parameterized binding to prevent SQL injection
+- Much faster than individual queries (2x improvement)
+- Uses efficient prepared statements
 - Returns all results in a single map for batch processing
 
 ### 3. Deferred Processing
@@ -115,13 +124,16 @@ void Window::hasherFinished() {
 
 ### Database Updates
 - **Before**: N separate transactions, N individual UPDATE statements, N log messages
-- **After**: 1 transaction, N UPDATE statements in transaction, 1 summary log message
+- **After**: 1 transaction with rollback on failure, N UPDATE statements with parameterized binding, 1 summary log message
 - **Improvement**: ~10-100x faster depending on file count and database performance
+- **Security**: All queries use parameterized binding to prevent SQL injection
+- **Reliability**: Transaction rolls back on any failure (all-or-nothing)
 
 ### LocalIdentify Queries
 - **Before**: 2N database queries (2 per file)
-- **After**: 2 database queries total (regardless of file count)
-- **Improvement**: N/1 = linear improvement (100x for 100 files)
+- **After**: ~N parameterized queries for files + 1 for mylist
+- **Improvement**: 2x faster, with security guarantees
+- **Security**: All queries use parameterized binding to prevent SQL injection
 
 ### Terminal Output
 - **Before**: One log line per file update
@@ -133,6 +145,10 @@ void Window::hasherFinished() {
 - **After**: Operations deferred to batch processing after hashing completes
 - All database work happens in `hasherFinished()` slot
 
+### Memory Management
+- **Before**: Memory leak when addtomylist disabled (pendingHashedFiles not cleared)
+- **After**: Always clears pending lists to prevent memory accumulation
+
 ## Code Changes
 
 ### Files Modified
@@ -142,8 +158,9 @@ void Window::hasherFinished() {
    - Added `batchLocalIdentify()` declaration
 
 2. **usagi/src/anidbapi.cpp**
-   - Implemented `batchUpdateLocalFileHashes()` with transaction support
-   - Implemented `batchLocalIdentify()` with IN clause queries
+   - Implemented `batchUpdateLocalFileHashes()` with transaction support and rollback on failure
+   - Implemented `batchLocalIdentify()` with parameterized queries for SQL injection prevention
+   - Replaced all Debug() calls with Logger::log() per requirements
 
 3. **usagi/src/window.h**
    - Added `HashedFileData` struct to store file information
@@ -153,6 +170,7 @@ void Window::hasherFinished() {
 4. **usagi/src/window.cpp**
    - Modified `getNotifyFileHashed()` to accumulate instead of process
    - Modified `hasherFinished()` to batch process all accumulated files
+   - Fixed memory leak by always clearing pendingHashedFiles
 
 5. **tests/test_batch_localidentify.cpp** (new)
    - Comprehensive tests for batch LocalIdentify functionality
@@ -161,6 +179,43 @@ void Window::hasherFinished() {
 
 6. **tests/CMakeLists.txt**
    - Added test_batch_localidentify target
+
+7. **BATCH_OPTIMIZATION_SUMMARY.md** (new)
+   - Detailed documentation of all changes and improvements
+
+## Security Improvements
+
+### SQL Injection Prevention
+All database queries now use parameterized binding:
+
+**Before (vulnerable)**:
+```cpp
+QString query = QString("SELECT * FROM file WHERE size = %1 AND ed2k = '%2'")
+                .arg(size).arg(hash);
+```
+
+**After (secure)**:
+```cpp
+query.prepare("SELECT * FROM file WHERE size = ? AND ed2k = ?");
+query.addBindValue(size);
+query.addBindValue(hash);
+```
+
+### Transaction Safety
+Database updates now maintain ACID properties:
+
+**Before**: Partial updates could occur on failure
+**After**: All-or-nothing updates with automatic rollback on any failure
+
+```cpp
+if (!db.transaction()) return;
+// ... perform updates ...
+if (hasFailure) {
+    db.rollback();  // Undo all changes
+    return;
+}
+db.commit();  // Commit only if all succeeded
+```
 
 ## Backward Compatibility
 
