@@ -467,19 +467,38 @@ void Window::ButtonHasherStartClick()
 	
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
-		if(hashes->item(i, 1)->text() == "0")
+		QString progress = hashes->item(i, 1)->text();
+		QString existingHash = hashes->item(i, 9)->text(); // Check hash column
+		
+		// Process files with progress="0" or progress="1" (already hashed but not yet API-processed)
+		if(progress == "0" || progress == "1")
 		{
 			QString filePath = hashes->item(i, 2)->text();
-			QString existingHash = hashes->item(i, 9)->text(); // Check hash column
+			
+			// Check if file has pending API calls (tags in columns 5 or 6)
+			// Tags are "?" initially, set to actual tag when API call is queued, and "0" when completed/not needed
+			QString fileTag = hashes->item(i, 5)->text();
+			QString mylistTag = hashes->item(i, 6)->text();
+			bool hasPendingAPICalls = (!fileTag.isEmpty() && fileTag != "?" && fileTag != "0") || 
+			                          (!mylistTag.isEmpty() && mylistTag != "?" && mylistTag != "0");
 			
 			if (!existingHash.isEmpty())
 			{
-				// File already has a hash - process it immediately
-				rowsWithHashes.append(i);
+				// Skip files with pending API calls to avoid duplicate processing
+				if (!hasPendingAPICalls)
+				{
+					// File already has a hash - process it immediately
+					rowsWithHashes.append(i);
+				}
 			}
 			else
 			{
 				// File needs to be hashed
+				// Note: If progress="1" but no hash, this is an inconsistent state
+				if (progress == "1")
+				{
+					Logger::log(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
+				}
 				filesToHash.append(filePath);
 			}
 		}
@@ -2003,17 +2022,37 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		}
 		
 		// Separate files with existing hashes from those that need hashing
+		// Check ALL files with progress="0" or "1", not just newly added ones
 		QStringList filesToHash;
 		QList<QPair<int, QString>> filesWithHashes; // row index, file path
 		
-		for (int i = hashes->rowCount() - filePaths.size(); i < hashes->rowCount(); i++) {
+		for (int i = 0; i < hashes->rowCount(); i++) {
+			QString progress = hashes->item(i, 1)->text();
 			QString filePath = hashes->item(i, 2)->text();
 			QString existingHash = hashes->item(i, 9)->text();
 			
-			if (!existingHash.isEmpty()) {
-				filesWithHashes.append(qMakePair(i, filePath));
-			} else {
-				filesToHash.append(filePath);
+			// Process files with progress="0" or progress="1" (already hashed but not yet API-processed)
+			if (progress == "0" || progress == "1") {
+				// Check if file has pending API calls (tags in columns 5 or 6)
+				// Tags are "?" initially, set to actual tag when API call is queued, and "0" when completed/not needed
+				QString fileTag = hashes->item(i, 5)->text();
+				QString mylistTag = hashes->item(i, 6)->text();
+				bool hasPendingAPICalls = (!fileTag.isEmpty() && fileTag != "?" && fileTag != "0") || 
+				                          (!mylistTag.isEmpty() && mylistTag != "?" && mylistTag != "0");
+				
+				if (!existingHash.isEmpty()) {
+					// Skip files with pending API calls to avoid duplicate processing
+					if (!hasPendingAPICalls) {
+						filesWithHashes.append(qMakePair(i, filePath));
+					}
+				} else {
+					// File needs to be hashed
+					// Note: If progress="1" but no hash, this is an inconsistent state
+					if (progress == "1") {
+						Logger::log(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
+					}
+					filesToHash.append(filePath);
+				}
 			}
 		}
 		
