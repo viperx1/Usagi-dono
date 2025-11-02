@@ -12,7 +12,6 @@ private:
 	bool shouldStop;
 	QString currentFile;
 public slots:
-	void start();
 	void hashFile(QString filePath);
 signals:
 	void sendHash(QString);

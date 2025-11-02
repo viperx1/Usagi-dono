@@ -18,11 +18,6 @@ void HasherThread::run()
 	exec(); // Enter event loop to process signals
 }
 
-void HasherThread::start()
-{
-	QThread::start();
-}
-
 void HasherThread::stop()
 {
 	shouldStop = true;

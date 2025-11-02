@@ -275,6 +275,7 @@ private:
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
+    QStringList getFilesNeedingHash();
 };
 
 #endif // WINDOW_H

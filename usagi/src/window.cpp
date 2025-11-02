@@ -144,7 +144,7 @@ Window::Window()
     connect(buttonstart, SIGNAL(clicked()), this, SLOT(ButtonHasherStartClick()));
     connect(buttonclear, SIGNAL(clicked()), this, SLOT(ButtonHasherClearClick()));
     connect(&hasherThread, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
-    connect(this, SIGNAL(fileToHash(QString)), &hasherThread, SLOT(hashFile(QString)));
+    connect(this, SIGNAL(fileToHash(QString)), &hasherThread, SLOT(hashFile(QString)), Qt::QueuedConnection);
     connect(&hasherThread, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
     connect(&hasherThread, SIGNAL(finished()), this, SLOT(hasherFinished()));
     connect(adbapi, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
@@ -461,6 +461,21 @@ void Window::setupHashingProgress(const QStringList &files)
 	lastEtaUpdate.start();
 }
 
+QStringList Window::getFilesNeedingHash()
+{
+	QStringList filesToHash;
+	for(int i=0; i<hashes->rowCount(); i++)
+	{
+		QString progress = hashes->item(i, 1)->text();
+		QString existingHash = hashes->item(i, 9)->text();
+		if(progress == "0" && existingHash.isEmpty())
+		{
+			filesToHash.append(hashes->item(i, 2)->text());
+		}
+	}
+	return filesToHash;
+}
+
 void Window::ButtonHasherStartClick()
 {
 	QList<int> rowsWithHashes; // Rows that already have hashes
@@ -577,16 +592,7 @@ void Window::ButtonHasherStartClick()
 	if (filesToHashCount > 0)
 	{
 		// Calculate total hash parts for progress tracking
-		QStringList filesToHash;
-		for(int i=0; i<hashes->rowCount(); i++)
-		{
-			QString progress = hashes->item(i, 1)->text();
-			QString existingHash = hashes->item(i, 9)->text();
-			if(progress == "0" && existingHash.isEmpty())
-			{
-				filesToHash.append(hashes->item(i, 2)->text());
-			}
-		}
+		QStringList filesToHash = getFilesNeedingHash();
 		setupHashingProgress(filesToHash);
 		
 		buttonstart->setEnabled(0);
@@ -615,7 +621,9 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	progressFile->setValue(0);
 	progressFile->setMaximum(1);
-	hasherThread.stop();
+	if (hasherThread.isRunning()) {
+		hasherThread.stop();
+	}
 	emit notifyStopHasher();
 }
 
@@ -2164,16 +2172,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		// Start hashing for files without existing hashes
 		if (filesToHashCount > 0) {
 			// Calculate total hash parts for progress tracking
-			QStringList filesToHash;
-			for(int i=0; i<hashes->rowCount(); i++)
-			{
-				QString progress = hashes->item(i, 1)->text();
-				QString existingHash = hashes->item(i, 9)->text();
-				if(progress == "0" && existingHash.isEmpty())
-				{
-					filesToHash.append(hashes->item(i, 2)->text());
-				}
-			}
+			QStringList filesToHash = getFilesNeedingHash();
 			setupHashingProgress(filesToHash);
 			
 			// Start hashing all detected files that need hashing
