@@ -587,8 +587,9 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			QString filePath = hashes->item(i, 2)->text();
 			
 			// Check if this file already had a hash in the database (was retrieved from cache)
+			// and the hash matches (if hash changed, file was modified and should be treated as new)
 			QString existingHash = adbapi->getLocalFileHash(filePath);
-			bool wasAlreadyHashed = !existingHash.isEmpty();
+			bool wasAlreadyHashed = !existingHash.isEmpty() && existingHash == data.hexdigest;
 			
 			if (wasAlreadyHashed)
 			{
