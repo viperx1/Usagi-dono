@@ -584,18 +584,66 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
 			
-			// Accumulate the file data for batch processing later
 			QString filePath = hashes->item(i, 2)->text();
-			HashedFileData fileData;
-			fileData.filename = data.filename;
-			fileData.filePath = filePath;
-			fileData.size = data.size;
-			fileData.hexdigest = data.hexdigest;
-			fileData.tableRow = i;
-			pendingHashedFiles.append(fileData);
 			
-			// Also accumulate for batch hash update
-			pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
+			// Check if this file already had a hash in the database (was retrieved from cache)
+			QString existingHash = adbapi->getLocalFileHash(filePath);
+			bool wasAlreadyHashed = !existingHash.isEmpty();
+			
+			if (wasAlreadyHashed)
+			{
+				// File was already hashed - process it immediately instead of deferring
+				Logger::log(QString("Processing already-hashed file immediately: %1").arg(data.filename));
+				
+				// Update hash in database with status=1
+				adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
+				
+				// If adding to mylist, perform API calls immediately
+				if (addtomylist->checkState() > 0)
+				{
+					// Perform LocalIdentify
+					std::bitset<2> li = adbapi->LocalIdentify(data.size, data.hexdigest);
+					
+					// Update UI with LocalIdentify results
+					hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
+					
+					QString tag;
+					if(li[AniDBApi::LI_FILE_IN_DB] == 0)
+					{
+						tag = adbapi->File(data.size, data.hexdigest);
+						hashes->item(i, 5)->setText(tag);
+					}
+					else
+					{
+						hashes->item(i, 5)->setText("0");
+					}
+
+					hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
+					if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
+					{
+						tag = adbapi->MylistAdd(data.size, data.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
+						hashes->item(i, 6)->setText(tag);
+					}
+					else
+					{
+						hashes->item(i, 6)->setText("0");
+					}
+				}
+			}
+			else
+			{
+				// File was newly hashed - accumulate for batch processing later
+				HashedFileData fileData;
+				fileData.filename = data.filename;
+				fileData.filePath = filePath;
+				fileData.size = data.size;
+				fileData.hexdigest = data.hexdigest;
+				fileData.tableRow = i;
+				pendingHashedFiles.append(fileData);
+				
+				// Also accumulate for batch hash update
+				pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
+			}
 			
 			break; // Found the file, no need to continue
 		}
