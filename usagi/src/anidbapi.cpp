@@ -1920,10 +1920,12 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	QString filename = fileInfo.fileName();
 	qint64 fileSize = fileInfo.size();
 	
-	// Search for another file with same filename and size that has a hash
+	// Search for another file with same filename that has a hash
+	// We'll verify the size matches in a second query to ensure data integrity
 	QSqlQuery duplicateQuery(threadDb);
-	duplicateQuery.prepare("SELECT `path`, `ed2k_hash` FROM `local_files` WHERE `filename` = ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != '' LIMIT 1");
+	duplicateQuery.prepare("SELECT `path`, `ed2k_hash` FROM `local_files` WHERE `filename` = ? AND `path` != ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != '' LIMIT 1");
 	duplicateQuery.addBindValue(filename);
+	duplicateQuery.addBindValue(localPath); // Exclude current file
 	
 	if(!duplicateQuery.exec())
 	{
@@ -1936,7 +1938,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 		QString duplicatePath = duplicateQuery.value(0).toString();
 		QString duplicateHash = duplicateQuery.value(1).toString();
 		
-		// Verify the duplicate file has the same size
+		// Verify the duplicate file still exists and has the same size
 		QFileInfo duplicateFileInfo(duplicatePath);
 		if(duplicateFileInfo.exists() && duplicateFileInfo.size() == fileSize)
 		{
@@ -1957,6 +1959,10 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 			{
 				Logger::log(QString("Failed to update hash for path=%1: %2").arg(localPath).arg(updateQuery.lastError().text()));
 			}
+		}
+		else
+		{
+			Logger::log(QString("Duplicate file size mismatch or file no longer exists: %1").arg(duplicatePath));
 		}
 	}
 	
