@@ -475,10 +475,19 @@ void Window::ButtonHasherStartClick()
 		{
 			QString filePath = hashes->item(i, 2)->text();
 			
+			// Check if file has pending API calls (tags in columns 5 or 6)
+			QString fileTag = hashes->item(i, 5)->text();
+			QString mylistTag = hashes->item(i, 6)->text();
+			bool hasPendingAPICalls = (fileTag != "?" && fileTag != "0") || (mylistTag != "?" && mylistTag != "0");
+			
 			if (!existingHash.isEmpty())
 			{
-				// File already has a hash - process it immediately
-				rowsWithHashes.append(i);
+				// Skip files with pending API calls to avoid duplicate processing
+				if (!hasPendingAPICalls)
+				{
+					// File already has a hash - process it immediately
+					rowsWithHashes.append(i);
+				}
 			}
 			else
 			{
