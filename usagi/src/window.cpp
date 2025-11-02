@@ -626,52 +626,56 @@ void Window::hasherFinished()
 	}
 	
 	// Batch process LocalIdentify and API calls if adding to mylist
-	if (!pendingHashedFiles.isEmpty() && addtomylist->checkState() > 0)
+	if (!pendingHashedFiles.isEmpty())
 	{
-		// Build list of size/hash pairs for batch LocalIdentify
-		QList<QPair<qint64, QString>> sizeHashPairs;
-		for (const auto& fileData : pendingHashedFiles)
+		if (addtomylist->checkState() > 0)
 		{
-			sizeHashPairs.append(qMakePair(fileData.size, fileData.hexdigest));
-		}
-		
-		// Perform batch LocalIdentify
-		QMap<QString, std::bitset<2>> localIdentifyResults = adbapi->batchLocalIdentify(sizeHashPairs);
-		
-		// Process each file with the batch results
-		for (const auto& fileData : pendingHashedFiles)
-		{
-			QString key = QString("%1:%2").arg(fileData.size).arg(fileData.hexdigest);
-			std::bitset<2> li = localIdentifyResults.value(key, std::bitset<2>());
-			
-			int i = fileData.tableRow;
-			
-			// Update UI with LocalIdentify results
-			hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
-			
-			QString tag;
-			if(li[AniDBApi::LI_FILE_IN_DB] == 0)
+			// Build list of size/hash pairs for batch LocalIdentify
+			QList<QPair<qint64, QString>> sizeHashPairs;
+			for (const auto& fileData : pendingHashedFiles)
 			{
-				tag = adbapi->File(fileData.size, fileData.hexdigest);
-				hashes->item(i, 5)->setText(tag);
+				sizeHashPairs.append(qMakePair(fileData.size, fileData.hexdigest));
 			}
-			else
+			
+			// Perform batch LocalIdentify
+			QMap<QString, std::bitset<2>> localIdentifyResults = adbapi->batchLocalIdentify(sizeHashPairs);
+			
+			// Process each file with the batch results
+			for (const auto& fileData : pendingHashedFiles)
 			{
-				hashes->item(i, 5)->setText("0");
-			}
+				QString key = QString("%1:%2").arg(fileData.size).arg(fileData.hexdigest);
+				std::bitset<2> li = localIdentifyResults.value(key, std::bitset<2>());
+				
+				int i = fileData.tableRow;
+				
+				// Update UI with LocalIdentify results
+				hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
+				
+				QString tag;
+				if(li[AniDBApi::LI_FILE_IN_DB] == 0)
+				{
+					tag = adbapi->File(fileData.size, fileData.hexdigest);
+					hashes->item(i, 5)->setText(tag);
+				}
+				else
+				{
+					hashes->item(i, 5)->setText("0");
+				}
 
-			hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
-			if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
-			{
-				tag = adbapi->MylistAdd(fileData.size, fileData.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
-				hashes->item(i, 6)->setText(tag);
-			}
-			else
-			{
-				hashes->item(i, 6)->setText("0");
+				hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
+				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
+				{
+					tag = adbapi->MylistAdd(fileData.size, fileData.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
+					hashes->item(i, 6)->setText(tag);
+				}
+				else
+				{
+					hashes->item(i, 6)->setText("0");
+				}
 			}
 		}
 		
+		// Always clear pendingHashedFiles to prevent memory leak
 		pendingHashedFiles.clear();
 	}
 	
