@@ -549,7 +549,8 @@ void Window::ButtonHasherStartClick()
 		else
 		{
 			// Not adding to mylist - update status to 2 to prevent re-detection
-			// (assumes file hash is valid and doesn't need re-checking)
+			// Status 2 indicates file is fully processed (user chose not to add to mylist)
+			// This prevents the directory watcher from repeatedly detecting this file
 			adbapi->UpdateLocalFileStatus(filePath, 2);
 		}
 	}
@@ -2073,7 +2074,8 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 				}
 			} else {
 				// Not logged in - update status to 2 to prevent re-detection
-				// (assumes file hash is valid and doesn't need re-checking)
+				// Status 2 indicates file is fully processed (cannot check AniDB when not logged in)
+				// This prevents the directory watcher from repeatedly detecting this file
 				adbapi->UpdateLocalFileStatus(filePath, 2);
 			}
 		}
