@@ -1921,9 +1921,10 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	qint64 fileSize = fileInfo.size();
 	
 	// Search for another file with same filename that has a hash
-	// We'll verify the size matches in a second query to ensure data integrity
+	// We'll verify the size matches via filesystem check to ensure data integrity
+	// Use ORDER BY to ensure consistent duplicate selection
 	QSqlQuery duplicateQuery(threadDb);
-	duplicateQuery.prepare("SELECT `path`, `ed2k_hash` FROM `local_files` WHERE `filename` = ? AND `path` != ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != '' LIMIT 1");
+	duplicateQuery.prepare("SELECT `path`, `ed2k_hash` FROM `local_files` WHERE `filename` = ? AND `path` != ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != '' ORDER BY `path` ASC LIMIT 1");
 	duplicateQuery.addBindValue(filename);
 	duplicateQuery.addBindValue(localPath); // Exclude current file
 	

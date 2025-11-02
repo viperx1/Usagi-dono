@@ -46,9 +46,11 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
     
     // Use the default database connection that AniDBApi created
     QSqlDatabase db = QSqlDatabase::database();
+    QVERIFY2(db.isValid(), "Database connection is not valid");
+    QVERIFY2(db.isOpen(), "Database is not open");
     QSqlQuery query(db);
     
-    // Insert first file with a hash
+    // Insert first file with a hash (using proper 32-char ED2K hash format)
     query.prepare("INSERT INTO local_files (path, filename, ed2k_hash, status) VALUES (?, ?, ?, 1)");
     query.addBindValue(filePath1);
     query.addBindValue("video.mkv");
@@ -118,13 +120,15 @@ void TestHashDuplicateReuse::testDuplicateFileWithDifferentSizeNoReuse()
     
     // Use the default database connection that AniDBApi created
     QSqlDatabase db = QSqlDatabase::database();
+    QVERIFY2(db.isValid(), "Database connection is not valid");
+    QVERIFY2(db.isOpen(), "Database is not open");
     QSqlQuery query(db);
     
-    // Insert first file with a hash
+    // Insert first file with a hash (using proper 32-char ED2K hash format)
     query.prepare("INSERT INTO local_files (path, filename, ed2k_hash, status) VALUES (?, ?, ?, 1)");
     query.addBindValue(filePath1);
     query.addBindValue("video.mkv");
-    query.addBindValue("hash_for_small_file");
+    query.addBindValue("1234567890abcdef1234567890abcdef");
     QVERIFY(query.exec());
     
     // Insert second file WITHOUT a hash
@@ -167,6 +171,8 @@ void TestHashDuplicateReuse::testNoHashAvailableForDuplicate()
     
     // Use the default database connection that AniDBApi created
     QSqlDatabase db = QSqlDatabase::database();
+    QVERIFY2(db.isValid(), "Database connection is not valid");
+    QVERIFY2(db.isOpen(), "Database is not open");
     QSqlQuery query(db);
     
     // Insert file WITHOUT a hash and no duplicate exists
