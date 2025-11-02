@@ -520,10 +520,15 @@ void Window::ButtonHasherStartClick()
 			{
 				tag = adbapi->File(fileSize, hexdigest);
 				hashes->item(rowIndex, 5)->setText(tag);
+				// File info not in local DB yet - API call queued
+				// Status will be updated when MylistAdd completes (via UpdateLocalPath)
 			}
 			else
 			{
 				hashes->item(rowIndex, 5)->setText("0");
+				// File is in local DB (previously fetched from AniDB)
+				// Update status to 2 (in anidb) to prevent re-detection
+				adbapi->UpdateLocalFileStatus(filePath, 2);
 			}
 
 			hashes->item(rowIndex, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
@@ -531,11 +536,21 @@ void Window::ButtonHasherStartClick()
 			{
 				tag = adbapi->MylistAdd(fileSize, hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
 				hashes->item(rowIndex, 6)->setText(tag);
+				// Status will be updated when MylistAdd completes (via UpdateLocalPath)
 			}
 			else
 			{
 				hashes->item(rowIndex, 6)->setText("0");
+				// File already in mylist - no API call needed
+				// Update status to 2 (in anidb) to prevent re-detection
+				adbapi->UpdateLocalFileStatus(filePath, 2);
 			}
+		}
+		else
+		{
+			// Not adding to mylist - update status to 2 to prevent re-detection
+			// (assumes file hash is valid and doesn't need re-checking)
+			adbapi->UpdateLocalFileStatus(filePath, 2);
 		}
 	}
 	
