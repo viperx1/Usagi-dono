@@ -2036,10 +2036,11 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 				if(li[AniDBApi::LI_FILE_IN_DB] == 0) {
 					tag = adbapi->File(fileSize, hexdigest);
 					hashes->item(rowIndex, 5)->setText(tag);
-					// Update status to 3 (not in anidb) to prevent re-detection
-					adbapi->UpdateLocalFileStatus(filePath, 3);
+					// File info not in local DB yet - API call queued
+					// Status will be updated when MylistAdd completes (via UpdateLocalPath)
 				} else {
 					hashes->item(rowIndex, 5)->setText("0");
+					// File is in local DB (previously fetched from AniDB)
 					// Update status to 2 (in anidb) to prevent re-detection
 					adbapi->UpdateLocalFileStatus(filePath, 2);
 				}
@@ -2048,8 +2049,12 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0) {
 					tag = adbapi->MylistAdd(fileSize, hexdigest, Qt::Unchecked, 1, storage->text());
 					hashes->item(rowIndex, 6)->setText(tag);
+					// Status will be updated when MylistAdd completes (via UpdateLocalPath)
 				} else {
 					hashes->item(rowIndex, 6)->setText("0");
+					// File already in mylist - no API call needed
+					// Update status to 2 (in anidb) to prevent re-detection
+					adbapi->UpdateLocalFileStatus(filePath, 2);
 				}
 			} else {
 				// Not logged in - update status to 2 to prevent re-detection
