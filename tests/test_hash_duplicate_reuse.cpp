@@ -27,7 +27,8 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
         QVERIFY2(db.isValid(), "Database connection is not valid");
         QVERIFY2(db.isOpen(), "Database is not open");
         QSqlQuery cleanupQuery(db);
-        cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'");
+        QVERIFY2(cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'"), 
+                 "Failed to clean up stale database entries");
     }
     
     // Create temporary files with identical content
@@ -114,7 +115,8 @@ void TestHashDuplicateReuse::testDuplicateFileWithDifferentSizeNoReuse()
         QVERIFY2(db.isValid(), "Database connection is not valid");
         QVERIFY2(db.isOpen(), "Database is not open");
         QSqlQuery cleanupQuery(db);
-        cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'");
+        QVERIFY2(cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'"), 
+                 "Failed to clean up stale database entries");
     }
     
     // Create temporary files with same name but different sizes
@@ -186,7 +188,8 @@ void TestHashDuplicateReuse::testNoHashAvailableForDuplicate()
         QVERIFY2(db.isValid(), "Database connection is not valid");
         QVERIFY2(db.isOpen(), "Database is not open");
         QSqlQuery cleanupQuery(db);
-        cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'");
+        QVERIFY2(cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'"), 
+                 "Failed to clean up stale database entries");
     }
     
     // Create temporary file
