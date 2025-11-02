@@ -21,6 +21,16 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
     // Create AniDBApi instance
     AniDBApi api("test", 1);
     
+    // Clean up stale entries from previous test runs
+    {
+        QSqlDatabase db = QSqlDatabase::database();
+        QVERIFY2(db.isValid(), "Database connection is not valid");
+        QVERIFY2(db.isOpen(), "Database is not open");
+        QSqlQuery cleanupQuery(db);
+        QVERIFY2(cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'"), 
+                 "Failed to clean up stale database entries");
+    }
+    
     // Create temporary files with identical content
     QTemporaryDir tempDir;
     QVERIFY(tempDir.isValid());
@@ -56,12 +66,14 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
     query.addBindValue("video.mkv");
     query.addBindValue("abcdef1234567890abcdef1234567890");
     QVERIFY(query.exec());
+    query.finish(); // Release query resources
     
     // Insert second file WITHOUT a hash (NULL hash)
     query.prepare("INSERT INTO local_files (path, filename, status) VALUES (?, ?, 0)");
     query.addBindValue(filePath2);
     query.addBindValue("video.mkv");
     QVERIFY(query.exec());
+    query.finish(); // Release query resources
     
     // Verify second file has no hash initially
     QSqlQuery verifyQuery1(db);
@@ -70,6 +82,7 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
     QVERIFY(verifyQuery1.exec());
     QVERIFY(verifyQuery1.next());
     QVERIFY(verifyQuery1.value(0).isNull() || verifyQuery1.value(0).toString().isEmpty());
+    verifyQuery1.finish(); // Release the query resources to avoid database locks
     
     // Call getLocalFileHash for the second file (should find and copy hash from first file)
     QString retrievedHash = api.getLocalFileHash(filePath2);
@@ -95,6 +108,16 @@ void TestHashDuplicateReuse::testDuplicateFileWithDifferentSizeNoReuse()
 {
     // Create AniDBApi instance
     AniDBApi api("test", 1);
+    
+    // Clean up stale entries from previous test runs
+    {
+        QSqlDatabase db = QSqlDatabase::database();
+        QVERIFY2(db.isValid(), "Database connection is not valid");
+        QVERIFY2(db.isOpen(), "Database is not open");
+        QSqlQuery cleanupQuery(db);
+        QVERIFY2(cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'"), 
+                 "Failed to clean up stale database entries");
+    }
     
     // Create temporary files with same name but different sizes
     QTemporaryDir tempDir;
@@ -130,12 +153,14 @@ void TestHashDuplicateReuse::testDuplicateFileWithDifferentSizeNoReuse()
     query.addBindValue("video.mkv");
     query.addBindValue("1234567890abcdef1234567890abcdef");
     QVERIFY(query.exec());
+    query.finish(); // Release query resources
     
     // Insert second file WITHOUT a hash
     query.prepare("INSERT INTO local_files (path, filename, status) VALUES (?, ?, 0)");
     query.addBindValue(filePath2);
     query.addBindValue("video.mkv");
     QVERIFY(query.exec());
+    query.finish(); // Release query resources
     
     // Call getLocalFileHash for the second file (should NOT copy hash due to size mismatch)
     QString retrievedHash = api.getLocalFileHash(filePath2);
@@ -156,6 +181,16 @@ void TestHashDuplicateReuse::testNoHashAvailableForDuplicate()
 {
     // Create AniDBApi instance
     AniDBApi api("test", 1);
+    
+    // Clean up stale entries from previous test runs
+    {
+        QSqlDatabase db = QSqlDatabase::database();
+        QVERIFY2(db.isValid(), "Database connection is not valid");
+        QVERIFY2(db.isOpen(), "Database is not open");
+        QSqlQuery cleanupQuery(db);
+        QVERIFY2(cleanupQuery.exec("DELETE FROM local_files WHERE path LIKE '/tmp/%'"), 
+                 "Failed to clean up stale database entries");
+    }
     
     // Create temporary file
     QTemporaryDir tempDir;
@@ -180,6 +215,7 @@ void TestHashDuplicateReuse::testNoHashAvailableForDuplicate()
     query.addBindValue(filePath);
     query.addBindValue("video.mkv");
     QVERIFY(query.exec());
+    query.finish(); // Release query resources
     
     // Call getLocalFileHash (should return empty since no duplicate with hash exists)
     QString retrievedHash = api.getLocalFileHash(filePath);
