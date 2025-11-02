@@ -1763,7 +1763,7 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 	
 	if(query.exec())
 	{
-		Logger::log(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
+		Debug(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
 	}
 	else
 	{
