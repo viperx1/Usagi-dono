@@ -2036,8 +2036,12 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 				if(li[AniDBApi::LI_FILE_IN_DB] == 0) {
 					tag = adbapi->File(fileSize, hexdigest);
 					hashes->item(rowIndex, 5)->setText(tag);
+					// Update status to 3 (not in anidb) to prevent re-detection
+					adbapi->UpdateLocalFileStatus(filePath, 3);
 				} else {
 					hashes->item(rowIndex, 5)->setText("0");
+					// Update status to 2 (in anidb) to prevent re-detection
+					adbapi->UpdateLocalFileStatus(filePath, 2);
 				}
 
 				hashes->item(rowIndex, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0"));
@@ -2047,6 +2051,10 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 				} else {
 					hashes->item(rowIndex, 6)->setText("0");
 				}
+			} else {
+				// Not logged in - update status to 2 to prevent re-detection
+				// (assumes file hash is valid and doesn't need re-checking)
+				adbapi->UpdateLocalFileStatus(filePath, 2);
 			}
 		}
 		
