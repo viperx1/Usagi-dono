@@ -520,8 +520,8 @@ void Window::ButtonHasherStartClick()
 			{
 				tag = adbapi->File(fileSize, hexdigest);
 				hashes->item(rowIndex, 5)->setText(tag);
-				// File info not in local DB yet - API call queued
-				// Status will be updated when MylistAdd completes (via UpdateLocalPath)
+				// File info not in local DB yet - File() API call queued to fetch from AniDB
+				// Status will be updated to 2 when subsequent MylistAdd completes (via UpdateLocalPath)
 			}
 			else
 			{
@@ -2052,8 +2052,8 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 				if(li[AniDBApi::LI_FILE_IN_DB] == 0) {
 					tag = adbapi->File(fileSize, hexdigest);
 					hashes->item(rowIndex, 5)->setText(tag);
-					// File info not in local DB yet - API call queued
-					// Status will be updated when MylistAdd completes (via UpdateLocalPath)
+					// File info not in local DB yet - File() API call queued to fetch from AniDB
+					// Status will be updated to 2 when subsequent MylistAdd completes (via UpdateLocalPath)
 				} else {
 					hashes->item(rowIndex, 5)->setText("0");
 					// File is in local DB (previously fetched from AniDB)
