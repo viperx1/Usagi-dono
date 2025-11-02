@@ -573,7 +573,6 @@ void Window::getNotifyPartsDone(int total, int done)
 
 void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 {
-	QString tag;
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
 		if(hashes->item(i, 0)->text() == data.filename)
@@ -585,38 +584,20 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
 			
-			// Store the hash in local_files table with status=1 (hashed but not checked by API)
+			// Accumulate the file data for batch processing later
 			QString filePath = hashes->item(i, 2)->text();
-			adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
+			HashedFileData fileData;
+			fileData.filename = data.filename;
+			fileData.filePath = filePath;
+			fileData.size = data.size;
+			fileData.hexdigest = data.hexdigest;
+			fileData.tableRow = i;
+			pendingHashedFiles.append(fileData);
 			
-			if(addtomylist->checkState() > 0)
-			{
-				std::bitset<2> li(adbapi->LocalIdentify(data.size, data.hexdigest));
-				hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
-				if(li[AniDBApi::LI_FILE_IN_DB] == 0)
-				{
-					tag = adbapi->File(data.size, data.hexdigest);
-					hashes->item(i, 5)->setText(tag);
-				}
-				else
-				{
-					hashes->item(i, 5)->setText("0");
-				}
-
-				hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
-				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
-				{
-					tag = adbapi->MylistAdd(data.size, data.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
-					hashes->item(i, 6)->setText(tag);
-				}
-				else
-				{
-					hashes->item(i, 6)->setText("0");
-				}
-//				adbapi->File(data.size, data.hexdigest);
-//				QTableWidgetItem *itemtag = new QTableWidgetItem(QTableWidgetItem(tag));
-//				hashes->setItem(i, 3, itemtag);
-			}
+			// Also accumulate for batch hash update
+			pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
+			
+			break; // Found the file, no need to continue
 		}
 	}
 }
@@ -637,6 +618,63 @@ void Window::startupInitialization()
 
 void Window::hasherFinished()
 {
+	// Batch update all accumulated hashes to database
+	if (!pendingHashUpdates.isEmpty())
+	{
+		adbapi->batchUpdateLocalFileHashes(pendingHashUpdates, 1);
+		pendingHashUpdates.clear();
+	}
+	
+	// Batch process LocalIdentify and API calls if adding to mylist
+	if (!pendingHashedFiles.isEmpty() && addtomylist->checkState() > 0)
+	{
+		// Build list of size/hash pairs for batch LocalIdentify
+		QList<QPair<qint64, QString>> sizeHashPairs;
+		for (const auto& fileData : pendingHashedFiles)
+		{
+			sizeHashPairs.append(qMakePair(fileData.size, fileData.hexdigest));
+		}
+		
+		// Perform batch LocalIdentify
+		QMap<QString, std::bitset<2>> localIdentifyResults = adbapi->batchLocalIdentify(sizeHashPairs);
+		
+		// Process each file with the batch results
+		for (const auto& fileData : pendingHashedFiles)
+		{
+			QString key = QString("%1:%2").arg(fileData.size).arg(fileData.hexdigest);
+			std::bitset<2> li = localIdentifyResults.value(key, std::bitset<2>());
+			
+			int i = fileData.tableRow;
+			
+			// Update UI with LocalIdentify results
+			hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
+			
+			QString tag;
+			if(li[AniDBApi::LI_FILE_IN_DB] == 0)
+			{
+				tag = adbapi->File(fileData.size, fileData.hexdigest);
+				hashes->item(i, 5)->setText(tag);
+			}
+			else
+			{
+				hashes->item(i, 5)->setText("0");
+			}
+
+			hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
+			if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
+			{
+				tag = adbapi->MylistAdd(fileData.size, fileData.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
+				hashes->item(i, 6)->setText(tag);
+			}
+			else
+			{
+				hashes->item(i, 6)->setText("0");
+			}
+		}
+		
+		pendingHashedFiles.clear();
+	}
+	
 	buttonstart->setEnabled(1);
 	buttonclear->setEnabled(1);
 	progressTotal->setFormat("");
