@@ -714,6 +714,9 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			// Also accumulate for batch hash update
 			pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
 			
+			// Update the hash column (column 9) in the UI to reflect the newly computed hash
+			hashes->item(i, 9)->setText(data.hexdigest);
+			
 			break; // Found the file, no need to continue
 		}
 	}
