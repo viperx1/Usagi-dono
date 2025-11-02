@@ -692,41 +692,60 @@ void Window::markwatchedStateChanged(int state)
 
 void Window::getNotifyPartsDone(int total, int done)
 {
-	progressFile->setMaximum(total);
-	progressFile->setValue(done);
 	completedHashParts++;
-	progressTotal->setValue(completedHashParts);
 	
-	// Update percentage label
-	int percentage = totalHashParts > 0 ? (completedHashParts * 100 / totalHashParts) : 0;
-	progressTotalLabel->setText(QString("%1%").arg(percentage));
+	// Throttle UI updates to prevent freezing - update at most every 100ms
+	// This dramatically reduces the number of UI updates from thousands to ~10 per second
+	static QElapsedTimer uiUpdateTimer;
+	static bool timerInitialized = false;
 	
-	// Calculate and display ETA - throttled to once per second to prevent UI freeze
-	if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
-		qint64 elapsedMs = hashingTimer.elapsed();
-		double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
-		int remainingParts = totalHashParts - completedHashParts;
+	if (!timerInitialized) {
+		uiUpdateTimer.start();
+		timerInitialized = true;
+	}
+	
+	// Always update on the last part to ensure progress bars reach 100%
+	bool isLastPart = (done == total && completedHashParts == totalHashParts);
+	bool shouldUpdate = (uiUpdateTimer.elapsed() >= 100) || isLastPart;
+	
+	if (shouldUpdate) {
+		progressFile->setMaximum(total);
+		progressFile->setValue(done);
+		progressTotal->setValue(completedHashParts);
 		
-		if (remainingParts > 0 && partsPerMs > 0) {
-			qint64 etaMs = static_cast<qint64>(remainingParts / partsPerMs);
-			int etaSec = etaMs / 1000;
-			int etaMin = etaSec / 60;
-			int etaHour = etaMin / 60;
+		// Update percentage label
+		int percentage = totalHashParts > 0 ? (completedHashParts * 100 / totalHashParts) : 0;
+		progressTotalLabel->setText(QString("%1%").arg(percentage));
+		
+		// Calculate and display ETA - throttled to once per second to prevent UI freeze
+		if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
+			qint64 elapsedMs = hashingTimer.elapsed();
+			double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
+			int remainingParts = totalHashParts - completedHashParts;
 			
-			QString etaStr;
-			if (etaHour > 0) {
-				etaStr = QString("%1h %2m").arg(etaHour).arg(etaMin % 60);
-			} else if (etaMin > 0) {
-				etaStr = QString("%1m %2s").arg(etaMin).arg(etaSec % 60);
+			if (remainingParts > 0 && partsPerMs > 0) {
+				qint64 etaMs = static_cast<qint64>(remainingParts / partsPerMs);
+				int etaSec = etaMs / 1000;
+				int etaMin = etaSec / 60;
+				int etaHour = etaMin / 60;
+				
+				QString etaStr;
+				if (etaHour > 0) {
+					etaStr = QString("%1h %2m").arg(etaHour).arg(etaMin % 60);
+				} else if (etaMin > 0) {
+					etaStr = QString("%1m %2s").arg(etaMin).arg(etaSec % 60);
+				} else {
+					etaStr = QString("%1s").arg(etaSec);
+				}
+				
+				progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
 			} else {
-				etaStr = QString("%1s").arg(etaSec);
+				progressTotal->setFormat("ETA: calculating...");
 			}
-			
-			progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
-		} else {
-			progressTotal->setFormat("ETA: calculating...");
+			lastEtaUpdate.restart();
 		}
-		lastEtaUpdate.restart();
+		
+		uiUpdateTimer.restart();
 	}
 }
 
@@ -743,17 +762,9 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
 			
-			// Accumulate the file data for batch processing later
 			QString filePath = hashes->item(i, 2)->text();
-			HashedFileData fileData;
-			fileData.filename = data.filename;
-			fileData.filePath = filePath;
-			fileData.size = data.size;
-			fileData.hexdigest = data.hexdigest;
-			fileData.tableRow = i;
-			pendingHashedFiles.append(fileData);
 			
-			// Also accumulate for batch hash update
+			// Accumulate for batch hash update (database operation)
 			pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
 			
 			// Update the hash column (column 9) in the UI to reflect the newly computed hash
@@ -766,6 +777,49 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 				// Column 9 doesn't exist, create it
 				QTableWidgetItem* newHashItem = new QTableWidgetItem(data.hexdigest);
 				hashes->setItem(i, 9, newHashItem);
+			}
+			
+			// Process file identification immediately instead of batching
+			if (addtomylist->checkState() > 0)
+			{
+				// Update hash in database with status=1 immediately
+				adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
+				
+				// Perform LocalIdentify immediately
+				std::bitset<2> li = adbapi->LocalIdentify(data.size, data.hexdigest);
+				
+				// Update UI with LocalIdentify results
+				hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
+				
+				QString tag;
+				if(li[AniDBApi::LI_FILE_IN_DB] == 0)
+				{
+					tag = adbapi->File(data.size, data.hexdigest);
+					hashes->item(i, 5)->setText(tag);
+					// File info not in local DB yet - File() API call queued to fetch from AniDB
+				}
+				else
+				{
+					hashes->item(i, 5)->setText("0");
+					// File is in local DB (previously fetched from AniDB)
+					// Update status to 2 (in anidb) to prevent re-detection
+					adbapi->UpdateLocalFileStatus(filePath, 2);
+				}
+
+				hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
+				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
+				{
+					tag = adbapi->MylistAdd(data.size, data.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
+					hashes->item(i, 6)->setText(tag);
+					// Status will be updated when MylistAdd completes (via UpdateLocalPath)
+				}
+				else
+				{
+					hashes->item(i, 6)->setText("0");
+					// File already in mylist - no API call needed
+					// Update status to 2 (in anidb) to prevent re-detection
+					adbapi->UpdateLocalFileStatus(filePath, 2);
+				}
 			}
 			
 			break; // Found the file, no need to continue
@@ -789,66 +843,16 @@ void Window::startupInitialization()
 
 void Window::hasherFinished()
 {
-	// Batch update all accumulated hashes to database
+	// Batch update all accumulated hashes to database for files not already updated
+	// (files where addtomylist was unchecked are updated here)
 	if (!pendingHashUpdates.isEmpty())
 	{
 		adbapi->batchUpdateLocalFileHashes(pendingHashUpdates, 1);
 		pendingHashUpdates.clear();
 	}
 	
-	// Batch process LocalIdentify and API calls if adding to mylist
-	if (!pendingHashedFiles.isEmpty())
-	{
-		if (addtomylist->checkState() > 0)
-		{
-			// Build list of size/hash pairs for batch LocalIdentify
-			QList<QPair<qint64, QString>> sizeHashPairs;
-			for (const auto& fileData : pendingHashedFiles)
-			{
-				sizeHashPairs.append(qMakePair(fileData.size, fileData.hexdigest));
-			}
-			
-			// Perform batch LocalIdentify
-			QMap<QString, std::bitset<2>> localIdentifyResults = adbapi->batchLocalIdentify(sizeHashPairs);
-			
-			// Process each file with the batch results
-			for (const auto& fileData : pendingHashedFiles)
-			{
-				QString key = QString("%1:%2").arg(fileData.size).arg(fileData.hexdigest);
-				std::bitset<2> li = localIdentifyResults.value(key, std::bitset<2>());
-				
-				int i = fileData.tableRow;
-				
-				// Update UI with LocalIdentify results
-				hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
-				
-				QString tag;
-				if(li[AniDBApi::LI_FILE_IN_DB] == 0)
-				{
-					tag = adbapi->File(fileData.size, fileData.hexdigest);
-					hashes->item(i, 5)->setText(tag);
-				}
-				else
-				{
-					hashes->item(i, 5)->setText("0");
-				}
-
-				hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
-				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
-				{
-					tag = adbapi->MylistAdd(fileData.size, fileData.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
-					hashes->item(i, 6)->setText(tag);
-				}
-				else
-				{
-					hashes->item(i, 6)->setText("0");
-				}
-			}
-		}
-		
-		// Always clear pendingHashedFiles to prevent memory leak
-		pendingHashedFiles.clear();
-	}
+	// Note: File identification now happens immediately in getNotifyFileHashed()
+	// This ensures UI remains responsive and files are identified as soon as they are hashed
 	
 	buttonstart->setEnabled(1);
 	buttonclear->setEnabled(1);
