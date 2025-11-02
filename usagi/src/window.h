@@ -203,6 +203,17 @@ private:
 	
 	// Directory watcher
 	DirectoryWatcher *directoryWatcher;
+	
+	// Batch processing for hashed files
+	struct HashedFileData {
+		QString filename;
+		QString filePath;
+		qint64 size;
+		QString hexdigest;
+		int tableRow;
+	};
+	QList<HashedFileData> pendingHashedFiles; // Files waiting for batch processing
+	QList<QPair<QString, QString>> pendingHashUpdates; // path, hash pairs for database update
 
 
 public slots:

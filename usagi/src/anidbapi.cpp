@@ -1510,6 +1510,105 @@ std::bitset<2> AniDBApi::LocalIdentify(int size, QString ed2khash)
 	return ret;
 }
 
+QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qint64, QString>>& sizeHashPairs)
+{
+	QMap<QString, std::bitset<2>> results;
+	
+	// Check if database is valid and open
+	if (!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Database not available, cannot perform batch LocalIdentify");
+		return results;
+	}
+	
+	if (sizeHashPairs.isEmpty())
+	{
+		return results;
+	}
+	
+	// Initialize results for all files
+	for (const auto& pair : sizeHashPairs)
+	{
+		QString key = QString("%1:%2").arg(pair.first).arg(pair.second);
+		results[key] = std::bitset<2>(); // Initialize with 0,0
+	}
+	
+	// Build a parameterized query to get all file information
+	// We'll use multiple executions with bind values to avoid SQL injection
+	QSqlQuery query(db);
+	query.prepare("SELECT `fid`, `size`, `ed2k` FROM `file` WHERE `size` = ? AND `ed2k` = ?");
+	
+	// Store fids and mark files as in DB
+	QMap<int, QString> fidToKey; // Map fid to our key
+	
+	for (const auto& pair : sizeHashPairs)
+	{
+		query.addBindValue(pair.first);  // size
+		query.addBindValue(pair.second); // ed2k hash
+		
+		if (!query.exec())
+		{
+			Logger::log(QString("Batch LocalIdentify file query error: %1").arg(query.lastError().text()));
+			continue; // Skip this file but continue with others
+		}
+		
+		if (query.next())
+		{
+			int fid = query.value(0).toInt();
+			qint64 size = query.value(1).toLongLong();
+			QString ed2k = query.value(2).toString();
+			QString key = QString("%1:%2").arg(size).arg(ed2k);
+			
+			if (fid > 0 && results.contains(key))
+			{
+				results[key][LI_FILE_IN_DB] = 1;
+				fidToKey[fid] = key;
+			}
+		}
+	}
+	
+	// Now check mylist for all found fids
+	if (!fidToKey.isEmpty())
+	{
+		QStringList fidPlaceholders;
+		QList<int> fids = fidToKey.keys();
+		for (int i = 0; i < fids.size(); ++i)
+		{
+			fidPlaceholders.append("?");
+		}
+		
+		QString mylistQuery = QString("SELECT `fid`, `lid` FROM `mylist` WHERE `fid` IN (%1)").arg(fidPlaceholders.join(","));
+		query.prepare(mylistQuery);
+		
+		// Bind all fid values
+		for (int fid : fids)
+		{
+			query.addBindValue(fid);
+		}
+		
+		if (!query.exec())
+		{
+			Logger::log(QString("Batch LocalIdentify mylist query error: %1").arg(query.lastError().text()));
+			return results;
+		}
+		
+		while (query.next())
+		{
+			int fid = query.value(0).toInt();
+			int lid = query.value(1).toInt();
+			
+			if (lid > 0 && fidToKey.contains(fid))
+			{
+				QString key = fidToKey[fid];
+				results[key][LI_FILE_IN_MYLIST] = 1;
+			}
+		}
+	}
+	
+	Logger::log(QString("Batch LocalIdentify completed for %1 file(s)").arg(sizeHashPairs.size()));
+	return results;
+}
+
 void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QString storage)
 {
 	QString q = QString("SELECT `fid`,`lid` FROM `file` WHERE `size` = %1 AND `ed2k` = %2").arg(size).arg(ed2khash);
@@ -1601,7 +1700,7 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 				
 				if(updateQuery.exec(q))
 				{
-					Debug(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
+					Logger::log(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 					
 					// Update status in local_files table to 2 (in anidb)
 					QSqlQuery statusQuery(db);
@@ -1611,22 +1710,22 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 				}
 				else
 				{
-					Debug("Failed to update local_file: " + updateQuery.lastError().text());
+					Logger::log("Failed to update local_file: " + updateQuery.lastError().text());
 				}
 			}
 			else
 			{
-				Debug("Could not find local_file entry for path=" + localPath);
+				Logger::log("Could not find local_file entry for path=" + localPath);
 			}
 		}
 		else
 		{
-			Debug("Could not find mylist entry for tag=" + tag);
+			Logger::log("Could not find mylist entry for tag=" + tag);
 		}
 	}
 	else
 	{
-		Debug("Could not find packet for tag=" + tag);
+		Logger::log("Could not find packet for tag=" + tag);
 	}
 }
 
@@ -1635,7 +1734,7 @@ void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
-		Debug("Database not available, cannot update local file status");
+		Logger::log("Database not available, cannot update local file status");
 		return;
 	}
 	
@@ -1647,11 +1746,11 @@ void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 	
 	if(query.exec())
 	{
-		Debug(QString("Updated local_files status for path=%1 to status=%2").arg(localPath).arg(status));
+		Logger::log(QString("Updated local_files status for path=%1 to status=%2").arg(localPath).arg(status));
 	}
 	else
 	{
-		Debug("Failed to update local_files status: " + query.lastError().text());
+		Logger::log("Failed to update local_files status: " + query.lastError().text());
 	}
 }
 
@@ -1660,7 +1759,7 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
-		Debug("Database not available, cannot update local file hash");
+		Logger::log("Database not available, cannot update local file hash");
 		return;
 	}
 	
@@ -1674,12 +1773,80 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 	
 	if(query.exec())
 	{
-		Debug(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
+		Logger::log(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
 	}
 	else
 	{
-		Debug("Failed to update local_files hash and status: " + query.lastError().text());
+		Logger::log("Failed to update local_files hash and status: " + query.lastError().text());
 	}
+}
+
+void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& pathHashPairs, int status)
+{
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Database not available, cannot batch update local file hashes");
+		return;
+	}
+	
+	if (pathHashPairs.isEmpty())
+	{
+		return;
+	}
+	
+	// Begin transaction for batch update
+	if (!db.transaction())
+	{
+		Logger::log("Failed to begin transaction for batch update: " + db.lastError().text());
+		return;
+	}
+	
+	QSqlQuery query(db);
+	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `status` = ? WHERE `path` = ?");
+	
+	int successCount = 0;
+	int failCount = 0;
+	bool hasFailure = false;
+	
+	// Batch all updates in a single transaction
+	for (const auto& pair : pathHashPairs)
+	{
+		query.addBindValue(pair.second); // ed2k hash
+		query.addBindValue(status);
+		query.addBindValue(pair.first);  // path
+		
+		if (query.exec())
+		{
+			successCount++;
+		}
+		else
+		{
+			failCount++;
+			hasFailure = true;
+			Logger::log(QString("Failed to update file %1: %2").arg(pair.first).arg(query.lastError().text()));
+		}
+	}
+	
+	// Rollback if any failures occurred to maintain consistency
+	if (hasFailure)
+	{
+		Logger::log(QString("Rolling back batch update due to %1 failure(s)").arg(failCount));
+		db.rollback();
+		return;
+	}
+	
+	// Commit transaction only if all updates succeeded
+	if (!db.commit())
+	{
+		Logger::log("Failed to commit batch update transaction: " + db.lastError().text());
+		db.rollback();
+		return;
+	}
+	
+	// Log summary
+	Logger::log(QString("Batch updated %1 file(s) to status=%2 (all successful)")
+	            .arg(pathHashPairs.size()).arg(status));
 }
 
 QString AniDBApi::getLocalFileHash(QString localPath)
