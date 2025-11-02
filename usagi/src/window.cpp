@@ -467,10 +467,13 @@ void Window::ButtonHasherStartClick()
 	
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
-		if(hashes->item(i, 1)->text() == "0")
+		QString progress = hashes->item(i, 1)->text();
+		QString existingHash = hashes->item(i, 9)->text(); // Check hash column
+		
+		// Process files with progress="0" or progress="1" (already hashed but not yet API-processed)
+		if(progress == "0" || progress == "1")
 		{
 			QString filePath = hashes->item(i, 2)->text();
-			QString existingHash = hashes->item(i, 9)->text(); // Check hash column
 			
 			if (!existingHash.isEmpty())
 			{
@@ -479,7 +482,7 @@ void Window::ButtonHasherStartClick()
 			}
 			else
 			{
-				// File needs to be hashed
+				// File needs to be hashed (should only happen when progress="0")
 				filesToHash.append(filePath);
 			}
 		}
