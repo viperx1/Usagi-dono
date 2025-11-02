@@ -257,9 +257,12 @@ public slots:
     void onWatcherEnabledChanged(int state);
     void onWatcherBrowseClicked();
     void onWatcherNewFilesDetected(const QStringList &filePaths);
+    
+    // Hasher slots
+    void provideNextFileToHash();
 
 signals:
-	void hashFiles(QStringList);
+	void fileToHash(QString);
 	void notifyStopHasher();
 public:
 	// page hasher

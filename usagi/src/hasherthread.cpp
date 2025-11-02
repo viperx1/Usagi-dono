@@ -8,27 +8,58 @@ extern myAniDBApi *adbapi;
 void HasherThread::run()
 {
 	Logger::log("HasherThread started processing files [hasherthread.cpp]");
-	while(!files.isEmpty())
-	{
-		switch(adbapi->ed2khash(files.first()))
-		{
-		case 1:
-			files.pop_front();
-			emit sendHash(adbapi->ed2khashstr);
-			break;
-		case 2:
-			break;
-		case 3:
-			files.clear();
-			break;
-		default:
-			break;
-		}
-	}
+	shouldStop = false;
+	
+	// Request the first file to hash
+	emit requestNextFile();
+	
+	// The thread will remain running until stop() is called or no more files are available
+	// Processing happens in hashFile() slot which is called from the main thread
+	exec(); // Enter event loop to process signals
 }
 
-void HasherThread::getFiles(QStringList files_)
+void HasherThread::start()
 {
-	files = files_;
-	start();
+	QThread::start();
+}
+
+void HasherThread::stop()
+{
+	shouldStop = true;
+	quit(); // Exit the event loop
+	wait(); // Wait for thread to finish
+}
+
+void HasherThread::hashFile(QString filePath)
+{
+	if (shouldStop || filePath.isEmpty())
+	{
+		// No more files to hash or stop requested
+		quit(); // Exit the event loop, which will end the thread
+		return;
+	}
+	
+	currentFile = filePath;
+	
+	switch(adbapi->ed2khash(filePath))
+	{
+	case 1:
+		emit sendHash(adbapi->ed2khashstr);
+		// Request the next file after successfully hashing this one
+		emit requestNextFile();
+		break;
+	case 2:
+		// Error occurred, but continue with next file
+		emit requestNextFile();
+		break;
+	case 3:
+		// Stop requested during hashing
+		shouldStop = true;
+		quit();
+		break;
+	default:
+		// Unknown result, request next file
+		emit requestNextFile();
+		break;
+	}
 }

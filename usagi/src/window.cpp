@@ -143,7 +143,8 @@ Window::Window()
 	connect(button3, SIGNAL(clicked()), this, SLOT(Button3Click()));
     connect(buttonstart, SIGNAL(clicked()), this, SLOT(ButtonHasherStartClick()));
     connect(buttonclear, SIGNAL(clicked()), this, SLOT(ButtonHasherClearClick()));
-    connect(this, SIGNAL(hashFiles(QStringList)), &hasherThread, SLOT(getFiles(QStringList)));
+    connect(&hasherThread, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
+    connect(this, SIGNAL(fileToHash(QString)), &hasherThread, SLOT(hashFile(QString)));
     connect(&hasherThread, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
     connect(&hasherThread, SIGNAL(finished()), this, SLOT(hasherFinished()));
     connect(adbapi, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
@@ -462,8 +463,8 @@ void Window::setupHashingProgress(const QStringList &files)
 
 void Window::ButtonHasherStartClick()
 {
-	QStringList filesToHash;
 	QList<int> rowsWithHashes; // Rows that already have hashes
+	int filesToHashCount = 0;
 	
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
@@ -499,7 +500,7 @@ void Window::ButtonHasherStartClick()
 				{
 					Logger::log(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
 				}
-				filesToHash.append(filePath);
+				filesToHashCount++;
 			}
 		}
 	}
@@ -573,12 +574,24 @@ void Window::ButtonHasherStartClick()
 	}
 	
 	// Start hashing for files without existing hashes
-	if (!filesToHash.isEmpty())
+	if (filesToHashCount > 0)
 	{
+		// Calculate total hash parts for progress tracking
+		QStringList filesToHash;
+		for(int i=0; i<hashes->rowCount(); i++)
+		{
+			QString progress = hashes->item(i, 1)->text();
+			QString existingHash = hashes->item(i, 9)->text();
+			if(progress == "0" && existingHash.isEmpty())
+			{
+				filesToHash.append(hashes->item(i, 2)->text());
+			}
+		}
 		setupHashingProgress(filesToHash);
+		
 		buttonstart->setEnabled(0);
 		buttonclear->setEnabled(0);
-		emit hashFiles(filesToHash);
+		hasherThread.start();
 	}
 	else if (rowsWithHashes.isEmpty())
 	{
@@ -602,7 +615,28 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	progressFile->setValue(0);
 	progressFile->setMaximum(1);
+	hasherThread.stop();
 	emit notifyStopHasher();
+}
+
+void Window::provideNextFileToHash()
+{
+	// Look through the hashes widget for the next file that needs hashing (progress="0" and no hash)
+	for(int i=0; i<hashes->rowCount(); i++)
+	{
+		QString progress = hashes->item(i, 1)->text();
+		QString existingHash = hashes->item(i, 9)->text();
+		
+		if(progress == "0" && existingHash.isEmpty())
+		{
+			QString filePath = hashes->item(i, 2)->text();
+			emit fileToHash(filePath);
+			return;
+		}
+	}
+	
+	// No more files to hash, send empty string to signal completion
+	emit fileToHash(QString());
 }
 
 void Window::ButtonHasherClearClick()
@@ -2035,7 +2069,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		
 		// Separate files with existing hashes from those that need hashing
 		// Check ALL files with progress="0" or "1", not just newly added ones
-		QStringList filesToHash;
+		int filesToHashCount = 0;
 		QList<QPair<int, QString>> filesWithHashes; // row index, file path
 		
 		for (int i = 0; i < hashes->rowCount(); i++) {
@@ -2063,7 +2097,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 					if (progress == "1") {
 						Logger::log(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
 					}
-					filesToHash.append(filePath);
+					filesToHashCount++;
 				}
 			}
 		}
@@ -2128,19 +2162,29 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		}
 		
 		// Start hashing for files without existing hashes
-		if (!filesToHash.isEmpty()) {
-			// Setup progress tracking before starting hasher
+		if (filesToHashCount > 0) {
+			// Calculate total hash parts for progress tracking
+			QStringList filesToHash;
+			for(int i=0; i<hashes->rowCount(); i++)
+			{
+				QString progress = hashes->item(i, 1)->text();
+				QString existingHash = hashes->item(i, 9)->text();
+				if(progress == "0" && existingHash.isEmpty())
+				{
+					filesToHash.append(hashes->item(i, 2)->text());
+				}
+			}
 			setupHashingProgress(filesToHash);
 			
 			// Start hashing all detected files that need hashing
 			buttonstart->setEnabled(false);
 			buttonclear->setEnabled(false);
-			emit hashFiles(filesToHash);
+			hasherThread.start();
 			
 			if (adbapi->LoggedIn()) {
-				Logger::log(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filesToHash.size()));
+				Logger::log(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filesToHashCount));
 			} else {
-				Logger::log(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filesToHash.size()));
+				Logger::log(QString("Auto-hashing %1 file(s) - login to add to MyList").arg(filesToHashCount));
 			}
 		}
 		

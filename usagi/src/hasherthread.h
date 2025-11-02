@@ -7,11 +7,16 @@ class HasherThread : public QThread
     Q_OBJECT
 public:
 	void run();
-	QStringList files;
+	void stop();
+private:
+	bool shouldStop;
+	QString currentFile;
 public slots:
-	void getFiles(QStringList);
+	void start();
+	void hashFile(QString filePath);
 signals:
 	void sendHash(QString);
+	void requestNextFile();
 };
 
 #endif // HASHERTHREAD_H
