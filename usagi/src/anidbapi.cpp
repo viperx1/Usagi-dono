@@ -1893,7 +1893,13 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	query.prepare("SELECT `ed2k_hash` FROM `local_files` WHERE `path` = ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
 	query.addBindValue(localPath);
 	
-	if(query.exec() && query.next())
+	if(!query.exec())
+	{
+		Logger::log(QString("Database query failed for path=%1, error: %2").arg(localPath).arg(query.lastError().text()));
+		return QString();
+	}
+	
+	if(query.next())
 	{
 		QString hash = query.value(0).toString();
 		Logger::log(QString("Retrieved existing hash for path=%1").arg(localPath));
@@ -1902,6 +1908,15 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	else
 	{
 		Logger::log(QString("No existing hash found for path=%1").arg(localPath));
+		// Additional debugging: check if the path exists in the table at all
+		QSqlQuery debugQuery(threadDb);
+		debugQuery.prepare("SELECT COUNT(*) FROM `local_files` WHERE `path` = ?");
+		debugQuery.addBindValue(localPath);
+		if(debugQuery.exec() && debugQuery.next())
+		{
+			int count = debugQuery.value(0).toInt();
+			Logger::log(QString("Debug: Found %1 row(s) with path=%2 (hash may be NULL or empty)").arg(count).arg(localPath));
+		}
 		return QString();
 	}
 }
