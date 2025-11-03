@@ -32,7 +32,6 @@ public:
 	QString FileName();
     qint64 FileSize();
     ed2k();
-	virtual void Debug(QString msg);
 	struct ed2kfilestruct
 	{
 		QString filename;

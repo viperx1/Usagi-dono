@@ -133,9 +133,3 @@ void ed2k::getNotifyStopHasher()
 {
 	dohash = 0;
 }
-
-void ed2k::Debug(QString msg)
-{
-	// Use unified logging system
-	Logger::log(msg);
-}
