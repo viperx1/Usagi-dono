@@ -25,8 +25,8 @@ set(CMAKE_AUTOMOC ON)
 
 # Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
 # This is necessary so that Qt headers are processed with correct linkage declarations
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+# QT_IS_STATIC is set in the root CMakeLists.txt based on detection of static Qt plugins
+if(QT_IS_STATIC)
     # Make sure MOC-generated files also see QT_STATIC
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
 endif()
@@ -68,17 +68,14 @@ set(HEADERS
 add_executable(usagi ${SOURCES} ${HEADERS})
 
 # For static Qt builds, ensure all compile units see QT_STATIC
-if(WIN32)
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Explicitly set QT_STATIC for this target
-        target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-        
-        # Import platform plugins for static Qt on Windows
-        qt_import_plugins(usagi
-            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
-        )
-    endif()
+if(WIN32 AND QT_IS_STATIC)
+    # Explicitly set QT_STATIC for this target
+    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
+    
+    # Import platform plugins for static Qt on Windows
+    qt_import_plugins(usagi
+        INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+    )
 endif()
 
 # Link Qt libraries
@@ -96,24 +93,21 @@ target_link_libraries(usagi PRIVATE
 )
 
 # For static Qt builds on Windows, we need additional system libraries
-if(WIN32)
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Static Qt6 on Windows requires these additional libraries
-        target_link_libraries(usagi PRIVATE
-            winmm        # Windows multimedia
-            version      # Version information
-            netapi32     # Network API
-            ws2_32       # Windows Sockets (already may be linked by Qt but explicit doesn't hurt)
-            iphlpapi     # IP Helper API
-            crypt32      # Cryptography API
-            ole32        # OLE32
-            oleaut32     # OLE Automation
-            uuid         # UUID functions
-        )
-        # Link Qt6::Core again at the end to resolve any circular dependencies
-        target_link_libraries(usagi PRIVATE Qt6::Core)
-    endif()
+if(WIN32 AND QT_IS_STATIC)
+    # Static Qt6 on Windows requires these additional libraries
+    target_link_libraries(usagi PRIVATE
+        winmm        # Windows multimedia
+        version      # Version information
+        netapi32     # Network API
+        ws2_32       # Windows Sockets (already may be linked by Qt but explicit doesn't hurt)
+        iphlpapi     # IP Helper API
+        crypt32      # Cryptography API
+        ole32        # OLE32
+        oleaut32     # OLE Automation
+        uuid         # UUID functions
+    )
+    # Link Qt6::Core again at the end to resolve any circular dependencies
+    target_link_libraries(usagi PRIVATE Qt6::Core)
 endif()
 
 # Link platform-specific libraries
@@ -121,8 +115,7 @@ if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
     
     # For static Qt builds, link Qt6::EntryPoint which contains WinMain
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    if(QT_IS_STATIC)
         # Qt6::EntryPoint provides WinMain/main entry point for static builds
         if(TARGET Qt6::EntryPoint)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)

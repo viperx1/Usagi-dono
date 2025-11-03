@@ -135,8 +135,12 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Concurrent Test REQUIRED)
 
 # Check if Qt is statically linked and add necessary definitions BEFORE any compilation
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+# Note: For Qt from install-qt-action (LLVM MinGW), Qt is built as shared libraries (DLLs).
+# The TYPE property of imported targets may not reliably indicate STATIC_LIBRARY vs SHARED_LIBRARY.
+# We use a more robust check: look for Qt6::QWindowsIntegrationPlugin which only exists in static builds.
+set(QT_IS_STATIC FALSE)
+if(TARGET Qt6::QWindowsIntegrationPlugin)
+    set(QT_IS_STATIC TRUE)
     message(STATUS "Detected static Qt6 libraries - configuring for static build")
     # Must define QT_STATIC before including any Qt headers
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
@@ -147,6 +151,8 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
             target_compile_definitions(${qt_target} INTERFACE QT_STATIC QT_STATICPLUGIN)
         endif()
     endforeach()
+else()
+    message(STATUS "Detected shared Qt6 libraries - configuring for dynamic build")
 endif()
 
 set(CMAKE_AUTOMOC ON)
@@ -169,10 +175,8 @@ if(WIN32)
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     
-    # Check if Qt is statically linked and ensure definitions are set
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Already added above, but ensure it's set
+    # Verify Qt static configuration if applicable
+    if(QT_IS_STATIC)
         message(STATUS "Verifying static Qt6 configuration")
     endif()
     

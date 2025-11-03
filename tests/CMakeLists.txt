@@ -17,8 +17,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 set(CMAKE_AUTOMOC ON)
 
 # Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
 endif()
 
@@ -42,8 +41,7 @@ set(HASH_TEST_HEADERS
 add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_hash PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -79,8 +77,7 @@ set(CRASHLOG_TEST_HEADERS
 add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_crashlog PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -131,8 +128,7 @@ add_executable(test_anidbapi ${ANIDBAPI_TEST_SOURCES} ${ANIDBAPI_TEST_HEADERS})
 target_compile_definitions(test_anidbapi PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_anidbapi PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -182,8 +178,7 @@ add_executable(test_anime_titles ${ANIME_TITLES_TEST_SOURCES} ${ANIME_TITLES_TES
 target_compile_definitions(test_anime_titles PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_anime_titles PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -213,8 +208,7 @@ add_test(NAME test_anime_titles COMMAND test_anime_titles -v2)
 add_executable(test_url_extraction test_url_extraction.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_url_extraction PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -236,8 +230,7 @@ add_test(NAME test_url_extraction COMMAND test_url_extraction -v2)
 add_executable(test_mylist_xml_parser test_mylist_xml_parser.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_mylist_xml_parser PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -260,8 +253,7 @@ add_test(NAME test_mylist_xml_parser COMMAND test_mylist_xml_parser -v2)
 add_executable(test_export_template_verification test_export_template_verification.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_export_template_verification PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -283,8 +275,7 @@ add_test(NAME test_export_template_verification COMMAND test_export_template_ver
 add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_epno PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -310,8 +301,7 @@ add_test(NAME test_epno COMMAND test_epno -v2)
 add_executable(test_episode_column_format test_episode_column_format.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_episode_column_format PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -333,8 +323,7 @@ add_test(NAME test_episode_column_format COMMAND test_episode_column_format -v2)
 add_executable(test_mylist_221_fix test_mylist_221_fix.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_mylist_221_fix PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -357,8 +346,7 @@ add_test(NAME test_mylist_221_fix COMMAND test_mylist_221_fix -v2)
 add_executable(test_evangelion_ha_fix test_evangelion_ha_fix.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_evangelion_ha_fix PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -381,8 +369,7 @@ add_test(NAME test_evangelion_ha_fix COMMAND test_evangelion_ha_fix -v2)
 add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_aired PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -408,8 +395,7 @@ add_test(NAME test_aired COMMAND test_aired -v2)
 add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_mylist_type_aired PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -436,8 +422,7 @@ add_test(NAME test_mylist_type_aired COMMAND test_mylist_type_aired -v2)
 add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_mylist_columns_fix PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -464,8 +449,7 @@ add_test(NAME test_mylist_columns_fix COMMAND test_mylist_columns_fix -v2)
 add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_mylist_aired_sorting PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -491,8 +475,7 @@ add_test(NAME test_mylist_aired_sorting COMMAND test_mylist_aired_sorting -v2)
 add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp ../usagi/src/logger.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_directorywatcher PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -542,8 +525,7 @@ add_executable(test_hash_storage ${HASH_STORAGE_TEST_SOURCES} ${HASH_STORAGE_TES
 target_compile_definitions(test_hash_storage PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_hash_storage PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -585,8 +567,7 @@ add_executable(test_logger ${LOGGER_TEST_SOURCES} ${LOGGER_TEST_HEADERS})
 target_compile_definitions(test_logger PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_logger PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -633,8 +614,7 @@ add_executable(test_hash_reuse ${HASH_REUSE_TEST_SOURCES} ${HASH_REUSE_TEST_HEAD
 target_compile_definitions(test_hash_reuse PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_hash_reuse PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -684,8 +664,7 @@ add_executable(test_batch_localidentify ${BATCH_LOCALIDENTIFY_TEST_SOURCES} ${BA
 target_compile_definitions(test_batch_localidentify PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_batch_localidentify PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -735,8 +714,7 @@ add_executable(test_hash_duplicate_reuse ${HASH_DUPLICATE_REUSE_TEST_SOURCES} ${
 target_compile_definitions(test_hash_duplicate_reuse PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_hash_duplicate_reuse PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -765,8 +743,7 @@ add_test(NAME test_hash_duplicate_reuse COMMAND test_hash_duplicate_reuse -v2)
 add_executable(test_database_validation test_database_validation.cpp)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_database_validation PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -809,8 +786,7 @@ add_executable(test_thread_safety ${THREAD_SAFETY_TEST_SOURCES} ${THREAD_SAFETY_
 target_compile_definitions(test_thread_safety PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_thread_safety PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -860,8 +836,7 @@ add_executable(test_immediate_identification ${IMMEDIATE_IDENTIFICATION_TEST_SOU
 target_compile_definitions(test_immediate_identification PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_immediate_identification PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
@@ -911,8 +886,7 @@ add_executable(test_batch_hash_retrieval ${BATCH_HASH_RETRIEVAL_TEST_SOURCES} ${
 target_compile_definitions(test_batch_hash_retrieval PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+if(QT_IS_STATIC)
     target_compile_definitions(test_batch_hash_retrieval PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
