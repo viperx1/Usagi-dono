@@ -223,6 +223,10 @@ private:
 		QString filename;
 		QString hexdigest;
 		qint64 fileSize;
+		bool useUserSettings;  // If true, use UI settings; if false, use auto-watcher defaults
+		bool addToMylist;      // Whether to add to mylist
+		int markWatchedState;  // Used only when useUserSettings is true
+		int fileState;         // Used only when useUserSettings is true
 	};
 	QList<HashedFileInfo> pendingHashedFilesQueue;
 	QTimer *hashedFilesProcessingTimer;
@@ -280,7 +284,7 @@ signals:
 public:
 	// page hasher
     hashes_ *hashes;
-	void hashesinsertrow(QFileInfo, Qt::CheckState);
+	void hashesinsertrow(QFileInfo, Qt::CheckState, const QString& preloadedHash = QString());
 	int parseMylistExport(const QString &tarGzPath);
     Window();
 	~Window();
