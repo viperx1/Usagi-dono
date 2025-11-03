@@ -582,8 +582,8 @@ void Window::ButtonHasherStartClick()
 	}
 	else
 	{
-		// Only had pre-hashed files, all done
-		Logger::log(QString("Processed %1 already-hashed file(s) immediately").arg(rowsWithHashes.size()));
+		// Only had pre-hashed files, queued for processing
+		Logger::log(QString("Queued %1 already-hashed file(s) for processing").arg(rowsWithHashes.size()));
 	}
 }
 
