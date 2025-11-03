@@ -1026,12 +1026,6 @@ void Window::apitesterProcess()
 	}
 }
 
-void myAniDBApi::Debug(QString msg)
-{
-	// Use unified logging system
-	Logger::log(msg);
-}
-
 void Window::getNotifyMylistAdd(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyMylistAdd() tag=" + tag + " code=" + QString::number(code);
