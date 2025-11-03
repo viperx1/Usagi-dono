@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     CrashLog::install();
     
     // Test unified logging system
-    Logger::log("Usagi-dono application starting [main.cpp]");
+    Logger::log("Usagi-dono application starting [main.cpp]", "", 0);
     
     app.addLibraryPath(".\\plugins");
     window = new Window;

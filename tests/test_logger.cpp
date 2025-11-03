@@ -24,7 +24,7 @@ private slots:
         QSignalSpy spy(logger, &Logger::logMessage);
         
         QString testMessage = "Test log message";
-        Logger::log(testMessage);
+        Logger::log(testMessage, "", 0);
         
         // Verify signal was emitted
         QCOMPARE(spy.count(), 1);
@@ -78,9 +78,9 @@ private slots:
         Logger* logger = Logger::instance();
         QSignalSpy spy(logger, &Logger::logMessage);
         
-        Logger::log("Message 1");
-        Logger::log("Message 2");
-        Logger::log("Message 3");
+        Logger::log("Message 1", "", 0);
+        Logger::log("Message 2", "", 0);
+        Logger::log("Message 3", "", 0);
         
         // Verify all signals were emitted
         QCOMPARE(spy.count(), 3);
