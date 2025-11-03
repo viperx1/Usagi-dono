@@ -209,6 +209,18 @@ private:
 	// Note: HashedFileData structure removed as identification now happens immediately
 	// Only keep hash updates for efficient database batching
 	QList<QPair<QString, QString>> pendingHashUpdates; // path, hash pairs for database update
+	
+	// Deferred processing for already-hashed files to prevent UI freeze
+	struct HashedFileInfo {
+		int rowIndex;
+		QString filePath;
+		QString filename;
+		QString hexdigest;
+		qint64 fileSize;
+	};
+	QList<HashedFileInfo> pendingHashedFilesQueue;
+	QTimer *hashedFilesProcessingTimer;
+	void processPendingHashedFiles();
 
 
 public slots:
