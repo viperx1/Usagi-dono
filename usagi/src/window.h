@@ -118,6 +118,7 @@ private:
     QElapsedTimer waitforlogout;
     QElapsedTimer hashingTimer;
     QElapsedTimer lastEtaUpdate;
+    QElapsedTimer lastUiUpdate; // For throttling UI updates in getNotifyPartsDone
     int totalHashParts;
     int completedHashParts;
 	// main layout
@@ -205,14 +206,8 @@ private:
 	DirectoryWatcher *directoryWatcher;
 	
 	// Batch processing for hashed files
-	struct HashedFileData {
-		QString filename;
-		QString filePath;
-		qint64 size;
-		QString hexdigest;
-		int tableRow;
-	};
-	QList<HashedFileData> pendingHashedFiles; // Files waiting for batch processing
+	// Note: HashedFileData structure removed as identification now happens immediately
+	// Only keep hash updates for efficient database batching
 	QList<QPair<QString, QString>> pendingHashUpdates; // path, hash pairs for database update
 
 
