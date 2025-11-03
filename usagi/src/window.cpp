@@ -30,8 +30,8 @@ Window::Window()
 	totalHashParts = 0;
 	completedHashParts = 0;
 	
-	// Initialize UI color constants
-	m_hashedFileColor.setRgb(255, 255, 0); // Yellow for hashed files
+	// Initialize UI color constants (use Qt's predefined yellow color)
+	m_hashedFileColor = QColor(Qt::yellow);
 	
     safeclose = new QTimer;
     safeclose->setInterval(100);
@@ -870,8 +870,9 @@ void Window::processPendingHashedFiles()
 {
 	// Process files in small batches to keep UI responsive
 	int processed = 0;
+	int queueSize = pendingHashedFilesQueue.size(); // Cache size for efficiency
 	
-	while (!pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
+	while (processed < HASHED_FILES_BATCH_SIZE && processed < queueSize) {
 		HashedFileInfo info = pendingHashedFilesQueue.takeFirst();
 		processed++;
 		
