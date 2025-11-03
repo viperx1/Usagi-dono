@@ -6,30 +6,30 @@
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Constructor started");
+	Logger::log("[AniDB Init] Constructor started", __FILE__, __LINE__);
 	protover = 3;
 	client = client_; //"usagi";
 	clientver = clientver_; //1;
 	enc = "utf8";
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Starting DNS lookup for api.anidb.net (this may block)");
+	Logger::log("[AniDB Init] Starting DNS lookup for api.anidb.net (this may block)", __FILE__, __LINE__);
 	host = QHostInfo::fromName("api.anidb.net");
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] DNS lookup completed");
+	Logger::log("[AniDB Init] DNS lookup completed", __FILE__, __LINE__);
 	if(!host.addresses().isEmpty())
 	{
 		anidbaddr.setAddress(host.addresses().first().toIPv4Address());
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] DNS resolved successfully to " + host.addresses().first().toString());
+		Logger::log("[AniDB Init] DNS resolved successfully to " + host.addresses().first().toString(), __FILE__, __LINE__);
 	}
 	else
 	{
 		// Fallback to a default IP or leave uninitialized
 		// DNS resolution failed, socket operations will be skipped
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] DNS resolution for api.anidb.net failed");
+		Logger::log("[AniDB Error] DNS resolution for api.anidb.net failed", __FILE__, __LINE__);
 	}
 	anidbport = 9000;
 	loggedin = 0;
 	Socket = nullptr;
 
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Setting up database connection");
+	Logger::log("[AniDB Init] Setting up database connection", __FILE__, __LINE__);
 	// Check if default database connection already exists (e.g., in tests)
 	if(QSqlDatabase::contains(QSqlDatabase::defaultConnection))
 	{
@@ -49,10 +49,10 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 
     aes_key = "8fsd789f7sd7f6sd78695g35345g34gf4";
 
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Opening database");
+	Logger::log("[AniDB Init] Opening database", __FILE__, __LINE__);
 	if(db.open())
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Database opened, starting transaction");
+		Logger::log("[AniDB Init] Database opened, starting transaction", __FILE__, __LINE__);
 		db.transaction();
 //		Debug("AniDBApi: Database opened");
 		query = QSqlQuery(db);
@@ -82,12 +82,12 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `notifications`(`nid` INTEGER PRIMARY KEY, `type` TEXT, `from_user_id` INTEGER, `from_user_name` TEXT, `date` INTEGER, `message_type` INTEGER, `title` TEXT, `body` TEXT, `received_at` INTEGER, `acknowledged` BOOL DEFAULT 0);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
 		
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Committing database transaction");
+		Logger::log("[AniDB Init] Committing database transaction", __FILE__, __LINE__);
 		db.commit();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Database transaction committed");
+		Logger::log("[AniDB Init] Database transaction committed", __FILE__, __LINE__);
 	}
 //	QStringList names = QStringList()<<"username"<<"password";
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Reading settings from database");
+	Logger::log("[AniDB Init] Reading settings from database", __FILE__, __LINE__);
 	
 	// Execute SELECT query after transaction commit to read settings
 	query.exec("SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC");
@@ -130,11 +130,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	}
 
 	// Initialize network manager for anime titles download
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Initializing network manager");
+	Logger::log("[AniDB Init] Initializing network manager", __FILE__, __LINE__);
 	networkManager = new QNetworkAccessManager(this);
 	connect(networkManager, &QNetworkAccessManager::finished, this, &AniDBApi::onAnimeTitlesDownloaded);
 
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Setting up packet sender timer");
+	Logger::log("[AniDB Init] Setting up packet sender timer", __FILE__, __LINE__);
 	packetsender = new QTimer();
 	connect(packetsender, SIGNAL(timeout()), this, SLOT(SendPacket()));
 
@@ -142,7 +142,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	packetsender->start();
 	
 	// Initialize notification checking timer
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Setting up notification check timer");
+	Logger::log("[AniDB Init] Setting up notification check timer", __FILE__, __LINE__);
 	notifyCheckTimer = new QTimer();
 	connect(notifyCheckTimer, SIGNAL(timeout()), this, SLOT(checkForNotifications()));
 	isExportQueued = false;
@@ -155,18 +155,18 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	loadExportQueueState();
 
 	// Check and download anime titles if needed (automatically on startup)
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Checking if anime titles need update");
+	Logger::log("[AniDB Init] Checking if anime titles need update", __FILE__, __LINE__);
 	if(shouldUpdateAnimeTitles())
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Starting anime titles download");
+		Logger::log("[AniDB Init] Starting anime titles download", __FILE__, __LINE__);
 		downloadAnimeTitles();
 	}
 	else
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Anime titles are up to date, skipping download");
+		Logger::log("[AniDB Init] Anime titles are up to date, skipping download", __FILE__, __LINE__);
 	}
 
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Init] Constructor completed successfully");
+	Logger::log("[AniDB Init] Constructor completed successfully", __FILE__, __LINE__);
 
 //	codec = QTextCodec::codecForName("UTF-8");
 }
@@ -231,32 +231,32 @@ int AniDBApi::CreateSocket()
 {
 	if(Socket != nullptr)
 	{
-		Debug("AniDBApi: Socket already created");
+		Logger::log("AniDBApi: Socket already created");
 		return 1;
 	}
  	Socket = new QUdpSocket;
  	if(!Socket->bind(QHostAddress::Any, 3962))
  	{
-		Debug("AniDBApi: Can't bind socket");
+		Logger::log("AniDBApi: Can't bind socket");
 		return 0;
  	}
  	else
  	{
 		if(Socket->isValid())
 	 	{
-			Debug("AniDBApi: UDP socket created");
+			Logger::log("AniDBApi: UDP socket created");
 		}
 		else
 		{
-			Debug("AniDBApi: ERROR: failed to create UDP socket");
-			Debug("AniDBApi: " + Socket->errorString());
+			Logger::log("AniDBApi: ERROR: failed to create UDP socket");
+			Logger::log("AniDBApi: " + Socket->errorString());
 			return 0;
 		}
 	}
 	Socket->connectToHost(anidbaddr, anidbport);
 /*	if(Socket->error())
 	{
-		Debug("AniDBApi: " + Socket->errorString());
+		Logger::log("AniDBApi: " + Socket->errorString());
 		return 0;
 	}*/
 	connect(Socket, SIGNAL(readyRead()), this, SLOT(Recv()));
@@ -267,7 +267,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 {
 	if(Message.length() == 0)
 	{
-        Debug("AniDBApi: ParseMessage: Message empty");
+        Logger::log("AniDBApi: ParseMessage: Message empty");
 		return 0;
 	}
 //    Debug("AniDBApi: ParseMessage: " + Message);
@@ -297,16 +297,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Common case: "598 UNKNOWN COMMAND" becomes Tag="598", ReplyID="UNKNOWN"
 			ReplyID = Tag;
 			Tag = "0"; // Use default tag since none was provided
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] Tagless response detected - Tag: " + Tag + " ReplyID: " + ReplyID);
+			Logger::log("[AniDB Response] Tagless response detected - Tag: " + Tag + " ReplyID: " + ReplyID, __FILE__, __LINE__);
 		}
 		else
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID);
+			Logger::log("[AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID, __FILE__, __LINE__);
 		}
 	}
 	else
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID);
+		Logger::log("[AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID, __FILE__, __LINE__);
 	}
 
 	token.pop_front();
@@ -322,7 +322,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         notifyLoggedIn(Tag, 201);
 	}
     else if(ReplyID == "203"){ // 203 LOGGED OUT
-        Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 203 LOGGED OUT - Tag: " + Tag);
+        Logger::log("[AniDB Response] 203 LOGGED OUT - Tag: " + Tag, __FILE__, __LINE__);
 		loggedin = 0;
         notifyLoggedOut(Tag, 203);
 	}
@@ -386,23 +386,23 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				QSqlQuery insertQuery(db);
 				if(!insertQuery.exec(q))
 				{
-					Debug("Failed to insert mylist entry: " + insertQuery.lastError().text());
+					Logger::log("Failed to insert mylist entry: " + insertQuery.lastError().text());
 				}
 				else
 				{
-					Debug(QString("Successfully added mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
+					Logger::log(QString("Successfully added mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
 				}
 			}
 			else
 			{
-				Debug("Could not find file info for size=" + size + " ed2k=" + ed2k);
+				Logger::log("Could not find file info for size=" + size + " ed2k=" + ed2k);
 			}
 		}
 		
 		notifyMylistAdd(Tag, 210);
 	}
 	else if(ReplyID == "217"){ // 217 EXPORT QUEUED
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 217 EXPORT QUEUED - Tag: " + Tag);
+		Logger::log("[AniDB Response] 217 EXPORT QUEUED - Tag: " + Tag, __FILE__, __LINE__);
 		// Export has been queued and will be generated by AniDB
 		// When ready, a notification will be sent with the download link
 		
@@ -413,7 +413,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		exportQueuedTimestamp = QDateTime::currentSecsSinceEpoch();
 		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		notifyCheckTimer->start();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Started periodic notification checking (every 1 minute initially)");
+		Logger::log("[AniDB Export] Started periodic notification checking (every 1 minute initially)", __FILE__, __LINE__);
 		
 		// Save state to persist across restarts
 		saveExportQueueState();
@@ -421,23 +421,23 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		emit notifyExportQueued(Tag);
 	}
 	else if(ReplyID == "218"){ // 218 EXPORT CANCELLED
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 218 EXPORT CANCELLED - Tag: " + Tag);
+		Logger::log("[AniDB Response] 218 EXPORT CANCELLED - Tag: " + Tag, __FILE__, __LINE__);
 		// Reply to cancel=1 parameter - export was cancelled
 	}
 	else if(ReplyID == "317"){ // 317 EXPORT NO SUCH TEMPLATE
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 317 EXPORT NO SUCH TEMPLATE - Tag: " + Tag);
+		Logger::log("[AniDB Response] 317 EXPORT NO SUCH TEMPLATE - Tag: " + Tag, __FILE__, __LINE__);
 		// The requested template name does not exist
 		// Valid templates: xml-plain-cs, xml, csv, json, anidb
 		emit notifyExportNoSuchTemplate(Tag);
 	}
 	else if(ReplyID == "318"){ // 318 EXPORT ALREADY IN QUEUE
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 318 EXPORT ALREADY IN QUEUE - Tag: " + Tag);
+		Logger::log("[AniDB Response] 318 EXPORT ALREADY IN QUEUE - Tag: " + Tag, __FILE__, __LINE__);
 		// An export is already queued - cannot queue another until current one completes
 		// Client should wait for notification when current export is ready
 		emit notifyExportAlreadyInQueue(Tag);
 	}
 	else if(ReplyID == "319"){ // 319 EXPORT NO EXPORT QUEUED OR IS PROCESSING
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 319 EXPORT NO EXPORT QUEUED OR IS PROCESSING - Tag: " + Tag);
+		Logger::log("[AniDB Response] 319 EXPORT NO EXPORT QUEUED OR IS PROCESSING - Tag: " + Tag, __FILE__, __LINE__);
 		// Reply to cancel=1 when there's no export to cancel
 		// No export is currently queued or being processed
 	}
@@ -479,7 +479,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QSqlQuery query(db);
 		if(!query.exec(q))
 		{
-			Debug("Database query error: " + query.lastError().text());
+			Logger::log("Database query error: " + query.lastError().text());
 		}
 		
 		// Parse anime/episode data if available (indices 27+)
@@ -532,7 +532,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(synonyms).replace("'", "''"));
 				if(!query.exec(q_anime))
 				{
-					Debug("Anime database query error: " + query.lastError().text());
+					Logger::log("Anime database query error: " + query.lastError().text());
 				}
 			}
 			
@@ -549,7 +549,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(epno).replace("'", "''"));  // Store episode number!
 				if(!query.exec(q_episode))
 				{
-					Debug("Episode database query error: " + query.lastError().text());
+					Logger::log("Episode database query error: " + query.lastError().text());
 				}
 			}
 		}
@@ -601,29 +601,29 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QSqlQuery insertQuery(db);
 			if(!insertQuery.exec(q))
 			{
-				Debug("Database query error: " + insertQuery.lastError().text());
+				Logger::log("Database query error: " + insertQuery.lastError().text());
 			}
 			else
 			{
-				Debug(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))));
+				Logger::log(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))));
 			}
 		}
 		else if(lid.isEmpty())
 		{
-			Debug("Could not extract lid from MYLIST command");
+			Logger::log("Could not extract lid from MYLIST command");
 		}
 	}
 	else if(ReplyID == "222"){ // 222 MYLISTSTATS
 		// Response format: entries|watched|size|viewed size|viewed%|watched%|episodes watched
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 222 MYLISTSTATS - Tag: " + Tag + " Data: " + token2.first());
+		Logger::log("[AniDB Response] 222 MYLISTSTATS - Tag: " + Tag + " Data: " + token2.first(), __FILE__, __LINE__);
 	}
 	else if(ReplyID == "223"){ // 223 WISHLIST
 		// Parse wishlist response
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first());
+		Logger::log("[AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first(), __FILE__, __LINE__);
 	}
 	else if(ReplyID == "240"){ // 240 EPISODE
 		// Response format: eid|aid|length|rating|votes|epno|eng|romaji|kanji|aired|type
@@ -656,11 +656,11 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QSqlQuery query(db);
 			if(!query.exec(q_episode))
 			{
-				Debug("Episode database query error: " + query.lastError().text());
+				Logger::log("Episode database query error: " + query.lastError().text());
 			}
 			else
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 240 EPISODE stored - EID: " + eid + " AID: " + aid + " EPNO: " + epno + " Name: " + epname);
+				Logger::log("[AniDB Response] 240 EPISODE stored - EID: " + eid + " AID: " + aid + " EPNO: " + epno + " Name: " + epname, __FILE__, __LINE__);
 				// Emit signal to notify UI that episode data was updated
 				emit notifyEpisodeUpdated(eid.toInt(), aid.toInt());
 			}
@@ -742,29 +742,29 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				QSqlQuery insertQuery(db);
 				if(!insertQuery.exec(q))
 				{
-					Debug("Failed to update mylist entry: " + insertQuery.lastError().text());
+					Logger::log("Failed to update mylist entry: " + insertQuery.lastError().text());
 				}
 				else
 				{
-					Debug(QString("Successfully updated mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
+					Logger::log(QString("Successfully updated mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
 				}
 			}
 			else
 			{
-				Debug("Could not find file info for size=" + size + " ed2k=" + ed2k);
+				Logger::log("Could not find file info for size=" + size + " ed2k=" + ed2k);
 			}
 		}
 		
 		notifyMylistAdd(Tag, 311);
 	}
 	else if(ReplyID == "312"){ // 312 NO SUCH MYLIST ENTRY
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag);
+		Logger::log("[AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag, __FILE__, __LINE__);
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
         notifyMylistAdd(Tag, 320);
         // Mark packet as processed and received reply instead of deleting
         QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID).arg(Tag);
-        Debug("Database update query: " + q + " Tag: " + Tag);
+        Logger::log("Database update query: " + q + " Tag: " + Tag);
         QSqlQuery query(db);
         query.exec(q);
     }
@@ -782,7 +782,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString title = parts[4];
 			QString body = parts[5];
 			
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 270 NOTIFICATION - NID: " + QString::number(nid) + " Title: " + title + " Body: " + body);
+			Logger::log("[AniDB Response] 270 NOTIFICATION - NID: " + QString::number(nid) + " Title: " + title + " Body: " + body, __FILE__, __LINE__);
 			
 			// Store notification in database
 			QSqlQuery query(db);
@@ -797,13 +797,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			query.exec(q);
 			if(query.lastError().isValid())
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Database] Error storing notification: " + query.lastError().text());
+				Logger::log("[AniDB Database] Error storing notification: " + query.lastError().text(), __FILE__, __LINE__);
 			}
 			
 			// Check if this is an export notification (contains .tgz link)
 			if(body.contains(".tgz", Qt::CaseInsensitive) && isExportQueued)
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
+				Logger::log("[AniDB Export] Export notification received, stopping periodic checks", __FILE__, __LINE__);
 				isExportQueued = false;
 				notifyCheckTimer->stop();
 				notifyCheckIntervalMs = 60000; // Reset to 1 minute for next export
@@ -820,21 +820,21 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 	}
 	else if(ReplyID == "271"){ // 271 NOTIFYACK - NOTIFICATION ACKNOWLEDGED
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 271 NOTIFICATION ACKNOWLEDGED - Tag: " + Tag);
+		Logger::log("[AniDB Response] 271 NOTIFICATION ACKNOWLEDGED - Tag: " + Tag, __FILE__, __LINE__);
 	}
 	else if(ReplyID == "272"){ // 272 NO SUCH NOTIFICATION
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 272 NO SUCH NOTIFICATION - Tag: " + Tag);
+		Logger::log("[AniDB Response] 272 NO SUCH NOTIFICATION - Tag: " + Tag, __FILE__, __LINE__);
 	}
 	else if(ReplyID == "290"){ // 290 NOTIFYLIST
 		// Parse notification list - show all entries
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()));
+		Logger::log("[AniDB Response] 290 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()), __FILE__, __LINE__);
 		
 		// Log all notification entries
 		for(int i = 0; i < token2.size(); i++)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i]);
+			Logger::log("[AniDB Response] 290 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i], __FILE__, __LINE__);
 		}
 		
 		// Collect all message notification IDs (M|nid entries)
@@ -862,7 +862,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 		}
 		
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Total messages: " + QString::number(messageNids.size()) + ", New messages: " + QString::number(newNids.size()));
+		Logger::log("[AniDB Response] 290 NOTIFYLIST - Total messages: " + QString::number(messageNids.size()) + ", New messages: " + QString::number(newNids.size()), __FILE__, __LINE__);
 		
 		// Fetch only new message notifications to search for export link
 		// The export notification is most likely recent, but not guaranteed to be the very last one
@@ -871,31 +871,31 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		
 		if(notificationsToFetch > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching " + QString::number(notificationsToFetch) + " new message notifications");
+			Logger::log("[AniDB Response] 290 NOTIFYLIST - Fetching " + QString::number(notificationsToFetch) + " new message notifications", __FILE__, __LINE__);
 			emit notifyCheckStarting(notificationsToFetch);
 			for(int i = 0; i < notificationsToFetch; i++)
 			{
 				// Fetch from the end of the list (most recent first)
 				QString nid = newNids[newNids.size() - 1 - i];
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - Fetching new message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
+				Logger::log("[AniDB Response] 290 NOTIFYLIST - Fetching new message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid, __FILE__, __LINE__);
 				NotifyGet(nid.toInt());
 			}
 		}
 		else if(messageNids.size() > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 290 NOTIFYLIST - No new notifications to fetch, all are already in database");
+			Logger::log("[AniDB Response] 290 NOTIFYLIST - No new notifications to fetch, all are already in database", __FILE__, __LINE__);
 		}
 	}
 	else if(ReplyID == "291"){ // 291 NOTIFYLIST ENTRY
 		// Parse notification list - can contain single entry (pagination) or full list
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()));
+		Logger::log("[AniDB Response] 291 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()), __FILE__, __LINE__);
 		
 		// Log all notification entries
 		for(int i = 0; i < token2.size(); i++)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i]);
+			Logger::log("[AniDB Response] 291 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i], __FILE__, __LINE__);
 		}
 		
 		// Collect all message notification IDs (M|nid entries)
@@ -923,7 +923,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 		}
 		
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Total messages: " + QString::number(messageNids.size()) + ", New messages: " + QString::number(newNids.size()));
+		Logger::log("[AniDB Response] 291 NOTIFYLIST - Total messages: " + QString::number(messageNids.size()) + ", New messages: " + QString::number(newNids.size()), __FILE__, __LINE__);
 		
 		// Fetch only new message notifications to search for export link
 		// The export notification is most likely recent, but not guaranteed to be the very last one
@@ -932,19 +932,19 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		
 		if(notificationsToFetch > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching " + QString::number(notificationsToFetch) + " new message notifications");
+			Logger::log("[AniDB Response] 291 NOTIFYLIST - Fetching " + QString::number(notificationsToFetch) + " new message notifications", __FILE__, __LINE__);
 			emit notifyCheckStarting(notificationsToFetch);
 			for(int i = 0; i < notificationsToFetch; i++)
 			{
 				// Fetch from the end of the list (most recent first)
 				QString nid = newNids[newNids.size() - 1 - i];
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - Fetching new message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid);
+				Logger::log("[AniDB Response] 291 NOTIFYLIST - Fetching new message notification " + QString::number(i+1) + " of " + QString::number(notificationsToFetch) + ": " + nid, __FILE__, __LINE__);
 				NotifyGet(nid.toInt());
 			}
 		}
 		else if(messageNids.size() > 0)
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 291 NOTIFYLIST - No new notifications to fetch, all are already in database");
+			Logger::log("[AniDB Response] 291 NOTIFYLIST - No new notifications to fetch, all are already in database", __FILE__, __LINE__);
 		}
 	}
 	else if(ReplyID == "292"){ // 292 NOTIFYGET (type=M) - {int4 id}|{int4 from_user_id}|{str from_user_name}|{int4 date}|{int4 type}|{str title}|{str body}
@@ -962,7 +962,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString title = parts[5];
 			QString body = parts[6];
 			
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 292 NOTIFYGET - ID: " + QString::number(id) + " Title: " + title + " Body: " + body);
+			Logger::log("[AniDB Response] 292 NOTIFYGET - ID: " + QString::number(id) + " Title: " + title + " Body: " + body, __FILE__, __LINE__);
 			
 			// Store notification in database
 			QSqlQuery query(db);
@@ -978,13 +978,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			query.exec(q);
 			if(query.lastError().isValid())
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Database] Error storing notification: " + query.lastError().text());
+				Logger::log("[AniDB Database] Error storing notification: " + query.lastError().text(), __FILE__, __LINE__);
 			}
 			
 			// Check if this is an export notification (contains .tgz link)
 			if(body.contains(".tgz", Qt::CaseInsensitive) && isExportQueued)
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export notification received, stopping periodic checks");
+				Logger::log("[AniDB Export] Export notification received, stopping periodic checks", __FILE__, __LINE__);
 				isExportQueued = false;
 				requestedExportTemplate.clear(); // Clear the requested template
 				notifyCheckTimer->stop();
@@ -1001,7 +1001,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 		else
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 292 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()));
+			Logger::log("[AniDB Response] 292 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()), __FILE__, __LINE__);
 		}
 	}
 	else if(ReplyID == "293"){ // 293 NOTIFYGET (type=N) - {int4 relid}|{int4 type}|{int2 count}|{int4 date}|{str relidname}|{str fids}
@@ -1018,7 +1018,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString relidname = parts[4];
 			QString fids = parts[5];
 			
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - RelID: " + QString::number(relid) + " Type: " + QString::number(type) + " Count: " + QString::number(count) + " Name: " + relidname + " FIDs: " + fids);
+			Logger::log("[AniDB Response] 293 NOTIFYGET - RelID: " + QString::number(relid) + " Type: " + QString::number(type) + " Count: " + QString::number(count) + " Name: " + relidname + " FIDs: " + fids, __FILE__, __LINE__);
 			
 			// Store file notification in database
 			QSqlQuery query(db);
@@ -1032,7 +1032,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			query.exec(q);
 			if(query.lastError().isValid())
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Database] Error storing file notification: " + query.lastError().text());
+				Logger::log("[AniDB Database] Error storing file notification: " + query.lastError().text(), __FILE__, __LINE__);
 			}
 			
 			// Note: For N-type notifications, we don't emit notifyMessageReceived as these are file notifications
@@ -1042,7 +1042,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 		else
 		{
-			Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 293 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()));
+			Logger::log("[AniDB Response] 293 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()), __FILE__, __LINE__);
 		}
 	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
@@ -1063,7 +1063,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("-");
 		token2.pop_front();
 		bannedfor = token2.first();
-		Debug("AniDBApi: Client banned: "+ bannedfor);
+		Logger::log("AniDBApi: Client banned: "+ bannedfor);
 	}
 	else if(ReplyID == "505"){ // 505 ILLEGAL INPUT OR ACCESS DENIED
 	}
@@ -1076,18 +1076,18 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
     }
 	else if(ReplyID == "598"){ // 598 UNKNOWN COMMAND
 		// This typically means the command was malformed or not recognized
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] 598 UNKNOWN COMMAND - Tag: " + Tag + " - check request format");
+		Logger::log("[AniDB Error] 598 UNKNOWN COMMAND - Tag: " + Tag + " - check request format", __FILE__, __LINE__);
 	}
 	else if(ReplyID == "601"){ // 601 ANIDB OUT OF SERVICE - TRY AGAIN LATER
 	}
 	else if(ReplyID == "702"){ // 702 NO SUCH PACKET PENDING
 		// This occurs when trying to PUSHACK a notification that wasn't sent via PUSH
 		// PUSHACK is only for notifications received via code 270 (PUSH), not for notifications fetched via NOTIFYGET
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Response] 702 NO SUCH PACKET PENDING - Tag: " + Tag);
+		Logger::log("[AniDB Response] 702 NO SUCH PACKET PENDING - Tag: " + Tag, __FILE__, __LINE__);
 	}
     else
     {
-        Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] ParseMessage - UNSUPPORTED ReplyID: " + ReplyID + " Tag: " + Tag);
+        Logger::log("[AniDB Error] ParseMessage - UNSUPPORTED ReplyID: " + ReplyID + " Tag: " + Tag, __FILE__, __LINE__);
     }
     waitingForReply.isWaiting = false;
 	return ReplyID;
@@ -1101,7 +1101,7 @@ QString AniDBApi::Auth()
 	QSqlQuery query(db);
 	if(!query.exec(q))
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Auth] Database query error: " + query.lastError().text());
+		Logger::log("[AniDB Auth] Database query error: " + query.lastError().text(), __FILE__, __LINE__);
 	}
 
 //	Send(msg, "AUTH", "xxx");
@@ -1112,7 +1112,7 @@ QString AniDBApi::Auth()
 QString AniDBApi::Logout()
 {
 	QString msg = buildLogoutCommand();
-    Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Sending LOGOUT command");
+    Logger::log("[AniDB API] Sending LOGOUT command", __FILE__, __LINE__);
     Send(msg, "LOGOUT", "0");
 
 	return 0;
@@ -1130,13 +1130,13 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 	QSqlQuery query(db);
 	if(!query.exec(q))
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB MylistAdd] Database insert error: " + query.lastError().text());
+		Logger::log("[AniDB MylistAdd] Database insert error: " + query.lastError().text(), __FILE__, __LINE__);
 		return "0";
 	}
 
 /*	q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = 0").arg(msg);
 	query.exec(q);
-	Debug("Database query error: " + query.lastError().text());
+	Logger::log("Database query error: " + query.lastError().text());
 
 	if(query.isSelect())
 	{
@@ -1161,12 +1161,12 @@ QString AniDBApi::File(qint64 size, QString ed2k)
 				fRESOLUTION | fFILETYPE | fLANG_DUB | fLANG_SUB | fLENGTH | fDESCRIPTION | fAIRDATE |
 				fFILENAME;
 	QString msg = buildFileCommand(size, ed2k, fmask, amask);
-	Debug(msg);
+	Logger::log(msg);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
 	if(!query.exec(q))
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB File] Database insert error: " + query.lastError().text());
+		Logger::log("[AniDB File] Database insert error: " + query.lastError().text(), __FILE__, __LINE__);
 		return "0";
 	}
 //	Send(a, "", "zzz");
@@ -1245,7 +1245,7 @@ QString AniDBApi::MylistExport(QString template_name)
 	{
 		Auth();
 	}
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Requesting MYLISTEXPORT with template: " + template_name);
+	Logger::log("[AniDB API] Requesting MYLISTEXPORT with template: " + template_name, __FILE__, __LINE__);
 	
 	// Store the requested template so we can verify the notification matches
 	requestedExportTemplate = template_name;
@@ -1264,7 +1264,7 @@ QString AniDBApi::Episode(int eid)
 	{
 		Auth();
 	}
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB API] Requesting EPISODE data for EID: " + QString::number(eid));
+	Logger::log("[AniDB API] Requesting EPISODE data for EID: " + QString::number(eid), __FILE__, __LINE__);
 	QString msg = buildEpisodeCommand(eid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
@@ -1368,7 +1368,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 {
 	if(Socket == nullptr)
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Error] Socket not initialized, cannot send");
+		Logger::log("[AniDB Error] Socket not initialized, cannot send", __FILE__, __LINE__);
 		return 0;
 	}
 	QString a;
@@ -1376,10 +1376,10 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	{
 		a = QString("%1&s=%2").arg(str).arg(SID);
 	}
-	Debug("AniDBApi: Send: " + (a.length() > 0 ? a : a = str));
+	Logger::log("AniDBApi: Send: " + (a.length() > 0 ? a : a = str));
 
 	a = QString("%1&tag=%2").arg(a).arg(tag);
-    Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Send] Command: " + a);
+    Logger::log("[AniDB Send] Command: " + a, __FILE__, __LINE__);
 //    QByteArray bytes = a.toUtf8();
 //	const char *ptr = bytes.data();
 //	Socket->write(ptr);
@@ -1412,7 +1412,7 @@ int AniDBApi::Recv()
 //		result = codec->toUnicode(data);
 //		result.toUtf8();
         result = QString::fromUtf8(data.data());
-		Debug("AniDBApi: Recv: " + result);
+		Logger::log("AniDBApi: Recv: " + result);
     }
 	if(result.length() > 0)
 	{
@@ -1452,21 +1452,21 @@ int AniDBApi::SendPacket()
             {
                 tag = query.value(0).toString();
                 str = query.value(1).toString();
-                Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Queue] Sending query - Tag: " + tag + " Command: " + str);
+                Logger::log("[AniDB Queue] Sending query - Tag: " + tag + " Command: " + str, __FILE__, __LINE__);
                 if(!LoggedIn() && !str.contains("AUTH"))
                 {
                     Auth();
                     return 0;
                 }
                 Send(str,"", tag);
-                Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Sent] Command: " + lastSentPacket);
+                Logger::log("[AniDB Sent] Command: " + lastSentPacket, __FILE__, __LINE__);
             }
         }
     }
 	Recv();
     if(waitingForReply.isWaiting == true && waitingForReply.start.elapsed() > 10000)
     {
-        Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed: " + QString::number(waitingForReply.start.elapsed()) + " ms");
+        Logger::log("[AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed: " + QString::number(waitingForReply.start.elapsed()) + " ms", __FILE__, __LINE__);
     }
 	return 0;
 }
@@ -1478,7 +1478,7 @@ std::bitset<2> AniDBApi::LocalIdentify(int size, QString ed2khash)
 	QSqlQuery query(db);
 	if(!query.exec(q))
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB LocalIdentify] Database query error: " + query.lastError().text());
+		Logger::log("[AniDB LocalIdentify] Database query error: " + query.lastError().text(), __FILE__, __LINE__);
 		return ret;
 	}
 	
@@ -1495,7 +1495,7 @@ std::bitset<2> AniDBApi::LocalIdentify(int size, QString ed2khash)
 	q = QString("SELECT `lid` FROM `mylist` WHERE `fid` = '%1'").arg(fid);
 	if(!query.exec(q))
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB LocalIdentify] Database query error: " + query.lastError().text());
+		Logger::log("[AniDB LocalIdentify] Database query error: " + query.lastError().text(), __FILE__, __LINE__);
 		return ret;
 	}
 	
@@ -1615,7 +1615,7 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 	QSqlQuery query(db);
 	if(!query.exec(q))
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB UpdateFile] Database query error: " + query.lastError().text());
+		Logger::log("[AniDB UpdateFile] Database query error: " + query.lastError().text(), __FILE__, __LINE__);
 		return;
 	}
 	
@@ -1627,7 +1627,7 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 			q = QString("UPDATE `mylist` SET `viewed` = '%1', `state` = '%2', `storage` = '%3' WHERE `lid` = %4").arg(viewed).arg(state).arg(storage).arg(lid);
 			if(!query.exec(q))
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB UpdateFile] Database update error: " + query.lastError().text());
+				Logger::log("[AniDB UpdateFile] Database update error: " + query.lastError().text(), __FILE__, __LINE__);
 				return;
 			}
 			if(query.numRowsAffected() == 1)
@@ -1648,7 +1648,7 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
-		Debug("Database not available, cannot update local path");
+		Logger::log("Database not available, cannot update local path");
 		return;
 	}
 	
@@ -2045,7 +2045,7 @@ QString AniDBApi::GetTag(QString str)
 	QSqlQuery query(db);
 	if(!query.exec(q))
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB GetTag] Database query error: " + query.lastError().text());
+		Logger::log("[AniDB GetTag] Database query error: " + query.lastError().text(), __FILE__, __LINE__);
 		return "0";
 	}
 	
@@ -2060,7 +2060,7 @@ QString AniDBApi::GetTag(QString str)
 
 bool AniDBApi::shouldUpdateAnimeTitles()
 {
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Checking if anime titles need update");
+	Logger::log("[AniDB Anime Titles] Checking if anime titles need update", __FILE__, __LINE__);
 	// Check if we should download anime titles
 	// Download if: never downloaded before OR last update was more than 24 hours ago
 	// Read from database to ensure we have the most up-to-date timestamp
@@ -2070,20 +2070,20 @@ bool AniDBApi::shouldUpdateAnimeTitles()
 	if(!query.next())
 	{
 		// Never downloaded before
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] No previous download found, download needed");
+		Logger::log("[AniDB Anime Titles] No previous download found, download needed", __FILE__, __LINE__);
 		return true;
 	}
 	
 	QDateTime lastUpdate = QDateTime::fromSecsSinceEpoch(query.value(0).toLongLong());
 	qint64 secondsSinceLastUpdate = lastUpdate.secsTo(QDateTime::currentDateTime());
 	bool needsUpdate = secondsSinceLastUpdate > 86400; // 86400 seconds = 24 hours
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Last update was " + QString::number(secondsSinceLastUpdate) + " seconds ago, needs update: " + (needsUpdate ? "yes" : "no"));
+	Logger::log("[AniDB Anime Titles] Last update was " + QString::number(secondsSinceLastUpdate) + " seconds ago, needs update: " + (needsUpdate ? "yes" : "no"), __FILE__, __LINE__);
 	return needsUpdate;
 }
 
 void AniDBApi::downloadAnimeTitles()
 {
-	Debug("Downloading anime titles from AniDB...");
+	Logger::log("Downloading anime titles from AniDB...");
 	
 	QNetworkRequest request{QUrl("http://anidb.net/api/anime-titles.dat.gz")};
 	request.setHeader(QNetworkRequest::UserAgentHeader, QString("Usagi/%1").arg(clientver));
@@ -2102,10 +2102,10 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 		return;
 	}
 	
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Download callback triggered");
+	Logger::log("[AniDB Anime Titles] Download callback triggered", __FILE__, __LINE__);
 	if(reply->error() != QNetworkReply::NoError)
 	{
-		Debug(QString("Failed to download anime titles: %1").arg(reply->errorString()));
+		Logger::log(QString("Failed to download anime titles: %1").arg(reply->errorString()));
 		reply->deleteLater();
 		return;
 	}
@@ -2113,19 +2113,19 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	QByteArray compressedData = reply->readAll();
 	reply->deleteLater();
 	
-	Debug(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()));
+	Logger::log(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()));
 	
 	// The file is in gzip format, which uses deflate compression
 	// We need to decompress it properly using zlib
 	QByteArray decompressedData;
 	
 	// Check if it's gzip format (starts with 0x1f 0x8b)
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting decompression");
+	Logger::log("[AniDB Anime Titles] Starting decompression", __FILE__, __LINE__);
 	if(compressedData.size() >= 2 && 
 	   (unsigned char)compressedData[0] == 0x1f && 
 	   (unsigned char)compressedData[1] == 0x8b)
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Detected gzip format, using zlib decompression");
+		Logger::log("[AniDB Anime Titles] Detected gzip format, using zlib decompression", __FILE__, __LINE__);
 		// It's gzip format - use zlib to decompress
 		// Initialize zlib stream
 		z_stream stream;
@@ -2140,7 +2140,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 		int ret = inflateInit2(&stream, 15 + 16);
 		if(ret != Z_OK)
 		{
-			Debug(QString("Failed to initialize gzip decompression: %1").arg(ret));
+			Logger::log(QString("Failed to initialize gzip decompression: %1").arg(ret));
 			return;
 		}
 		
@@ -2148,7 +2148,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 		const int CHUNK = 4 * 1024 * 1024;
 		unsigned char* out = new unsigned char[CHUNK];
 		
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting inflate operation (this may take a moment)");
+		Logger::log("[AniDB Anime Titles] Starting inflate operation (this may take a moment)", __FILE__, __LINE__);
 		// Decompress
 		do {
 			stream.avail_out = CHUNK;
@@ -2157,7 +2157,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 			ret = inflate(&stream, Z_NO_FLUSH);
 			if(ret == Z_STREAM_ERROR || ret == Z_NEED_DICT || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
 			{
-				Debug(QString("Gzip decompression failed: %1").arg(ret));
+				Logger::log(QString("Gzip decompression failed: %1").arg(ret));
 				delete[] out;
 				inflateEnd(&stream);
 				return;
@@ -2167,29 +2167,29 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 			decompressedData.append((char*)out, have);
 		} while(ret != Z_STREAM_END);
 		
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Decompression completed successfully");
+		Logger::log("[AniDB Anime Titles] Decompression completed successfully", __FILE__, __LINE__);
 		// Clean up
 		delete[] out;
 		inflateEnd(&stream);
 	}
 	else
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Not gzip format, trying qUncompress");
+		Logger::log("[AniDB Anime Titles] Not gzip format, trying qUncompress", __FILE__, __LINE__);
 		// Try direct decompression with qUncompress (for zlib format)
 		decompressedData = qUncompress(compressedData);
 	}
 	
 	if(decompressedData.isEmpty())
 	{
-		Debug("Failed to decompress anime titles data. Will retry on next startup.");
+		Logger::log("Failed to decompress anime titles data. Will retry on next startup.");
 		return;
 	}
 	
-	Debug(QString("Decompressed to %1 bytes").arg(decompressedData.size()));
+	Logger::log(QString("Decompressed to %1 bytes").arg(decompressedData.size()));
 	
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting to parse and store titles");
+	Logger::log("[AniDB Anime Titles] Starting to parse and store titles", __FILE__, __LINE__);
 	parseAndStoreAnimeTitles(decompressedData);
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Finished parsing and storing titles");
+	Logger::log("[AniDB Anime Titles] Finished parsing and storing titles", __FILE__, __LINE__);
 	
 	// Update last download timestamp
 	lastAnimeTitlesUpdate = QDateTime::currentDateTime();
@@ -2198,27 +2198,27 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 				.arg(lastAnimeTitlesUpdate.toSecsSinceEpoch());
 	query.exec(q);
 	
-	Debug(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()));
+	Logger::log(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()));
 }
 
 void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 {
 	if(data.isEmpty())
 	{
-		Debug("No data to parse for anime titles");
+		Logger::log("No data to parse for anime titles");
 		return;
 	}
 	
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting to parse anime titles data (" + QString::number(data.size()) + " bytes)");
+	Logger::log("[AniDB Anime Titles] Starting to parse anime titles data (" + QString::number(data.size()) + " bytes)", __FILE__, __LINE__);
 	QString content = QString::fromUtf8(data);
 	QStringList lines = content.split('\n', Qt::SkipEmptyParts);
 	
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Starting database transaction for " + QString::number(lines.size()) + " lines");
+	Logger::log("[AniDB Anime Titles] Starting database transaction for " + QString::number(lines.size()) + " lines", __FILE__, __LINE__);
 	db.transaction();
 	
 	// Clear old titles
 	QSqlQuery query(db);
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Clearing old anime titles from database");
+	Logger::log("[AniDB Anime Titles] Clearing old anime titles from database", __FILE__, __LINE__);
 	query.exec("DELETE FROM `anime_titles`");
 	
 	int count = 0;
@@ -2252,21 +2252,21 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 			// Report progress periodically to show it's not frozen
 			if(count % progressInterval == 0)
 			{
-				Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Processing progress: " + QString::number(count) + " titles inserted");
+				Logger::log("[AniDB Anime Titles] Processing progress: " + QString::number(count) + " titles inserted", __FILE__, __LINE__);
 			}
 		}
 	}
 	
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Committing database transaction with " + QString::number(count) + " titles");
+	Logger::log("[AniDB Anime Titles] Committing database transaction with " + QString::number(count) + " titles", __FILE__, __LINE__);
 	db.commit();
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Anime Titles] Parsed and stored " + QString::number(count) + " anime titles successfully");
+	Logger::log("[AniDB Anime Titles] Parsed and stored " + QString::number(count) + " anime titles successfully", __FILE__, __LINE__);
 }
 
 void AniDBApi::checkForNotifications()
 {
 	if(!isExportQueued)
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] No export queued, stopping notification checks");
+		Logger::log("[AniDB Export] No export queued, stopping notification checks", __FILE__, __LINE__);
 		notifyCheckTimer->stop();
 		return;
 	}
@@ -2276,7 +2276,7 @@ void AniDBApi::checkForNotifications()
 	qint64 elapsedHours = elapsedSeconds / 3600;
 	if(elapsedSeconds > 48 * 3600)  // 48 hours = 172800 seconds
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Stopping notification checks after 48 hours");
+		Logger::log("[AniDB Export] Stopping notification checks after 48 hours", __FILE__, __LINE__);
 		notifyCheckTimer->stop();
 		isExportQueued = false;
 		notifyCheckAttempts = 0;
@@ -2288,7 +2288,7 @@ void AniDBApi::checkForNotifications()
 	
 	notifyCheckAttempts++;
 	int intervalMinutes = notifyCheckIntervalMs / 60000;
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Periodic notification check (attempt " + QString::number(notifyCheckAttempts) + ", interval: " + QString::number(intervalMinutes) + " minutes, elapsed: " + QString::number(elapsedHours) + " hours)");
+	Logger::log("[AniDB Export] Periodic notification check (attempt " + QString::number(notifyCheckAttempts) + ", interval: " + QString::number(intervalMinutes) + " minutes, elapsed: " + QString::number(elapsedHours) + " hours)", __FILE__, __LINE__);
 	
 	// Check for new notifications by requesting NOTIFYLIST
 	if(SID.length() > 0 && LoginStatus() > 0)
@@ -2298,7 +2298,7 @@ void AniDBApi::checkForNotifications()
 		QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 		QSqlQuery query(db);
 		query.exec(q);
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Requesting NOTIFYLIST to check for export notification");
+		Logger::log("[AniDB Export] Requesting NOTIFYLIST to check for export notification", __FILE__, __LINE__);
 		
 		// Increase check interval by 1 minute after each successful check attempt
 		// Cap at 60 minutes to avoid very long waits
@@ -2309,15 +2309,15 @@ void AniDBApi::checkForNotifications()
 		}
 		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		int nextIntervalMinutes = notifyCheckIntervalMs / 60000;
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Next check will be in " + QString::number(nextIntervalMinutes) + " minutes");
+		Logger::log("[AniDB Export] Next check will be in " + QString::number(nextIntervalMinutes) + " minutes", __FILE__, __LINE__);
 	}
 	else
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Not logged in, skipping notification check");
+		Logger::log("[AniDB Export] Not logged in, skipping notification check", __FILE__, __LINE__);
 		// Don't increase interval when not logged in - keep trying at the same interval
 		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		int nextIntervalMinutes = notifyCheckIntervalMs / 60000;
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Will retry in " + QString::number(nextIntervalMinutes) + " minutes after login");
+		Logger::log("[AniDB Export] Will retry in " + QString::number(nextIntervalMinutes) + " minutes after login", __FILE__, __LINE__);
 	}
 	
 	// Save state after each check
@@ -2344,7 +2344,7 @@ void AniDBApi::saveExportQueueState()
 	QString q4 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued_timestamp', '%1');").arg(exportQueuedTimestamp);
 	query.exec(q4);
 	
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Saved export queue state to database");
+	Logger::log("[AniDB Export] Saved export queue state to database", __FILE__, __LINE__);
 }
 
 void AniDBApi::loadExportQueueState()
@@ -2380,7 +2380,7 @@ void AniDBApi::loadExportQueueState()
 	
 	if(hadExportQueued)
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Loaded export queue state from database - queued since " + QDateTime::fromSecsSinceEpoch(exportQueuedTimestamp).toString());
+		Logger::log("[AniDB Export] Loaded export queue state from database - queued since " + QDateTime::fromSecsSinceEpoch(exportQueuedTimestamp).toString(), __FILE__, __LINE__);
 		
 		// Check if export has already been ready (check for existing notification first)
 		// This will be triggered after login when we have a session
@@ -2394,7 +2394,7 @@ void AniDBApi::loadExportQueueState()
 	}
 	else
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] No pending export found in database");
+		Logger::log("[AniDB Export] No pending export found in database", __FILE__, __LINE__);
 	}
 }
 
@@ -2402,7 +2402,7 @@ void AniDBApi::checkForExistingExport()
 {
 	if(!isExportQueued)
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] No export queued, skipping check for existing export");
+		Logger::log("[AniDB Export] No export queued, skipping check for existing export", __FILE__, __LINE__);
 		return;
 	}
 	
@@ -2410,7 +2410,7 @@ void AniDBApi::checkForExistingExport()
 	qint64 elapsedSeconds = QDateTime::currentSecsSinceEpoch() - exportQueuedTimestamp;
 	if(elapsedSeconds > 48 * 3600)  // 48 hours
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Export queue expired (>48 hours), clearing state");
+		Logger::log("[AniDB Export] Export queue expired (>48 hours), clearing state", __FILE__, __LINE__);
 		isExportQueued = false;
 		notifyCheckAttempts = 0;
 		notifyCheckIntervalMs = 60000;
@@ -2419,7 +2419,7 @@ void AniDBApi::checkForExistingExport()
 		return;
 	}
 	
-	Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Checking for existing export notification on startup");
+	Logger::log("[AniDB Export] Checking for existing export notification on startup", __FILE__, __LINE__);
 	
 	// Check if we're logged in
 	if(SID.length() > 0 && LoginStatus() > 0)
@@ -2429,16 +2429,16 @@ void AniDBApi::checkForExistingExport()
 		QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 		QSqlQuery query(db);
 		query.exec(q);
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Requested NOTIFYLIST to check for existing export");
+		Logger::log("[AniDB Export] Requested NOTIFYLIST to check for existing export", __FILE__, __LINE__);
 		
 		// Resume periodic checking with the saved interval
 		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		notifyCheckTimer->start();
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Resumed periodic notification checking");
+		Logger::log("[AniDB Export] Resumed periodic notification checking", __FILE__, __LINE__);
 	}
 	else
 	{
-		Debug(QString(__FILE__) + " " + QString::number(__LINE__) + " [AniDB Export] Not logged in yet, will check after login");
+		Logger::log("[AniDB Export] Not logged in yet, will check after login", __FILE__, __LINE__);
 		// The check will be triggered again after login via the timer
 		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		notifyCheckTimer->start();
