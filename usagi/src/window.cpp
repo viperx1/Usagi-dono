@@ -870,9 +870,8 @@ void Window::processPendingHashedFiles()
 {
 	// Process files in small batches to keep UI responsive
 	int processed = 0;
-	int queueSize = pendingHashedFilesQueue.size(); // Cache size for efficiency
 	
-	while (processed < HASHED_FILES_BATCH_SIZE && processed < queueSize) {
+	while (!pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
 		HashedFileInfo info = pendingHashedFilesQueue.takeFirst();
 		processed++;
 		
