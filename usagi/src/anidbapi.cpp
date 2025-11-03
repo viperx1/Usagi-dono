@@ -1998,6 +1998,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	
 	// Build a query with IN clause for batch retrieval
 	QStringList placeholders;
+	placeholders.reserve(filePaths.size());  // Pre-allocate to avoid reallocations
 	for (int i = 0; i < filePaths.size(); ++i)
 	{
 		placeholders.append("?");
