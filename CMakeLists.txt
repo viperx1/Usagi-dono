@@ -138,6 +138,7 @@ find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Concurrent Test REQUIRE
 # Note: For Qt from install-qt-action (LLVM MinGW), Qt is built as shared libraries (DLLs).
 # The TYPE property of imported targets may not reliably indicate STATIC_LIBRARY vs SHARED_LIBRARY.
 # We use a more robust check: look for Qt6::QWindowsIntegrationPlugin which only exists in static builds.
+# Note: This project is Windows-only (enforced above), so we only check for Windows-specific plugins.
 set(QT_IS_STATIC FALSE)
 if(TARGET Qt6::QWindowsIntegrationPlugin)
     set(QT_IS_STATIC TRUE)
