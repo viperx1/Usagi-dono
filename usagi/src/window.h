@@ -121,6 +121,12 @@ private:
     QElapsedTimer lastUiUpdate; // For throttling UI updates in getNotifyPartsDone
     int totalHashParts;
     int completedHashParts;
+    
+    // Constants for deferred processing
+    static const int HASHED_FILES_BATCH_SIZE = 5; // Process 5 files per timer tick
+    static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
+    QColor m_hashedFileColor; // Reusable color object for UI updates
+    
 	// main layout
     QBoxLayout *layout;
     QTabWidget *tabwidget;
@@ -209,6 +215,18 @@ private:
 	// Note: HashedFileData structure removed as identification now happens immediately
 	// Only keep hash updates for efficient database batching
 	QList<QPair<QString, QString>> pendingHashUpdates; // path, hash pairs for database update
+	
+	// Deferred processing for already-hashed files to prevent UI freeze
+	struct HashedFileInfo {
+		int rowIndex;
+		QString filePath;
+		QString filename;
+		QString hexdigest;
+		qint64 fileSize;
+	};
+	QList<HashedFileInfo> pendingHashedFilesQueue;
+	QTimer *hashedFilesProcessingTimer;
+	void processPendingHashedFiles();
 
 
 public slots:
