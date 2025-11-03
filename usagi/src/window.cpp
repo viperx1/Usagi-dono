@@ -30,6 +30,9 @@ Window::Window()
 	totalHashParts = 0;
 	completedHashParts = 0;
 	
+	// Initialize UI color constants
+	m_hashedFileColor.setRgb(255, 255, 0); // Yellow for hashed files
+	
     safeclose = new QTimer;
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
@@ -296,7 +299,7 @@ Window::Window()
     // Initialize timer for deferred processing of already-hashed files
     hashedFilesProcessingTimer = new QTimer(this);
     hashedFilesProcessingTimer->setSingleShot(false);
-    hashedFilesProcessingTimer->setInterval(10); // Process in small chunks every 10ms to keep UI responsive
+    hashedFilesProcessingTimer->setInterval(HASHED_FILES_TIMER_INTERVAL);
     connect(hashedFilesProcessingTimer, &QTimer::timeout, this, &Window::processPendingHashedFiles);
     
     // Load directory watcher settings from database
@@ -540,9 +543,8 @@ void Window::ButtonHasherStartClick()
 		QFileInfo fileInfo(filePath);
 		qint64 fileSize = fileInfo.size();
 		
-		// Mark as hashed in UI
-		QColor yellow; yellow.setRgb(255, 255, 0);
-		hashes->item(rowIndex, 0)->setBackground(yellow.toRgb());
+		// Mark as hashed in UI (use pre-allocated color object)
+		hashes->item(rowIndex, 0)->setBackground(m_hashedFileColor);
 		hashes->item(rowIndex, 1)->setText("1");
 		
 		// Update hash in database with status=1
@@ -754,9 +756,8 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 	{
 		if(hashes->item(i, 0)->text() == data.filename)
 		{
-            QColor yellow; yellow.setRgb(255, 255, 0);
-//			hashes->item(i, 0)->setBackgroundColor(yellow.toRgb());
-            hashes->item(i, 0)->setBackground(yellow.toRgb());
+            // Mark as hashed in UI (use pre-allocated color object)
+            hashes->item(i, 0)->setBackground(m_hashedFileColor);
 			QTableWidgetItem *itemprogress = new QTableWidgetItem(QTableWidgetItem(QString("1")));
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
@@ -868,16 +869,14 @@ void Window::hasherFinished()
 void Window::processPendingHashedFiles()
 {
 	// Process files in small batches to keep UI responsive
-	const int batchSize = 5; // Process 5 files per timer tick
 	int processed = 0;
 	
-	while (!pendingHashedFilesQueue.isEmpty() && processed < batchSize) {
+	while (!pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
 		HashedFileInfo info = pendingHashedFilesQueue.takeFirst();
 		processed++;
 		
-		// Mark as hashed in UI
-		QColor yellow; yellow.setRgb(255, 255, 0);
-		hashes->item(info.rowIndex, 0)->setBackground(yellow.toRgb());
+		// Mark as hashed in UI (use pre-allocated color object)
+		hashes->item(info.rowIndex, 0)->setBackground(m_hashedFileColor);
 		hashes->item(info.rowIndex, 1)->setText("1");
 		
 		// Update hash in database with status=1

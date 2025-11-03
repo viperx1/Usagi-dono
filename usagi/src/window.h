@@ -121,6 +121,12 @@ private:
     QElapsedTimer lastUiUpdate; // For throttling UI updates in getNotifyPartsDone
     int totalHashParts;
     int completedHashParts;
+    
+    // Constants for deferred processing
+    static const int HASHED_FILES_BATCH_SIZE = 5; // Process 5 files per timer tick
+    static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
+    QColor m_hashedFileColor; // Reusable color object for UI updates
+    
 	// main layout
     QBoxLayout *layout;
     QTabWidget *tabwidget;
