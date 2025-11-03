@@ -30,7 +30,7 @@ public:
      * @param file Optional source file name for context (default: empty)
      * @param line Optional source line number for context (default: 0)
      */
-    static void log(const QString &msg, const QString &file = QString(), int line = 0);
+    static void log(const QString &msg, const QString &file, int line);
     
     /**
      * Get the singleton instance of the Logger
