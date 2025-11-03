@@ -7,7 +7,7 @@ extern myAniDBApi *adbapi;
 
 void HasherThread::run()
 {
-	Logger::log("HasherThread started processing files [hasherthread.cpp]");
+	Logger::log("HasherThread started processing files [hasherthread.cpp]", "", 0);
 	shouldStop = false;
 	
 	// Request the first file to hash

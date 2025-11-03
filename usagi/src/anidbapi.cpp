@@ -183,7 +183,7 @@ int AniDBApi::ed2khash(QString filepath)
 	if (!existingHash.isEmpty())
 	{
 		// We have an existing hash, reuse it
-		Logger::log(QString("Reusing existing hash for file: %1").arg(filepath));
+		Logger::log(QString("Reusing existing hash for file: %1").arg(filepath), "", 0);
 		
 		// Get file info to populate the struct
 		QFileInfo fileinfo(filepath);
@@ -191,7 +191,7 @@ int AniDBApi::ed2khash(QString filepath)
 		// Verify the file still exists before reusing the hash
 		if (!fileinfo.exists())
 		{
-			Logger::log(QString("File no longer exists: %1 - delegating to base class which will return error code 2").arg(filepath));
+			Logger::log(QString("File no longer exists: %1 - delegating to base class which will return error code 2").arg(filepath), "", 0);
 			// Fall through to let the base class handle the missing file case
 		}
 		else
@@ -231,32 +231,32 @@ int AniDBApi::CreateSocket()
 {
 	if(Socket != nullptr)
 	{
-		Logger::log("AniDBApi: Socket already created");
+		Logger::log("AniDBApi: Socket already created", "", 0);
 		return 1;
 	}
  	Socket = new QUdpSocket;
  	if(!Socket->bind(QHostAddress::Any, 3962))
  	{
-		Logger::log("AniDBApi: Can't bind socket");
+		Logger::log("AniDBApi: Can't bind socket", "", 0);
 		return 0;
  	}
  	else
  	{
 		if(Socket->isValid())
 	 	{
-			Logger::log("AniDBApi: UDP socket created");
+			Logger::log("AniDBApi: UDP socket created", "", 0);
 		}
 		else
 		{
-			Logger::log("AniDBApi: ERROR: failed to create UDP socket");
-			Logger::log("AniDBApi: " + Socket->errorString());
+			Logger::log("AniDBApi: ERROR: failed to create UDP socket", "", 0);
+			Logger::log("AniDBApi: " + Socket->errorString(), "", 0);
 			return 0;
 		}
 	}
 	Socket->connectToHost(anidbaddr, anidbport);
 /*	if(Socket->error())
 	{
-		Logger::log("AniDBApi: " + Socket->errorString());
+		Logger::log("AniDBApi: " + Socket->errorString(), "", 0);
 		return 0;
 	}*/
 	connect(Socket, SIGNAL(readyRead()), this, SLOT(Recv()));
@@ -267,7 +267,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 {
 	if(Message.length() == 0)
 	{
-        Logger::log("AniDBApi: ParseMessage: Message empty");
+        Logger::log("AniDBApi: ParseMessage: Message empty", "", 0);
 		return 0;
 	}
 //    Debug("AniDBApi: ParseMessage: " + Message);
@@ -386,16 +386,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				QSqlQuery insertQuery(db);
 				if(!insertQuery.exec(q))
 				{
-					Logger::log("Failed to insert mylist entry: " + insertQuery.lastError().text());
+					Logger::log("Failed to insert mylist entry: " + insertQuery.lastError().text(), "", 0);
 				}
 				else
 				{
-					Logger::log(QString("Successfully added mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
+					Logger::log(QString("Successfully added mylist entry - lid=%1, fid=%2").arg(lid).arg(fid), "", 0);
 				}
 			}
 			else
 			{
-				Logger::log("Could not find file info for size=" + size + " ed2k=" + ed2k);
+				Logger::log("Could not find file info for size=" + size + " ed2k=" + ed2k, "", 0);
 			}
 		}
 		
@@ -479,7 +479,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QSqlQuery query(db);
 		if(!query.exec(q))
 		{
-			Logger::log("Database query error: " + query.lastError().text());
+			Logger::log("Database query error: " + query.lastError().text(), "", 0);
 		}
 		
 		// Parse anime/episode data if available (indices 27+)
@@ -532,7 +532,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(synonyms).replace("'", "''"));
 				if(!query.exec(q_anime))
 				{
-					Logger::log("Anime database query error: " + query.lastError().text());
+					Logger::log("Anime database query error: " + query.lastError().text(), "", 0);
 				}
 			}
 			
@@ -549,7 +549,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(epno).replace("'", "''"));  // Store episode number!
 				if(!query.exec(q_episode))
 				{
-					Logger::log("Episode database query error: " + query.lastError().text());
+					Logger::log("Episode database query error: " + query.lastError().text(), "", 0);
 				}
 			}
 		}
@@ -601,16 +601,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QSqlQuery insertQuery(db);
 			if(!insertQuery.exec(q))
 			{
-				Logger::log("Database query error: " + insertQuery.lastError().text());
+				Logger::log("Database query error: " + insertQuery.lastError().text(), "", 0);
 			}
 			else
 			{
-				Logger::log(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))));
+				Logger::log(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))), "", 0);
 			}
 		}
 		else if(lid.isEmpty())
 		{
-			Logger::log("Could not extract lid from MYLIST command");
+			Logger::log("Could not extract lid from MYLIST command", "", 0);
 		}
 	}
 	else if(ReplyID == "222"){ // 222 MYLISTSTATS
@@ -656,7 +656,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QSqlQuery query(db);
 			if(!query.exec(q_episode))
 			{
-				Logger::log("Episode database query error: " + query.lastError().text());
+				Logger::log("Episode database query error: " + query.lastError().text(), "", 0);
 			}
 			else
 			{
@@ -742,16 +742,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				QSqlQuery insertQuery(db);
 				if(!insertQuery.exec(q))
 				{
-					Logger::log("Failed to update mylist entry: " + insertQuery.lastError().text());
+					Logger::log("Failed to update mylist entry: " + insertQuery.lastError().text(), "", 0);
 				}
 				else
 				{
-					Logger::log(QString("Successfully updated mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
+					Logger::log(QString("Successfully updated mylist entry - lid=%1, fid=%2").arg(lid).arg(fid), "", 0);
 				}
 			}
 			else
 			{
-				Logger::log("Could not find file info for size=" + size + " ed2k=" + ed2k);
+				Logger::log("Could not find file info for size=" + size + " ed2k=" + ed2k, "", 0);
 			}
 		}
 		
@@ -764,7 +764,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         notifyMylistAdd(Tag, 320);
         // Mark packet as processed and received reply instead of deleting
         QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID).arg(Tag);
-        Logger::log("Database update query: " + q + " Tag: " + Tag);
+        Logger::log("Database update query: " + q + " Tag: " + Tag, "", 0);
         QSqlQuery query(db);
         query.exec(q);
     }
@@ -1063,7 +1063,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("-");
 		token2.pop_front();
 		bannedfor = token2.first();
-		Logger::log("AniDBApi: Client banned: "+ bannedfor);
+		Logger::log("AniDBApi: Client banned: "+ bannedfor, "", 0);
 	}
 	else if(ReplyID == "505"){ // 505 ILLEGAL INPUT OR ACCESS DENIED
 	}
@@ -1136,7 +1136,7 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 
 /*	q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = 0").arg(msg);
 	query.exec(q);
-	Logger::log("Database query error: " + query.lastError().text());
+	Logger::log("Database query error: " + query.lastError().text(), "", 0);
 
 	if(query.isSelect())
 	{
@@ -1161,7 +1161,7 @@ QString AniDBApi::File(qint64 size, QString ed2k)
 				fRESOLUTION | fFILETYPE | fLANG_DUB | fLANG_SUB | fLENGTH | fDESCRIPTION | fAIRDATE |
 				fFILENAME;
 	QString msg = buildFileCommand(size, ed2k, fmask, amask);
-	Logger::log(msg);
+	Logger::log(msg, "", 0);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
 	if(!query.exec(q))
@@ -1376,7 +1376,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	{
 		a = QString("%1&s=%2").arg(str).arg(SID);
 	}
-	Logger::log("AniDBApi: Send: " + (a.length() > 0 ? a : a = str));
+	Logger::log("AniDBApi: Send: " + (a.length() > 0 ? a : a = str), "", 0);
 
 	a = QString("%1&tag=%2").arg(a).arg(tag);
     Logger::log("[AniDB Send] Command: " + a, __FILE__, __LINE__);
@@ -1412,7 +1412,7 @@ int AniDBApi::Recv()
 //		result = codec->toUnicode(data);
 //		result.toUtf8();
         result = QString::fromUtf8(data.data());
-		Logger::log("AniDBApi: Recv: " + result);
+		Logger::log("AniDBApi: Recv: " + result, "", 0);
     }
 	if(result.length() > 0)
 	{
@@ -1517,7 +1517,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 	// Check if database is valid and open
 	if (!db.isValid() || !db.isOpen())
 	{
-		Logger::log("Database not available, cannot perform batch LocalIdentify");
+		Logger::log("Database not available, cannot perform batch LocalIdentify", "", 0);
 		return results;
 	}
 	
@@ -1548,7 +1548,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		
 		if (!query.exec())
 		{
-			Logger::log(QString("Batch LocalIdentify file query error: %1").arg(query.lastError().text()));
+			Logger::log(QString("Batch LocalIdentify file query error: %1").arg(query.lastError().text()), "", 0);
 			continue; // Skip this file but continue with others
 		}
 		
@@ -1588,7 +1588,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		
 		if (!query.exec())
 		{
-			Logger::log(QString("Batch LocalIdentify mylist query error: %1").arg(query.lastError().text()));
+			Logger::log(QString("Batch LocalIdentify mylist query error: %1").arg(query.lastError().text()), "", 0);
 			return results;
 		}
 		
@@ -1605,7 +1605,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		}
 	}
 	
-	Logger::log(QString("Batch LocalIdentify completed for %1 file(s)").arg(sizeHashPairs.size()));
+	Logger::log(QString("Batch LocalIdentify completed for %1 file(s)").arg(sizeHashPairs.size()), "", 0);
 	return results;
 }
 
@@ -1648,7 +1648,7 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
-		Logger::log("Database not available, cannot update local path");
+		Logger::log("Database not available, cannot update local path", "", 0);
 		return;
 	}
 	
@@ -1700,7 +1700,7 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 				
 				if(updateQuery.exec(q))
 				{
-					Logger::log(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
+					Logger::log(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath), "", 0);
 					
 					// Update status in local_files table to 2 (in anidb)
 					QSqlQuery statusQuery(db);
@@ -1710,22 +1710,22 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 				}
 				else
 				{
-					Logger::log("Failed to update local_file: " + updateQuery.lastError().text());
+					Logger::log("Failed to update local_file: " + updateQuery.lastError().text(), "", 0);
 				}
 			}
 			else
 			{
-				Logger::log("Could not find local_file entry for path=" + localPath);
+				Logger::log("Could not find local_file entry for path=" + localPath, "", 0);
 			}
 		}
 		else
 		{
-			Logger::log("Could not find mylist entry for tag=" + tag);
+			Logger::log("Could not find mylist entry for tag=" + tag, "", 0);
 		}
 	}
 	else
 	{
-		Logger::log("Could not find packet for tag=" + tag);
+		Logger::log("Could not find packet for tag=" + tag, "", 0);
 	}
 }
 
@@ -1734,7 +1734,7 @@ void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
-		Logger::log("Database not available, cannot update local file status");
+		Logger::log("Database not available, cannot update local file status", "", 0);
 		return;
 	}
 	
@@ -1746,11 +1746,11 @@ void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 	
 	if(query.exec())
 	{
-		Logger::log(QString("Updated local_files status for path=%1 to status=%2").arg(localPath).arg(status));
+		Logger::log(QString("Updated local_files status for path=%1 to status=%2").arg(localPath).arg(status), "", 0);
 	}
 	else
 	{
-		Logger::log("Failed to update local_files status: " + query.lastError().text());
+		Logger::log("Failed to update local_files status: " + query.lastError().text(), "", 0);
 	}
 }
 
@@ -1759,7 +1759,7 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
-		Logger::log("Database not available, cannot update local file hash");
+		Logger::log("Database not available, cannot update local file hash", "", 0);
 		return;
 	}
 	
@@ -1773,11 +1773,11 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 	
 	if(query.exec())
 	{
-		Logger::log(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
+		Logger::log(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status), "", 0);
 	}
 	else
 	{
-		Logger::log("Failed to update local_files hash and status: " + query.lastError().text());
+		Logger::log("Failed to update local_files hash and status: " + query.lastError().text(), "", 0);
 	}
 }
 
@@ -1786,7 +1786,7 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
-		Logger::log("Database not available, cannot batch update local file hashes");
+		Logger::log("Database not available, cannot batch update local file hashes", "", 0);
 		return;
 	}
 	
@@ -1798,7 +1798,7 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 	// Begin transaction for batch update
 	if (!db.transaction())
 	{
-		Logger::log("Failed to begin transaction for batch update: " + db.lastError().text());
+		Logger::log("Failed to begin transaction for batch update: " + db.lastError().text(), "", 0);
 		return;
 	}
 	
@@ -1824,14 +1824,14 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 		{
 			failCount++;
 			hasFailure = true;
-			Logger::log(QString("Failed to update file %1: %2").arg(pair.first).arg(query.lastError().text()));
+			Logger::log(QString("Failed to update file %1: %2").arg(pair.first).arg(query.lastError().text()), "", 0);
 		}
 	}
 	
 	// Rollback if any failures occurred to maintain consistency
 	if (hasFailure)
 	{
-		Logger::log(QString("Rolling back batch update due to %1 failure(s)").arg(failCount));
+		Logger::log(QString("Rolling back batch update due to %1 failure(s)").arg(failCount), "", 0);
 		db.rollback();
 		return;
 	}
@@ -1839,14 +1839,14 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 	// Commit transaction only if all updates succeeded
 	if (!db.commit())
 	{
-		Logger::log("Failed to commit batch update transaction: " + db.lastError().text());
+		Logger::log("Failed to commit batch update transaction: " + db.lastError().text(), "", 0);
 		db.rollback();
 		return;
 	}
 	
 	// Log summary
 	Logger::log(QString("Batch updated %1 file(s) to status=%2 (all successful)")
-	            .arg(pathHashPairs.size()).arg(status));
+	            .arg(pathHashPairs.size()).arg(status), "", 0);
 }
 
 QString AniDBApi::getLocalFileHash(QString localPath)
@@ -1866,7 +1866,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 		// Verify the main database connection is valid before cloning it
 		if (!db.isValid() || db.databaseName().isEmpty())
 		{
-			Logger::log("Main database connection is invalid, cannot create thread-local connection");
+			Logger::log("Main database connection is invalid, cannot create thread-local connection", "", 0);
 			return QString();
 		}
 		
@@ -1876,7 +1876,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 		
 		if (!threadDb.open())
 		{
-			Logger::log(QString("Failed to open thread-local database connection: %1").arg(threadDb.lastError().text()));
+			Logger::log(QString("Failed to open thread-local database connection: %1").arg(threadDb.lastError().text()), "", 0);
 			return QString();
 		}
 	}
@@ -1884,7 +1884,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	// Check if database is valid and open
 	if (!threadDb.isValid() || !threadDb.isOpen())
 	{
-		Logger::log(QString("Database not available, cannot retrieve hash for path=%1").arg(localPath));
+		Logger::log(QString("Database not available, cannot retrieve hash for path=%1").arg(localPath), "", 0);
 		return QString();
 	}
 	
@@ -1895,25 +1895,25 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	
 	if(!query.exec())
 	{
-		Logger::log(QString("Database query failed for path=%1, error: %2").arg(localPath).arg(query.lastError().text()));
+		Logger::log(QString("Database query failed for path=%1, error: %2").arg(localPath).arg(query.lastError().text()), "", 0);
 		return QString();
 	}
 	
 	if(query.next())
 	{
 		QString hash = query.value(0).toString();
-		Logger::log(QString("Retrieved existing hash for path=%1").arg(localPath));
+		Logger::log(QString("Retrieved existing hash for path=%1").arg(localPath), "", 0);
 		return hash;
 	}
 	
 	// No hash found for exact path - try to find hash from duplicate file (same filename and size)
-	Logger::log(QString("No existing hash found for path=%1").arg(localPath));
+	Logger::log(QString("No existing hash found for path=%1").arg(localPath), "", 0);
 	
 	// Get file info for the current file
 	QFileInfo fileInfo(localPath);
 	if(!fileInfo.exists())
 	{
-		Logger::log(QString("File does not exist: %1").arg(localPath));
+		Logger::log(QString("File does not exist: %1").arg(localPath), "", 0);
 		return QString();
 	}
 	
@@ -1930,7 +1930,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	
 	if(!duplicateQuery.exec())
 	{
-		Logger::log(QString("Failed to query for duplicate files: %1").arg(duplicateQuery.lastError().text()));
+		Logger::log(QString("Failed to query for duplicate files: %1").arg(duplicateQuery.lastError().text()), "", 0);
 		return QString();
 	}
 	
@@ -1943,7 +1943,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 		QFileInfo duplicateFileInfo(duplicatePath);
 		if(duplicateFileInfo.exists() && duplicateFileInfo.size() == fileSize)
 		{
-			Logger::log(QString("Found duplicate file with hash: %1 (size=%2)").arg(duplicatePath).arg(fileSize));
+			Logger::log(QString("Found duplicate file with hash: %1 (size=%2)").arg(duplicatePath).arg(fileSize), "", 0);
 			
 			// Copy the hash to the current file's record
 			QSqlQuery updateQuery(threadDb);
@@ -1953,17 +1953,17 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 			
 			if(updateQuery.exec())
 			{
-				Logger::log(QString("Copied hash from duplicate file to path=%1").arg(localPath));
+				Logger::log(QString("Copied hash from duplicate file to path=%1").arg(localPath), "", 0);
 				return duplicateHash;
 			}
 			else
 			{
-				Logger::log(QString("Failed to update hash for path=%1: %2").arg(localPath).arg(updateQuery.lastError().text()));
+				Logger::log(QString("Failed to update hash for path=%1: %2").arg(localPath).arg(updateQuery.lastError().text()), "", 0);
 			}
 		}
 		else
 		{
-			Logger::log(QString("Duplicate file size mismatch or file no longer exists: %1").arg(duplicatePath));
+			Logger::log(QString("Duplicate file size mismatch or file no longer exists: %1").arg(duplicatePath), "", 0);
 		}
 	}
 	
@@ -1974,7 +1974,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	if(debugQuery.exec() && debugQuery.next())
 	{
 		int count = debugQuery.value(0).toInt();
-		Logger::log(QString("Debug: Found %1 row(s) with path=%2 (hash may be NULL or empty)").arg(count).arg(localPath));
+		Logger::log(QString("Debug: Found %1 row(s) with path=%2 (hash may be NULL or empty)").arg(count).arg(localPath), "", 0);
 	}
 	
 	return QString();
@@ -1987,7 +1987,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	// Check if database is valid and open
 	if (!db.isValid() || !db.isOpen())
 	{
-		Logger::log("Database not available, cannot perform batch hash retrieval");
+		Logger::log("Database not available, cannot perform batch hash retrieval", "", 0);
 		return results;
 	}
 	
@@ -2018,7 +2018,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	
 	if (!query.exec())
 	{
-		Logger::log(QString("Batch hash retrieval query failed: %1").arg(query.lastError().text()));
+		Logger::log(QString("Batch hash retrieval query failed: %1").arg(query.lastError().text()), "", 0);
 		return results;
 	}
 	
@@ -2034,7 +2034,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	}
 	
 	Logger::log(QString("Batch retrieved hashes for %1 out of %2 files")
-	            .arg(results.size()).arg(filePaths.size()));
+	            .arg(results.size()).arg(filePaths.size()), "", 0);
 	
 	return results;
 }
@@ -2083,7 +2083,7 @@ bool AniDBApi::shouldUpdateAnimeTitles()
 
 void AniDBApi::downloadAnimeTitles()
 {
-	Logger::log("Downloading anime titles from AniDB...");
+	Logger::log("Downloading anime titles from AniDB...", "", 0);
 	
 	QNetworkRequest request{QUrl("http://anidb.net/api/anime-titles.dat.gz")};
 	request.setHeader(QNetworkRequest::UserAgentHeader, QString("Usagi/%1").arg(clientver));
@@ -2105,7 +2105,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	Logger::log("[AniDB Anime Titles] Download callback triggered", __FILE__, __LINE__);
 	if(reply->error() != QNetworkReply::NoError)
 	{
-		Logger::log(QString("Failed to download anime titles: %1").arg(reply->errorString()));
+		Logger::log(QString("Failed to download anime titles: %1").arg(reply->errorString()), "", 0);
 		reply->deleteLater();
 		return;
 	}
@@ -2113,7 +2113,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	QByteArray compressedData = reply->readAll();
 	reply->deleteLater();
 	
-	Logger::log(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()));
+	Logger::log(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()), "", 0);
 	
 	// The file is in gzip format, which uses deflate compression
 	// We need to decompress it properly using zlib
@@ -2140,7 +2140,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 		int ret = inflateInit2(&stream, 15 + 16);
 		if(ret != Z_OK)
 		{
-			Logger::log(QString("Failed to initialize gzip decompression: %1").arg(ret));
+			Logger::log(QString("Failed to initialize gzip decompression: %1").arg(ret), "", 0);
 			return;
 		}
 		
@@ -2157,7 +2157,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 			ret = inflate(&stream, Z_NO_FLUSH);
 			if(ret == Z_STREAM_ERROR || ret == Z_NEED_DICT || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
 			{
-				Logger::log(QString("Gzip decompression failed: %1").arg(ret));
+				Logger::log(QString("Gzip decompression failed: %1").arg(ret), "", 0);
 				delete[] out;
 				inflateEnd(&stream);
 				return;
@@ -2181,11 +2181,11 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	
 	if(decompressedData.isEmpty())
 	{
-		Logger::log("Failed to decompress anime titles data. Will retry on next startup.");
+		Logger::log("Failed to decompress anime titles data. Will retry on next startup.", "", 0);
 		return;
 	}
 	
-	Logger::log(QString("Decompressed to %1 bytes").arg(decompressedData.size()));
+	Logger::log(QString("Decompressed to %1 bytes").arg(decompressedData.size()), "", 0);
 	
 	Logger::log("[AniDB Anime Titles] Starting to parse and store titles", __FILE__, __LINE__);
 	parseAndStoreAnimeTitles(decompressedData);
@@ -2198,14 +2198,14 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 				.arg(lastAnimeTitlesUpdate.toSecsSinceEpoch());
 	query.exec(q);
 	
-	Logger::log(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()));
+	Logger::log(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()), "", 0);
 }
 
 void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 {
 	if(data.isEmpty())
 	{
-		Logger::log("No data to parse for anime titles");
+		Logger::log("No data to parse for anime titles", "", 0);
 		return;
 	}
 	
