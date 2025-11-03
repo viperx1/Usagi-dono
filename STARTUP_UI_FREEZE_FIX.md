@@ -216,6 +216,25 @@ Together, these fixes ensure the UI remains responsive both during:
 - 1000 files = ~100KB of memory (negligible)
 - Queue is cleared as files are processed
 
+### Design Tradeoff: File Size Reading
+
+The implementation reads file size (`QFileInfo::size()`) during the queuing phase, not in deferred processing:
+
+**Why This Is Acceptable:**
+- `QFileInfo::size()` reads file **metadata** (not file content) - typically < 1ms per file
+- Worst case: 1000 files = ~1 second total for metadata reads
+- Original problem: 50-100 seconds of UI freeze from database queries and API calls
+- The file size is required for subsequent API calls (LocalIdentify, File, MylistAdd)
+
+**Alternative Considered:**
+- Deferring file size reading to batch processing
+- **Rejected because**: 
+  - Adds complexity: files could be deleted between queue and process
+  - Minimal benefit: metadata reads are 50-100x faster than database operations
+  - Not the bottleneck: the freeze was caused by DB/API operations, not file I/O
+
+**Verdict**: The current implementation strikes the right balance between simplicity and performance. The file metadata reads are negligible (1-2% of original problem) and don't justify the added complexity of deferring them.
+
 ## Future Enhancements
 
 Potential improvements if needed:
