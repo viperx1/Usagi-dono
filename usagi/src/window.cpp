@@ -764,9 +764,6 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			
 			QString filePath = hashes->item(i, 2)->text();
 			
-			// Accumulate for batch hash update (database operation)
-			pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
-			
 			// Update the hash column (column 9) in the UI to reflect the newly computed hash
 			if (QTableWidgetItem* hashItem = hashes->item(i, 9))
 			{
@@ -820,6 +817,11 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 					// Update status to 2 (in anidb) to prevent re-detection
 					adbapi->UpdateLocalFileStatus(filePath, 2);
 				}
+			}
+			else
+			{
+				// Not adding to mylist - just accumulate hash for batch database update later
+				pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
 			}
 			
 			break; // Found the file, no need to continue
