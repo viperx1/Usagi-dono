@@ -513,7 +513,7 @@ void Window::ButtonHasherStartClick()
 				// Skip files with pending API calls to avoid duplicate processing
 				if (!hasPendingAPICalls)
 				{
-					// File already has a hash - process it immediately
+					// File already has a hash - queue for deferred processing
 					rowsWithHashes.append(i);
 				}
 			}
@@ -530,71 +530,38 @@ void Window::ButtonHasherStartClick()
 		}
 	}
 	
-	// Process files with existing hashes immediately
+	// Queue files with existing hashes for deferred processing to prevent UI freeze
 	for (int rowIndex : rowsWithHashes)
 	{
 		QString filename = hashes->item(rowIndex, 0)->text();
 		QString filePath = hashes->item(rowIndex, 2)->text();
 		QString hexdigest = hashes->item(rowIndex, 9)->text();
 		
-		Logger::log(QString("Processing already-hashed file immediately: %1").arg(filename));
+		Logger::log(QString("Queueing already-hashed file for processing: %1").arg(filename));
 		
 		// Get file size
 		QFileInfo fileInfo(filePath);
 		qint64 fileSize = fileInfo.size();
 		
-		// Mark as hashed in UI (use pre-allocated color object)
-		hashes->item(rowIndex, 0)->setBackground(m_hashedFileColor);
-		hashes->item(rowIndex, 1)->setText("1");
-		
-		// Update hash in database with status=1
-		adbapi->updateLocalFileHash(filePath, hexdigest, 1);
-		
-		// If adding to mylist, perform API calls immediately
-		if (addtomylist->checkState() > 0)
-		{
-			// Perform LocalIdentify
-			std::bitset<2> li = adbapi->LocalIdentify(fileSize, hexdigest);
-			
-			// Update UI with LocalIdentify results
-			hashes->item(rowIndex, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
-			
-			QString tag;
-			if(li[AniDBApi::LI_FILE_IN_DB] == 0)
-			{
-				tag = adbapi->File(fileSize, hexdigest);
-				hashes->item(rowIndex, 5)->setText(tag);
-				// File info not in local DB yet - File() API call queued to fetch from AniDB
-				// Status will be updated to 2 when subsequent MylistAdd completes (via UpdateLocalPath)
-			}
-			else
-			{
-				hashes->item(rowIndex, 5)->setText("0");
-				// File is in local DB (previously fetched from AniDB)
-				// Update status to 2 (in anidb) to prevent re-detection
-				adbapi->UpdateLocalFileStatus(filePath, 2);
-			}
-
-			hashes->item(rowIndex, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
-			if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
-			{
-				tag = adbapi->MylistAdd(fileSize, hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
-				hashes->item(rowIndex, 6)->setText(tag);
-				// Status will be updated when MylistAdd completes (via UpdateLocalPath)
-			}
-			else
-			{
-				hashes->item(rowIndex, 6)->setText("0");
-				// File already in mylist - no API call needed
-				// Update status to 2 (in anidb) to prevent re-detection
-				adbapi->UpdateLocalFileStatus(filePath, 2);
-			}
-		}
-		else
-		{
-			// Not adding to mylist - mark as fully processed to prevent re-detection
-			adbapi->UpdateLocalFileStatus(filePath, 2);
-		}
+		// Queue for deferred processing
+		HashedFileInfo info;
+		info.rowIndex = rowIndex;
+		info.filePath = filePath;
+		info.filename = filename;
+		info.hexdigest = hexdigest;
+		info.fileSize = fileSize;
+		info.useUserSettings = true;
+		info.addToMylist = (addtomylist->checkState() > 0);
+		info.markWatchedState = markwatched->checkState();
+		info.fileState = hasherFileState->currentIndex();
+		pendingHashedFilesQueue.append(info);
+	}
+	
+	// Start timer to process queued files in batches (keeps UI responsive)
+	if (!rowsWithHashes.isEmpty())
+	{
+		Logger::log(QString("Queued %1 already-hashed file(s) for deferred processing").arg(rowsWithHashes.size()));
+		hashedFilesProcessingTimer->start();
 	}
 	
 	// Start hashing for files without existing hashes
@@ -615,8 +582,8 @@ void Window::ButtonHasherStartClick()
 	}
 	else
 	{
-		// Only had pre-hashed files, all done
-		Logger::log(QString("Processed %1 already-hashed file(s) immediately").arg(rowsWithHashes.size()));
+		// Only had pre-hashed files, queued for processing
+		Logger::log(QString("Queued %1 already-hashed file(s) for processing").arg(rowsWithHashes.size()));
 	}
 }
 
@@ -882,8 +849,8 @@ void Window::processPendingHashedFiles()
 		// Update hash in database with status=1
 		adbapi->updateLocalFileHash(info.filePath, info.hexdigest, 1);
 		
-		// If adding to mylist (logged in), perform API calls immediately
-		if (adbapi->LoggedIn()) {
+		// If adding to mylist and logged in, perform API calls
+		if (info.addToMylist && adbapi->LoggedIn()) {
 			// Perform LocalIdentify
 			std::bitset<2> li = adbapi->LocalIdentify(info.fileSize, info.hexdigest);
 			
@@ -905,7 +872,10 @@ void Window::processPendingHashedFiles()
 
 			hashes->item(info.rowIndex, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0"));
 			if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0) {
-				tag = adbapi->MylistAdd(info.fileSize, info.hexdigest, Qt::Unchecked, 1, storage->text());
+				// Use settings from the info struct
+				int markWatched = info.useUserSettings ? info.markWatchedState : Qt::Unchecked;
+				int fileState = info.useUserSettings ? info.fileState : 1;
+				tag = adbapi->MylistAdd(info.fileSize, info.hexdigest, markWatched, fileState, storage->text());
 				hashes->item(info.rowIndex, 6)->setText(tag);
 				// Status will be updated when MylistAdd completes (via UpdateLocalPath)
 			} else {
@@ -1489,7 +1459,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 	Logger::log(QString("Episode item not found in tree for EID %1 (AID %2)").arg(eid).arg(aid));
 }
 
-void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
+void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash)
 {
 	QTableWidgetItem *item1 = new QTableWidgetItem(QTableWidgetItem(QString(file.fileName())));
 	QColor colorgray;
@@ -1504,8 +1474,8 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren)
 	QTableWidgetItem *item8 = new QTableWidgetItem(QTableWidgetItem(QString(ren > 0 ? "1" : "0")));
 	QTableWidgetItem *item9 = new QTableWidgetItem(QTableWidgetItem(QString("0")));
 	
-	// Check if file already has a hash in the database
-	QString existingHash = adbapi->getLocalFileHash(file.absoluteFilePath());
+	// Use preloaded hash if provided, otherwise query database
+	QString existingHash = preloadedHash.isEmpty() ? adbapi->getLocalFileHash(file.absoluteFilePath()) : preloadedHash;
 	QTableWidgetItem *item10 = new QTableWidgetItem(QTableWidgetItem(existingHash.isEmpty() ? QString("") : existingHash));
 	
 	hashes->insertRow(hashes->rowCount());
@@ -2131,10 +2101,14 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	// Log the detection
 	Logger::log(QString("Detected %1 new file(s)").arg(filePaths.size()));
 	
-	// Add all files to hasher table (will populate hashes if they exist)
+	// Perform single batch query to retrieve all existing hashes and status
+	QMap<QString, AniDBApi::FileHashInfo> hashInfoMap = adbapi->batchGetLocalFileHashes(filePaths);
+	
+	// Add all files to hasher table with pre-loaded hash data
 	for (const QString &filePath : filePaths) {
 		QFileInfo fileInfo(filePath);
-		hashesinsertrow(fileInfo, Qt::Unchecked);
+		QString preloadedHash = hashInfoMap.contains(filePath) ? hashInfoMap[filePath].hash : QString();
+		hashesinsertrow(fileInfo, Qt::Unchecked, preloadedHash);
 	}
 	
 	// Directory watcher always auto-starts the hasher for detected files
@@ -2201,6 +2175,10 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			info.filename = filename;
 			info.hexdigest = hexdigest;
 			info.fileSize = fileSize;
+			info.useUserSettings = false;  // Use auto-watcher defaults
+			info.addToMylist = true;  // Auto-watcher always adds to mylist when logged in
+			info.markWatchedState = Qt::Unchecked;  // Default for auto-watcher
+			info.fileState = 1;  // Internal (HDD)
 			pendingHashedFilesQueue.append(info);
 		}
 		

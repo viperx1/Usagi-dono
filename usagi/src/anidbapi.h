@@ -216,6 +216,13 @@ public:
 	void updateLocalFileHash(QString localPath, QString ed2kHash, int status);
 	void batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& pathHashPairs, int status);
 	QString getLocalFileHash(QString localPath);
+	
+	struct FileHashInfo {
+		QString path;
+		QString hash;
+		int status;
+	};
+	QMap<QString, FileHashInfo> batchGetLocalFileHashes(const QStringList& filePaths);
 
 	/* === Socket Start */
 	int CreateSocket();

@@ -1980,6 +1980,65 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	return QString();
 }
 
+QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QStringList& filePaths)
+{
+	QMap<QString, FileHashInfo> results;
+	
+	// Check if database is valid and open
+	if (!db.isValid() || !db.isOpen())
+	{
+		Logger::log("Database not available, cannot perform batch hash retrieval");
+		return results;
+	}
+	
+	if (filePaths.isEmpty())
+	{
+		return results;
+	}
+	
+	// Build a query with IN clause for batch retrieval
+	QStringList placeholders;
+	placeholders.reserve(filePaths.size());  // Pre-allocate to avoid reallocations
+	for (int i = 0; i < filePaths.size(); ++i)
+	{
+		placeholders.append("?");
+	}
+	
+	QString queryStr = QString("SELECT `path`, `ed2k_hash`, `status` FROM `local_files` WHERE `path` IN (%1)")
+	                   .arg(placeholders.join(","));
+	
+	QSqlQuery query(db);
+	query.prepare(queryStr);
+	
+	// Bind all file paths
+	for (const QString& path : filePaths)
+	{
+		query.addBindValue(path);
+	}
+	
+	if (!query.exec())
+	{
+		Logger::log(QString("Batch hash retrieval query failed: %1").arg(query.lastError().text()));
+		return results;
+	}
+	
+	// Process results
+	while (query.next())
+	{
+		FileHashInfo info;
+		info.path = query.value(0).toString();
+		info.hash = query.value(1).toString();
+		info.status = query.value(2).toInt();
+		
+		results[info.path] = info;
+	}
+	
+	Logger::log(QString("Batch retrieved hashes for %1 out of %2 files")
+	            .arg(results.size()).arg(filePaths.size()));
+	
+	return results;
+}
+
 QString AniDBApi::GetTag(QString str)
 {
 	QString q = QString("SELECT `tag` FROM `packets` WHERE `str` = '%1' AND `processed` = '0' ORDER BY `tag` ASC LIMIT 1").arg(str);
