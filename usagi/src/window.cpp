@@ -459,6 +459,7 @@ void Window::setupHashingProgress(const QStringList &files)
 	progressTotalLabel->setText("0%");
 	hashingTimer.start();
 	lastEtaUpdate.start();
+	lastUiUpdate.start(); // Initialize UI update throttling timer
 }
 
 QStringList Window::getFilesNeedingHash()
@@ -696,17 +697,9 @@ void Window::getNotifyPartsDone(int total, int done)
 	
 	// Throttle UI updates to prevent freezing - update at most every 100ms
 	// This dramatically reduces the number of UI updates from thousands to ~10 per second
-	static QElapsedTimer uiUpdateTimer;
-	static bool timerInitialized = false;
-	
-	if (!timerInitialized) {
-		uiUpdateTimer.start();
-		timerInitialized = true;
-	}
-	
 	// Always update on the last part to ensure progress bars reach 100%
 	bool isLastPart = (done == total && completedHashParts == totalHashParts);
-	bool shouldUpdate = (uiUpdateTimer.elapsed() >= 100) || isLastPart;
+	bool shouldUpdate = (lastUiUpdate.elapsed() >= 100) || isLastPart;
 	
 	if (shouldUpdate) {
 		progressFile->setMaximum(total);
@@ -745,7 +738,7 @@ void Window::getNotifyPartsDone(int total, int done)
 			lastEtaUpdate.restart();
 		}
 		
-		uiUpdateTimer.restart();
+		lastUiUpdate.restart();
 	}
 }
 
@@ -783,6 +776,10 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 				adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
 				
 				// Perform LocalIdentify immediately
+				// Note: This is done per-file instead of batching to provide immediate feedback
+				// LocalIdentify is a fast indexed database query, so the performance difference
+				// is negligible compared to the user experience improvement of seeing results
+				// immediately after each file is hashed rather than waiting for the entire batch
 				std::bitset<2> li = adbapi->LocalIdentify(data.size, data.hexdigest);
 				
 				// Update UI with LocalIdentify results
