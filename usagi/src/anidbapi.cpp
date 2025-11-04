@@ -29,6 +29,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	anidbport = 9000;
 	loggedin = 0;
 	Socket = nullptr;
+	currentTag = ""; // Initialize current tag tracker
 
 	Logger::log("[AniDB Init] Setting up database connection", __FILE__, __LINE__);
 	// Check if default database connection already exists (e.g., in tests)
@@ -78,7 +79,9 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
-		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT);");
+		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT, `retry_count` INTEGER DEFAULT 0);");
+		// Add retry_count column to packets if it doesn't exist (for existing databases)
+		query.exec("ALTER TABLE `packets` ADD COLUMN `retry_count` INTEGER DEFAULT 0");
 		query.exec("CREATE TABLE IF NOT EXISTS `settings`(`id` INTEGER PRIMARY KEY, `name` TEXT UNIQUE, `value` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `notifications`(`nid` INTEGER PRIMARY KEY, `type` TEXT, `from_user_id` INTEGER, `from_user_name` TEXT, `date` INTEGER, `message_type` INTEGER, `title` TEXT, `body` TEXT, `received_at` INTEGER, `acknowledged` BOOL DEFAULT 0);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
@@ -1090,6 +1093,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
         Logger::log("[AniDB Error] ParseMessage - UNSUPPORTED ReplyID: " + ReplyID + " Tag: " + Tag, __FILE__, __LINE__);
     }
     waitingForReply.isWaiting = false;
+    currentTag = ""; // Reset current tag when response is received
 	return ReplyID;
 }
 
@@ -1386,6 +1390,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
     Socket->write(a.toUtf8().constData());
     waitingForReply.isWaiting = true;
     waitingForReply.start.start();
+    currentTag = tag; // Track the current tag
 
 	lastSentPacket = a;
 
@@ -1434,6 +1439,57 @@ bool AniDBApi::LoggedIn()
 
 int AniDBApi::SendPacket()
 {
+    // Check for timeout and handle retry logic
+    if(waitingForReply.isWaiting == true && waitingForReply.start.elapsed() > 10000)
+    {
+        qint64 elapsed = waitingForReply.start.elapsed();
+        Logger::log("[AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed: " + QString::number(elapsed) + " ms", __FILE__, __LINE__);
+        
+        // Get retry count for the current packet
+        QSqlQuery retryQuery(db);
+        retryQuery.prepare("SELECT `retry_count` FROM `packets` WHERE `tag` = ?");
+        retryQuery.addBindValue(currentTag);
+        retryQuery.exec();
+        
+        int retryCount = 0;
+        if(retryQuery.next())
+        {
+            retryCount = retryQuery.value(0).toInt();
+        }
+        
+        const int MAX_RETRIES = 3;
+        
+        if(retryCount < MAX_RETRIES)
+        {
+            // Increment retry count and reset processed flag to retry
+            Logger::log("[AniDB Retry] Resending packet (attempt " + QString::number(retryCount + 2) + "/" + QString::number(MAX_RETRIES + 1) + ") - Tag: " + currentTag, __FILE__, __LINE__);
+            
+            QSqlQuery updateQuery(db);
+            updateQuery.prepare("UPDATE `packets` SET `processed` = 0, `retry_count` = ? WHERE `tag` = ?");
+            updateQuery.addBindValue(retryCount + 1);
+            updateQuery.addBindValue(currentTag);
+            updateQuery.exec();
+            
+            // Reset waiting state to allow resend
+            waitingForReply.isWaiting = false;
+            currentTag = "";
+        }
+        else
+        {
+            // Max retries reached, mark as failed
+            Logger::log("[AniDB Error] Maximum retries (" + QString::number(MAX_RETRIES) + ") reached for Tag: " + currentTag + " - Giving up", __FILE__, __LINE__);
+            
+            QSqlQuery failQuery(db);
+            failQuery.prepare("UPDATE `packets` SET `got_reply` = 1, `reply` = 'TIMEOUT' WHERE `tag` = ?");
+            failQuery.addBindValue(currentTag);
+            failQuery.exec();
+            
+            // Reset waiting state to continue processing queue
+            waitingForReply.isWaiting = false;
+            currentTag = "";
+        }
+    }
+    
     if(!waitingForReply.isWaiting)
     {
 /*        if(banned == true)
@@ -1464,10 +1520,6 @@ int AniDBApi::SendPacket()
         }
     }
 	Recv();
-    if(waitingForReply.isWaiting == true && waitingForReply.start.elapsed() > 10000)
-    {
-        Logger::log("[AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed: " + QString::number(waitingForReply.start.elapsed()) + " ms", __FILE__, __LINE__);
-    }
 	return 0;
 }
 
