@@ -2,7 +2,6 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>
-#include <cassert>
 
 // Static instance pointer and mutex for thread safety
 // Note: The instance is intentionally never deleted as it should live for the
@@ -32,27 +31,34 @@ Logger* Logger::instance()
 
 void Logger::log(const QString &msg, const QString &file, int line)
 {
-    // Empty file and line parameters are NOT allowed.
-    assert(!file.isEmpty() && "Logger::log: file parameter is empty");
-    assert(line > 0 && "Logger::log: line parameter invalid");
     // Build the full message
     QString fullMessage;
 
-    // Extract just the filename from the full path
-    QString filename = file;
-    int lastSlash = filename.lastIndexOf('/');
-    if (lastSlash == -1)
-    {
-        lastSlash = filename.lastIndexOf('\\');
-    }
-    if (lastSlash >= 0)
-    {
-        filename = filename.mid(lastSlash + 1);
-    }
     //timestamp
     QString timestamp = QDateTime::currentDateTime().toString("HH:mm:ss.zzz");
 
-    fullMessage = QString("[%1] [%2:%3] %4").arg(timestamp).arg(filename).arg(line).arg(msg);
+    // If file and line are provided, include them in the message
+    if (!file.isEmpty() && line > 0)
+    {
+        // Extract just the filename from the full path
+        QString filename = file;
+        int lastSlash = filename.lastIndexOf('/');
+        if (lastSlash == -1)
+        {
+            lastSlash = filename.lastIndexOf('\\');
+        }
+        if (lastSlash >= 0)
+        {
+            filename = filename.mid(lastSlash + 1);
+        }
+        
+        fullMessage = QString("[%1] [%2:%3] %4").arg(timestamp).arg(filename).arg(line).arg(msg);
+    }
+    else
+    {
+        // No file/line info provided, just timestamp and message
+        fullMessage = QString("[%1] %2").arg(timestamp).arg(msg);
+    }
     
     // 1. Output to console (for development and debugging)
     qDebug().noquote() << fullMessage;
