@@ -1047,6 +1047,7 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/anidbapi.cpp
+    ../usagi/src/myanidbapi.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
@@ -1057,6 +1058,7 @@ set(HASHER_THREAD_TEST_HEADERS
     ../usagi/src/hash/ed2k.h
     ../usagi/src/hash/md4.h
     ../usagi/src/anidbapi.h
+    ../usagi/src/main.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
 )

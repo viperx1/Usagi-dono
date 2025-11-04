@@ -50,3 +50,6 @@ _codeql_build_dir/
 
 # User settings
 settings.dat
+
+# CMake build directory
+build/
