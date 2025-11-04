@@ -989,45 +989,51 @@ endif()
 
 add_test(NAME test_ui_freeze_fix COMMAND test_ui_freeze_fix -v2)
 
-# Test 26: Signal throttling during hashing
-set(HASHING_THROTTLE_TEST_SOURCES
-    test_hashing_throttle.cpp
+# Test 26: HasherThread runs in separate thread
+set(HASHER_THREAD_TEST_SOURCES
+    test_hasher_thread.cpp
+    ../usagi/src/hasherthread.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
+    ../usagi/src/anidbapi.cpp
     ../usagi/src/logger.cpp
 )
 
-set(HASHING_THROTTLE_TEST_HEADERS
+set(HASHER_THREAD_TEST_HEADERS
+    ../usagi/src/hasherthread.h
     ../usagi/src/hash/ed2k.h
     ../usagi/src/hash/md4.h
+    ../usagi/src/anidbapi.h
     ../usagi/src/logger.h
 )
 
-add_executable(test_hashing_throttle ${HASHING_THROTTLE_TEST_SOURCES} ${HASHING_THROTTLE_TEST_HEADERS})
+add_executable(test_hasher_thread ${HASHER_THREAD_TEST_SOURCES} ${HASHER_THREAD_TEST_HEADERS})
 
-target_compile_definitions(test_hashing_throttle PRIVATE CRYPTOPP_DEBUG=0)
+target_compile_definitions(test_hasher_thread PRIVATE CRYPTOPP_DEBUG=0)
 
 # For static Qt builds, ensure QT_STATIC is defined
 get_target_property(qt_core_type Qt6::Core TYPE)
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
-    target_compile_definitions(test_hashing_throttle PRIVATE QT_STATIC QT_STATICPLUGIN)
+    target_compile_definitions(test_hasher_thread PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
-target_link_libraries(test_hashing_throttle PRIVATE
+target_link_libraries(test_hasher_thread PRIVATE
     Qt6::Core
+    Qt6::Network
+    Qt6::Sql
     Qt6::Test
 )
 
-target_include_directories(test_hashing_throttle PRIVATE
+target_include_directories(test_hasher_thread PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
 # Force console subsystem for LLVM MinGW on Windows
 if(WIN32)
-    target_link_options(test_hashing_throttle PRIVATE
+    target_link_options(test_hasher_thread PRIVATE
         "-Wl,--subsystem,console"
     )
 endif()
 
-add_test(NAME test_hashing_throttle COMMAND test_hashing_throttle -v2)
+add_test(NAME test_hasher_thread COMMAND test_hasher_thread -v2)
 

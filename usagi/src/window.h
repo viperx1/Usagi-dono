@@ -279,7 +279,6 @@ public slots:
     void provideNextFileToHash();
 
 signals:
-	void fileToHash(QString);
 	void notifyStopHasher();
 public:
 	// page hasher

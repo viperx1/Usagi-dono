@@ -1,21 +1,32 @@
 #ifndef HASHERTHREAD_H
 #define HASHERTHREAD_H
-#include <QtGui>
+
+#include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
+#include <QString>
+#include <QQueue>
 
 class HasherThread : public QThread
 {
     Q_OBJECT
 public:
-	void run();
-	void stop();
-private:
-	bool shouldStop;
-	QString currentFile;
-public slots:
-	void hashFile(QString filePath);
+    HasherThread();
+    void stop();
+    void addFile(const QString &filePath);
+    
+protected:
+    void run() override;
+    
 signals:
-	void sendHash(QString);
-	void requestNextFile();
+    void sendHash(QString);
+    void requestNextFile();
+    
+private:
+    QMutex mutex;
+    QWaitCondition condition;
+    QQueue<QString> fileQueue;
+    bool shouldStop;
 };
 
 #endif // HASHERTHREAD_H
