@@ -12,7 +12,10 @@ HasherThread::HasherThread()
 void HasherThread::run()
 {
     // Reset shouldStop flag for this thread execution
-    shouldStop = false;
+    {
+        QMutexLocker locker(&mutex);
+        shouldStop = false;
+    }
     
     LOG("HasherThread started processing files [hasherthread.cpp]");
     
