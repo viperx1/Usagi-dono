@@ -477,8 +477,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					.arg(QString(token2.at(23)).replace("'", "''"))
 					.arg(QString(token2.at(24)).replace("'", "''"))
 					.arg(QString(token2.at(25)).replace("'", "''"))
-					.arg(QString(token2.at(26)).replace("'", "''"))
-					.arg(token2.size() > 27 ? QString(token2.at(27)).replace("'", "''") : "");
+					.arg(QString(token2.at(26)).replace("'", "''"));
 		QSqlQuery query(db);
 		if(!query.exec(q))
 		{
