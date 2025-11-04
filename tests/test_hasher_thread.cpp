@@ -52,7 +52,6 @@ void TestHasherThread::cleanupTestCase()
     adbapi = nullptr;
     QSqlDatabase::database().close();
 }
-};
 
 void TestHasherThread::testHashingRunsInSeparateThread()
 {
