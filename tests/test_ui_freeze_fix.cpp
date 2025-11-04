@@ -26,6 +26,19 @@ class TestUIFreezeFix : public QObject
 private slots:
     void testPreHashedFileEmitsMinimalSignals();
     void testLargePreHashedFileDoesNotFloodEventQueue();
+
+private:
+    // Helper method to store a hash in the database for testing
+    void storeHashInDatabase(const QString &filePath, const QString &hash)
+    {
+        QSqlDatabase db = QSqlDatabase::database();
+        QSqlQuery query(db);
+        query.prepare("INSERT OR REPLACE INTO local_files (path, filename, ed2k_hash, status) VALUES (?, ?, ?, 1)");
+        query.addBindValue(filePath);
+        query.addBindValue(QFileInfo(filePath).fileName());
+        query.addBindValue(hash);
+        QVERIFY(query.exec());
+    }
 };
 
 void TestUIFreezeFix::testPreHashedFileEmitsMinimalSignals()
@@ -43,13 +56,7 @@ void TestUIFreezeFix::testPreHashedFileEmitsMinimalSignals()
     QString filePath = tempFile.fileName();
     
     // Store a hash in the database (simulating a pre-hashed file)
-    QSqlDatabase db = QSqlDatabase::database();
-    QSqlQuery query(db);
-    query.prepare("INSERT OR REPLACE INTO local_files (path, filename, ed2k_hash, status) VALUES (?, ?, ?, 1)");
-    query.addBindValue(filePath);
-    query.addBindValue(QFileInfo(filePath).fileName());
-    query.addBindValue("abcdef1234567890abcdef1234567890"); // Dummy hash
-    QVERIFY(query.exec());
+    storeHashInDatabase(filePath, "abcdef1234567890abcdef1234567890");
     
     // Set up signal spy to count how many times notifyPartsDone is emitted
     QSignalSpy partsSpy(&api, &ed2k::notifyPartsDone);
@@ -91,13 +98,7 @@ void TestUIFreezeFix::testLargePreHashedFileDoesNotFloodEventQueue()
     QString filePath = tempFile.fileName();
     
     // Store a hash in the database
-    QSqlDatabase db = QSqlDatabase::database();
-    QSqlQuery query(db);
-    query.prepare("INSERT OR REPLACE INTO local_files (path, filename, ed2k_hash, status) VALUES (?, ?, ?, 1)");
-    query.addBindValue(filePath);
-    query.addBindValue(QFileInfo(filePath).fileName());
-    query.addBindValue("fedcba9876543210fedcba9876543210"); // Dummy hash
-    QVERIFY(query.exec());
+    storeHashInDatabase(filePath, "fedcba9876543210fedcba9876543210");
     
     // Set up signal spy
     QSignalSpy partsSpy(&api, &ed2k::notifyPartsDone);
