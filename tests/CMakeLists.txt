@@ -938,4 +938,54 @@ endif()
 
 add_test(NAME test_batch_hash_retrieval COMMAND test_batch_hash_retrieval -v2)
 
+# Test 25: UI freeze fix for pre-hashed files
+set(UI_FREEZE_FIX_TEST_SOURCES
+    test_ui_freeze_fix.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(UI_FREEZE_FIX_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_ui_freeze_fix ${UI_FREEZE_FIX_TEST_SOURCES} ${UI_FREEZE_FIX_TEST_HEADERS})
+
+target_compile_definitions(test_ui_freeze_fix PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_ui_freeze_fix PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_ui_freeze_fix PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_ui_freeze_fix PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_ui_freeze_fix PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_ui_freeze_fix COMMAND test_ui_freeze_fix -v2)
 
