@@ -54,8 +54,8 @@ void DirectoryScanWorker::scan()
     }
     
     qint64 elapsed = timer.elapsed();
-    Logger::log(QString("DirectoryScanWorker completed: scanned %1 files, found %2 new files in %3 ms [directorywatcher.cpp]")
-                .arg(totalFilesScanned).arg(newFiles.size()).arg(elapsed), "", 0);
+    LOG(QString("DirectoryScanWorker completed: scanned %1 files, found %2 new files in %3 ms")
+                .arg(totalFilesScanned).arg(newFiles.size()).arg(elapsed));
     
     emit scanComplete(newFiles);
 }
@@ -134,8 +134,8 @@ void DirectoryWatcher::startWatching(const QString &directory)
     m_initialScanTimer->start();
     
     qint64 totalTime = totalTimer.elapsed();
-    Logger::log(QString("DirectoryWatcher: Started watching %1 (total startup: %2 ms) [directorywatcher.cpp]")
-                .arg(directory).arg(totalTime), "", 0);
+    LOG(QString("DirectoryWatcher: Started watching %1 (total startup: %2 ms)")
+                .arg(directory).arg(totalTime));
 }
 
 void DirectoryWatcher::stopWatching()
@@ -241,7 +241,7 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
         return;
     }
     
-    Logger::log(QString("DirectoryWatcher: Detected %1 new file(s)").arg(newFiles.size()), "", 0);
+    LOG(QString("DirectoryWatcher: Detected %1 new file(s)").arg(newFiles.size()));
     
     // Mark files as processed
     {
@@ -287,8 +287,8 @@ void DirectoryWatcher::loadProcessedFiles()
     qint64 queryTime = timer.elapsed();
     
     if (!querySuccess) {
-        Logger::log(QString("DirectoryWatcher: Failed to query local_files table (query time: %1 ms): %2")
-                    .arg(queryTime).arg(query.lastError().text()), "", 0);
+        LOG(QString("DirectoryWatcher: Failed to query local_files table (query time: %1 ms): %2")
+                    .arg(queryTime).arg(query.lastError().text()));
         return;
     }
     
@@ -303,8 +303,8 @@ void DirectoryWatcher::loadProcessedFiles()
     }
     
     qint64 rowProcessTime = timer.elapsed();
-    Logger::log(QString("DirectoryWatcher: Loaded %1 API-checked files from database (row processing: %2 ms) [directorywatcher.cpp]")
-                .arg(m_processedFiles.size()).arg(rowProcessTime), "", 0);
+    LOG(QString("DirectoryWatcher: Loaded %1 API-checked files from database (row processing: %2 ms)")
+                .arg(m_processedFiles.size()).arg(rowProcessTime));
 }
 
 void DirectoryWatcher::saveProcessedFile(const QString &filePath)
