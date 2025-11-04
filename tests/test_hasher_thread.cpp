@@ -25,6 +25,7 @@ private slots:
     void cleanupTestCase();
     void testHashingRunsInSeparateThread();
     void testStopInterruptsHashing();
+    void testResumeAfterStop();
 };
 
 void TestHasherThread::initTestCase()
@@ -131,6 +132,75 @@ void TestHasherThread::testStopInterruptsHashing()
     
     // Verify the thread stops within a reasonable time
     // If it doesn't stop, it means stop() didn't work correctly
+    QVERIFY(hasherThread.wait(2000));
+}
+
+void TestHasherThread::testResumeAfterStop()
+{
+    // This test simulates the real-world scenario where the same HasherThread
+    // object is reused across multiple start/stop cycles (like in window.cpp)
+    
+    // Create a temporary file to hash
+    QTemporaryFile tempFile1;
+    QVERIFY(tempFile1.open());
+    QByteArray data1(512 * 1024, 'C'); // 512KB
+    tempFile1.write(data1);
+    tempFile1.close();
+    QString filePath1 = tempFile1.fileName();
+    
+    QTemporaryFile tempFile2;
+    QVERIFY(tempFile2.open());
+    QByteArray data2(512 * 1024, 'D'); // 512KB
+    tempFile2.write(data2);
+    tempFile2.close();
+    QString filePath2 = tempFile2.fileName();
+    
+    // Create HasherThread (simulating global hasherThread in window.cpp)
+    HasherThread hasherThread;
+    
+    // === First hash cycle ===
+    QSignalSpy requestSpy1(&hasherThread, &HasherThread::requestNextFile);
+    QSignalSpy hashSpy1(&hasherThread, &HasherThread::sendHash);
+    
+    // Start the thread
+    hasherThread.start();
+    
+    // Wait for initial requestNextFile signal
+    QVERIFY(requestSpy1.wait(1000));
+    
+    // Add a file to hash
+    hasherThread.addFile(filePath1);
+    
+    // Wait for hashing to complete
+    QVERIFY(requestSpy1.wait(5000));
+    QVERIFY(hashSpy1.count() > 0);
+    
+    // Stop the thread (simulating user clicking stop button)
+    hasherThread.stop();
+    QVERIFY(hasherThread.wait(2000));
+    
+    // === Second hash cycle (Resume) ===
+    QSignalSpy requestSpy2(&hasherThread, &HasherThread::requestNextFile);
+    QSignalSpy hashSpy2(&hasherThread, &HasherThread::sendHash);
+    
+    // Start the thread again (simulating user clicking start button)
+    hasherThread.start();
+    
+    // Wait for initial requestNextFile signal - THIS IS THE KEY TEST
+    // If shouldStop flag is not reset, the thread will exit immediately
+    // and this wait will timeout
+    QVERIFY(requestSpy2.wait(1000));
+    QCOMPARE(requestSpy2.count(), 1);
+    
+    // Add another file to hash
+    hasherThread.addFile(filePath2);
+    
+    // Wait for hashing to complete
+    QVERIFY(requestSpy2.wait(5000));
+    QVERIFY(hashSpy2.count() > 0);
+    
+    // Clean stop
+    hasherThread.addFile(QString()); // Empty path signals completion
     QVERIFY(hasherThread.wait(2000));
 }
 
