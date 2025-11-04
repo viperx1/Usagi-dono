@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Usagi-dono VERSION 1.0.0 LANGUAGES CXX)
 
-add_definitions(-UQT_NO_DEBUG)
+# Note: Removed -UQT_NO_DEBUG to prevent aggressive Qt assertions
+# that cause crashes instead of warnings on signal/slot connection failures
 
 set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
 set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
