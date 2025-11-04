@@ -2,8 +2,14 @@
 #include <QThread>
 #include <QSignalSpy>
 #include <QTemporaryFile>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include "../usagi/src/hasherthread.h"
 #include "../usagi/src/anidbapi.h"
+#include "../usagi/src/main.h"
+
+// Global adbapi used by HasherThread
+myAniDBApi *adbapi = nullptr;
 
 /**
  * Test to verify that HasherThread actually runs hashing in a separate thread.
@@ -15,8 +21,37 @@ class TestHasherThread : public QObject
     Q_OBJECT
 
 private slots:
+    void initTestCase();
+    void cleanupTestCase();
     void testHashingRunsInSeparateThread();
     void testStopInterruptsHashing();
+};
+
+void TestHasherThread::initTestCase()
+{
+    // Initialize the database for testing
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
+    db.setDatabaseName(":memory:");
+    QVERIFY(db.open());
+    
+    // Create necessary tables
+    QSqlQuery query(db);
+    query.exec("CREATE TABLE IF NOT EXISTS local_files ("
+               "path TEXT PRIMARY KEY, "
+               "filename TEXT, "
+               "ed2k_hash TEXT, "
+               "status INTEGER)");
+    
+    // Initialize the global adbapi object
+    adbapi = new myAniDBApi("test", 1);
+}
+
+void TestHasherThread::cleanupTestCase()
+{
+    delete adbapi;
+    adbapi = nullptr;
+    QSqlDatabase::database().close();
+}
 };
 
 void TestHasherThread::testHashingRunsInSeparateThread()
