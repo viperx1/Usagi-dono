@@ -12,10 +12,8 @@ class myAniDBApi : public AniDBApi
 {
 	Q_OBJECT
 public:
-	myAniDBApi(QString client_, int clientver_): AniDBApi(client_, clientver_)
-	{
-
-	}
+	myAniDBApi(QString client_, int clientver_);
+	virtual ~myAniDBApi();
 signals:
 	void notifyLogAppend(QString);
 };

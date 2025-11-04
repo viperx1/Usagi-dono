@@ -34,6 +34,7 @@ endif()
 # Source files
 set(SOURCES
     src/anidbapi.cpp
+    src/myanidbapi.cpp
     src/main.cpp
     src/window.cpp
     src/hasherthread.cpp
