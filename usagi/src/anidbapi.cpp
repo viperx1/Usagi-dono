@@ -201,12 +201,11 @@ int AniDBApi::ed2khash(QString filepath)
 			qint64 fileSize = fileinfo.size();
 			qint64 numParts = calculateHashParts(fileSize);
 			
-			// Emit progress signals for all parts to update the UI correctly
-			// This mirrors the behavior of the base class which emits one signal per chunk read
-			// The tight loop is acceptable because we're saving the time of actually hashing the file
-			for (int i = 1; i <= numParts; i++) {
-				emit notifyPartsDone(numParts, i);
-			}
+			// For pre-hashed files, emit only completion signal to avoid flooding the UI event queue
+			// Emitting thousands of signals in a tight loop causes UI freeze even with throttling
+			// The throttling in getNotifyPartsDone() controls UI updates but not signal processing
+			// So we emit only the final signal to indicate completion
+			emit notifyPartsDone(numParts, numParts);
 			
 			// Populate the hash data structure with the existing hash
 			ed2kfilestruct hash;
