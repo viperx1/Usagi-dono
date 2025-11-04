@@ -37,8 +37,8 @@ void Logger::log(const QString &msg, const QString &file, int line)
     // If these assertions are hit at runtime, it means Logger::log is being called
     // INCORRECTLY and needs to be fixed. Use the LOG(msg) macro instead, which
     // automatically provides __FILE__ and __LINE__.
-    assert(!file.isEmpty() && "Logger::log: file parameter is MANDATORY and must not be empty");
-    assert(line > 0 && "Logger::log: line parameter is MANDATORY and must be > 0");
+    assert(!file.isEmpty() && "Logger::log: file parameter is MANDATORY - use LOG(msg) macro instead");
+    assert(line > 0 && "Logger::log: line parameter is MANDATORY - use LOG(msg) macro instead");
     // Build the full message
     QString fullMessage;
 

@@ -27,13 +27,13 @@ public:
      * Logs a message to console and UI log tab
      * 
      * @param msg The message to log
-     * @param file MANDATORY source file name (must not be empty) - use __FILE__ or the LOG macro
-     * @param line MANDATORY source line number (must be > 0) - use __LINE__ or the LOG macro
+     * @param file MANDATORY source file name (must not be empty) - prefer using LOG macro over __FILE__
+     * @param line MANDATORY source line number (must be > 0) - prefer using LOG macro over __LINE__
      * 
      * IMPORTANT: The file and line parameters are MANDATORY and enforced by assertions.
      * If the application hits these assertions at runtime, it means Logger::log is being
-     * called INCORRECTLY. Use the LOG(msg) macro instead, which automatically provides
-     * file and line information.
+     * called INCORRECTLY. Use the LOG(msg) macro instead (preferred), which automatically
+     * provides file and line information.
      */
     static void log(const QString &msg, const QString &file, int line);
     
