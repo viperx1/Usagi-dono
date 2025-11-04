@@ -66,6 +66,7 @@ private:
 	QSqlDatabase db;
 
 	QString lastSentPacket;
+	QString currentTag; // Track the tag of the currently pending request
 	
 	// Anime titles download and management
 	QNetworkAccessManager *networkManager;

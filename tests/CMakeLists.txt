@@ -158,6 +158,57 @@ endif()
 
 add_test(NAME test_anidbapi COMMAND test_anidbapi -v2)
 
+# Test: AniDB Timeout and Retry tests
+set(TIMEOUT_RETRY_TEST_SOURCES
+    test_anidb_timeout_retry.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(TIMEOUT_RETRY_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_anidb_timeout_retry ${TIMEOUT_RETRY_TEST_SOURCES} ${TIMEOUT_RETRY_TEST_HEADERS})
+
+target_compile_definitions(test_anidb_timeout_retry PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_anidb_timeout_retry PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_anidb_timeout_retry PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_anidb_timeout_retry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_anidb_timeout_retry PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_anidb_timeout_retry COMMAND test_anidb_timeout_retry -v2)
+
 # Test 4: Anime titles import tests
 set(ANIME_TITLES_TEST_SOURCES
     test_anime_titles.cpp
