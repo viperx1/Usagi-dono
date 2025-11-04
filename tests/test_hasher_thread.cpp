@@ -30,6 +30,9 @@ private slots:
 
 void TestHasherThread::initTestCase()
 {
+    // Register Qt::HANDLE as a metatype so QSignalSpy can handle it
+    qRegisterMetaType<Qt::HANDLE>("Qt::HANDLE");
+    
     // Set environment variable to signal test mode before any Qt network operations
     qputenv("USAGI_TEST_MODE", "1");
     
@@ -91,8 +94,12 @@ void TestHasherThread::testHashingRunsInSeparateThread()
     // Verify they are different threads
     QVERIFY(mainThreadId != workerThreadId);
     
-    // Wait for initial requestNextFile signal
-    QVERIFY(requestSpy.wait(1000));
+    // The requestNextFile signal is emitted right after threadStarted,
+    // so it should already be in the spy. Give a small amount of time
+    // for event processing if needed.
+    if (requestSpy.count() == 0) {
+        QVERIFY(requestSpy.wait(1000));
+    }
     QVERIFY(requestSpy.count() >= 1);
     
     // Add a file to hash
