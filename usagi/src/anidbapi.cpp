@@ -3,6 +3,7 @@
 #include "logger.h"
 #include <cmath>
 #include <QThread>
+#include <QElapsedTimer>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
@@ -1982,6 +1983,9 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 
 QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QStringList& filePaths)
 {
+	QElapsedTimer overallTimer;
+	overallTimer.start();
+	
 	QMap<QString, FileHashInfo> results;
 	
 	// Check if database is valid and open
@@ -1996,7 +2000,12 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 		return results;
 	}
 	
+	qint64 checkTime = overallTimer.elapsed();
+	LOG(QString("[TIMING] batchGetLocalFileHashes initial checks: %1 ms [anidbapi.cpp]").arg(checkTime));
+	
 	// Build a query with IN clause for batch retrieval
+	QElapsedTimer buildQueryTimer;
+	buildQueryTimer.start();
 	QStringList placeholders;
 	placeholders.reserve(filePaths.size());  // Pre-allocate to avoid reallocations
 	for (int i = 0; i < filePaths.size(); ++i)
@@ -2007,6 +2016,12 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	QString queryStr = QString("SELECT `path`, `ed2k_hash`, `status` FROM `local_files` WHERE `path` IN (%1)")
 	                   .arg(placeholders.join(","));
 	
+	qint64 buildQueryTime = buildQueryTimer.elapsed();
+	LOG(QString("[TIMING] Query string build for %1 paths: %2 ms [anidbapi.cpp]")
+		.arg(filePaths.size()).arg(buildQueryTime));
+	
+	QElapsedTimer prepareTimer;
+	prepareTimer.start();
 	QSqlQuery query(db);
 	query.prepare(queryStr);
 	
@@ -2015,14 +2030,24 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	{
 		query.addBindValue(path);
 	}
+	qint64 prepareTime = prepareTimer.elapsed();
+	LOG(QString("[TIMING] Query prepare and bind for %1 paths: %2 ms [anidbapi.cpp]")
+		.arg(filePaths.size()).arg(prepareTime));
 	
+	QElapsedTimer execTimer;
+	execTimer.start();
 	if (!query.exec())
 	{
 		LOG(QString("Batch hash retrieval query failed: %1").arg(query.lastError().text()));
 		return results;
 	}
+	qint64 execTime = execTimer.elapsed();
+	LOG(QString("[TIMING] Query exec for %1 paths: %2 ms [anidbapi.cpp]")
+		.arg(filePaths.size()).arg(execTime));
 	
 	// Process results
+	QElapsedTimer processTimer;
+	processTimer.start();
 	while (query.next())
 	{
 		FileHashInfo info;
@@ -2032,9 +2057,12 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 		
 		results[info.path] = info;
 	}
+	qint64 processTime = processTimer.elapsed();
+	LOG(QString("[TIMING] Query result processing: %1 ms [anidbapi.cpp]").arg(processTime));
 	
-	Logger::log(QString("Batch retrieved hashes for %1 out of %2 files")
-	            .arg(results.size()).arg(filePaths.size()), __FILE__, __LINE__);
+	qint64 totalTime = overallTimer.elapsed();
+	Logger::log(QString("[TIMING] batchGetLocalFileHashes TOTAL for %1 paths (found %2): %3 ms [anidbapi.cpp]")
+	            .arg(filePaths.size()).arg(results.size()).arg(totalTime), __FILE__, __LINE__);
 	
 	return results;
 }
