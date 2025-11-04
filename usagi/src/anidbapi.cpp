@@ -42,11 +42,15 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		db = QSqlDatabase::addDatabase("QSQLITE");
 	}
 
-	QString path = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-	QDir().mkpath(path); // make sure it exists
-	QString dbPath = path + "/usagi.sqlite";
-	
-	db.setDatabaseName(dbPath);
+	// Only set database name if it hasn't been set already (e.g., by tests)
+	if(db.databaseName().isEmpty())
+	{
+		QString path = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+		QDir().mkpath(path); // make sure it exists
+		QString dbPath = path + "/usagi.sqlite";
+		
+		db.setDatabaseName(dbPath);
+	}
 	QSqlQuery query;
 
     aes_key = "8fsd789f7sd7f6sd78695g35345g34gf4";
