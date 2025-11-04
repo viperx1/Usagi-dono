@@ -3,6 +3,7 @@
 #include "hasherthread.h"
 #include "crashlog.h"
 #include "logger.h"
+#include <QElapsedTimer>
 
 HasherThread hasherThread;
 myAniDBApi *adbapi;
@@ -2092,18 +2093,41 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		return;
 	}
 	
+	// Start overall timing
+	QElapsedTimer overallTimer;
+	overallTimer.start();
+	
 	// Log the detection
 	LOG(QString("Detected %1 new file(s)").arg(filePaths.size()));
+	qint64 logTime = overallTimer.elapsed();
+	LOG(QString("[TIMING] Initial log: %1 ms [window.cpp]").arg(logTime));
 	
 	// Perform single batch query to retrieve all existing hashes and status
+	QElapsedTimer batchQueryTimer;
+	batchQueryTimer.start();
 	QMap<QString, AniDBApi::FileHashInfo> hashInfoMap = adbapi->batchGetLocalFileHashes(filePaths);
+	qint64 batchQueryTime = batchQueryTimer.elapsed();
+	LOG(QString("[TIMING] batchGetLocalFileHashes() for %1 files: %2 ms [window.cpp]")
+		.arg(filePaths.size()).arg(batchQueryTime));
 	
 	// Add all files to hasher table with pre-loaded hash data
+	// Disable table updates during bulk insertion for performance
+	hashes->setUpdatesEnabled(false);
+	
+	QElapsedTimer insertTimer;
+	insertTimer.start();
 	for (const QString &filePath : filePaths) {
 		QFileInfo fileInfo(filePath);
 		QString preloadedHash = hashInfoMap.contains(filePath) ? hashInfoMap[filePath].hash : QString();
 		hashesinsertrow(fileInfo, Qt::Unchecked, preloadedHash);
 	}
+	
+	// Re-enable table updates after bulk insertion
+	hashes->setUpdatesEnabled(true);
+	
+	qint64 insertTime = insertTimer.elapsed();
+	LOG(QString("[TIMING] hashesinsertrow() loop for %1 files: %2 ms [window.cpp]")
+		.arg(filePaths.size()).arg(insertTime));
 	
 	// Directory watcher always auto-starts the hasher for detected files
 	if (!hasherThread.isRunning()) {
@@ -2202,4 +2226,8 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	} else {
 		LOG("Files added to hasher. Hasher is busy - click Start to hash queued files.");
 	}
+	
+	// Log total time for the entire function
+	qint64 totalTime = overallTimer.elapsed();
+	LOG(QString("[TIMING] onWatcherNewFilesDetected() TOTAL: %1 ms [window.cpp]").arg(totalTime));
 }
