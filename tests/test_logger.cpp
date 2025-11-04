@@ -105,23 +105,29 @@ private slots:
         QString loggedMessage = arguments.at(0).toString();
         QVERIFY(loggedMessage.contains(testMessage));
         
-        // Verify no file or line info is present
-        // Message should be in format: [timestamp] message
-        // Should not contain ":" which would indicate file:line format
-        int colonIndex = loggedMessage.indexOf(':');
-        int messageIndex = loggedMessage.indexOf(testMessage);
-        // If there's a colon, it should only be in the timestamp (HH:mm:ss.zzz)
-        // which comes before the message
-        if (colonIndex >= 0) {
-            QVERIFY(colonIndex < messageIndex);
-            // Count colons before the message - should be 2 (for time like 12:34:56.789)
-            int colonCount = 0;
-            for (int i = 0; i < messageIndex; ++i) {
-                if (loggedMessage[i] == ':') {
-                    colonCount++;
-                }
+        // Verify format is [timestamp] message (without file:line)
+        // The message should start with '[' for the timestamp
+        QVERIFY(loggedMessage.startsWith("["));
+        
+        // Find the closing bracket of the timestamp
+        int closingBracket = loggedMessage.indexOf(']');
+        QVERIFY(closingBracket > 0);
+        
+        // Count colons in the timestamp section (should be 2 for HH:mm:ss)
+        int colonCount = 0;
+        for (int i = 0; i < closingBracket; ++i) {
+            if (loggedMessage[i] == ':') {
+                colonCount++;
             }
-            QCOMPARE(colonCount, 2); // Only the two colons from the timestamp
+        }
+        QCOMPARE(colonCount, 2); // Two colons in HH:mm:ss.zzz format
+        
+        // Verify there's no second '[' which would indicate [file:line] format
+        int secondBracket = loggedMessage.indexOf('[', closingBracket + 1);
+        int messageIndex = loggedMessage.indexOf(testMessage);
+        if (secondBracket >= 0) {
+            // If there's a second '[', it should be after the message (not between timestamp and message)
+            QVERIFY(secondBracket >= messageIndex);
         }
     }
 };
