@@ -12,20 +12,30 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	client = client_; //"usagi";
 	clientver = clientver_; //1;
 	enc = "utf8";
-	Logger::log("[AniDB Init] Starting DNS lookup for api.anidb.net (this may block)", __FILE__, __LINE__);
-	host = QHostInfo::fromName("api.anidb.net");
-	Logger::log("[AniDB Init] DNS lookup completed", __FILE__, __LINE__);
-	if(!host.addresses().isEmpty())
+	
+	// Skip DNS lookup in test mode to avoid network-related crashes on Windows
+	if (qgetenv("USAGI_TEST_MODE") != "1")
 	{
-		anidbaddr.setAddress(host.addresses().first().toIPv4Address());
-		Logger::log("[AniDB Init] DNS resolved successfully to " + host.addresses().first().toString(), __FILE__, __LINE__);
+		Logger::log("[AniDB Init] Starting DNS lookup for api.anidb.net (this may block)", __FILE__, __LINE__);
+		host = QHostInfo::fromName("api.anidb.net");
+		Logger::log("[AniDB Init] DNS lookup completed", __FILE__, __LINE__);
+		if(!host.addresses().isEmpty())
+		{
+			anidbaddr.setAddress(host.addresses().first().toIPv4Address());
+			Logger::log("[AniDB Init] DNS resolved successfully to " + host.addresses().first().toString(), __FILE__, __LINE__);
+		}
+		else
+		{
+			// Fallback to a default IP or leave uninitialized
+			// DNS resolution failed, socket operations will be skipped
+			Logger::log("[AniDB Error] DNS resolution for api.anidb.net failed", __FILE__, __LINE__);
+		}
 	}
 	else
 	{
-		// Fallback to a default IP or leave uninitialized
-		// DNS resolution failed, socket operations will be skipped
-		Logger::log("[AniDB Error] DNS resolution for api.anidb.net failed", __FILE__, __LINE__);
+		Logger::log("[AniDB Init] Test mode: Skipping DNS lookup for api.anidb.net", __FILE__, __LINE__);
 	}
+	
 	anidbport = 9000;
 	loggedin = 0;
 	Socket = nullptr;

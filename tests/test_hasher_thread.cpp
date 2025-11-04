@@ -30,6 +30,9 @@ private slots:
 
 void TestHasherThread::initTestCase()
 {
+    // Set environment variable to signal test mode before any Qt network operations
+    qputenv("USAGI_TEST_MODE", "1");
+    
     // Initialize the database for testing
     QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(":memory:");
