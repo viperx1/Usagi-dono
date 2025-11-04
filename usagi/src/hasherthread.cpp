@@ -11,10 +11,11 @@ HasherThread::HasherThread()
 
 void HasherThread::run()
 {
-    // Reset shouldStop flag for this thread execution
+    // Reset shouldStop flag and clear queue for this thread execution
     {
         QMutexLocker locker(&mutex);
         shouldStop = false;
+        fileQueue.clear();
     }
     
     LOG("HasherThread started processing files [hasherthread.cpp]");
