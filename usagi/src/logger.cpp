@@ -35,33 +35,28 @@ void Logger::log(const QString &msg, const QString &file, int line)
     // Empty file and line parameters are NOT allowed.
     assert(!file.isEmpty() && "Logger::log: file parameter is empty");
     assert(line > 0 && "Logger::log: line parameter invalid");
-    // Build the full message with optional file/line info
+    // Build the full message
     QString fullMessage;
-    if (!file.isEmpty() && line > 0)
+
+    // Extract just the filename from the full path
+    QString filename = file;
+    int lastSlash = filename.lastIndexOf('/');
+    if (lastSlash == -1)
     {
-        // Extract just the filename from the full path
-        QString filename = file;
-        int lastSlash = filename.lastIndexOf('/');
-        if (lastSlash == -1)
-        {
-            lastSlash = filename.lastIndexOf('\\');
-        }
-        if (lastSlash >= 0)
-        {
-            filename = filename.mid(lastSlash + 1);
-        }
-        
-        fullMessage = QString("[%1:%2] %3").arg(filename).arg(line).arg(msg);
+        lastSlash = filename.lastIndexOf('\\');
     }
-    else
+    if (lastSlash >= 0)
     {
-        fullMessage = msg;
+        filename = filename.mid(lastSlash + 1);
     }
+    //timestamp
+    QString timestamp = QDateTime::currentDateTime().toString("HH:mm:ss.zzz");
+
+    fullMessage = QString("[%1] [%2:%3] %4").arg(timestamp).arg(filename).arg(line).arg(msg);
     
     // 1. Output to console (for development and debugging)
     qDebug().noquote() << fullMessage;
     
-    // 2. Emit signal for UI log tab (with timestamp)
-    // The timestamp will be added by the receiving slot to maintain consistency
+    // 2. Emit signal for UI log tab
     emit instance()->logMessage(fullMessage);
 }
