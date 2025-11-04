@@ -116,8 +116,8 @@ jobs:
           if [ -f build/test_log.txt ]; then
             echo "### Test Summary" >> issue_body.md
             echo '```' >> issue_body.md
-            # Extract test summary (lines with "Test #" and "% tests passed")
-            grep -E "(^Test |% tests passed|tests failed out of)" build/test_log.txt | tail -n 50 >> issue_body.md 2>/dev/null || echo "Could not extract test summary" >> issue_body.md
+            # Extract test summary (test results and final summary)
+            grep -E "^[[:space:]]*[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#|tests passed|tests failed out of|% tests" build/test_log.txt | tail -n 50 >> issue_body.md 2>/dev/null || echo "Could not extract test summary" >> issue_body.md
             echo '```' >> issue_body.md
             echo "" >> issue_body.md
           fi
