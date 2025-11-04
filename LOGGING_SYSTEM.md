@@ -10,32 +10,43 @@ The unified Logger provides:
 
 1. **Console Output**: Messages are output to the console using `qDebug()` for development and debugging
 2. **UI Log Tab**: Messages are displayed in the application's Log tab through Qt signal/slot mechanism
-3. **File/Line Context**: Optional file and line number information for better debugging
+3. **File/Line Context**: MANDATORY file and line number information for accurate debugging
 
 **Note**: CrashLog is intentionally kept separate and is only used for emergency crash situations, not for regular logging.
 
 ## Usage
 
-### Basic Logging
+### Recommended: Use the LOG Macro (ALWAYS PREFER THIS)
+
+The LOG macro is the **recommended and preferred way** to log messages. It automatically provides the required file and line information:
 
 ```cpp
 #include "logger.h"
 
-// Simple log message
-Logger::log("Your message here");
+// Simple log message - RECOMMENDED
+LOG("Your message here");
 
-// Log with variable formatting
-Logger::log(QString("User %1 logged in with status %2").arg(username).arg(status));
+// Log with variable formatting - RECOMMENDED
+LOG(QString("User %1 logged in with status %2").arg(username).arg(status));
 ```
 
-### Logging with File and Line Information
+### Direct Logger::log Call (Advanced - Use Only When Necessary)
+
+The `Logger::log()` function requires **MANDATORY** file and line parameters. These parameters are enforced by assertions:
 
 ```cpp
-// Explicit file and line
+// Direct call with explicit file and line - ONLY use when you cannot use LOG macro
 Logger::log("Error occurred", __FILE__, __LINE__);
+```
 
-// Or use the convenient LOG macro
-LOG("This automatically includes file and line info");
+**CRITICAL**: Do NOT call `Logger::log()` with empty strings or zero for file/line parameters:
+
+```cpp
+// ❌ WRONG - Will trigger assertion failure at runtime
+Logger::log("Message", "", 0);
+
+// ✅ CORRECT - Use the LOG macro instead
+LOG("Message");
 ```
 
 ### In Class Methods
@@ -43,12 +54,24 @@ LOG("This automatically includes file and line info");
 ```cpp
 void MyClass::someMethod()
 {
-    Logger::log("MyClass::someMethod called");
+    // Always use the LOG macro - RECOMMENDED
+    LOG("MyClass::someMethod called");
     
-    // With context
+    // For processing messages
     LOG("Processing data");
 }
 ```
+
+## IMPORTANT: Mandatory File and Line Parameters
+
+The `file` and `line` parameters in `Logger::log()` are **MANDATORY** and are enforced by assertions:
+
+- `file` must not be empty
+- `line` must be greater than 0
+
+**If the application hits these assertions at runtime**, it means `Logger::log()` is being called **INCORRECTLY** and needs to be fixed. The assertions are intentionally there to catch incorrect usage during development.
+
+**Always use the LOG(msg) macro** instead of calling `Logger::log()` directly. The macro automatically provides `__FILE__` and `__LINE__`.
 
 ## Implementation Details
 
@@ -80,11 +103,13 @@ The Logger is automatically integrated with:
 
 The old logging functions have been replaced:
 
-- `Debug(msg)` → `Logger::log(msg)`
-- `logOutput->append(msg)` → `Logger::log(msg)`
-- Direct `qDebug()` → Can still be used, but `Logger::log()` is preferred
+- `Debug(msg)` → `LOG(msg)` (preferred)
+- `logOutput->append(msg)` → `LOG(msg)` (preferred)
+- Direct `qDebug()` → Can still be used, but `LOG()` is preferred
 
 All three old Debug() implementations (myAniDBApi, AniDBApi, ed2k) now use the unified Logger internally.
+
+**IMPORTANT**: Never call `Logger::log(msg, "", 0)` as this will trigger assertion failures. Always use the `LOG(msg)` macro instead.
 
 ## Testing
 

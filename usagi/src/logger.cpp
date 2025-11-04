@@ -32,9 +32,13 @@ Logger* Logger::instance()
 
 void Logger::log(const QString &msg, const QString &file, int line)
 {
-    // Empty file and line parameters are NOT allowed.
-    assert(!file.isEmpty() && "Logger::log: file parameter is empty");
-    assert(line > 0 && "Logger::log: line parameter invalid");
+    // MANDATORY: file and line parameters MUST be valid.
+    // These assertions enforce correct usage of Logger::log.
+    // If these assertions are hit at runtime, it means Logger::log is being called
+    // INCORRECTLY and needs to be fixed. Use the LOG(msg) macro instead, which
+    // automatically provides __FILE__ and __LINE__.
+    assert(!file.isEmpty() && "Logger::log: file parameter is MANDATORY - use LOG(msg) macro instead");
+    assert(line > 0 && "Logger::log: line parameter is MANDATORY - use LOG(msg) macro instead");
     // Build the full message
     QString fullMessage;
 

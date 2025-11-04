@@ -605,7 +605,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 			else
 			{
-				Logger::log(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))), "", 0);
+				LOG(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))));
 			}
 		}
 		else if(lid.isEmpty())
@@ -1376,7 +1376,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	{
 		a = QString("%1&s=%2").arg(str).arg(SID);
 	}
-	Logger::log("AniDBApi: Send: " + (a.length() > 0 ? a : a = str), "", 0);
+	LOG("AniDBApi: Send: " + (a.length() > 0 ? a : a = str));
 
 	a = QString("%1&tag=%2").arg(a).arg(tag);
     Logger::log("[AniDB Send] Command: " + a, __FILE__, __LINE__);
@@ -1548,7 +1548,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		
 		if (!query.exec())
 		{
-			Logger::log(QString("Batch LocalIdentify file query error: %1").arg(query.lastError().text()), "", 0);
+			LOG(QString("Batch LocalIdentify file query error: %1").arg(query.lastError().text()));
 			continue; // Skip this file but continue with others
 		}
 		
@@ -1588,7 +1588,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		
 		if (!query.exec())
 		{
-			Logger::log(QString("Batch LocalIdentify mylist query error: %1").arg(query.lastError().text()), "", 0);
+			LOG(QString("Batch LocalIdentify mylist query error: %1").arg(query.lastError().text()));
 			return results;
 		}
 		
@@ -1605,7 +1605,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		}
 	}
 	
-	Logger::log(QString("Batch LocalIdentify completed for %1 file(s)").arg(sizeHashPairs.size()), "", 0);
+	LOG(QString("Batch LocalIdentify completed for %1 file(s)").arg(sizeHashPairs.size()));
 	return results;
 }
 
@@ -1700,7 +1700,7 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 				
 				if(updateQuery.exec(q))
 				{
-					Logger::log(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath), "", 0);
+					LOG(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 					
 					// Update status in local_files table to 2 (in anidb)
 					QSqlQuery statusQuery(db);
@@ -1824,14 +1824,14 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 		{
 			failCount++;
 			hasFailure = true;
-			Logger::log(QString("Failed to update file %1: %2").arg(pair.first).arg(query.lastError().text()), "", 0);
+			LOG(QString("Failed to update file %1: %2").arg(pair.first).arg(query.lastError().text()));
 		}
 	}
 	
 	// Rollback if any failures occurred to maintain consistency
 	if (hasFailure)
 	{
-		Logger::log(QString("Rolling back batch update due to %1 failure(s)").arg(failCount), "", 0);
+		LOG(QString("Rolling back batch update due to %1 failure(s)").arg(failCount));
 		db.rollback();
 		return;
 	}
@@ -1876,7 +1876,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 		
 		if (!threadDb.open())
 		{
-			Logger::log(QString("Failed to open thread-local database connection: %1").arg(threadDb.lastError().text()), "", 0);
+			LOG(QString("Failed to open thread-local database connection: %1").arg(threadDb.lastError().text()));
 			return QString();
 		}
 	}
@@ -1895,7 +1895,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	
 	if(!query.exec())
 	{
-		Logger::log(QString("Database query failed for path=%1, error: %2").arg(localPath).arg(query.lastError().text()), "", 0);
+		LOG(QString("Database query failed for path=%1, error: %2").arg(localPath).arg(query.lastError().text()));
 		return QString();
 	}
 	
@@ -1930,7 +1930,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	
 	if(!duplicateQuery.exec())
 	{
-		Logger::log(QString("Failed to query for duplicate files: %1").arg(duplicateQuery.lastError().text()), "", 0);
+		LOG(QString("Failed to query for duplicate files: %1").arg(duplicateQuery.lastError().text()));
 		return QString();
 	}
 	
@@ -1943,7 +1943,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 		QFileInfo duplicateFileInfo(duplicatePath);
 		if(duplicateFileInfo.exists() && duplicateFileInfo.size() == fileSize)
 		{
-			Logger::log(QString("Found duplicate file with hash: %1 (size=%2)").arg(duplicatePath).arg(fileSize), "", 0);
+			LOG(QString("Found duplicate file with hash: %1 (size=%2)").arg(duplicatePath).arg(fileSize));
 			
 			// Copy the hash to the current file's record
 			QSqlQuery updateQuery(threadDb);
@@ -1958,7 +1958,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 			}
 			else
 			{
-				Logger::log(QString("Failed to update hash for path=%1: %2").arg(localPath).arg(updateQuery.lastError().text()), "", 0);
+				LOG(QString("Failed to update hash for path=%1: %2").arg(localPath).arg(updateQuery.lastError().text()));
 			}
 		}
 		else
@@ -1974,7 +1974,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	if(debugQuery.exec() && debugQuery.next())
 	{
 		int count = debugQuery.value(0).toInt();
-		Logger::log(QString("Debug: Found %1 row(s) with path=%2 (hash may be NULL or empty)").arg(count).arg(localPath), "", 0);
+		LOG(QString("Debug: Found %1 row(s) with path=%2 (hash may be NULL or empty)").arg(count).arg(localPath));
 	}
 	
 	return QString();
@@ -2018,7 +2018,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	
 	if (!query.exec())
 	{
-		Logger::log(QString("Batch hash retrieval query failed: %1").arg(query.lastError().text()), "", 0);
+		LOG(QString("Batch hash retrieval query failed: %1").arg(query.lastError().text()));
 		return results;
 	}
 	
@@ -2105,7 +2105,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	Logger::log("[AniDB Anime Titles] Download callback triggered", __FILE__, __LINE__);
 	if(reply->error() != QNetworkReply::NoError)
 	{
-		Logger::log(QString("Failed to download anime titles: %1").arg(reply->errorString()), "", 0);
+		LOG(QString("Failed to download anime titles: %1").arg(reply->errorString()));
 		reply->deleteLater();
 		return;
 	}
@@ -2113,7 +2113,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	QByteArray compressedData = reply->readAll();
 	reply->deleteLater();
 	
-	Logger::log(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()), "", 0);
+	LOG(QString("Downloaded %1 bytes of compressed anime titles data").arg(compressedData.size()));
 	
 	// The file is in gzip format, which uses deflate compression
 	// We need to decompress it properly using zlib
@@ -2185,7 +2185,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 		return;
 	}
 	
-	Logger::log(QString("Decompressed to %1 bytes").arg(decompressedData.size()), "", 0);
+	LOG(QString("Decompressed to %1 bytes").arg(decompressedData.size()));
 	
 	Logger::log("[AniDB Anime Titles] Starting to parse and store titles", __FILE__, __LINE__);
 	parseAndStoreAnimeTitles(decompressedData);
@@ -2198,7 +2198,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 				.arg(lastAnimeTitlesUpdate.toSecsSinceEpoch());
 	query.exec(q);
 	
-	Logger::log(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()), "", 0);
+	LOG(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()));
 }
 
 void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
