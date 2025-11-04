@@ -32,6 +32,7 @@ Logger* Logger::instance()
 
 void Logger::log(const QString &msg, const QString &file, int line)
 {
+    // Empty file and line parameters are NOT allowed.
     assert(!file.isEmpty() && "Logger::log: file parameter is empty");
     assert(line > 0 && "Logger::log: line parameter invalid");
     // Build the full message with optional file/line info
