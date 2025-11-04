@@ -1440,7 +1440,7 @@ bool AniDBApi::LoggedIn()
 int AniDBApi::SendPacket()
 {
     // Check for timeout and handle retry logic
-    if(waitingForReply.isWaiting == true && waitingForReply.start.elapsed() > 10000)
+    if(waitingForReply.isWaiting && waitingForReply.start.elapsed() > 10000)
     {
         qint64 elapsed = waitingForReply.start.elapsed();
         Logger::log("[AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed: " + QString::number(elapsed) + " ms", __FILE__, __LINE__);
@@ -1449,12 +1449,15 @@ int AniDBApi::SendPacket()
         QSqlQuery retryQuery(db);
         retryQuery.prepare("SELECT `retry_count` FROM `packets` WHERE `tag` = ?");
         retryQuery.addBindValue(currentTag);
-        retryQuery.exec();
         
         int retryCount = 0;
-        if(retryQuery.next())
+        if(retryQuery.exec() && retryQuery.next())
         {
             retryCount = retryQuery.value(0).toInt();
+        }
+        else
+        {
+            Logger::log("[AniDB Error] Failed to query retry count for Tag: " + currentTag, __FILE__, __LINE__);
         }
         
         const int MAX_RETRIES = 3;
@@ -1468,7 +1471,10 @@ int AniDBApi::SendPacket()
             updateQuery.prepare("UPDATE `packets` SET `processed` = 0, `retry_count` = ? WHERE `tag` = ?");
             updateQuery.addBindValue(retryCount + 1);
             updateQuery.addBindValue(currentTag);
-            updateQuery.exec();
+            if(!updateQuery.exec())
+            {
+                Logger::log("[AniDB Error] Failed to update packet for retry - Tag: " + currentTag, __FILE__, __LINE__);
+            }
             
             // Reset waiting state to allow resend
             waitingForReply.isWaiting = false;
@@ -1482,7 +1488,10 @@ int AniDBApi::SendPacket()
             QSqlQuery failQuery(db);
             failQuery.prepare("UPDATE `packets` SET `got_reply` = 1, `reply` = 'TIMEOUT' WHERE `tag` = ?");
             failQuery.addBindValue(currentTag);
-            failQuery.exec();
+            if(!failQuery.exec())
+            {
+                Logger::log("[AniDB Error] Failed to mark packet as timed out - Tag: " + currentTag, __FILE__, __LINE__);
+            }
             
             // Reset waiting state to continue processing queue
             waitingForReply.isWaiting = false;

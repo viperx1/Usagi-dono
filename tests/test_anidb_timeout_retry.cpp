@@ -29,29 +29,38 @@ private slots:
 
 private:
     AniDBApi* api;
-    QSqlDatabase db;
+    
+    void clearPackets();
 };
+
+void TestAniDBTimeoutRetry::clearPackets()
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
+    query.exec("DELETE FROM `packets`");
+}
 
 void TestAniDBTimeoutRetry::initTestCase()
 {
-    // Create a temporary database for testing
-    db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName(":memory:");
-    QVERIFY(db.open());
-    
-    // Create API instance
+    // Create API instance - it will set up its own database
     api = new AniDBApi("usagi", 1);
 }
 
 void TestAniDBTimeoutRetry::cleanupTestCase()
 {
     delete api;
-    db.close();
 }
 
 void TestAniDBTimeoutRetry::cleanup()
 {
     // Clean up packets table between tests
+    clearPackets();
+}
+
+void TestAniDBTimeoutRetry::testRetryCountColumnExists()
+{
+    // Verify that the retry_count column exists in the packets table
+    QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
     query.exec("DELETE FROM packets");
 }
@@ -79,6 +88,7 @@ void TestAniDBTimeoutRetry::testRetryCountColumnExists()
 void TestAniDBTimeoutRetry::testPacketRetriedOnTimeout()
 {
     // Insert a test packet
+    QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
     query.exec("INSERT INTO packets (tag, str, processed, got_reply, retry_count) VALUES ('1000', 'FILE test', 1, 0, 0)");
     
@@ -103,6 +113,7 @@ void TestAniDBTimeoutRetry::testPacketRetriedOnTimeout()
 void TestAniDBTimeoutRetry::testMaxRetriesReached()
 {
     // Insert a test packet that has reached max retries
+    QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
     query.exec("INSERT INTO packets (tag, str, processed, got_reply, retry_count) VALUES ('2000', 'FILE test', 1, 0, 3)");
     
