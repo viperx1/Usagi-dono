@@ -599,10 +599,16 @@ void Window::ButtonHasherStopClick()
 	progressFile->setMaximum(1);
 	
 	if (hasherThread.isRunning()) {
-		// Notify ed2k to stop hashing before stopping the thread
+		// 1. First, notify ed2k to interrupt the current hashing operation
+		//    This sets a flag that ed2khash checks, causing it to return early
 		emit notifyStopHasher();
+		
+		// 2. Then signal the thread to stop processing more files
 		hasherThread.stop();
-		hasherThread.wait(); // Wait for thread to finish
+		
+		// 3. Finally, wait for the thread to finish
+		//    The thread will finish quickly because ed2khash will exit early
+		hasherThread.wait();
 	}
 }
 
