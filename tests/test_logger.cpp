@@ -24,14 +24,16 @@ private slots:
         QSignalSpy spy(logger, &Logger::logMessage);
         
         QString testMessage = "Test log message";
-        Logger::log(testMessage, "", 0);
+        LOG(testMessage);
         
         // Verify signal was emitted
         QCOMPARE(spy.count(), 1);
         
-        // Verify signal argument
+        // Verify signal argument contains the message and file info
         QList<QVariant> arguments = spy.takeFirst();
-        QCOMPARE(arguments.at(0).toString(), testMessage);
+        QString loggedMessage = arguments.at(0).toString();
+        QVERIFY(loggedMessage.contains(testMessage));
+        QVERIFY(loggedMessage.contains("test_logger.cpp"));
     }
 
     void testLoggerWithFileAndLine()
@@ -78,9 +80,9 @@ private slots:
         Logger* logger = Logger::instance();
         QSignalSpy spy(logger, &Logger::logMessage);
         
-        Logger::log("Message 1", "", 0);
-        Logger::log("Message 2", "", 0);
-        Logger::log("Message 3", "", 0);
+        LOG("Message 1");
+        LOG("Message 2");
+        LOG("Message 3");
         
         // Verify all signals were emitted
         QCOMPARE(spy.count(), 3);

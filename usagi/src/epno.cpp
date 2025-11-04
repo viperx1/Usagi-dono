@@ -9,7 +9,7 @@ epno::epno()
 {
     // Log only once when first epno object is created
     if (!s_epnoLogged) {
-        Logger::log("epno type system initialized [epno.cpp]", "", 0);
+        LOG("epno type system initialized [epno.cpp]");
         s_epnoLogged = true;
     }
 }

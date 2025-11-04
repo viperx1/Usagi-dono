@@ -10,7 +10,7 @@ aired::aired()
 {
     // Log only once when first aired object is created
     if (!s_airedLogged) {
-        Logger::log("aired date system initialized [aired.cpp]", "", 0);
+        LOG("aired date system initialized [aired.cpp]");
         s_airedLogged = true;
     }
 }

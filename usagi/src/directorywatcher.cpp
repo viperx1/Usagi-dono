@@ -23,7 +23,7 @@ void DirectoryScanWorker::scan()
     QElapsedTimer timer;
     timer.start();
     
-    Logger::log("DirectoryScanWorker starting directory scan [directorywatcher.cpp]", "", 0);
+    LOG("DirectoryScanWorker starting directory scan [directorywatcher.cpp]");
     QStringList newFiles;
     
     if (m_directory.isEmpty() || !QDir(m_directory).exists()) {
@@ -107,7 +107,7 @@ void DirectoryWatcher::startWatching(const QString &directory)
     totalTimer.start();
     
     if (directory.isEmpty() || !QDir(directory).exists()) {
-        Logger::log("DirectoryWatcher: Invalid directory: " + directory, "", 0);
+        LOG("DirectoryWatcher: Invalid directory: " + directory);
         return;
     }
     
@@ -122,13 +122,13 @@ void DirectoryWatcher::startWatching(const QString &directory)
     m_isWatching = true;
     
     qint64 setupTime = timer.elapsed();
-    Logger::log(QString("DirectoryWatcher: Setup completed in %1 ms [directorywatcher.cpp]").arg(setupTime), "", 0);
+    LOG(QString("DirectoryWatcher: Setup completed in %1 ms [directorywatcher.cpp]").arg(setupTime));
     
     // Load previously processed files
     timer.restart();
     loadProcessedFiles();
     qint64 loadTime = timer.elapsed();
-    Logger::log(QString("DirectoryWatcher: Database load completed in %1 ms [directorywatcher.cpp]").arg(loadTime), "", 0);
+    LOG(QString("DirectoryWatcher: Database load completed in %1 ms [directorywatcher.cpp]").arg(loadTime));
     
     // Defer initial scan to avoid UI freeze
     m_initialScanTimer->start();
@@ -154,7 +154,7 @@ void DirectoryWatcher::stopWatching()
     m_debounceTimer->stop();
     m_initialScanTimer->stop();
     
-    Logger::log("DirectoryWatcher: Stopped watching", "", 0);
+    LOG("DirectoryWatcher: Stopped watching");
 }
 
 bool DirectoryWatcher::isWatching() const
@@ -192,11 +192,11 @@ void DirectoryWatcher::scanDirectory()
     
     // Check if a scan is already in progress
     if (m_scanInProgress) {
-        Logger::log("DirectoryWatcher: Scan already in progress, skipping", "", 0);
+        LOG("DirectoryWatcher: Scan already in progress, skipping");
         return;
     }
     
-    Logger::log("DirectoryWatcher: Starting background directory scan", "", 0);
+    LOG("DirectoryWatcher: Starting background directory scan");
     
     m_scanInProgress = true;
     
@@ -237,7 +237,7 @@ void DirectoryWatcher::scanDirectory()
 void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
 {
     if (newFiles.isEmpty()) {
-        Logger::log("DirectoryWatcher: No new files detected", "", 0);
+        LOG("DirectoryWatcher: No new files detected");
         return;
     }
     
@@ -270,12 +270,12 @@ void DirectoryWatcher::loadProcessedFiles()
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isValid() || !db.isOpen()) {
-        Logger::log("DirectoryWatcher: Database not available, cannot load processed files", "", 0);
+        LOG("DirectoryWatcher: Database not available, cannot load processed files");
         return;
     }
     
     qint64 dbCheckTime = timer.elapsed();
-    Logger::log(QString("DirectoryWatcher: Database connection check: %1 ms [directorywatcher.cpp]").arg(dbCheckTime), "", 0);
+    LOG(QString("DirectoryWatcher: Database connection check: %1 ms [directorywatcher.cpp]").arg(dbCheckTime));
     
     QSqlQuery query(db);
     
@@ -292,7 +292,7 @@ void DirectoryWatcher::loadProcessedFiles()
         return;
     }
     
-    Logger::log(QString("DirectoryWatcher: Database query execution: %1 ms [directorywatcher.cpp]").arg(queryTime), "", 0);
+    LOG(QString("DirectoryWatcher: Database query execution: %1 ms [directorywatcher.cpp]").arg(queryTime));
     
     timer.restart();
     while (query.next()) {
@@ -311,7 +311,7 @@ void DirectoryWatcher::saveProcessedFile(const QString &filePath)
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isValid() || !db.isOpen()) {
-        Logger::log("DirectoryWatcher: Database not available, cannot save processed file", "", 0);
+        LOG("DirectoryWatcher: Database not available, cannot save processed file");
         return;
     }
     
@@ -327,6 +327,6 @@ void DirectoryWatcher::saveProcessedFile(const QString &filePath)
     query.addBindValue(filename);
     
     if (!query.exec()) {
-        Logger::log("DirectoryWatcher: Failed to save processed file: " + query.lastError().text(), "", 0);
+        LOG("DirectoryWatcher: Failed to save processed file: " + query.lastError().text());
     }
 }
