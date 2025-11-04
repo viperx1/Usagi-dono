@@ -32,8 +32,8 @@ void TestHashingThrottle::testLargeFileHashingEmitsThrottledSignals()
     ed2k hasher;
     
     // Create a temporary file large enough to have many parts
-    // 5MB = approximately 50 parts of 102400 bytes each
-    // Without throttling, this would emit 50 signals
+    // 5MB = approximately 52 parts of 102400 bytes each
+    // Without throttling, this would emit 52 signals
     // With throttling (100ms), and assuming hashing takes ~500ms,
     // we should see about 5-6 signals instead
     QTemporaryFile tempFile;
@@ -65,14 +65,14 @@ void TestHashingThrottle::testLargeFileHashingEmitsThrottledSignals()
     int expectedMaxSignals = (elapsed / 100) + 2; // +2 for safety margin
     int actualSignals = partsSpy.count();
     
-    qDebug() << "File size: 5MB (~50 parts)";
+    qDebug() << "File size: 5MB (~52 parts)";
     qDebug() << "Hashing took:" << elapsed << "ms";
     qDebug() << "Signals emitted:" << actualSignals;
     qDebug() << "Expected max signals:" << expectedMaxSignals;
     
     // Verify we emitted far fewer signals than parts
-    QVERIFY2(actualSignals < 50, 
-             QString("Expected < 50 signals with throttling, got %1").arg(actualSignals).toLatin1());
+    QVERIFY2(actualSignals < 52, 
+             QString("Expected < 52 signals with throttling, got %1").arg(actualSignals).toLatin1());
     
     // Verify we did emit at least some signals (not zero)
     QVERIFY2(actualSignals > 0,
