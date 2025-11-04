@@ -70,7 +70,9 @@ jobs:
         shell: bash
 
       - name: Run tests
-        run: ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
+        run: |
+          ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
+          exit ${PIPESTATUS[0]}
         shell: bash
 
 
@@ -81,6 +83,17 @@ jobs:
           name: Usagi-dono-alpha-llvm
           path: |
             build/**/*.exe
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-failure
+          path: |
+            build/configure_log.txt
+            build/build_log.txt
+            build/test_log.txt
+          if-no-files-found: ignore
 
       - name: Create Release & Upload (Stable/Beta, LLVM)
         if: success() && startsWith(github.ref, 'refs/tags/')
@@ -98,10 +111,21 @@ jobs:
           echo "**Branch/Tag:** ${{ github.ref }}" >> issue_body.md
           echo "**Commit:** ${{ github.sha }}" >> issue_body.md
           echo "" >> issue_body.md
+          
+          # Add test summary first if tests were run
+          if [ -f build/test_log.txt ]; then
+            echo "### Test Summary" >> issue_body.md
+            echo '```' >> issue_body.md
+            # Extract test summary (lines with "Test #" and "% tests passed")
+            grep -E "(^Test |% tests passed|tests failed out of)" build/test_log.txt | tail -n 50 >> issue_body.md 2>/dev/null || echo "Could not extract test summary" >> issue_body.md
+            echo '```' >> issue_body.md
+            echo "" >> issue_body.md
+          fi
+          
           echo "### Configure log" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/configure_log.txt ]; then
-            tail -n 200 build/configure_log.txt >> issue_body.md
+            tail -n 100 build/configure_log.txt >> issue_body.md
           else
             echo "Log file not available" >> issue_body.md
           fi
@@ -109,19 +133,21 @@ jobs:
           echo "### Build log" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/build_log.txt ]; then
-            tail -n 200 build/build_log.txt >> issue_body.md
+            tail -n 100 build/build_log.txt >> issue_body.md
           else
             echo "Log file not available" >> issue_body.md
           fi
           echo '```' >> issue_body.md
-          echo "### Test log" >> issue_body.md
+          echo "### Test log (last 500 lines)" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/test_log.txt ]; then
-            tail -n 200 build/test_log.txt >> issue_body.md
+            tail -n 500 build/test_log.txt >> issue_body.md
           else
             echo "Log file not available" >> issue_body.md
           fi
           echo '```' >> issue_body.md
+          echo "" >> issue_body.md
+          echo "**Note:** Full logs are available in the workflow run artifacts." >> issue_body.md
 
           gh issue create \
             --title "🚨 Build failed: ${{ github.workflow }} on ${{ github.ref }}" \
