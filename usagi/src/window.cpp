@@ -597,11 +597,11 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	progressFile->setValue(0);
 	progressFile->setMaximum(1);
+	emit notifyStopHasher(); // Notify ed2k to stop hashing
 	if (hasherThread.isRunning()) {
 		hasherThread.stop();
 		hasherThread.wait(); // Wait for thread to finish
 	}
-	emit notifyStopHasher();
 }
 
 void Window::provideNextFileToHash()
