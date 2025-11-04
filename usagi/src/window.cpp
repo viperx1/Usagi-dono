@@ -148,7 +148,6 @@ Window::Window()
     connect(buttonstart, SIGNAL(clicked()), this, SLOT(ButtonHasherStartClick()));
     connect(buttonclear, SIGNAL(clicked()), this, SLOT(ButtonHasherClearClick()));
     connect(&hasherThread, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
-    connect(this, SIGNAL(fileToHash(QString)), &hasherThread, SLOT(hashFile(QString)), Qt::QueuedConnection);
     connect(&hasherThread, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
     connect(&hasherThread, SIGNAL(finished()), this, SLOT(hasherFinished()));
     connect(adbapi, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
@@ -600,6 +599,7 @@ void Window::ButtonHasherStopClick()
 	progressFile->setMaximum(1);
 	if (hasherThread.isRunning()) {
 		hasherThread.stop();
+		hasherThread.wait(); // Wait for thread to finish
 	}
 	emit notifyStopHasher();
 }
@@ -615,13 +615,13 @@ void Window::provideNextFileToHash()
 		if(progress == "0" && existingHash.isEmpty())
 		{
 			QString filePath = hashes->item(i, 2)->text();
-			emit fileToHash(filePath);
+			hasherThread.addFile(filePath);
 			return;
 		}
 	}
 	
 	// No more files to hash, send empty string to signal completion
-	emit fileToHash(QString());
+	hasherThread.addFile(QString());
 }
 
 void Window::ButtonHasherClearClick()

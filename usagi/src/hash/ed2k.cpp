@@ -77,9 +77,6 @@ int ed2k::ed2khash(QString filepath)
         int parts = (fileSize + 102399) / 102400; // Ceiling division
 		int partsdone = 0;
 		
-		// Start timer for throttling signal emissions
-		signalThrottleTimer.start();
-		
 		do
 		{
 			if(dohash == 0)
@@ -90,17 +87,8 @@ int ed2k::ed2khash(QString filepath)
 			Update((unsigned char *)buffer, i);
 			partsdone++;
 			
-			// Throttle signal emission to prevent UI freeze
-			// Emit signal only every 100ms OR on the last part
-			// This prevents flooding the event queue with thousands of signals
-			bool isLastPart = (partsdone >= parts || file.atEnd());
-			bool shouldEmit = (signalThrottleTimer.elapsed() >= 100) || isLastPart;
-			
-			if (shouldEmit)
-			{
-				emit notifyPartsDone(parts, partsdone);
-				signalThrottleTimer.restart();
-			}
+			// Emit progress signal for each part
+			emit notifyPartsDone(parts, partsdone);
 		}while(!file.atEnd());
 		Final();
 		ed2kfilestruct hash;

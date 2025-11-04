@@ -5,7 +5,6 @@
 #include <QString>
 #include <QFileInfo>
 #include <QFile>
-#include <QElapsedTimer>
 
 class ed2k:public QObject, private MD4
 {
@@ -21,7 +20,6 @@ private:
     qint64 fileSize;
 	QString fileName;
 	bool dohash;
-	QElapsedTimer signalThrottleTimer;
 protected:
 	static qint64 calculateHashParts(qint64 fileSize);
 public:
