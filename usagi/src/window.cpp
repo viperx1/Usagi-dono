@@ -2112,7 +2112,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	
 	// Add all files to hasher table with pre-loaded hash data
 	// Disable table updates during bulk insertion for performance
-	hashes->setUpdatesEnabled(0);
+	hashes->setUpdatesEnabled(false);
 	
 	QElapsedTimer insertTimer;
 	insertTimer.start();
@@ -2123,7 +2123,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	}
 	
 	// Re-enable table updates after bulk insertion
-	hashes->setUpdatesEnabled(1);
+	hashes->setUpdatesEnabled(true);
 	
 	qint64 insertTime = insertTimer.elapsed();
 	LOG(QString("[TIMING] hashesinsertrow() loop for %1 files: %2 ms [window.cpp]")
