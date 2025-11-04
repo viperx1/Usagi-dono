@@ -73,12 +73,14 @@ int ed2k::ed2khash(QString filepath)
 	if(file.isOpen())
 	{
         fileSize = file.size();
-        qint64 a = fileSize;
-        qint64 b = a/102400;
-        qint64 c = ceil(b);
-        int parts = c;
+        // Calculate number of parts correctly
+        int parts = (fileSize + 102399) / 102400; // Ceiling division
 		int partsdone = 0;
 		Init();
+		
+		// Start timer for throttling signal emissions
+		signalThrottleTimer.start();
+		
 		do
 		{
 			if(dohash == 0)
@@ -87,7 +89,19 @@ int ed2k::ed2khash(QString filepath)
 			}
 			i = file.read(buffer, 102400);
 			Update((unsigned char *)buffer, i);
-			emit notifyPartsDone(parts, ++partsdone);
+			partsdone++;
+			
+			// Throttle signal emission to prevent UI freeze
+			// Emit signal only every 100ms OR on the last part
+			// This prevents flooding the event queue with thousands of signals
+			bool isLastPart = (partsdone == parts || file.atEnd());
+			bool shouldEmit = (signalThrottleTimer.elapsed() >= 100) || isLastPart;
+			
+			if (shouldEmit)
+			{
+				emit notifyPartsDone(parts, partsdone);
+				signalThrottleTimer.restart();
+			}
 		}while(!file.atEnd());
 		Final();
 		ed2kfilestruct hash;
