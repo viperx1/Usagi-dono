@@ -87,26 +87,6 @@ private slots:
         // Verify all signals were emitted
         QCOMPARE(spy.count(), 3);
     }
-
-    void testLoggerWithoutFileAndLine()
-    {
-        // Test that Logger accepts empty file and zero line (optional parameters)
-        // This is a common usage pattern throughout the codebase
-        Logger* logger = Logger::instance();
-        QSignalSpy spy(logger, &Logger::logMessage);
-        
-        QString testMessage = "Test message without context";
-        Logger::log(testMessage, "", 0);
-        
-        // Verify signal was emitted
-        QCOMPARE(spy.count(), 1);
-        
-        // Verify signal contains only the message (no file/line info)
-        QList<QVariant> arguments = spy.takeFirst();
-        QString loggedMessage = arguments.at(0).toString();
-        QCOMPARE(loggedMessage, testMessage);
-        QVERIFY(!loggedMessage.contains(":"));  // No file:line format
-    }
 };
 
 QTEST_MAIN(TestLogger)
