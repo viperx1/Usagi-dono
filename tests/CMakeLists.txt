@@ -1047,6 +1047,8 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/anidbapi.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
 )
 
@@ -1055,6 +1057,7 @@ set(HASHER_THREAD_TEST_HEADERS
     ../usagi/src/hash/ed2k.h
     ../usagi/src/hash/md4.h
     ../usagi/src/anidbapi.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
 )
 
@@ -1072,7 +1075,9 @@ target_link_libraries(test_hasher_thread PRIVATE
     Qt6::Core
     Qt6::Network
     Qt6::Sql
+    Qt6::Widgets
     Qt6::Test
+    z
 )
 
 target_include_directories(test_hasher_thread PRIVATE
