@@ -38,7 +38,10 @@ private slots:
 
     void testLoggerWithFileAndLine()
     {
-        // Test that Logger includes file and line info when provided
+        // Test that Logger includes file and line info when provided with valid parameters
+        // Note: This test uses valid parameters. The assertions for empty file/line
+        // are intentionally not tested as they would cause test failure - the assertions
+        // are meant to catch incorrect usage at runtime during development.
         Logger* logger = Logger::instance();
         QSignalSpy spy(logger, &Logger::logMessage);
         
