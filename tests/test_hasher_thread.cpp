@@ -85,7 +85,10 @@ void TestHasherThread::testHashingRunsInSeparateThread()
     hasherThread.start();
     
     // Wait for threadStarted signal to capture the worker thread ID
-    QVERIFY(threadStartedSpy.wait(1000));
+    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
+    for (int i = 0; i < 100 && threadStartedSpy.count() == 0; ++i) {
+        QTest::qWait(10);
+    }
     QVERIFY(threadStartedSpy.count() == 1);
     
     // Extract the worker thread ID from the signal
@@ -97,7 +100,9 @@ void TestHasherThread::testHashingRunsInSeparateThread()
     // The requestNextFile signal is emitted right after threadStarted,
     // so it should already be in the spy. If not, wait for it.
     if (requestSpy.count() == 0) {
-        QVERIFY(requestSpy.wait(1000));
+        for (int i = 0; i < 100 && requestSpy.count() == 0; ++i) {
+            QTest::qWait(10);
+        }
     }
     QVERIFY(requestSpy.count() >= 1);
     
