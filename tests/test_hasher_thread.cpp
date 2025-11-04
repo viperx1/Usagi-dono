@@ -95,8 +95,7 @@ void TestHasherThread::testHashingRunsInSeparateThread()
     QVERIFY(mainThreadId != workerThreadId);
     
     // The requestNextFile signal is emitted right after threadStarted,
-    // so it should already be in the spy. Give a small amount of time
-    // for event processing if needed.
+    // so it should already be in the spy. If not, wait for it.
     if (requestSpy.count() == 0) {
         QVERIFY(requestSpy.wait(1000));
     }
