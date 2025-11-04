@@ -110,7 +110,7 @@ Window::Window()
     progressTotalLayout->addWidget(progressTotal);
     progressTotalLayout->addWidget(progressTotalLabel);
 
-    pageHasher->addWidget(hashes, 0, Qt::AlignTop);
+    pageHasher->addWidget(hashes, 1);
     pageHasher->addLayout(pageHasherSettings);
     pageHasher->addLayout(progress);
     pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
