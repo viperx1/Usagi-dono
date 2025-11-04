@@ -87,6 +87,43 @@ private slots:
         // Verify all signals were emitted
         QCOMPARE(spy.count(), 3);
     }
+
+    void testLoggerWithoutFileAndLine()
+    {
+        // Test that Logger works when file and line are not provided
+        Logger* logger = Logger::instance();
+        QSignalSpy spy(logger, &Logger::logMessage);
+        
+        QString testMessage = "Test message without context";
+        Logger::log(testMessage, "", 0);
+        
+        // Verify signal was emitted
+        QCOMPARE(spy.count(), 1);
+        
+        // Verify signal contains the message
+        QList<QVariant> arguments = spy.takeFirst();
+        QString loggedMessage = arguments.at(0).toString();
+        QVERIFY(loggedMessage.contains(testMessage));
+        
+        // Verify no file or line info is present
+        // Message should be in format: [timestamp] message
+        // Should not contain ":" which would indicate file:line format
+        int colonIndex = loggedMessage.indexOf(':');
+        int messageIndex = loggedMessage.indexOf(testMessage);
+        // If there's a colon, it should only be in the timestamp (HH:mm:ss.zzz)
+        // which comes before the message
+        if (colonIndex >= 0) {
+            QVERIFY(colonIndex < messageIndex);
+            // Count colons before the message - should be 2 (for time like 12:34:56.789)
+            int colonCount = 0;
+            for (int i = 0; i < messageIndex; ++i) {
+                if (loggedMessage[i] == ':') {
+                    colonCount++;
+                }
+            }
+            QCOMPARE(colonCount, 2); // Only the two colons from the timestamp
+        }
+    }
 };
 
 QTEST_MAIN(TestLogger)
