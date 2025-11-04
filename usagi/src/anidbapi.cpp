@@ -1846,7 +1846,7 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 	
 	// Log summary
 	Logger::log(QString("Batch updated %1 file(s) to status=%2 (all successful)")
-	            .arg(pathHashPairs.size()).arg(status), "", 0);
+	            .arg(pathHashPairs.size()).arg(status), __FILE__, __LINE__);
 }
 
 QString AniDBApi::getLocalFileHash(QString localPath)
@@ -2034,7 +2034,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	}
 	
 	Logger::log(QString("Batch retrieved hashes for %1 out of %2 files")
-	            .arg(results.size()).arg(filePaths.size()), "", 0);
+	            .arg(results.size()).arg(filePaths.size()), __FILE__, __LINE__);
 	
 	return results;
 }
