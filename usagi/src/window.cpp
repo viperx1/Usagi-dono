@@ -2111,6 +2111,9 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		.arg(filePaths.size()).arg(batchQueryTime));
 	
 	// Add all files to hasher table with pre-loaded hash data
+	// Disable table updates during bulk insertion for performance
+	hashes->setUpdatesEnabled(0);
+	
 	QElapsedTimer insertTimer;
 	insertTimer.start();
 	for (const QString &filePath : filePaths) {
@@ -2118,6 +2121,10 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		QString preloadedHash = hashInfoMap.contains(filePath) ? hashInfoMap[filePath].hash : QString();
 		hashesinsertrow(fileInfo, Qt::Unchecked, preloadedHash);
 	}
+	
+	// Re-enable table updates after bulk insertion
+	hashes->setUpdatesEnabled(1);
+	
 	qint64 insertTime = insertTimer.elapsed();
 	LOG(QString("[TIMING] hashesinsertrow() loop for %1 files: %2 ms [window.cpp]")
 		.arg(filePaths.size()).arg(insertTime));
