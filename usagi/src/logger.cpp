@@ -2,7 +2,6 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>
-#include <cassert>
 
 // Static instance pointer and mutex for thread safety
 // Note: The instance is intentionally never deleted as it should live for the
@@ -32,8 +31,6 @@ Logger* Logger::instance()
 
 void Logger::log(const QString &msg, const QString &file, int line)
 {
-    assert(!file.isEmpty() && "Logger::log: file parameter is empty");
-    assert(line > 0 && "Logger::log: line parameter invalid");
     // Build the full message with optional file/line info
     QString fullMessage;
     if (!file.isEmpty() && line > 0)
