@@ -597,7 +597,11 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	progressFile->setValue(0);
 	progressFile->setMaximum(1);
-	emit notifyStopHasher(); // Notify ed2k to stop hashing
+	
+	// Always notify ed2k to stop hashing, even if thread isn't running
+	// This ensures any ongoing hash operation is interrupted
+	emit notifyStopHasher();
+	
 	if (hasherThread.isRunning()) {
 		hasherThread.stop();
 		hasherThread.wait(); // Wait for thread to finish
