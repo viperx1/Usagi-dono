@@ -19,7 +19,7 @@ Window::Window()
 //	adbapi->SetPassword(settings->value("password").toString());
 	
 	// Test unified logging system
-	Logger::log("Window constructor initializing [window.cpp]", "", 0);
+	LOG("Window constructor initializing [window.cpp]");
 	
 	// Initialize notification tracking
 	expectedNotificationsToCheck = 0;
@@ -355,7 +355,7 @@ bool Window::validateDatabaseConnection(const QSqlDatabase& db, const QString& m
 {
 	if(!db.isValid() || !db.isOpen())
 	{
-		Logger::log("Error: Database connection is not valid or not open in " + methodName, "", 0);
+		LOG("Error: Database connection is not valid or not open in " + methodName);
 		return false;
 	}
 	return true;
@@ -523,7 +523,7 @@ void Window::ButtonHasherStartClick()
 				// Note: If progress="1" but no hash, this is an inconsistent state
 				if (progress == "1")
 				{
-					Logger::log(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i), "", 0);
+					LOG(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
 				}
 				filesToHashCount++;
 			}
@@ -537,7 +537,7 @@ void Window::ButtonHasherStartClick()
 		QString filePath = hashes->item(rowIndex, 2)->text();
 		QString hexdigest = hashes->item(rowIndex, 9)->text();
 		
-		Logger::log(QString("Queueing already-hashed file for processing: %1").arg(filename), "", 0);
+		LOG(QString("Queueing already-hashed file for processing: %1").arg(filename));
 		
 		// Get file size
 		QFileInfo fileInfo(filePath);
@@ -578,7 +578,7 @@ void Window::ButtonHasherStartClick()
 	else if (rowsWithHashes.isEmpty())
 	{
 		// No files to process at all
-		Logger::log("No files to process", "", 0);
+		LOG("No files to process");
 	}
 	else
 	{
@@ -637,7 +637,7 @@ void Window::ButtonLoginClick()
 {
     bool loggedin = adbapi->LoggedIn();
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " loggedin=" + (loggedin ? "true" : "false");
-    Logger::log(logMsg, "", 0);
+    LOG(logMsg);
     if(loggedin == true)
     {
         adbapi->Logout();
@@ -893,7 +893,7 @@ void Window::processPendingHashedFiles()
 	// Stop timer if queue is empty
 	if (pendingHashedFilesQueue.isEmpty()) {
 		hashedFilesProcessingTimer->stop();
-		Logger::log("Finished processing all already-hashed files", "", 0);
+		LOG("Finished processing all already-hashed files");
 	}
 }
 
@@ -1002,7 +1002,7 @@ void Window::closeEvent(QCloseEvent *event)
 
 void Window::saveSettings()
 {
-	Logger::log("Saving settings - username: " + editLogin->text(), "", 0);
+	LOG("Saving settings - username: " + editLogin->text());
 	adbapi->setUsername(editLogin->text());
 	adbapi->setPassword(editPassword->text());
 	
@@ -1011,7 +1011,7 @@ void Window::saveSettings()
 	adbapi->setWatcherDirectory(watcherDirectory->text());
 	adbapi->setWatcherAutoStart(watcherAutoStart->isChecked());
 	
-	Logger::log("Settings saved", "", 0);
+	LOG("Settings saved");
 }
 
 void Window::apitesterProcess()
@@ -1029,7 +1029,7 @@ void Window::apitesterProcess()
 void Window::getNotifyMylistAdd(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyMylistAdd() tag=" + tag + " code=" + QString::number(code);
-    Logger::log(logMsg, "", 0);
+    LOG(logMsg);
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
         if(hashes->item(i, 5)->text() == tag || hashes->item(i, 6)->text() == tag)
@@ -1042,7 +1042,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 hashes->item(i, 0)->setBackground(green_light.toRgb());
                 hashes->item(i, 1)->setText("2");
                 QString msg310 = "310-2";
-                Logger::log(msg310, "", 0);
+                LOG(msg310);
                 
                 // Store local file path for already existing entry
                 QString localPath = hashes->item(i, 2)->text();
@@ -1057,7 +1057,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 hashes->item(i, 0)->setBackground(red.toRgb());
                 hashes->item(i, 1)->setText("4"); // no such file
                 QString msg320 = "320-4";
-                Logger::log(msg320, "", 0);
+                LOG(msg320);
                 
                 // Update status in local_files to 3 (not in anidb)
                 QString localPath = hashes->item(i, 2)->text();
@@ -1070,7 +1070,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 hashes->item(i, 0)->setBackground(green_dark.toRgb());
 				hashes->item(i, 1)->setText("3");
                 QString msg311 = "311/210-3";
-                Logger::log(msg311, "", 0);
+                LOG(msg311);
 				
 				// Store local file path for newly added entry
 				QString localPath = hashes->item(i, 2)->text();
@@ -1091,24 +1091,24 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 void Window::getNotifyLoggedIn(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] Login notification received - Tag: " + tag + " Code: " + QString::number(code);
-    Logger::log(logMsg, "", 0);
+    LOG(logMsg);
     loginbutton->setText(QString("Logout - logged in with tag %1 and code %2").arg(tag).arg(code));
 	
 	// Enable notifications after successful login
 	adbapi->NotifyEnable();
-	Logger::log("Notifications enabled", "", 0);
+	LOG("Notifications enabled");
 }
 
 void Window::getNotifyLoggedOut(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " [Window] getNotifyLoggedOut";
-    Logger::log(logMsg, "", 0);
+    LOG(logMsg);
     loginbutton->setText(QString("Login - logged out with tag %1 and code %2").arg(tag).arg(code));
 }
 
 void Window::getNotifyMessageReceived(int nid, QString message)
 {
-	Logger::log(QString("Notification %1 received: %2").arg(nid).arg(message), "", 0);
+	LOG(QString("Notification %1 received: %2").arg(nid).arg(message));
 	
 	// Prevent downloading multiple exports simultaneously
 	static bool isDownloadingExport = false;
@@ -1145,7 +1145,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		// If a template was requested, verify the message mentions it
 		if(!expectedTemplate.isEmpty() && !message.contains(expectedTemplate, Qt::CaseInsensitive))
 		{
-			Logger::log(QString("MyList export link found but template mismatch: expected '%1', skipping").arg(expectedTemplate), "", 0);
+			LOG(QString("MyList export link found but template mismatch: expected '%1', skipping").arg(expectedTemplate));
 			
 			// Track notifications checked without finding correct export
 			if(isCheckingNotifications)
@@ -1168,7 +1168,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					}
 					else
 					{
-						Logger::log(QString("Checked %1 notifications with no matching export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck), "", 0);
+						LOG(QString("Checked %1 notifications with no matching export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
 						mylistStatusLabel->setText("MyList Status: No export found - request manually in Settings");
 					}
 					
@@ -1182,7 +1182,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 		}
 		
 		isDownloadingExport = true;
-		Logger::log(QString("MyList export link found: %1").arg(exportUrl), "", 0);
+		LOG(QString("MyList export link found: %1").arg(exportUrl));
 		mylistStatusLabel->setText("MyList Status: Downloading export...");
 		
 		// Reset notification checking state since we found an export
@@ -1211,7 +1211,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					file.write(reply->readAll());
 					file.close();
 					
-					Logger::log(QString("Export downloaded to: %1").arg(tempPath), "", 0);
+					LOG(QString("Export downloaded to: %1").arg(tempPath));
 					mylistStatusLabel->setText("MyList Status: Parsing export...");
 					
 					// Parse the xml-plain-cs file
@@ -1219,7 +1219,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					
 					if(count > 0)
 					{
-						Logger::log(QString("Successfully imported %1 mylist entries").arg(count), "", 0);
+						LOG(QString("Successfully imported %1 mylist entries").arg(count));
 						mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(count));
 						loadMylistFromDatabase();  // Refresh the display
 						
@@ -1228,7 +1228,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 					}
 					else
 					{
-						Logger::log("No entries imported from notification export", "", 0);
+						LOG("No entries imported from notification export");
 						mylistStatusLabel->setText("MyList Status: Import failed");
 					}
 					
@@ -1237,7 +1237,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 				}
 				else
 				{
-					Logger::log("Error: Cannot save export file", "", 0);
+					LOG("Error: Cannot save export file");
 					mylistStatusLabel->setText("MyList Status: Download failed");
 				}
 			}
@@ -1256,7 +1256,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	}
 	else
 	{
-		Logger::log("No mylist export link found in notification", "", 0);
+		LOG("No mylist export link found in notification");
 		
 		// Track notifications checked without finding export
 		if(isCheckingNotifications)
@@ -1277,7 +1277,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 				}
 				else
 				{
-					Logger::log(QString("Checked %1 notifications with no export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck), "", 0);
+					LOG(QString("Checked %1 notifications with no export link found - use 'Request MyList Export' in Settings to manually request").arg(expectedNotificationsToCheck));
 					mylistStatusLabel->setText("MyList Status: No export found - request manually in Settings");
 				}
 				
@@ -1296,7 +1296,7 @@ void Window::getNotifyCheckStarting(int count)
 	isCheckingNotifications = true;
 	expectedNotificationsToCheck = count;
 	notificationsCheckedWithoutExport = 0;
-	Logger::log(QString("Starting to check %1 notifications for mylist export link").arg(count), "", 0);
+	LOG(QString("Starting to check %1 notifications for mylist export link").arg(count));
 }
 
 void Window::getNotifyExportQueued(QString tag)
@@ -1375,13 +1375,13 @@ void Window::updateEpisodeInTree(int eid, int aid)
 	
 	if(!q.exec(query))
 	{
-		Logger::log("Error querying episode data: " + q.lastError().text(), "", 0);
+		LOG("Error querying episode data: " + q.lastError().text());
 		return;
 	}
 	
 	if(!q.next())
 	{
-		Logger::log(QString("No episode data found for EID %1").arg(eid), "", 0);
+		LOG(QString("No episode data found for EID %1").arg(eid));
 		return;
 	}
 	
@@ -1515,7 +1515,7 @@ void Window::loadMylistFromDatabase()
 	
 	if(!q.exec(query))
 	{
-		Logger::log("Error loading mylist: " + q.lastError().text(), "", 0);
+		LOG("Error loading mylist: " + q.lastError().text());
 		return;
 	}
 	
@@ -1787,14 +1787,14 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	if(!tarProcess.waitForFinished(30000))  // 30 second timeout
 	{
-		Logger::log("Error: Failed to extract tar.gz file (timeout)", "", 0);
+		LOG("Error: Failed to extract tar.gz file (timeout)");
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
 	
 	if(tarProcess.exitCode() != 0)
 	{
-		Logger::log("Error: Failed to extract tar.gz file: " + tarProcess.readAllStandardError(), "", 0);
+		LOG("Error: Failed to extract tar.gz file: " + tarProcess.readAllStandardError());
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
@@ -1805,7 +1805,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	if(xmlFiles.isEmpty())
 	{
-		Logger::log("Error: No XML file found in tar.gz", "", 0);
+		LOG("Error: No XML file found in tar.gz");
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
@@ -1816,7 +1816,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	if(!xmlFile.open(QIODevice::ReadOnly | QIODevice::Text))
 	{
-		Logger::log("Error: Cannot open XML file", "", 0);
+		LOG("Error: Cannot open XML file");
 		QDir(tempDir).removeRecursively();
 		return 0;
 	}
@@ -2036,13 +2036,13 @@ void Window::setMylistFirstRunComplete()
 	QSqlQuery query(db);
 	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'mylist_first_run_complete', '1')");
 	query.exec(q);
-	Logger::log("MyList first run marked as complete", "", 0);
+	LOG("MyList first run marked as complete");
 }
 
 void Window::requestMylistExportManually()
 {
 	// Manual mylist export request from Settings
-	Logger::log("Manually requesting MyList export...", "", 0);
+	LOG("Manually requesting MyList export...");
 	mylistStatusLabel->setText("MyList Status: Requesting export...");
 	adbapi->MylistExport("xml-plain-cs");
 }
@@ -2054,18 +2054,18 @@ void Window::onWatcherEnabledChanged(int state)
 		if (!dir.isEmpty() && QDir(dir).exists()) {
 			directoryWatcher->startWatching(dir);
 			watcherStatusLabel->setText("Status: Watching " + dir);
-			Logger::log("Directory watcher started: " + dir, "", 0);
+			LOG("Directory watcher started: " + dir);
 		} else if (dir.isEmpty()) {
 			watcherStatusLabel->setText("Status: Enabled (no directory set)");
-			Logger::log("Directory watcher enabled but no directory specified", "", 0);
+			LOG("Directory watcher enabled but no directory specified");
 		} else {
 			watcherStatusLabel->setText("Status: Enabled (invalid directory)");
-			Logger::log("Directory watcher enabled but directory is invalid: " + dir, "", 0);
+			LOG("Directory watcher enabled but directory is invalid: " + dir);
 		}
 	} else {
 		directoryWatcher->stopWatching();
 		watcherStatusLabel->setText("Status: Not watching");
-		Logger::log("Directory watcher stopped", "", 0);
+		LOG("Directory watcher stopped");
 	}
 }
 
@@ -2081,7 +2081,7 @@ void Window::onWatcherBrowseClicked()
 		if (watcherEnabled->isChecked()) {
 			directoryWatcher->startWatching(dir);
 			watcherStatusLabel->setText("Status: Watching " + dir);
-			Logger::log("Directory watcher changed to: " + dir, "", 0);
+			LOG("Directory watcher changed to: " + dir);
 		}
 	}
 }
@@ -2142,7 +2142,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 					// File needs to be hashed
 					// Note: If progress="1" but no hash, this is an inconsistent state
 					if (progress == "1") {
-						Logger::log(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i), "", 0);
+						LOG(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
 					}
 					filesToHashCount++;
 				}
@@ -2200,6 +2200,6 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			}
 		}
 	} else {
-		Logger::log("Files added to hasher. Hasher is busy - click Start to hash queued files.", "", 0);
+		LOG("Files added to hasher. Hasher is busy - click Start to hash queued files.");
 	}
 }

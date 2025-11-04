@@ -8,7 +8,7 @@ void AniDBApi::setUsername(QString username)
 {
 	// Log only once when first settings method is called
 	if (!s_settingsLogged) {
-		Logger::log("AniDB settings system initialized [anidbapi_settings.cpp]", "", 0);
+		LOG("AniDB settings system initialized [anidbapi_settings.cpp]");
 		s_settingsLogged = true;
 	}
 	
