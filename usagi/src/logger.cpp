@@ -45,27 +45,19 @@ void Logger::log(const QString &msg, const QString &file, int line)
     QString timestamp = QDateTime::currentDateTime().toString("HH:mm:ss.zzz");
 
     // If file and line are provided, include them in the message
-    if (!file.isEmpty() && line > 0)
+    // Extract just the filename from the full path
+    QString filename = file;
+    int lastSlash = filename.lastIndexOf('/');
+    if (lastSlash == -1)
     {
-        // Extract just the filename from the full path
-        QString filename = file;
-        int lastSlash = filename.lastIndexOf('/');
-        if (lastSlash == -1)
-        {
-            lastSlash = filename.lastIndexOf('\\');
-        }
-        if (lastSlash >= 0)
-        {
-            filename = filename.mid(lastSlash + 1);
-        }
-        
-        fullMessage = QString("[%1] [%2:%3] %4").arg(timestamp).arg(filename).arg(line).arg(msg);
+        lastSlash = filename.lastIndexOf('\\');
     }
-    else
+    if (lastSlash >= 0)
     {
-        // No file/line info provided, just timestamp and message
-        fullMessage = QString("[%1] %2").arg(timestamp).arg(msg);
+        filename = filename.mid(lastSlash + 1);
     }
+    
+    fullMessage = QString("[%1] [%2:%3] %4").arg(timestamp).arg(filename).arg(line).arg(msg);
     
     // 1. Output to console (for development and debugging)
     qDebug().noquote() << fullMessage;
