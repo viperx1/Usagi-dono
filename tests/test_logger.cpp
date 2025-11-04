@@ -90,6 +90,49 @@ private slots:
         // Verify all signals were emitted
         QCOMPARE(spy.count(), 3);
     }
+
+    void testLoggerWithoutFileAndLine()
+    {
+        // Test that Logger works when file and line are not provided
+        Logger* logger = Logger::instance();
+        QSignalSpy spy(logger, &Logger::logMessage);
+        
+        QString testMessage = "Test message without context";
+        Logger::log(testMessage, "", 0);
+        
+        // Verify signal was emitted
+        QCOMPARE(spy.count(), 1);
+        
+        // Verify signal contains the message
+        QList<QVariant> arguments = spy.takeFirst();
+        QString loggedMessage = arguments.at(0).toString();
+        QVERIFY(loggedMessage.contains(testMessage));
+        
+        // Verify format is [timestamp] message (without file:line)
+        // The message should start with '[' for the timestamp
+        QVERIFY(loggedMessage.startsWith("["));
+        
+        // Find the closing bracket of the timestamp
+        int closingBracket = loggedMessage.indexOf(']');
+        QVERIFY(closingBracket > 0);
+        
+        // Count colons in the timestamp section (should be 2 for HH:mm:ss)
+        int colonCount = 0;
+        for (int i = 0; i < closingBracket; ++i) {
+            if (loggedMessage[i] == ':') {
+                colonCount++;
+            }
+        }
+        QCOMPARE(colonCount, 2); // Two colons in HH:mm:ss.zzz format
+        
+        // Verify there's no second '[' which would indicate [file:line] format
+        int secondBracket = loggedMessage.indexOf('[', closingBracket + 1);
+        int messageIndex = loggedMessage.indexOf(testMessage);
+        if (secondBracket >= 0) {
+            // If there's a second '[', it should be after the message (not between timestamp and message)
+            QVERIFY(secondBracket >= messageIndex);
+        }
+    }
 };
 
 QTEST_MAIN(TestLogger)
