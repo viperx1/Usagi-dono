@@ -62,13 +62,6 @@ void TestAniDBTimeoutRetry::testRetryCountColumnExists()
     // Verify that the retry_count column exists in the packets table
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
-    query.exec("DELETE FROM packets");
-}
-
-void TestAniDBTimeoutRetry::testRetryCountColumnExists()
-{
-    // Verify that the retry_count column exists in the packets table
-    QSqlQuery query(db);
     query.exec("PRAGMA table_info(packets)");
     
     bool retryCountExists = false;
