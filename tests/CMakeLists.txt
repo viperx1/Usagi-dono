@@ -1073,12 +1073,15 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     target_compile_definitions(test_hasher_thread PRIVATE QT_STATIC QT_STATICPLUGIN)
 endif()
 
+# Link Qt libraries
+# Note: For static Qt builds, order matters. Qt6::Test must come before other Qt modules
+# to ensure QSignalSpy::wait() and other Qt Test methods are properly linked.
 target_link_libraries(test_hasher_thread PRIVATE
-    Qt6::Core
+    Qt6::Test
+    Qt6::Widgets
     Qt6::Network
     Qt6::Sql
-    Qt6::Widgets
-    Qt6::Test
+    Qt6::Core
     z
 )
 
