@@ -73,22 +73,27 @@ void TestHasherThread::testHashingRunsInSeparateThread()
     // Set up signal spy to capture when hashing completes
     QSignalSpy requestSpy(&hasherThread, &HasherThread::requestNextFile);
     QSignalSpy hashSpy(&hasherThread, &HasherThread::sendHash);
-    
-    // Start the thread
-    hasherThread.start();
-    
-    // Wait for initial requestNextFile signal
-    QTest::qWait(1000);
-    QVERIFY(requestSpy.count() >= 1);
+    QSignalSpy threadStartedSpy(&hasherThread, &HasherThread::threadStarted);
     
     // Record the main thread ID
     Qt::HANDLE mainThreadId = QThread::currentThreadId();
     
-    // Record the worker thread ID
-    Qt::HANDLE workerThreadId = hasherThread.currentThreadId();
+    // Start the thread
+    hasherThread.start();
+    
+    // Wait for threadStarted signal to capture the worker thread ID
+    QVERIFY(threadStartedSpy.wait(1000));
+    QVERIFY(threadStartedSpy.count() == 1);
+    
+    // Extract the worker thread ID from the signal
+    Qt::HANDLE workerThreadId = threadStartedSpy.at(0).at(0).value<Qt::HANDLE>();
     
     // Verify they are different threads
     QVERIFY(mainThreadId != workerThreadId);
+    
+    // Wait for initial requestNextFile signal
+    QVERIFY(requestSpy.wait(1000));
+    QVERIFY(requestSpy.count() >= 1);
     
     // Add a file to hash
     hasherThread.addFile(filePath);

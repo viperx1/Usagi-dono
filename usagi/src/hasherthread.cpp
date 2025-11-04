@@ -20,6 +20,9 @@ void HasherThread::run()
     
     LOG("HasherThread started processing files [hasherthread.cpp]");
     
+    // Emit the thread ID so tests can verify we're running in a separate thread
+    emit threadStarted(QThread::currentThreadId());
+    
     // Request the first file to hash
     emit requestNextFile();
     

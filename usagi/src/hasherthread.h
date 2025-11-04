@@ -21,6 +21,7 @@ protected:
 signals:
     void sendHash(QString);
     void requestNextFile();
+    void threadStarted(Qt::HANDLE threadId);
     
 private:
     QMutex mutex;
