@@ -321,6 +321,11 @@ Window::Window()
     watcherDirectory->blockSignals(false);
     watcherAutoStart->blockSignals(false);
     
+    adbapi->CreateSocket();
+
+    // Automatically load mylist on startup (using timer for delayed initialization)
+    startupTimer->start();
+
     // Auto-start directory watcher if enabled
     if (watcherEnabledSetting && watcherAutoStartSetting && !watcherDir.isEmpty()) {
         directoryWatcher->startWatching(watcherDir);
@@ -337,10 +342,6 @@ Window::Window()
     this->setLayout(layout);
 
 
-    adbapi->CreateSocket();
-    
-    // Automatically load mylist on startup (using timer for delayed initialization)
-    startupTimer->start();
 }
 
 Window::~Window()
