@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-llvm-mingw:
-    runs-on: windows-latest
+    runs-on: self-hosted
     name: Build with LLVM/Clang (Qt 6.9.2 MinGW)
 
     steps:
