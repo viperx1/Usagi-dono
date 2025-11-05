@@ -1717,62 +1717,73 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 	}
 }
 
-void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
+int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 {
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
 		LOG("Database not available, cannot update local path");
-		return;
+		return 0;
 	}
 	
 	// Get the original MYLISTADD command from packets table using the tag
-	QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = '%1'").arg(tag);
 	QSqlQuery query(db);
+	query.prepare("SELECT `str` FROM `packets` WHERE `tag` = ?");
+	query.addBindValue(tag);
 	
-	if(query.exec(q) && query.next())
+	if(query.exec() && query.next())
 	{
 		QString mylistAddCmd = query.value(0).toString();
 		
 		// Parse size and ed2k from the MYLISTADD command
 		QStringList params = mylistAddCmd.split("&");
-		QString size, ed2k;
+		QString sizeStr, ed2k;
 		
 		for(const QString& param : params)
 		{
 			if(param.contains("size="))
-				size = param.mid(param.indexOf("size=") + 5).split("&").first();
+				sizeStr = param.mid(param.indexOf("size=") + 5).split("&").first();
 			else if(param.contains("ed2k="))
 				ed2k = param.mid(param.indexOf("ed2k=") + 5).split("&").first();
 		}
 		
 		// Find the lid using the file info
-		q = QString("SELECT m.lid FROM mylist m "
-					"INNER JOIN file f ON m.fid = f.fid "
-					"WHERE f.size = '%1' AND f.ed2k = '%2'")
-			.arg(size).arg(ed2k);
-		QSqlQuery lidQuery(db);
-		
-		if(lidQuery.exec(q) && lidQuery.next())
+		// Convert size string to qint64 for proper type matching with database BIGINT column
+		bool sizeOk = false;
+		qint64 size = sizeStr.toLongLong(&sizeOk);
+		if(!sizeOk)
 		{
-			QString lid = lidQuery.value(0).toString();
+			LOG(QString("Error: Invalid size value in MYLISTADD command: %1").arg(sizeStr));
+			return 0;
+		}
+		
+		QSqlQuery lidQuery(db);
+		lidQuery.prepare("SELECT m.lid FROM mylist m "
+						 "INNER JOIN file f ON m.fid = f.fid "
+						 "WHERE f.size = ? AND f.ed2k = ?");
+		lidQuery.addBindValue(size);
+		lidQuery.addBindValue(ed2k);
+		
+		if(lidQuery.exec() && lidQuery.next())
+		{
+			int lid = lidQuery.value(0).toInt();
 			
 			// Get the local_file id from local_files table
-			q = QString("SELECT id FROM local_files WHERE path = '%1'")
-				.arg(QString(localPath).replace("'", "''"));
 			QSqlQuery localFileQuery(db);
+			localFileQuery.prepare("SELECT id FROM local_files WHERE path = ?");
+			localFileQuery.addBindValue(localPath);
 			
-			if(localFileQuery.exec(q) && localFileQuery.next())
+			if(localFileQuery.exec() && localFileQuery.next())
 			{
-				QString localFileId = localFileQuery.value(0).toString();
+				int localFileId = localFileQuery.value(0).toInt();
 				
 				// Update the local_file reference in mylist table
-				q = QString("UPDATE `mylist` SET `local_file` = %1 WHERE `lid` = %2")
-					.arg(localFileId)
-					.arg(lid);
 				QSqlQuery updateQuery(db);
+				updateQuery.prepare("UPDATE `mylist` SET `local_file` = ? WHERE `lid` = ?");
+				updateQuery.addBindValue(localFileId);
+				updateQuery.addBindValue(lid);
 				
-				if(updateQuery.exec(q))
+				if(updateQuery.exec())
 				{
 					LOG(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 					
@@ -1781,6 +1792,9 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 					statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
 					statusQuery.addBindValue(localFileId);
 					statusQuery.exec();
+					
+					// Return the lid for use by the caller
+					return lid;
 				}
 				else
 				{
@@ -1801,6 +1815,9 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 	{
 		LOG("Could not find packet for tag=" + tag);
 	}
+	
+	// Return 0 if we couldn't find or update the lid
+	return 0;
 }
 
 void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)

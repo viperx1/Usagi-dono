@@ -1045,10 +1045,13 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 
                 // Store local file path for already existing entry
                 QString localPath = hashes->item(i, 2)->text();
-                adbapi->UpdateLocalPath(tag, localPath);
+                int lid = adbapi->UpdateLocalPath(tag, localPath);
                 
-                // Refresh mylist widget to ensure it's up to date
-                loadMylistFromDatabase();
+                // Update only the specific mylist entry instead of reloading entire tree
+                if(lid > 0)
+                {
+                    updateOrAddMylistEntry(lid);
+                }
                 return;
             }
             if(code == 320)
@@ -1073,14 +1076,18 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 				
 				// Store local file path for newly added entry
 				QString localPath = hashes->item(i, 2)->text();
-				adbapi->UpdateLocalPath(tag, localPath);
+				int lid = adbapi->UpdateLocalPath(tag, localPath);
 				
 				if(renameto->checkState() > 0)
 				{
 					// TODO: rename
 				}
-				// Refresh mylist widget to show the newly added entry
-				loadMylistFromDatabase();
+				
+				// Update only the specific mylist entry instead of reloading entire tree
+				if(lid > 0)
+				{
+					updateOrAddMylistEntry(lid);
+				}
 				return;
 			}
 		}
@@ -1450,6 +1457,317 @@ void Window::updateEpisodeInTree(int eid, int aid)
 	
 	// If we get here, the episode item wasn't found in the tree
 	LOG(QString("Episode item not found in tree for EID %1 (AID %2)").arg(eid).arg(aid));
+}
+
+void Window::updateOrAddMylistEntry(int lid)
+{
+	// Update or add a single mylist entry without clearing the entire tree
+	// This preserves selection, sorting, focus, and expanded state
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	
+	// Validate database connection
+	if(!validateDatabaseConnection(db, "updateOrAddMylistEntry"))
+	{
+		return;
+	}
+	
+	// Query the database for this specific mylist entry
+	QSqlQuery q(db);
+	q.prepare("SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
+			  "a.nameromaji, a.nameenglish, a.eptotal, "
+			  "e.name as episode_name, e.epno, "
+			  "(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
+			  "a.eps, a.typename, a.startdate, a.enddate "
+			  "FROM mylist m "
+			  "LEFT JOIN anime a ON m.aid = a.aid "
+			  "LEFT JOIN episode e ON m.eid = e.eid "
+			  "WHERE m.lid = ?");
+	q.addBindValue(lid);
+	
+	if(!q.exec())
+	{
+		LOG(QString("Error querying mylist entry (lid=%1): %2").arg(lid).arg(q.lastError().text()));
+		return;
+	}
+	
+	if(!q.next())
+	{
+		LOG(QString("No mylist entry found for lid=%1").arg(lid));
+		return;
+	}
+	
+	// Extract data from query
+	int aid = q.value(1).toInt();
+	int eid = q.value(2).toInt();
+	int state = q.value(3).toInt();
+	int viewed = q.value(4).toInt();
+	QString storage = q.value(5).toString();
+	QString animeName = q.value(6).toString();
+	QString animeNameEnglish = q.value(7).toString();
+	int epTotal = q.value(8).toInt();
+	QString episodeName = q.value(9).toString();
+	QString epnoStr = q.value(10).toString();
+	QString animeTitle = q.value(11).toString();
+	int eps = q.value(12).toInt();
+	QString typeName = q.value(13).toString();
+	QString startDate = q.value(14).toString();
+	QString endDate = q.value(15).toString();
+	
+	// Determine anime name (same logic as loadMylistFromDatabase)
+	if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
+	{
+		animeName = animeNameEnglish;
+	}
+	if(animeName.isEmpty() && !animeTitle.isEmpty())
+	{
+		animeName = animeTitle;
+	}
+	if(animeName.isEmpty())
+	{
+		animeName = QString("Anime #%1").arg(aid);
+	}
+	
+	// Disable sorting temporarily to prevent issues during updates
+	bool sortingEnabled = mylistTreeWidget->isSortingEnabled();
+	int currentSortColumn = mylistTreeWidget->sortColumn();
+	Qt::SortOrder currentSortOrder = mylistTreeWidget->header()->sortIndicatorOrder();
+	mylistTreeWidget->setSortingEnabled(false);
+	
+	// Find or create the anime parent item
+	AnimeTreeWidgetItem *animeItem = nullptr;
+	int topLevelCount = mylistTreeWidget->topLevelItemCount();
+	for(int i = 0; i < topLevelCount; i++)
+	{
+		QTreeWidgetItem *item = mylistTreeWidget->topLevelItem(i);
+		if(item && item->data(0, Qt::UserRole).toInt() == aid)
+		{
+			// Use dynamic_cast for safe type checking
+			animeItem = dynamic_cast<AnimeTreeWidgetItem*>(item);
+			if(animeItem)
+			{
+				break;
+			}
+		}
+	}
+	
+	bool animeItemWasExpanded = false;
+	if(!animeItem)
+	{
+		// Create new anime item
+		animeItem = new AnimeTreeWidgetItem(mylistTreeWidget);
+		animeItem->setText(0, animeName);
+		animeItem->setData(0, Qt::UserRole, aid);
+		mylistTreeWidget->addTopLevelItem(animeItem);
+		
+		// Set Type and Aired for new anime items
+		if(!typeName.isEmpty())
+		{
+			animeItem->setText(7, typeName);
+		}
+		if(!startDate.isEmpty())
+		{
+			aired airedDates(startDate, endDate);
+			animeItem->setText(8, airedDates.toDisplayString());
+			animeItem->setAired(airedDates);
+		}
+	}
+	else
+	{
+		// Remember if anime was expanded
+		animeItemWasExpanded = animeItem->isExpanded();
+		
+		// Update Type and Aired if they're not already set
+		if(!typeName.isEmpty() && animeItem->text(7).isEmpty())
+		{
+			animeItem->setText(7, typeName);
+		}
+		if(!startDate.isEmpty() && animeItem->text(8).isEmpty())
+		{
+			aired airedDates(startDate, endDate);
+			animeItem->setText(8, airedDates.toDisplayString());
+			animeItem->setAired(airedDates);
+		}
+	}
+	
+	// Find or create the episode child item
+	EpisodeTreeWidgetItem *episodeItem = nullptr;
+	int childCount = animeItem->childCount();
+	for(int j = 0; j < childCount; j++)
+	{
+		QTreeWidgetItem *child = animeItem->child(j);
+		if(child && child->data(0, Qt::UserRole).toInt() == eid)
+		{
+			episodeItem = dynamic_cast<EpisodeTreeWidgetItem*>(child);
+			// If dynamic_cast returns nullptr, episodeItem will remain nullptr
+			// and a new item will be created below
+			if(episodeItem)
+			{
+				break;
+			}
+		}
+	}
+	
+	if(!episodeItem)
+	{
+		// Create new episode item (either not found or wrong type)
+		episodeItem = new EpisodeTreeWidgetItem(animeItem);
+		episodeItem->setText(0, ""); // Empty for episode child
+		episodeItem->setData(0, Qt::UserRole, eid);
+		episodeItem->setData(0, Qt::UserRole + 1, lid);
+	}
+	
+	// Update episode fields
+	// Column 1: Episode number
+	int episodeType = 1;  // Default to normal episode
+	if(!epnoStr.isEmpty())
+	{
+		::epno episodeNumber(epnoStr);
+		episodeItem->setEpno(episodeNumber);
+		episodeItem->setText(1, episodeNumber.toDisplayString());
+		episodeType = episodeNumber.type();
+	}
+	else
+	{
+		episodeItem->setText(1, "Loading...");
+		episodesNeedingData.insert(eid);
+	}
+	
+	// Column 2: Episode title
+	if(episodeName.isEmpty())
+	{
+		episodeName = "Loading...";
+		episodesNeedingData.insert(eid);
+	}
+	episodeItem->setText(2, episodeName);
+	
+	// Column 3: State
+	QString stateStr;
+	switch(state)
+	{
+		case 0: stateStr = "Unknown"; break;
+		case 1: stateStr = "HDD"; break;
+		case 2: stateStr = "CD/DVD"; break;
+		case 3: stateStr = "Deleted"; break;
+		default: stateStr = QString::number(state); break;
+	}
+	episodeItem->setText(3, stateStr);
+	
+	// Column 4: Viewed
+	episodeItem->setText(4, viewed ? "Yes" : "No");
+	
+	// Column 5: Storage
+	episodeItem->setText(5, storage);
+	
+	// Column 6: Mylist ID
+	episodeItem->setText(6, QString::number(lid));
+	
+	// Now recalculate anime parent statistics
+	// Count all episodes for this anime
+	int animeEpisodeCount = 0;
+	int animeViewedCount = 0;
+	int normalEpisodes = 0;
+	int otherEpisodes = 0;
+	int normalViewed = 0;
+	int otherViewed = 0;
+	
+	childCount = animeItem->childCount();
+	for(int j = 0; j < childCount; j++)
+	{
+		EpisodeTreeWidgetItem *child = dynamic_cast<EpisodeTreeWidgetItem*>(animeItem->child(j));
+		if(!child)
+		{
+			continue;
+		}
+		
+		int childEpisodeType = 1;
+		::epno childEpno = child->getEpno();
+		if(childEpno.isValid())
+		{
+			childEpisodeType = childEpno.type();
+		}
+		
+		bool childViewed = (child->text(4) == "Yes");
+		
+		animeEpisodeCount++;
+		if(childEpisodeType == 1)
+		{
+			normalEpisodes++;
+			if(childViewed)
+			{
+				normalViewed++;
+			}
+		}
+		else
+		{
+			otherEpisodes++;
+			if(childViewed)
+			{
+				otherViewed++;
+			}
+		}
+		
+		if(childViewed)
+		{
+			animeViewedCount++;
+		}
+	}
+	
+	// Update anime parent statistics (columns 1 and 4)
+	
+	// Column 1 (Episode): show format "A/B+C"
+	QString episodeText;
+	if(eps > 0)
+	{
+		if(otherEpisodes > 0)
+		{
+			episodeText = QString("%1/%2+%3").arg(normalEpisodes).arg(eps).arg(otherEpisodes);
+		}
+		else
+		{
+			episodeText = QString("%1/%2").arg(normalEpisodes).arg(eps);
+		}
+	}
+	else
+	{
+		if(otherEpisodes > 0)
+		{
+			episodeText = QString("%1/?+%2").arg(normalEpisodes).arg(otherEpisodes);
+		}
+		else
+		{
+			episodeText = QString("%1/?").arg(normalEpisodes);
+		}
+	}
+	animeItem->setText(1, episodeText);
+	
+	// Column 4 (Viewed): show format "A/B+C"
+	QString viewedText;
+	if(otherEpisodes > 0)
+	{
+		viewedText = QString("%1/%2+%3").arg(normalViewed).arg(normalEpisodes).arg(otherViewed);
+	}
+	else
+	{
+		viewedText = QString("%1/%2").arg(normalViewed).arg(normalEpisodes);
+	}
+	animeItem->setText(4, viewedText);
+	
+	// Restore expanded state
+	if(animeItemWasExpanded)
+	{
+		animeItem->setExpanded(true);
+	}
+	
+	// Re-enable sorting with the previous sort order
+	if(sortingEnabled)
+	{
+		mylistTreeWidget->setSortingEnabled(true);
+		mylistTreeWidget->sortByColumn(currentSortColumn, currentSortOrder);
+	}
+	
+	LOG(QString("Updated mylist entry: lid=%1, aid=%2, eid=%3, anime=%4, episode=%5")
+		.arg(lid).arg(aid).arg(eid).arg(animeName).arg(episodeItem->text(1)));
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash)

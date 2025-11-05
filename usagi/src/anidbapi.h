@@ -212,7 +212,7 @@ public:
 	std::bitset<2> LocalIdentify(int size, QString ed2khash);
 	QMap<QString, std::bitset<2>> batchLocalIdentify(const QList<QPair<qint64, QString>>& sizeHashPairs);
 	void UpdateFile(int size, QString ed2khash, int viewed, int state, QString storage);
-	void UpdateLocalPath(QString tag, QString localPath);
+	int UpdateLocalPath(QString tag, QString localPath);
 	void UpdateLocalFileStatus(QString localPath, int status);
 	void updateLocalFileHash(QString localPath, QString ed2kHash, int status);
 	void batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& pathHashPairs, int status);
