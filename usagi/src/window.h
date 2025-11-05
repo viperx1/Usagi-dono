@@ -118,7 +118,6 @@ private:
     QElapsedTimer waitforlogout;
     QElapsedTimer hashingTimer;
     QElapsedTimer lastEtaUpdate;
-    QElapsedTimer lastUiUpdate; // For throttling UI updates in getNotifyPartsDone
     int totalHashParts;
     int completedHashParts;
     

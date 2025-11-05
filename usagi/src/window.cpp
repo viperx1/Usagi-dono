@@ -468,7 +468,6 @@ void Window::setupHashingProgress(const QStringList &files)
 	progressTotalLabel->setText("0%");
 	hashingTimer.start();
 	lastEtaUpdate.start();
-	lastUiUpdate.start(); // Initialize UI update throttling timer
 }
 
 QStringList Window::getFilesNeedingHash()
@@ -679,50 +678,40 @@ void Window::getNotifyPartsDone(int total, int done)
 {
 	completedHashParts++;
 	
-	// Throttle UI updates to prevent freezing - update at most every 100ms
-	// This dramatically reduces the number of UI updates from thousands to ~10 per second
-	// Always update on the last part to ensure progress bars reach 100%
-	bool isLastPart = (done == total && completedHashParts == totalHashParts);
-	bool shouldUpdate = (lastUiUpdate.elapsed() >= 100) || isLastPart;
+	progressFile->setMaximum(total);
+	progressFile->setValue(done);
+	progressTotal->setValue(completedHashParts);
 	
-	if (shouldUpdate) {
-		progressFile->setMaximum(total);
-		progressFile->setValue(done);
-		progressTotal->setValue(completedHashParts);
+	// Update percentage label
+	int percentage = totalHashParts > 0 ? (completedHashParts * 100 / totalHashParts) : 0;
+	progressTotalLabel->setText(QString("%1%").arg(percentage));
+	
+	// Calculate and display ETA - throttled to once per second to prevent UI freeze
+	if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
+		qint64 elapsedMs = hashingTimer.elapsed();
+		double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
+		int remainingParts = totalHashParts - completedHashParts;
 		
-		// Update percentage label
-		int percentage = totalHashParts > 0 ? (completedHashParts * 100 / totalHashParts) : 0;
-		progressTotalLabel->setText(QString("%1%").arg(percentage));
-		
-		// Calculate and display ETA - throttled to once per second to prevent UI freeze
-		if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
-			qint64 elapsedMs = hashingTimer.elapsed();
-			double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
-			int remainingParts = totalHashParts - completedHashParts;
+		if (remainingParts > 0 && partsPerMs > 0) {
+			qint64 etaMs = static_cast<qint64>(remainingParts / partsPerMs);
+			int etaSec = etaMs / 1000;
+			int etaMin = etaSec / 60;
+			int etaHour = etaMin / 60;
 			
-			if (remainingParts > 0 && partsPerMs > 0) {
-				qint64 etaMs = static_cast<qint64>(remainingParts / partsPerMs);
-				int etaSec = etaMs / 1000;
-				int etaMin = etaSec / 60;
-				int etaHour = etaMin / 60;
-				
-				QString etaStr;
-				if (etaHour > 0) {
-					etaStr = QString("%1h %2m").arg(etaHour).arg(etaMin % 60);
-				} else if (etaMin > 0) {
-					etaStr = QString("%1m %2s").arg(etaMin).arg(etaSec % 60);
-				} else {
-					etaStr = QString("%1s").arg(etaSec);
-				}
-				
-				progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
+			QString etaStr;
+			if (etaHour > 0) {
+				etaStr = QString("%1h %2m").arg(etaHour).arg(etaMin % 60);
+			} else if (etaMin > 0) {
+				etaStr = QString("%1m %2s").arg(etaMin).arg(etaSec % 60);
 			} else {
-				progressTotal->setFormat("ETA: calculating...");
+				etaStr = QString("%1s").arg(etaSec);
 			}
-			lastEtaUpdate.restart();
+			
+			progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
+		} else {
+			progressTotal->setFormat("ETA: calculating...");
 		}
-		
-		lastUiUpdate.restart();
+		lastEtaUpdate.restart();
 	}
 }
 
