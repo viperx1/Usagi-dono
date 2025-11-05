@@ -1727,10 +1727,11 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 	}
 	
 	// Get the original MYLISTADD command from packets table using the tag
-	QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = '%1'").arg(tag);
 	QSqlQuery query(db);
+	query.prepare("SELECT `str` FROM `packets` WHERE `tag` = ?");
+	query.addBindValue(tag);
 	
-	if(query.exec(q) && query.next())
+	if(query.exec() && query.next())
 	{
 		QString mylistAddCmd = query.value(0).toString();
 		
@@ -1747,32 +1748,33 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 		}
 		
 		// Find the lid using the file info
-		q = QString("SELECT m.lid FROM mylist m "
-					"INNER JOIN file f ON m.fid = f.fid "
-					"WHERE f.size = '%1' AND f.ed2k = '%2'")
-			.arg(size).arg(ed2k);
 		QSqlQuery lidQuery(db);
+		lidQuery.prepare("SELECT m.lid FROM mylist m "
+						 "INNER JOIN file f ON m.fid = f.fid "
+						 "WHERE f.size = ? AND f.ed2k = ?");
+		lidQuery.addBindValue(size);
+		lidQuery.addBindValue(ed2k);
 		
-		if(lidQuery.exec(q) && lidQuery.next())
+		if(lidQuery.exec() && lidQuery.next())
 		{
 			int lid = lidQuery.value(0).toInt();
 			
 			// Get the local_file id from local_files table
-			q = QString("SELECT id FROM local_files WHERE path = '%1'")
-				.arg(QString(localPath).replace("'", "''"));
 			QSqlQuery localFileQuery(db);
+			localFileQuery.prepare("SELECT id FROM local_files WHERE path = ?");
+			localFileQuery.addBindValue(localPath);
 			
-			if(localFileQuery.exec(q) && localFileQuery.next())
+			if(localFileQuery.exec() && localFileQuery.next())
 			{
-				QString localFileId = localFileQuery.value(0).toString();
+				int localFileId = localFileQuery.value(0).toInt();
 				
 				// Update the local_file reference in mylist table
-				q = QString("UPDATE `mylist` SET `local_file` = %1 WHERE `lid` = %2")
-					.arg(localFileId)
-					.arg(lid);
 				QSqlQuery updateQuery(db);
+				updateQuery.prepare("UPDATE `mylist` SET `local_file` = ? WHERE `lid` = ?");
+				updateQuery.addBindValue(localFileId);
+				updateQuery.addBindValue(lid);
 				
-				if(updateQuery.exec(q))
+				if(updateQuery.exec())
 				{
 					LOG(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 					

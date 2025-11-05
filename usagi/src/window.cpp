@@ -1472,19 +1472,19 @@ void Window::updateOrAddMylistEntry(int lid)
 	}
 	
 	// Query the database for this specific mylist entry
-	QString query = QString("SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
-					"a.nameromaji, a.nameenglish, a.eptotal, "
-					"e.name as episode_name, e.epno, "
-					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
-					"a.eps, a.typename, a.startdate, a.enddate "
-					"FROM mylist m "
-					"LEFT JOIN anime a ON m.aid = a.aid "
-					"LEFT JOIN episode e ON m.eid = e.eid "
-					"WHERE m.lid = %1").arg(lid);
-	
 	QSqlQuery q(db);
+	q.prepare("SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
+			  "a.nameromaji, a.nameenglish, a.eptotal, "
+			  "e.name as episode_name, e.epno, "
+			  "(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
+			  "a.eps, a.typename, a.startdate, a.enddate "
+			  "FROM mylist m "
+			  "LEFT JOIN anime a ON m.aid = a.aid "
+			  "LEFT JOIN episode e ON m.eid = e.eid "
+			  "WHERE m.lid = ?");
+	q.addBindValue(lid);
 	
-	if(!q.exec(query))
+	if(!q.exec())
 	{
 		LOG(QString("Error querying mylist entry (lid=%1): %2").arg(lid).arg(q.lastError().text()));
 		return;
@@ -1654,12 +1654,12 @@ void Window::updateOrAddMylistEntry(int lid)
 	
 	// Now recalculate anime parent statistics
 	// Count all episodes for this anime
-	QMap<int, int> animeEpisodeCount;
-	QMap<int, int> animeViewedCount;
-	QMap<int, int> animeNormalEpisodeCount;
-	QMap<int, int> animeOtherEpisodeCount;
-	QMap<int, int> animeNormalViewedCount;
-	QMap<int, int> animeOtherViewedCount;
+	int animeEpisodeCount = 0;
+	int animeViewedCount = 0;
+	int normalEpisodes = 0;
+	int otherEpisodes = 0;
+	int normalViewed = 0;
+	int otherViewed = 0;
 	
 	childCount = animeItem->childCount();
 	for(int j = 0; j < childCount; j++)
@@ -1677,35 +1677,31 @@ void Window::updateOrAddMylistEntry(int lid)
 		
 		bool childViewed = (child->text(4) == "Yes");
 		
-		animeEpisodeCount[aid]++;
+		animeEpisodeCount++;
 		if(childEpisodeType == 1)
 		{
-			animeNormalEpisodeCount[aid]++;
+			normalEpisodes++;
 			if(childViewed)
 			{
-				animeNormalViewedCount[aid]++;
+				normalViewed++;
 			}
 		}
 		else
 		{
-			animeOtherEpisodeCount[aid]++;
+			otherEpisodes++;
 			if(childViewed)
 			{
-				animeOtherViewedCount[aid]++;
+				otherViewed++;
 			}
 		}
 		
 		if(childViewed)
 		{
-			animeViewedCount[aid]++;
+			animeViewedCount++;
 		}
 	}
 	
 	// Update anime parent statistics (columns 1 and 4)
-	int normalEpisodes = animeNormalEpisodeCount[aid];
-	int otherEpisodes = animeOtherEpisodeCount[aid];
-	int normalViewed = animeNormalViewedCount[aid];
-	int otherViewed = animeOtherViewedCount[aid];
 	
 	// Column 1 (Episode): show format "A/B+C"
 	QString episodeText;
