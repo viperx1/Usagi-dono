@@ -264,6 +264,7 @@ public slots:
     void safeClose();
     void loadMylistFromDatabase();
     void updateEpisodeInTree(int eid, int aid);
+    void updateOrAddMylistEntry(int lid);
     void startupInitialization();
     bool isMylistFirstRunComplete();
     void setMylistFirstRunComplete();

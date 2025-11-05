@@ -1717,13 +1717,13 @@ void AniDBApi::UpdateFile(int size, QString ed2khash, int viewed, int state, QSt
 	}
 }
 
-void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
+int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 {
 	// Check if database is valid and open before using it
 	if (!db.isValid() || !db.isOpen())
 	{
 		LOG("Database not available, cannot update local path");
-		return;
+		return 0;
 	}
 	
 	// Get the original MYLISTADD command from packets table using the tag
@@ -1755,7 +1755,7 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 		
 		if(lidQuery.exec(q) && lidQuery.next())
 		{
-			QString lid = lidQuery.value(0).toString();
+			int lid = lidQuery.value(0).toInt();
 			
 			// Get the local_file id from local_files table
 			q = QString("SELECT id FROM local_files WHERE path = '%1'")
@@ -1781,6 +1781,9 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 					statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
 					statusQuery.addBindValue(localFileId);
 					statusQuery.exec();
+					
+					// Return the lid for use by the caller
+					return lid;
 				}
 				else
 				{
@@ -1801,6 +1804,9 @@ void AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 	{
 		LOG("Could not find packet for tag=" + tag);
 	}
+	
+	// Return 0 if we couldn't find or update the lid
+	return 0;
 }
 
 void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
