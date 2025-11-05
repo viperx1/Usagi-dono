@@ -1997,77 +1997,8 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 		return hash;
 	}
 	
-	// No hash found for exact path - try to find hash from duplicate file (same filename and size)
+	// No hash found for this file
 	LOG(QString("No existing hash found for path=%1").arg(localPath));
-	
-	// Get file info for the current file
-	QFileInfo fileInfo(localPath);
-	if(!fileInfo.exists())
-	{
-		LOG(QString("File does not exist: %1").arg(localPath));
-		return QString();
-	}
-	
-	QString filename = fileInfo.fileName();
-	qint64 fileSize = fileInfo.size();
-	
-	// Search for another file with same filename that has a hash
-	// We'll verify the size matches via filesystem check to ensure data integrity
-	// Use ORDER BY to ensure consistent duplicate selection
-	QSqlQuery duplicateQuery(threadDb);
-	duplicateQuery.prepare("SELECT `path`, `ed2k_hash` FROM `local_files` WHERE `filename` = ? AND `path` != ? AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != '' ORDER BY `path` ASC LIMIT 1");
-	duplicateQuery.addBindValue(filename);
-	duplicateQuery.addBindValue(localPath); // Exclude current file
-	
-	if(!duplicateQuery.exec())
-	{
-		LOG(QString("Failed to query for duplicate files: %1").arg(duplicateQuery.lastError().text()));
-		return QString();
-	}
-	
-	if(duplicateQuery.next())
-	{
-		QString duplicatePath = duplicateQuery.value(0).toString();
-		QString duplicateHash = duplicateQuery.value(1).toString();
-		
-		// Verify the duplicate file still exists and has the same size
-		QFileInfo duplicateFileInfo(duplicatePath);
-		if(duplicateFileInfo.exists() && duplicateFileInfo.size() == fileSize)
-		{
-			LOG(QString("Found duplicate file with hash: %1 (size=%2)").arg(duplicatePath).arg(fileSize));
-			
-			// Copy the hash to the current file's record
-			QSqlQuery updateQuery(threadDb);
-			updateQuery.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `status` = 1 WHERE `path` = ?");
-			updateQuery.addBindValue(duplicateHash);
-			updateQuery.addBindValue(localPath);
-			
-			if(updateQuery.exec())
-			{
-				LOG(QString("Copied hash from duplicate file to path=%1").arg(localPath));
-				return duplicateHash;
-			}
-			else
-			{
-				LOG(QString("Failed to update hash for path=%1: %2").arg(localPath).arg(updateQuery.lastError().text()));
-			}
-		}
-		else
-		{
-			LOG(QString("Duplicate file size mismatch or file no longer exists: %1").arg(duplicatePath));
-		}
-	}
-	
-	// Additional debugging: check if the path exists in the table at all
-	QSqlQuery debugQuery(threadDb);
-	debugQuery.prepare("SELECT COUNT(*) FROM `local_files` WHERE `path` = ?");
-	debugQuery.addBindValue(localPath);
-	if(debugQuery.exec() && debugQuery.next())
-	{
-		int count = debugQuery.value(0).toInt();
-		LOG(QString("Debug: Found %1 row(s) with path=%2 (hash may be NULL or empty)").arg(count).arg(localPath));
-	}
-	
 	return QString();
 }
 

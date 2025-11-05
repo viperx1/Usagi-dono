@@ -84,13 +84,15 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
     QVERIFY(verifyQuery1.value(0).isNull() || verifyQuery1.value(0).toString().isEmpty());
     verifyQuery1.finish(); // Release the query resources to avoid database locks
     
-    // Call getLocalFileHash for the second file (should find and copy hash from first file)
+    // Call getLocalFileHash for the second file
+    // After removing duplicate file handling, this should return empty string
+    // since the file itself doesn't have a hash
     QString retrievedHash = api.getLocalFileHash(filePath2);
     
-    // Verify the hash was copied from the first file
-    QCOMPARE(retrievedHash, QString("abcdef1234567890abcdef1234567890"));
+    // Verify no hash was returned (duplicate reuse feature removed)
+    QVERIFY(retrievedHash.isEmpty());
     
-    // Verify the hash was actually stored in the database for the second file
+    // Verify the hash was NOT stored in the database for the second file
     QSqlQuery verifyQuery2(db);
     verifyQuery2.prepare("SELECT ed2k_hash, status FROM local_files WHERE path = ?");
     verifyQuery2.addBindValue(filePath2);
@@ -100,8 +102,9 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
     QString storedHash = verifyQuery2.value(0).toString();
     int status = verifyQuery2.value(1).toInt();
     
-    QCOMPARE(storedHash, QString("abcdef1234567890abcdef1234567890"));
-    QCOMPARE(status, 1); // Status should be updated to 1 (hashed)
+    // Hash should still be empty (no duplicate reuse)
+    QVERIFY(storedHash.isEmpty());
+    QCOMPARE(status, 0); // Status should remain 0 (not hashed)
 }
 
 void TestHashDuplicateReuse::testDuplicateFileWithDifferentSizeNoReuse()
@@ -162,10 +165,11 @@ void TestHashDuplicateReuse::testDuplicateFileWithDifferentSizeNoReuse()
     QVERIFY(query.exec());
     query.finish(); // Release query resources
     
-    // Call getLocalFileHash for the second file (should NOT copy hash due to size mismatch)
+    // Call getLocalFileHash for the second file
+    // After removing duplicate file handling, this should return empty string
     QString retrievedHash = api.getLocalFileHash(filePath2);
     
-    // Verify no hash was returned (size mismatch prevents reuse)
+    // Verify no hash was returned (duplicate reuse feature removed)
     QVERIFY(retrievedHash.isEmpty());
     
     // Verify the hash was NOT stored in the database for the second file

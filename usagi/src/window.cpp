@@ -720,15 +720,24 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 {
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
-		if(hashes->item(i, 0)->text() == data.filename)
+		// Match by filename AND verify it's the file being hashed (progress="0" and either no hash or matching size)
+		// This prevents matching wrong file when there are multiple files with the same name
+		QString progress = hashes->item(i, 1)->text();
+		if(hashes->item(i, 0)->text() == data.filename && progress == "0")
 		{
+			// Additional check: verify file size matches to ensure we have the right file
+			QString filePath = hashes->item(i, 2)->text();
+			QFileInfo fileInfo(filePath);
+			if(!fileInfo.exists() || fileInfo.size() != data.size)
+			{
+				// Size mismatch or file doesn't exist - this is not the right file, continue searching
+				continue;
+			}
             // Mark as hashed in UI (use pre-allocated color object)
             hashes->item(i, 0)->setBackground(m_hashedFileColor);
 			QTableWidgetItem *itemprogress = new QTableWidgetItem(QTableWidgetItem(QString("1")));
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
-			
-			QString filePath = hashes->item(i, 2)->text();
 			
 			// Update the hash column (column 9) in the UI to reflect the newly computed hash
 			if (QTableWidgetItem* hashItem = hashes->item(i, 9))
