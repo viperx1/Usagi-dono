@@ -1591,16 +1591,21 @@ void Window::updateOrAddMylistEntry(int lid)
 	for(int j = 0; j < childCount; j++)
 	{
 		QTreeWidgetItem *child = animeItem->child(j);
-		if(child->data(0, Qt::UserRole).toInt() == eid)
+		if(child && child->data(0, Qt::UserRole).toInt() == eid)
 		{
 			episodeItem = dynamic_cast<EpisodeTreeWidgetItem*>(child);
-			break;
+			// If dynamic_cast returns nullptr, episodeItem will remain nullptr
+			// and a new item will be created below
+			if(episodeItem)
+			{
+				break;
+			}
 		}
 	}
 	
 	if(!episodeItem)
 	{
-		// Create new episode item
+		// Create new episode item (either not found or wrong type)
 		episodeItem = new EpisodeTreeWidgetItem(animeItem);
 		episodeItem->setText(0, ""); // Empty for episode child
 		episodeItem->setData(0, Qt::UserRole, eid);

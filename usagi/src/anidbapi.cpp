@@ -1748,6 +1748,8 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 		}
 		
 		// Find the lid using the file info
+		// Note: size is a string here, but SQLite will automatically convert it
+		// to BIGINT for comparison with the f.size column (which is BIGINT)
 		QSqlQuery lidQuery(db);
 		lidQuery.prepare("SELECT m.lid FROM mylist m "
 						 "INNER JOIN file f ON m.fid = f.fid "
