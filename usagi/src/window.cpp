@@ -735,7 +735,7 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 			}
             // Mark as hashed in UI (use pre-allocated color object)
             hashes->item(i, 0)->setBackground(m_hashedFileColor);
-			QTableWidgetItem *itemprogress = new QTableWidgetItem(QTableWidgetItem(QString("1")));
+			QTableWidgetItem *itemprogress = new QTableWidgetItem(QString("1"));
 		    hashes->setItem(i, 1, itemprogress);
 		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
 			
