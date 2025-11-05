@@ -1539,10 +1539,14 @@ void Window::updateOrAddMylistEntry(int lid)
 	for(int i = 0; i < topLevelCount; i++)
 	{
 		QTreeWidgetItem *item = mylistTreeWidget->topLevelItem(i);
-		if(item->data(0, Qt::UserRole).toInt() == aid)
+		if(item && item->data(0, Qt::UserRole).toInt() == aid)
 		{
-			animeItem = static_cast<AnimeTreeWidgetItem*>(item);
-			break;
+			// Use dynamic_cast for safe type checking
+			animeItem = dynamic_cast<AnimeTreeWidgetItem*>(item);
+			if(animeItem)
+			{
+				break;
+			}
 		}
 	}
 	
@@ -1671,7 +1675,9 @@ void Window::updateOrAddMylistEntry(int lid)
 	{
 		EpisodeTreeWidgetItem *child = dynamic_cast<EpisodeTreeWidgetItem*>(animeItem->child(j));
 		if(!child)
+		{
 			continue;
+		}
 		
 		int childEpisodeType = 1;
 		::epno childEpno = child->getEpno();

@@ -1737,19 +1737,26 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 		
 		// Parse size and ed2k from the MYLISTADD command
 		QStringList params = mylistAddCmd.split("&");
-		QString size, ed2k;
+		QString sizeStr, ed2k;
 		
 		for(const QString& param : params)
 		{
 			if(param.contains("size="))
-				size = param.mid(param.indexOf("size=") + 5).split("&").first();
+				sizeStr = param.mid(param.indexOf("size=") + 5).split("&").first();
 			else if(param.contains("ed2k="))
 				ed2k = param.mid(param.indexOf("ed2k=") + 5).split("&").first();
 		}
 		
 		// Find the lid using the file info
-		// Note: size is a string here, but SQLite will automatically convert it
-		// to BIGINT for comparison with the f.size column (which is BIGINT)
+		// Convert size string to qint64 for proper type matching with database BIGINT column
+		bool sizeOk = false;
+		qint64 size = sizeStr.toLongLong(&sizeOk);
+		if(!sizeOk)
+		{
+			LOG(QString("Error: Invalid size value in MYLISTADD command: %1").arg(sizeStr));
+			return 0;
+		}
+		
 		QSqlQuery lidQuery(db);
 		lidQuery.prepare("SELECT m.lid FROM mylist m "
 						 "INNER JOIN file f ON m.fid = f.fid "
