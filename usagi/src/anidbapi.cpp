@@ -1393,7 +1393,11 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	{
 		a = QString("%1&s=%2").arg(str).arg(SID);
 	}
-	LOG("AniDBApi: Send: " + (a.length() > 0 ? a : a = str));
+	else
+	{
+		a = str;
+	}
+	LOG("AniDBApi: Send: " + a);
 
 	a = QString("%1&tag=%2").arg(a).arg(tag);
     Logger::log("[AniDB Send] Command: " + a, __FILE__, __LINE__);
