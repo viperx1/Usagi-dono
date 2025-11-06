@@ -244,22 +244,27 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
     LOG(QString("DirectoryWatcher: Detected %1 new file(s)").arg(newFiles.size()));
     
     // Mark files as processed
+    LOG("DirectoryWatcher: Starting to add files to m_processedFiles set");
     {
         QMutexLocker locker(&m_mutex);
         for (const QString &filePath : newFiles) {
             m_processedFiles.insert(filePath);
         }
     }
+    LOG("DirectoryWatcher: Finished adding files to m_processedFiles set");
     
     // Save to database if available
     QSqlDatabase db = QSqlDatabase::database();
     if (db.isValid() && db.isOpen()) {
+        LOG(QString("DirectoryWatcher: Starting to save %1 files to database").arg(newFiles.size()));
         for (const QString &filePath : newFiles) {
             saveProcessedFile(filePath);
         }
+        LOG("DirectoryWatcher: Finished saving files to database");
     }
     
     // Emit batch signal with all new files
+    LOG(QString("DirectoryWatcher: Emitting newFilesDetected signal with %1 files").arg(newFiles.size()));
     emit newFilesDetected(newFiles);
 }
 
