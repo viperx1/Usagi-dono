@@ -257,9 +257,21 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
     QSqlDatabase db = QSqlDatabase::database();
     if (db.isValid() && db.isOpen()) {
         LOG(QString("DirectoryWatcher: Starting to save %1 files to database").arg(newFiles.size()));
+        
+        // Use transaction for batch insert - much faster than individual commits
+        if (!db.transaction()) {
+            LOG("DirectoryWatcher: Failed to start transaction: " + db.lastError().text());
+        }
+        
         for (const QString &filePath : newFiles) {
             saveProcessedFile(filePath);
         }
+        
+        if (!db.commit()) {
+            LOG("DirectoryWatcher: Failed to commit transaction: " + db.lastError().text());
+            db.rollback();
+        }
+        
         LOG("DirectoryWatcher: Finished saving files to database");
     }
     
