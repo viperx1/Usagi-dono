@@ -2067,28 +2067,8 @@ void Window::loadMylistFromDatabase()
 		QString fileTypeDisplay = filetype.isEmpty() ? "video" : filetype;
 		fileItem->setText(2, fileTypeDisplay);
 		
-		// Determine file type for color coding
-		FileTreeWidgetItem::FileType type = FileTreeWidgetItem::Video;
-		if(filetype.contains("sub", Qt::CaseInsensitive) || filetype.contains("srt", Qt::CaseInsensitive) || 
-		   filetype.contains("ass", Qt::CaseInsensitive) || filetype.contains("ssa", Qt::CaseInsensitive))
-		{
-			type = FileTreeWidgetItem::Subtitle;
-		}
-		else if(filetype.contains("audio", Qt::CaseInsensitive) || filetype.contains("mp3", Qt::CaseInsensitive) || 
-		        filetype.contains("flac", Qt::CaseInsensitive) || filetype.contains("aac", Qt::CaseInsensitive))
-		{
-			type = FileTreeWidgetItem::Audio;
-		}
-		else if(filetype.contains("video", Qt::CaseInsensitive) || filetype.contains("mkv", Qt::CaseInsensitive) || 
-		        filetype.contains("mp4", Qt::CaseInsensitive) || filetype.contains("avi", Qt::CaseInsensitive) ||
-		        filetype.isEmpty())
-		{
-			type = FileTreeWidgetItem::Video;
-		}
-		else
-		{
-			type = FileTreeWidgetItem::Other;
-		}
+		// Determine file type for color coding using helper method
+		FileTreeWidgetItem::FileType type = determineFileType(filetype);
 		fileItem->setFileType(type);
 		fileItem->setResolution(resolution);
 		fileItem->setQuality(quality);
@@ -2138,38 +2118,54 @@ void Window::loadMylistFromDatabase()
 		fileItem->setData(0, Qt::UserRole, fid);
 		fileItem->setData(0, Qt::UserRole + 1, lid);
 		
-		// Update episode viewed count if this file is viewed and we haven't counted this episode yet
-		if(viewed)
+		totalFiles++;
+	}
+	
+	// Second pass: Calculate viewed counts per episode (more efficient than checking siblings for each file)
+	QSet<QPair<int, int>> viewedEpisodes; // Track which episodes have at least one viewed file
+	for(QMap<QPair<int, int>, QTreeWidgetItem*>::iterator it = episodeItems.begin(); it != episodeItems.end(); ++it)
+	{
+		QPair<int, int> episodeKey = it.key();
+		int aid = episodeKey.first;
+		int eid = episodeKey.second;
+		EpisodeTreeWidgetItem *episodeItem = static_cast<EpisodeTreeWidgetItem*>(it.value());
+		
+		if(!episodeItem)
+			continue;
+		
+		// Check if any file for this episode is viewed
+		bool episodeViewed = false;
+		for(int i = 0; i < episodeItem->childCount(); i++)
 		{
-			QPair<int, int> epKey(aid, eid);
-			// Check if this is the first viewed file for this episode
-			bool alreadyCountedViewed = false;
-			for(int i = 0; i < episodeItem->childCount(); i++)
+			QTreeWidgetItem *fileItem = episodeItem->child(i);
+			if(fileItem && fileItem->text(4) == "Yes")
 			{
-				FileTreeWidgetItem *sibling = dynamic_cast<FileTreeWidgetItem*>(episodeItem->child(i));
-				if(sibling && sibling != fileItem && sibling->text(4) == "Yes")
-				{
-					alreadyCountedViewed = true;
-					break;
-				}
-			}
-			
-			if(!alreadyCountedViewed)
-			{
-				animeViewedCount[aid]++;
-				int episodeType = episodeItem->getEpno().isValid() ? episodeItem->getEpno().type() : 1;
-				if(episodeType == 1)
-				{
-					animeNormalViewedCount[aid]++;
-				}
-				else
-				{
-					animeOtherViewedCount[aid]++;
-				}
+				episodeViewed = true;
+				break;
 			}
 		}
 		
-		totalFiles++;
+		if(episodeViewed && !viewedEpisodes.contains(episodeKey))
+		{
+			viewedEpisodes.insert(episodeKey);
+			animeViewedCount[aid]++;
+			
+			// Get episode type safely
+			int episodeType = 1; // Default to normal
+			if(episodeItem->getEpno().isValid())
+			{
+				episodeType = episodeItem->getEpno().type();
+			}
+			
+			if(episodeType == 1)
+			{
+				animeNormalViewedCount[aid]++;
+			}
+			else
+			{
+				animeOtherViewedCount[aid]++;
+			}
+		}
 	}
 	
 	// Update anime rows with aggregate statistics
@@ -2715,8 +2711,13 @@ FileTreeWidgetItem* Window::selectPreferredFile(const QList<FileTreeWidgetItem*>
 		return files.first();
 	}
 	
-	// TODO: Implement preference-based selection logic
-	// For now, return the first video file, or first file if no video
+	// TODO: Implement full preference-based selection logic:
+	// 1. Filter by FilePreference::preferredResolution (exact match or closest)
+	// 2. Filter by FilePreference::preferredGroup (case-insensitive substring match)
+	// 3. Apply FilePreference::preferHigherQuality to select highest/lowest quality
+	// 4. Consider file state (prefer HDD over CD/DVD, avoid Deleted)
+	// 5. Rank by multiple criteria with weighted scoring system
+	// For now, return the first video file with basic preference matching
 	
 	FileTreeWidgetItem* bestFile = nullptr;
 	
@@ -2725,8 +2726,7 @@ FileTreeWidgetItem* Window::selectPreferredFile(const QList<FileTreeWidgetItem*>
 	{
 		if(file->getFileType() == FileTreeWidgetItem::Video)
 		{
-			// TODO: Apply preferences (resolution, quality, group)
-			// For now, just take the first video file
+			// Basic preference matching (stub implementation)
 			if(!bestFile)
 			{
 				bestFile = file;
@@ -2757,4 +2757,62 @@ FileTreeWidgetItem* Window::selectPreferredFile(const QList<FileTreeWidgetItem*>
 	}
 	
 	return bestFile;
+}
+
+// Helper method to determine file type from filetype string
+// Uses pattern matching to classify files into Video, Subtitle, Audio, or Other
+FileTreeWidgetItem::FileType Window::determineFileType(const QString& filetype)
+{
+	// Common subtitle file extensions and patterns
+	static const QStringList subtitlePatterns = {
+		"sub", "srt", "ass", "ssa", "vtt", "idx", "smi", "sup"
+	};
+	
+	// Common audio file extensions and patterns
+	static const QStringList audioPatterns = {
+		"audio", "mp3", "flac", "aac", "ogg", "wav", "m4a", "wma", "opus"
+	};
+	
+	// Common video file extensions and patterns
+	static const QStringList videoPatterns = {
+		"video", "mkv", "mp4", "avi", "mov", "wmv", "flv", "webm", "m4v", "mpg", "mpeg"
+	};
+	
+	QString lowerFiletype = filetype.toLower();
+	
+	// Check subtitle patterns
+	for(const QString& pattern : subtitlePatterns)
+	{
+		if(lowerFiletype.contains(pattern))
+		{
+			return FileTreeWidgetItem::Subtitle;
+		}
+	}
+	
+	// Check audio patterns
+	for(const QString& pattern : audioPatterns)
+	{
+		if(lowerFiletype.contains(pattern))
+		{
+			return FileTreeWidgetItem::Audio;
+		}
+	}
+	
+	// Check video patterns (or empty filetype defaults to video)
+	for(const QString& pattern : videoPatterns)
+	{
+		if(lowerFiletype.contains(pattern))
+		{
+			return FileTreeWidgetItem::Video;
+		}
+	}
+	
+	// Default to video for empty filetype
+	if(filetype.isEmpty())
+	{
+		return FileTreeWidgetItem::Video;
+	}
+	
+	// Everything else is Other
+	return FileTreeWidgetItem::Other;
 }

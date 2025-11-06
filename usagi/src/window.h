@@ -325,6 +325,9 @@ private:
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();
     
+    // Helper method to determine file type from filetype string
+    FileTreeWidgetItem::FileType determineFileType(const QString& filetype);
+    
     // File selection for playback (stub for future implementation)
     struct FilePreference {
         QString preferredResolution; // e.g., "1920x1080", "1280x720"
