@@ -255,6 +255,10 @@ int AniDBApi::CreateSocket()
  	if(!Socket->bind(QHostAddress::Any, 3962))
  	{
 		LOG("AniDBApi: Can't bind socket");
+		LOG("AniDBApi: " + Socket->errorString());
+		// Clean up the socket if binding failed
+		delete Socket;
+		Socket = nullptr;
 		return 0;
  	}
  	else
@@ -267,6 +271,9 @@ int AniDBApi::CreateSocket()
 		{
 			LOG("AniDBApi: ERROR: failed to create UDP socket");
 			LOG("AniDBApi: " + Socket->errorString());
+			// Clean up the socket if it's invalid
+			delete Socket;
+			Socket = nullptr;
 			return 0;
 		}
 	}
@@ -1385,9 +1392,21 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 {
 	if(Socket == nullptr)
 	{
-		Logger::log("[AniDB Error] Socket not initialized, cannot send", __FILE__, __LINE__);
+		Logger::log("[AniDB Error] Socket not initialized, attempting to create socket", __FILE__, __LINE__);
+		if(!CreateSocket())
+		{
+			Logger::log("[AniDB Error] Failed to create socket, cannot send", __FILE__, __LINE__);
+			return 0;
+		}
+	}
+	
+	// Verify socket is in a valid state before attempting to write
+	if(!Socket->isValid() || Socket->state() == QAbstractSocket::UnconnectedState)
+	{
+		Logger::log("[AniDB Error] Socket is not in a valid state for writing", __FILE__, __LINE__);
 		return 0;
 	}
+	
 	QString a;
 	if(SID.length() > 0)
 	{
