@@ -2064,7 +2064,9 @@ void Window::loadMylistFromDatabase()
 		fileItem->setText(1, fileInfo);
 		
 		// Column 2: Show file type
-		QString fileTypeDisplay = filetype.isEmpty() ? "video" : filetype;
+		// Use constant for default file type
+		static const QString DEFAULT_FILETYPE = "video";
+		QString fileTypeDisplay = filetype.isEmpty() ? DEFAULT_FILETYPE : filetype;
 		fileItem->setText(2, fileTypeDisplay);
 		
 		// Determine file type for color coding using helper method
@@ -2123,7 +2125,7 @@ void Window::loadMylistFromDatabase()
 	
 	// Second pass: Calculate viewed counts per episode (more efficient than checking siblings for each file)
 	QSet<QPair<int, int>> viewedEpisodes; // Track which episodes have at least one viewed file
-	for(QMap<QPair<int, int>, QTreeWidgetItem*>::iterator it = episodeItems.begin(); it != episodeItems.end(); ++it)
+	for(QMap<QPair<int, int>, QTreeWidgetItem*>::const_iterator it = episodeItems.constBegin(); it != episodeItems.constEnd(); ++it)
 	{
 		QPair<int, int> episodeKey = it.key();
 		int aid = episodeKey.first;
@@ -2169,7 +2171,7 @@ void Window::loadMylistFromDatabase()
 	}
 	
 	// Update anime rows with aggregate statistics
-	for(QMap<int, QTreeWidgetItem*>::iterator it = animeItems.begin(); it != animeItems.end(); ++it)
+	for(QMap<int, QTreeWidgetItem*>::const_iterator it = animeItems.constBegin(); it != animeItems.constEnd(); ++it)
 	{
 		int aid = it.key();
 		QTreeWidgetItem *animeItem = it.value();

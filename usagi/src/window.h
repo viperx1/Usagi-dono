@@ -118,7 +118,7 @@ public:
         Other
     };
     
-    FileTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent), m_fileType(Other) {}
+    explicit FileTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent), m_fileType(Other) {}
     
     void setFileType(FileType type) { m_fileType = type; }
     FileType getFileType() const { return m_fileType; }
