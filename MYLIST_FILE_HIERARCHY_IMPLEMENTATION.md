@@ -18,6 +18,13 @@ Added a custom tree widget item for file-level entries with:
   - Audio: Light pink (#FFE6F0)
   - Other: Light gray (#F0F0F0)
 
+### 1.1 File Type Detection (window.cpp)
+Added `determineFileType()` helper method with:
+- Extensible pattern matching using QStringList
+- Support for common file extensions: mkv, mp4, avi, srt, ass, mp3, flac, etc.
+- Case-insensitive matching
+- Default to Video for empty filetype
+
 ### 2. Updated loadMylistFromDatabase() (window.cpp)
 Modified to create a three-level hierarchy:
 - **Level 1 (Anime)**: Aggregates episode statistics
@@ -36,6 +43,9 @@ Key improvements:
 - Groups files under their corresponding episodes
 - Applies color coding based on file type
 - Maintains episode-level statistics (counts each episode once, not per file)
+- **Performance**: Uses two-pass approach for viewed count calculation (O(n) instead of O(n²))
+  - First pass: Creates tree structure and counts episodes
+  - Second pass: Calculates viewed counts per episode efficiently
 
 ### 3. Preferred File Selection (Stub)
 Added `selectPreferredFile()` method for future playback feature:
