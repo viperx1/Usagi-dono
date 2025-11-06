@@ -1429,11 +1429,9 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	else
 	{
 		a = str;
-	}
-	LOG("AniDBApi: Send: " + a);
-
-	a = QString("%1&tag=%2").arg(a).arg(tag);
-    Logger::log("[AniDB Send] Command: " + a, __FILE__, __LINE__);
+    }
+    a = QString("%1&tag=%2").arg(a).arg(tag);
+    LOG("[AniDB Send] Command: " + a);
 //    QByteArray bytes = a.toUtf8();
 //	const char *ptr = bytes.data();
 //	Socket->write(ptr);
@@ -2035,7 +2033,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	}
 	
 	// No hash found for this file
-	LOG(QString("No existing hash found for path=%1").arg(localPath));
+//	LOG(QString("No existing hash found for path=%1").arg(localPath));
 	return QString();
 }
 

@@ -56,8 +56,12 @@ void Logger::log(const QString &msg, const QString &file, int line)
     {
         filename = filename.mid(lastSlash + 1);
     }
-    
-    fullMessage = QString("[%1] [%2:%3] %4").arg(timestamp).arg(filename).arg(line).arg(msg);
+    QString safeMsg = msg.contains("AUTH", Qt::CaseInsensitive)
+                          ? "[REDACTED AUTH MESSAGE]"
+                          : msg;
+
+    fullMessage = QString("[%1] [%2:%3] %4")
+                      .arg(timestamp, filename, QString::number(line), safeMsg);
     
     // 1. Output to console (for development and debugging)
     qDebug().noquote() << fullMessage;
