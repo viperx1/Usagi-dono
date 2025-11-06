@@ -1401,7 +1401,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 		Logger::log("[AniDB Error] Socket not initialized, attempting to create socket", __FILE__, __LINE__);
 		if(!CreateSocket())
 		{
-			Logger::log("[AniDB Error] Failed to create socket, cannot send", __FILE__, __LINE__);
+			Logger::log("[AniDB Error] Failed to create socket, cannot send - Check if port 3962 is available", __FILE__, __LINE__);
 			return 0;
 		}
 	}
@@ -1410,7 +1410,12 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	// Note: UDP sockets may be in UnconnectedState even when functional
 	if(Socket == nullptr || !Socket->isValid() || !Socket->isOpen())
 	{
-		Logger::log("[AniDB Error] Socket is not valid or not open for writing", __FILE__, __LINE__);
+		QString errorMsg = "[AniDB Error] Socket is not valid or not open for writing";
+		if(Socket != nullptr)
+		{
+			errorMsg += " - " + Socket->errorString();
+		}
+		Logger::log(errorMsg, __FILE__, __LINE__);
 		return 0;
 	}
 	
