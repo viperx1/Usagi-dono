@@ -1401,9 +1401,10 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	}
 	
 	// Verify socket is in a valid state before attempting to write
-	if(!Socket->isValid() || Socket->state() == QAbstractSocket::UnconnectedState)
+	// Note: UDP sockets may be in UnconnectedState even when functional
+	if(!Socket->isValid() || !Socket->isOpen())
 	{
-		Logger::log("[AniDB Error] Socket is not in a valid state for writing", __FILE__, __LINE__);
+		Logger::log("[AniDB Error] Socket is not valid or not open for writing", __FILE__, __LINE__);
 		return 0;
 	}
 	
