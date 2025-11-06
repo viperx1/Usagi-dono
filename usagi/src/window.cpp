@@ -2414,6 +2414,8 @@ void Window::onWatcherBrowseClicked()
 
 void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 {
+	LOG(QString("Window::onWatcherNewFilesDetected() called with %1 file(s)").arg(filePaths.size()));
+	
 	if (filePaths.isEmpty()) {
 		return;
 	}
