@@ -1816,8 +1816,8 @@ void Window::loadMylistFromDatabase()
 	mylistTreeWidget->clear();
 	episodesNeedingData.clear();  // Clear tracking set
 	
-	// Query the database for mylist entries joined with anime and episode data
-	// Also try to get anime name from anime_titles table if anime table is empty
+	// Query the database for mylist entries joined with anime, episode, and file data
+	// Structure: anime -> episode -> file (three-level hierarchy)
 	QSqlDatabase db = QSqlDatabase::database();
 	
 	// Validate database connection before proceeding
@@ -1827,15 +1827,20 @@ void Window::loadMylistFromDatabase()
 		return;
 	}
 	
-	QString query = "SELECT m.lid, m.aid, m.eid, m.state, m.viewed, m.storage, "
+	// Query all mylist entries with joined data including file information
+	QString query = "SELECT m.lid, m.aid, m.eid, m.fid, m.state, m.viewed, m.storage, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
 					"e.name as episode_name, e.epno, "
 					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
-					"a.eps, a.typename, a.startdate, a.enddate "
+					"a.eps, a.typename, a.startdate, a.enddate, "
+					"f.filetype, f.resolution, f.quality, "
+					"(SELECT name FROM `group` WHERE gid = m.gid) as group_name, "
+					"f.filename, m.gid "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
-					"ORDER BY a.nameromaji, m.eid";
+					"LEFT JOIN file f ON m.fid = f.fid "
+					"ORDER BY a.nameromaji, m.eid, m.lid";
 	
 	QSqlQuery q(db);
 	
@@ -1846,8 +1851,10 @@ void Window::loadMylistFromDatabase()
 	}
 	
 	QMap<int, QTreeWidgetItem*> animeItems; // aid -> tree item
+	QMap<QPair<int, int>, QTreeWidgetItem*> episodeItems; // (aid, eid) -> tree item
+	
 	// Track statistics per anime
-	QMap<int, int> animeEpisodeCount;  // aid -> count of episodes in mylist
+	QMap<int, int> animeEpisodeCount;  // aid -> count of unique episodes in mylist
 	QMap<int, int> animeViewedCount;   // aid -> count of viewed episodes
 	QMap<int, int> animeEpTotal;       // aid -> total primary type episodes (eptotal)
 	QMap<int, int> animeEps;           // aid -> total normal episodes (eps)
@@ -1856,26 +1863,37 @@ void Window::loadMylistFromDatabase()
 	QMap<int, int> animeOtherEpisodeCount;     // aid -> count of other type episodes (types 2-6) in mylist
 	QMap<int, int> animeNormalViewedCount;     // aid -> count of normal episodes viewed
 	QMap<int, int> animeOtherViewedCount;      // aid -> count of other type episodes viewed
-	int totalEntries = 0;
+	
+	// Track which episodes we've already counted (to avoid counting same episode multiple times)
+	QSet<QPair<int, int>> countedEpisodes; // (aid, eid) pairs
+	
+	int totalFiles = 0;
 	
 	while(q.next())
 	{
 		int lid = q.value(0).toInt();
 		int aid = q.value(1).toInt();
 		int eid = q.value(2).toInt();
-		int state = q.value(3).toInt();
-		int viewed = q.value(4).toInt();
-		QString storage = q.value(5).toString();
-		QString animeName = q.value(6).toString();
-		QString animeNameEnglish = q.value(7).toString();
-		int epTotal = q.value(8).toInt();
-		QString episodeName = q.value(9).toString();
-		QString epno = q.value(10).toString();  // Episode number from database
-		QString animeTitle = q.value(11).toString();  // From anime_titles table
-		int eps = q.value(12).toInt();  // Normal episode count from database
-		QString typeName = q.value(13).toString();  // Type name from database
-		QString startDate = q.value(14).toString();  // Start date from database
-		QString endDate = q.value(15).toString();  // End date from database
+		int fid = q.value(3).toInt();
+		int state = q.value(4).toInt();
+		int viewed = q.value(5).toInt();
+		QString storage = q.value(6).toString();
+		QString animeName = q.value(7).toString();
+		QString animeNameEnglish = q.value(8).toString();
+		int epTotal = q.value(9).toInt();
+		QString episodeName = q.value(10).toString();
+		QString epno = q.value(11).toString();
+		QString animeTitle = q.value(12).toString();
+		int eps = q.value(13).toInt();
+		QString typeName = q.value(14).toString();
+		QString startDate = q.value(15).toString();
+		QString endDate = q.value(16).toString();
+		QString filetype = q.value(17).toString();
+		QString resolution = q.value(18).toString();
+		QString quality = q.value(19).toString();
+		QString groupName = q.value(20).toString();
+		QString filename = q.value(21).toString();
+		int gid = q.value(22).toInt();
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -1905,7 +1923,7 @@ void Window::loadMylistFromDatabase()
 		{
 			animeItem = new AnimeTreeWidgetItem(mylistTreeWidget);
 			animeItem->setText(0, animeName);
-			animeItem->setData(0, Qt::UserRole, aid); // Store aid
+			animeItem->setData(0, Qt::UserRole, aid);
 			
 			animeItems[aid] = animeItem;
 			mylistTreeWidget->addTopLevelItem(animeItem);
@@ -1922,82 +1940,183 @@ void Window::loadMylistFromDatabase()
 		}
 		
 		// Set Type column (column 7) for anime parent item
-		// Update on every row since all episodes have the same data
 		if(!typeName.isEmpty() && animeItem->text(7).isEmpty())
 		{
 			animeItem->setText(7, typeName);
 		}
 		
 		// Set Aired column (column 8) for anime parent item
-		// Update on every row since all episodes have the same data
 		if(!startDate.isEmpty() && animeItem->text(8).isEmpty())
 		{
 			aired airedDates(startDate, endDate);
 			animeItem->setText(8, airedDates.toDisplayString());
-			// Store the aired object for proper sorting by date
 			animeItem->setAired(airedDates);
 		}
 		
-		// Create episode item as child of anime
-		EpisodeTreeWidgetItem *episodeItem = new EpisodeTreeWidgetItem(animeItem);
-		episodeItem->setText(0, ""); // Empty for episode child
+		// Get or create the episode item
+		QPair<int, int> episodeKey(aid, eid);
+		EpisodeTreeWidgetItem *episodeItem;
 		
-		// Column 1: Episode number using epno type
-		int episodeType = 1;  // Default to normal episode
-		if(!epno.isEmpty())
+		if(episodeItems.contains(episodeKey))
 		{
-			// Create epno object from string
-			::epno episodeNumber(epno);
-			
-			// Store epno object in the item for sorting
-			episodeItem->setEpno(episodeNumber);
-			
-			// Display formatted episode number (with leading zeros removed)
-			episodeItem->setText(1, episodeNumber.toDisplayString());
-			
-			// Get the episode type (1 = normal, 2-6 = other types)
-			episodeType = episodeNumber.type();
+			episodeItem = static_cast<EpisodeTreeWidgetItem*>(episodeItems[episodeKey]);
 		}
 		else
 		{
-			// Fallback to EID if episode number not available
-			episodeItem->setText(1, "Loading...");
-			episodesNeedingData.insert(eid);  // Track this episode for lazy loading
+			// Create new episode item
+			episodeItem = new EpisodeTreeWidgetItem(animeItem);
+			episodeItem->setText(0, "");
+			episodeItem->setData(0, Qt::UserRole, eid);
+			
+			// Column 1: Episode number using epno type
+			int episodeType = 1;
+			if(!epno.isEmpty())
+			{
+				::epno episodeNumber(epno);
+				episodeItem->setEpno(episodeNumber);
+				episodeItem->setText(1, episodeNumber.toDisplayString());
+				episodeType = episodeNumber.type();
+			}
+			else
+			{
+				episodeItem->setText(1, "Loading...");
+				episodesNeedingData.insert(eid);
+			}
+			
+			// Column 2: Episode title
+			if(episodeName.isEmpty())
+			{
+				episodeName = "Loading...";
+				episodesNeedingData.insert(eid);
+			}
+			episodeItem->setText(2, episodeName);
+			
+			// Empty columns 3-6 for episode items (will be shown in file children)
+			episodeItem->setText(3, "");
+			episodeItem->setText(4, "");
+			episodeItem->setText(5, "");
+			episodeItem->setText(6, "");
+			
+			episodeItems[episodeKey] = episodeItem;
+			
+			// Update statistics only once per episode
+			if(!countedEpisodes.contains(episodeKey))
+			{
+				countedEpisodes.insert(episodeKey);
+				animeEpisodeCount[aid]++;
+				
+				if(episodeType == 1)
+				{
+					animeNormalEpisodeCount[aid]++;
+				}
+				else
+				{
+					animeOtherEpisodeCount[aid]++;
+				}
+				
+				// We'll update viewed count when we see the first viewed file for this episode
+			}
 		}
 		
-		// Update statistics for this anime based on episode type
-		animeEpisodeCount[aid]++;
-		if(episodeType == 1)
+		// Create file item as child of episode
+		FileTreeWidgetItem *fileItem = new FileTreeWidgetItem(episodeItem);
+		fileItem->setText(0, "");
+		
+		// Column 1: Display file info (resolution, quality, group)
+		QString fileInfo;
+		if(!resolution.isEmpty())
 		{
-			// Normal episode (type 1)
-			animeNormalEpisodeCount[aid]++;
-			if(viewed)
+			fileInfo = resolution;
+		}
+		if(!quality.isEmpty())
+		{
+			if(!fileInfo.isEmpty()) fileInfo += " ";
+			fileInfo += quality;
+		}
+		if(!groupName.isEmpty())
+		{
+			if(!fileInfo.isEmpty()) fileInfo += " ";
+			fileInfo += "[" + groupName + "]";
+		}
+		else if(gid > 0)
+		{
+			if(!fileInfo.isEmpty()) fileInfo += " ";
+			fileInfo += "[GID:" + QString::number(gid) + "]";
+		}
+		
+		// If no file info available, show filename or fid
+		if(fileInfo.isEmpty())
+		{
+			if(!filename.isEmpty())
 			{
-				animeNormalViewedCount[aid]++;
+				fileInfo = filename;
 			}
+			else if(fid > 0)
+			{
+				fileInfo = QString("FID:%1").arg(fid);
+			}
+			else
+			{
+				fileInfo = "File";
+			}
+		}
+		
+		fileItem->setText(1, fileInfo);
+		
+		// Column 2: Show file type
+		QString fileTypeDisplay = filetype.isEmpty() ? "video" : filetype;
+		fileItem->setText(2, fileTypeDisplay);
+		
+		// Determine file type for color coding
+		FileTreeWidgetItem::FileType type = FileTreeWidgetItem::Video;
+		if(filetype.contains("sub", Qt::CaseInsensitive) || filetype.contains("srt", Qt::CaseInsensitive) || 
+		   filetype.contains("ass", Qt::CaseInsensitive) || filetype.contains("ssa", Qt::CaseInsensitive))
+		{
+			type = FileTreeWidgetItem::Subtitle;
+		}
+		else if(filetype.contains("audio", Qt::CaseInsensitive) || filetype.contains("mp3", Qt::CaseInsensitive) || 
+		        filetype.contains("flac", Qt::CaseInsensitive) || filetype.contains("aac", Qt::CaseInsensitive))
+		{
+			type = FileTreeWidgetItem::Audio;
+		}
+		else if(filetype.contains("video", Qt::CaseInsensitive) || filetype.contains("mkv", Qt::CaseInsensitive) || 
+		        filetype.contains("mp4", Qt::CaseInsensitive) || filetype.contains("avi", Qt::CaseInsensitive) ||
+		        filetype.isEmpty())
+		{
+			type = FileTreeWidgetItem::Video;
 		}
 		else
 		{
-			// Other types (types 2-6: special, credit, trailer, parody, other)
-			animeOtherEpisodeCount[aid]++;
-			if(viewed)
-			{
-				animeOtherViewedCount[aid]++;
-			}
+			type = FileTreeWidgetItem::Other;
+		}
+		fileItem->setFileType(type);
+		fileItem->setResolution(resolution);
+		fileItem->setQuality(quality);
+		fileItem->setGroupName(groupName);
+		
+		// Apply color based on file type
+		QColor fileColor;
+		switch(type)
+		{
+			case FileTreeWidgetItem::Video:
+				fileColor = QColor(230, 240, 255); // Light blue
+				break;
+			case FileTreeWidgetItem::Subtitle:
+				fileColor = QColor(255, 250, 230); // Light yellow
+				break;
+			case FileTreeWidgetItem::Audio:
+				fileColor = QColor(255, 230, 240); // Light pink
+				break;
+			case FileTreeWidgetItem::Other:
+				fileColor = QColor(240, 240, 240); // Light gray
+				break;
 		}
 		
-		if(viewed)
+		// Apply background color to all columns
+		for(int col = 0; col < mylistTreeWidget->columnCount(); col++)
 		{
-			animeViewedCount[aid]++;
+			fileItem->setBackground(col, fileColor);
 		}
-		
-		// Column 2: Episode title
-		if(episodeName.isEmpty())
-		{
-			episodeName = "Loading...";
-			episodesNeedingData.insert(eid);  // Track this episode for lazy loading
-		}
-		episodeItem->setText(2, episodeName);
 		
 		// State: 0=unknown, 1=on hdd, 2=on cd, 3=deleted
 		QString stateStr;
@@ -2009,17 +2128,48 @@ void Window::loadMylistFromDatabase()
 			case 3: stateStr = "Deleted"; break;
 			default: stateStr = QString::number(state); break;
 		}
-		episodeItem->setText(3, stateStr);
+		fileItem->setText(3, stateStr);
 		
-		// Viewed: 0=no, 1=yes
-		episodeItem->setText(4, viewed ? "Yes" : "No");
-		episodeItem->setText(5, storage);
-		episodeItem->setText(6, QString::number(lid));
+		// Viewed status
+		fileItem->setText(4, viewed ? "Yes" : "No");
+		fileItem->setText(5, storage);
+		fileItem->setText(6, QString::number(lid));
 		
-		episodeItem->setData(0, Qt::UserRole, eid); // Store eid
-		episodeItem->setData(0, Qt::UserRole + 1, lid); // Store lid
+		fileItem->setData(0, Qt::UserRole, fid);
+		fileItem->setData(0, Qt::UserRole + 1, lid);
 		
-		totalEntries++;
+		// Update episode viewed count if this file is viewed and we haven't counted this episode yet
+		if(viewed)
+		{
+			QPair<int, int> epKey(aid, eid);
+			// Check if this is the first viewed file for this episode
+			bool alreadyCountedViewed = false;
+			for(int i = 0; i < episodeItem->childCount(); i++)
+			{
+				FileTreeWidgetItem *sibling = dynamic_cast<FileTreeWidgetItem*>(episodeItem->child(i));
+				if(sibling && sibling != fileItem && sibling->text(4) == "Yes")
+				{
+					alreadyCountedViewed = true;
+					break;
+				}
+			}
+			
+			if(!alreadyCountedViewed)
+			{
+				animeViewedCount[aid]++;
+				int episodeType = episodeItem->getEpno().isValid() ? episodeItem->getEpno().type() : 1;
+				if(episodeType == 1)
+				{
+					animeNormalViewedCount[aid]++;
+				}
+				else
+				{
+					animeOtherViewedCount[aid]++;
+				}
+			}
+		}
+		
+		totalFiles++;
 	}
 	
 	// Update anime rows with aggregate statistics
@@ -2028,9 +2178,6 @@ void Window::loadMylistFromDatabase()
 		int aid = it.key();
 		QTreeWidgetItem *animeItem = it.value();
 		
-		int episodesInMylist = animeEpisodeCount[aid];
-		int viewedEpisodes = animeViewedCount[aid];
-		int totalEpisodes = animeEpTotal[aid];
 		int totalNormalEpisodes = animeEps[aid];
 		int normalEpisodes = animeNormalEpisodeCount[aid];
 		int otherEpisodes = animeOtherEpisodeCount[aid];
@@ -2038,8 +2185,6 @@ void Window::loadMylistFromDatabase()
 		int otherViewed = animeOtherViewedCount[aid];
 		
 		// Column 1 (Episode): show format "A/B+C"
-		// A = normal episodes in mylist, B = total normal episodes (from Eps), C = other types in mylist
-		// When Eps is not available, show "?" to indicate unknown total
 		QString episodeText;
 		if(totalNormalEpisodes > 0)
 		{
@@ -2054,7 +2199,6 @@ void Window::loadMylistFromDatabase()
 		}
 		else
 		{
-			// If eps is not available, show "?" to indicate unknown total instead of using same value
 			if(otherEpisodes > 0)
 			{
 				episodeText = QString("%1/?+%2").arg(normalEpisodes).arg(otherEpisodes);
@@ -2067,7 +2211,6 @@ void Window::loadMylistFromDatabase()
 		animeItem->setText(1, episodeText);
 		
 		// Column 4 (Viewed): show format "A/B+C"
-		// A = normal episodes viewed, B = total normal episodes in mylist, C = other types viewed
 		QString viewedText;
 		if(otherEpisodes > 0)
 		{
@@ -2080,11 +2223,8 @@ void Window::loadMylistFromDatabase()
 		animeItem->setText(4, viewedText);
 	}
 	
-	// Keep anime items collapsed by default
-	// (User can expand manually if needed)
-	
-	LOG(QString("Loaded %1 mylist entries for %2 anime").arg(totalEntries).arg(animeItems.size()));
-	mylistStatusLabel->setText(QString("MyList Status: %1 entries loaded").arg(totalEntries));
+	LOG(QString("Loaded %1 files for %2 episodes in %3 anime").arg(totalFiles).arg(episodeItems.size()).arg(animeItems.size()));
+	mylistStatusLabel->setText(QString("MyList Status: %1 files loaded").arg(totalFiles));
 	
 	// Set default sort order to ascending by episode column (column 1)
 	mylistTreeWidget->sortByColumn(1, Qt::AscendingOrder);
@@ -2557,4 +2697,64 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	// Log total time for the entire function
 	qint64 totalTime = overallTimer.elapsed();
 	LOG(QString("[TIMING] onWatcherNewFilesDetected() TOTAL: %1 ms [window.cpp]").arg(totalTime));
+}
+
+// Stub method for selecting preferred file from a list of files for the same episode
+// This will be used for future playback feature
+// Preference options: video resolution, group name, quality
+FileTreeWidgetItem* Window::selectPreferredFile(const QList<FileTreeWidgetItem*>& files, const FilePreference& pref)
+{
+	if(files.isEmpty())
+	{
+		return nullptr;
+	}
+	
+	// If only one file, return it
+	if(files.size() == 1)
+	{
+		return files.first();
+	}
+	
+	// TODO: Implement preference-based selection logic
+	// For now, return the first video file, or first file if no video
+	
+	FileTreeWidgetItem* bestFile = nullptr;
+	
+	// First pass: try to find a video file
+	for(FileTreeWidgetItem* file : files)
+	{
+		if(file->getFileType() == FileTreeWidgetItem::Video)
+		{
+			// TODO: Apply preferences (resolution, quality, group)
+			// For now, just take the first video file
+			if(!bestFile)
+			{
+				bestFile = file;
+			}
+			
+			// Prefer matching resolution if specified
+			if(!pref.preferredResolution.isEmpty() && 
+			   file->getResolution() == pref.preferredResolution)
+			{
+				bestFile = file;
+				break;
+			}
+			
+			// Prefer matching group if specified
+			if(!pref.preferredGroup.isEmpty() && 
+			   file->getGroupName().contains(pref.preferredGroup, Qt::CaseInsensitive))
+			{
+				bestFile = file;
+				break;
+			}
+		}
+	}
+	
+	// If no video file found, return first file
+	if(!bestFile && !files.isEmpty())
+	{
+		bestFile = files.first();
+	}
+	
+	return bestFile;
 }
