@@ -107,6 +107,38 @@ private:
     aired m_aired;
 };
 
+// Custom tree widget item for file items (third level in hierarchy)
+class FileTreeWidgetItem : public QTreeWidgetItem
+{
+public:
+    enum FileType {
+        Video,
+        Subtitle,
+        Audio,
+        Other
+    };
+    
+    explicit FileTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent), m_fileType(Other) {}
+    
+    void setFileType(FileType type) { m_fileType = type; }
+    FileType getFileType() const { return m_fileType; }
+    
+    void setResolution(const QString& res) { m_resolution = res; }
+    QString getResolution() const { return m_resolution; }
+    
+    void setQuality(const QString& qual) { m_quality = qual; }
+    QString getQuality() const { return m_quality; }
+    
+    void setGroupName(const QString& group) { m_groupName = group; }
+    QString getGroupName() const { return m_groupName; }
+    
+private:
+    FileType m_fileType;
+    QString m_resolution;
+    QString m_quality;
+    QString m_groupName;
+};
+
 class Window : public QWidget
 {
     Q_OBJECT
@@ -292,6 +324,17 @@ private:
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();
+    
+    // Helper method to determine file type from filetype string
+    FileTreeWidgetItem::FileType determineFileType(const QString& filetype);
+    
+    // File selection for playback (stub for future implementation)
+    struct FilePreference {
+        QString preferredResolution; // e.g., "1920x1080", "1280x720"
+        QString preferredGroup;      // e.g., "Baka-Anime", "HorribleSubs"
+        bool preferHigherQuality;    // true = prefer higher quality
+    };
+    FileTreeWidgetItem* selectPreferredFile(const QList<FileTreeWidgetItem*>& files, const FilePreference& pref);
 };
 
 #endif // WINDOW_H
