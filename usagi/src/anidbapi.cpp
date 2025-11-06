@@ -191,6 +191,12 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 
 AniDBApi::~AniDBApi()
 {
+	// Clean up the UDP socket to prevent memory leaks
+	if(Socket != nullptr)
+	{
+		delete Socket;
+		Socket = nullptr;
+	}
 }
 
 int AniDBApi::ed2khash(QString filepath)
@@ -1402,7 +1408,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 	
 	// Verify socket is in a valid state before attempting to write
 	// Note: UDP sockets may be in UnconnectedState even when functional
-	if(!Socket->isValid() || !Socket->isOpen())
+	if(Socket == nullptr || !Socket->isValid() || !Socket->isOpen())
 	{
 		Logger::log("[AniDB Error] Socket is not valid or not open for writing", __FILE__, __LINE__);
 		return 0;
