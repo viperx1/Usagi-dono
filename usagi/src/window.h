@@ -28,6 +28,7 @@
 #include "epno.h"
 #include "aired.h"
 #include "directorywatcher.h"
+#include "playbackmanager.h"
 //#include "hasherthread.h"
 
 class hashes_ : public QTableWidget
@@ -223,6 +224,10 @@ private:
     QPushButton *watcherBrowseButton;
     QCheckBox *watcherAutoStart;
     QLabel *watcherStatusLabel;
+    
+    // Playback settings
+    QLineEdit *mediaPlayerPath;
+    QPushButton *mediaPlayerBrowseButton;
 
 	// page notify
 	QTextEdit *notifyOutput;
@@ -241,6 +246,9 @@ private:
 	
 	// Directory watcher
 	DirectoryWatcher *directoryWatcher;
+	
+	// Playback manager
+	PlaybackManager *playbackManager;
 	
 	// Batch processing for hashed files
 	// Note: HashedFileData structure removed as identification now happens immediately
@@ -307,6 +315,13 @@ public slots:
     void onWatcherBrowseClicked();
     void onWatcherNewFilesDetected(const QStringList &filePaths);
     
+    // Playback slots
+    void onMediaPlayerBrowseClicked();
+    void onPlayButtonClicked();
+    void onPlaybackPositionUpdated(int lid, int position, int duration);
+    void onPlaybackCompleted(int lid);
+    void onPlaybackStopped(int lid, int position);
+    
     // Hasher slots
     void provideNextFileToHash();
 
@@ -324,6 +339,10 @@ private:
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();
+    
+    // Helper methods for playback
+    QString getFilePathForPlayback(int lid);
+    void updatePlayButtonStates();
     
     // Helper method to determine file type from filetype string
     FileTreeWidgetItem::FileType determineFileType(const QString& filetype);

@@ -47,6 +47,7 @@ set(SOURCES
     src/aired.cpp
     src/directorywatcher.cpp
     src/logger.cpp
+    src/playbackmanager.cpp
 )
 
 # Header files
@@ -63,6 +64,7 @@ set(HEADERS
     src/aired.h
     src/directorywatcher.h
     src/logger.h
+    src/playbackmanager.h
 )
 
 # Create executable

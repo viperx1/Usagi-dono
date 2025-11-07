@@ -100,6 +100,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `notifications`(`nid` INTEGER PRIMARY KEY, `type` TEXT, `from_user_id` INTEGER, `from_user_name` TEXT, `date` INTEGER, `message_type` INTEGER, `title` TEXT, `body` TEXT, `received_at` INTEGER, `acknowledged` BOOL DEFAULT 0);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
 		
+		// Add playback tracking columns to mylist if they don't exist
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `playback_position` INTEGER DEFAULT 0");
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `playback_duration` INTEGER DEFAULT 0");
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `last_played` INTEGER DEFAULT 0");
+		
 		Logger::log("[AniDB Init] Committing database transaction", __FILE__, __LINE__);
 		db.commit();
 		Logger::log("[AniDB Init] Database transaction committed", __FILE__, __LINE__);

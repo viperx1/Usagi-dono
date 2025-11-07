@@ -117,8 +117,8 @@ Window::Window()
 
     // page mylist
     mylistTreeWidget = new QTreeWidget(this);
-    mylistTreeWidget->setColumnCount(9);
-    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID" << "Type" << "Aired");
+    mylistTreeWidget->setColumnCount(10);
+    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID" << "Type" << "Aired" << "Play");
     mylistTreeWidget->setColumnWidth(0, 300);
     mylistTreeWidget->setColumnWidth(1, 80);
     mylistTreeWidget->setColumnWidth(2, 250);
@@ -128,10 +128,14 @@ Window::Window()
     mylistTreeWidget->setColumnWidth(6, 80);
     mylistTreeWidget->setColumnWidth(7, 100);
     mylistTreeWidget->setColumnWidth(8, 180);
+    mylistTreeWidget->setColumnWidth(9, 60);
     mylistTreeWidget->setAlternatingRowColors(true);
     mylistTreeWidget->setSortingEnabled(true);
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pageMylist->addWidget(mylistTreeWidget);
+    
+    // Connect tree widget click handler for play buttons
+    connect(mylistTreeWidget, &QTreeWidget::itemClicked, this, &Window::onPlayButtonClicked);
     
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
@@ -250,18 +254,29 @@ Window::Window()
     pageSettings->addWidget(watcherAutoStart, 5, 0, 1, 2);
     pageSettings->addWidget(watcherStatusLabel, 6, 0, 1, 2);
     
-    pageSettings->setRowStretch(7, 1000);
-    pageSettings->addWidget(buttonSaveSettings, 8, 0);
-    pageSettings->addWidget(buttonRequestMylistExport, 9, 0);
+    // Add playback settings after directory watcher
+    QLabel *playbackLabel = new QLabel("Playback:");
+    mediaPlayerPath = new QLineEdit;
+    mediaPlayerBrowseButton = new QPushButton("Browse...");
+    
+    pageSettings->addWidget(playbackLabel, 7, 0, 1, 2);
+    pageSettings->addWidget(new QLabel("Media Player:"), 8, 0);
+    pageSettings->addWidget(mediaPlayerPath, 8, 1);
+    pageSettings->addWidget(mediaPlayerBrowseButton, 8, 2);
+    
+    pageSettings->setRowStretch(9, 1000);
+    pageSettings->addWidget(buttonSaveSettings, 10, 0);
+    pageSettings->addWidget(buttonRequestMylistExport, 11, 0);
 
     pageSettings->setColumnStretch(1, 100);
-    pageSettings->setRowStretch(10, 100);
+    pageSettings->setRowStretch(12, 100);
 
 	// page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
     connect(buttonRequestMylistExport, SIGNAL(clicked()), this, SLOT(requestMylistExportManually()));
     connect(watcherEnabled, SIGNAL(stateChanged(int)), this, SLOT(onWatcherEnabledChanged(int)));
     connect(watcherBrowseButton, SIGNAL(clicked()), this, SLOT(onWatcherBrowseClicked()));
+    connect(mediaPlayerBrowseButton, SIGNAL(clicked()), this, SLOT(onMediaPlayerBrowseClicked()));
 
     // page log
     logOutput = new QTextEdit;
@@ -296,6 +311,15 @@ Window::Window()
     connect(directoryWatcher, &DirectoryWatcher::newFilesDetected, 
             this, &Window::onWatcherNewFilesDetected);
     
+    // Initialize playback manager
+    playbackManager = new PlaybackManager(this);
+    connect(playbackManager, &PlaybackManager::playbackPositionUpdated,
+            this, &Window::onPlaybackPositionUpdated);
+    connect(playbackManager, &PlaybackManager::playbackCompleted,
+            this, &Window::onPlaybackCompleted);
+    connect(playbackManager, &PlaybackManager::playbackStopped,
+            this, &Window::onPlaybackStopped);
+    
     // Initialize timer for deferred processing of already-hashed files
     hashedFilesProcessingTimer = new QTimer(this);
     hashedFilesProcessingTimer->setSingleShot(false);
@@ -320,6 +344,10 @@ Window::Window()
     watcherEnabled->blockSignals(false);
     watcherDirectory->blockSignals(false);
     watcherAutoStart->blockSignals(false);
+    
+    // Load media player path from settings
+    QString playerPath = PlaybackManager::getMediaPlayerPath();
+    mediaPlayerPath->setText(playerPath);
     
     adbapi->CreateSocket();
 
@@ -1018,6 +1046,9 @@ void Window::saveSettings()
 	adbapi->setWatcherEnabled(watcherEnabled->isChecked());
 	adbapi->setWatcherDirectory(watcherDirectory->text());
 	adbapi->setWatcherAutoStart(watcherAutoStart->isChecked());
+	
+	// Save media player path
+	PlaybackManager::setMediaPlayerPath(mediaPlayerPath->text());
 	
 	LOG("Settings saved");
 }
@@ -2117,6 +2148,17 @@ void Window::loadMylistFromDatabase()
 		fileItem->setText(5, storage);
 		fileItem->setText(6, QString::number(lid));
 		
+		// Add play button text indicator (column 9)
+		if (type == FileTreeWidgetItem::Video) {
+			if (viewed) {
+				fileItem->setText(9, "✓"); // Checkmark for watched
+			} else {
+				fileItem->setText(9, "▶"); // Play button
+			}
+		} else {
+			fileItem->setText(9, ""); // No button for non-video files
+		}
+		
 		fileItem->setData(0, Qt::UserRole, fid);
 		fileItem->setData(0, Qt::UserRole + 1, lid);
 		
@@ -2137,14 +2179,37 @@ void Window::loadMylistFromDatabase()
 		
 		// Check if any file for this episode is viewed
 		bool episodeViewed = false;
+		bool hasVideoFile = false;
 		for(int i = 0; i < episodeItem->childCount(); i++)
 		{
 			QTreeWidgetItem *fileItem = episodeItem->child(i);
-			if(fileItem && fileItem->text(4) == "Yes")
+			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
+			if(file && file->getFileType() == FileTreeWidgetItem::Video)
 			{
-				episodeViewed = true;
-				break;
+				hasVideoFile = true;
+				if(fileItem->text(4) == "Yes")
+				{
+					episodeViewed = true;
+					break;
+				}
 			}
+		}
+		
+		// Set play button for episode
+		if(hasVideoFile)
+		{
+			if(episodeViewed)
+			{
+				episodeItem->setText(9, "✓"); // Checkmark for watched
+			}
+			else
+			{
+				episodeItem->setText(9, "▶"); // Play button
+			}
+		}
+		else
+		{
+			episodeItem->setText(9, ""); // No button if no video file
 		}
 		
 		if(episodeViewed && !viewedEpisodes.contains(episodeKey))
@@ -2219,6 +2284,21 @@ void Window::loadMylistFromDatabase()
 			viewedText = QString("%1/%2").arg(normalViewed).arg(normalEpisodes);
 		}
 		animeItem->setText(4, viewedText);
+		
+		// Column 9 (Play button): Show checkmark if all normal episodes are watched
+		bool allNormalWatched = (totalNormalEpisodes > 0 && normalViewed >= totalNormalEpisodes);
+		if(allNormalWatched)
+		{
+			animeItem->setText(9, "✓"); // Checkmark for fully watched
+		}
+		else if(normalEpisodes > 0 || otherEpisodes > 0)
+		{
+			animeItem->setText(9, "▶"); // Play button
+		}
+		else
+		{
+			animeItem->setText(9, ""); // No button if no episodes
+		}
 	}
 	
 	LOG(QString("Loaded %1 files for %2 episodes in %3 anime").arg(totalFiles).arg(episodeItems.size()).arg(animeItems.size()));
@@ -2817,4 +2897,193 @@ FileTreeWidgetItem::FileType Window::determineFileType(const QString& filetype)
 	
 	// Everything else is Other
 	return FileTreeWidgetItem::Other;
+}
+
+// Playback slot implementations
+
+void Window::onMediaPlayerBrowseClicked()
+{
+	QString path = QFileDialog::getOpenFileName(this, "Select Media Player", 
+		mediaPlayerPath->text(), "Executable Files (*.exe);;All Files (*)");
+	
+	if (!path.isEmpty()) {
+		mediaPlayerPath->setText(path);
+		PlaybackManager::setMediaPlayerPath(path);
+		LOG(QString("Media player path set to: %1").arg(path));
+	}
+}
+
+void Window::onPlayButtonClicked()
+{
+	QTreeWidgetItem *item = mylistTreeWidget->currentItem();
+	if (!item) {
+		return;
+	}
+	
+	// Get the column that was clicked
+	int column = mylistTreeWidget->currentColumn();
+	
+	// Only handle clicks on the Play column (column 9)
+	if (column != 9) {
+		return;
+	}
+	
+	// Determine what type of item was clicked
+	// Check if this is a file item (has a parent that has a parent)
+	QTreeWidgetItem *parent = item->parent();
+	if (parent && parent->parent()) {
+		// This is a file item
+		int lid = item->data(6, Qt::DisplayRole).toInt();
+		if (lid > 0) {
+			QString filePath = getFilePathForPlayback(lid);
+			if (!filePath.isEmpty()) {
+				// Get playback position from database
+				QSqlDatabase db = QSqlDatabase::database();
+				if (db.isOpen()) {
+					QSqlQuery q(db);
+					q.prepare("SELECT playback_position FROM mylist WHERE lid = ?");
+					q.addBindValue(lid);
+					
+					int resumePosition = 0;
+					if (q.exec() && q.next()) {
+						resumePosition = q.value(0).toInt();
+					}
+					
+					playbackManager->startPlayback(filePath, lid, resumePosition);
+				}
+			} else {
+				LOG(QString("Cannot play: file path not found for LID %1").arg(lid));
+			}
+		}
+	}
+	// Check if this is an episode item (has a parent but no grandparent)
+	else if (parent && !parent->parent()) {
+		// This is an episode item - find the first video file and play it
+		int childCount = item->childCount();
+		for (int i = 0; i < childCount; i++) {
+			QTreeWidgetItem *fileItem = item->child(i);
+			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
+			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
+				int lid = fileItem->data(6, Qt::DisplayRole).toInt();
+				if (lid > 0) {
+					QString filePath = getFilePathForPlayback(lid);
+					if (!filePath.isEmpty()) {
+						// Get playback position from database
+						QSqlDatabase db = QSqlDatabase::database();
+						if (db.isOpen()) {
+							QSqlQuery q(db);
+							q.prepare("SELECT playback_position FROM mylist WHERE lid = ?");
+							q.addBindValue(lid);
+							
+							int resumePosition = 0;
+							if (q.exec() && q.next()) {
+								resumePosition = q.value(0).toInt();
+							}
+							
+							playbackManager->startPlayback(filePath, lid, resumePosition);
+						}
+						return;
+					}
+				}
+			}
+		}
+		LOG("Cannot play: no video file found for episode");
+	}
+	// Otherwise it's an anime item - find the first episode with a video file
+	else if (!parent) {
+		// This is an anime item
+		int childCount = item->childCount();
+		for (int i = 0; i < childCount; i++) {
+			QTreeWidgetItem *episodeItem = item->child(i);
+			int fileCount = episodeItem->childCount();
+			for (int j = 0; j < fileCount; j++) {
+				QTreeWidgetItem *fileItem = episodeItem->child(j);
+				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
+				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
+					int lid = fileItem->data(6, Qt::DisplayRole).toInt();
+					if (lid > 0) {
+						QString filePath = getFilePathForPlayback(lid);
+						if (!filePath.isEmpty()) {
+							// Get playback position from database
+							QSqlDatabase db = QSqlDatabase::database();
+							if (db.isOpen()) {
+								QSqlQuery q(db);
+								q.prepare("SELECT playback_position FROM mylist WHERE lid = ?");
+								q.addBindValue(lid);
+								
+								int resumePosition = 0;
+								if (q.exec() && q.next()) {
+									resumePosition = q.value(0).toInt();
+								}
+								
+								playbackManager->startPlayback(filePath, lid, resumePosition);
+							}
+							return;
+						}
+					}
+				}
+			}
+		}
+		LOG("Cannot play: no video file found for anime");
+	}
+}
+
+void Window::onPlaybackPositionUpdated(int lid, int position, int duration)
+{
+	LOG(QString("Playback position updated: LID %1, %2/%3s").arg(lid).arg(position).arg(duration));
+	// The position is already saved by PlaybackManager, no need to do anything here
+}
+
+void Window::onPlaybackCompleted(int lid)
+{
+	LOG(QString("Playback completed: LID %1").arg(lid));
+	// Update the mylist tree to reflect the watched status
+	loadMylistFromDatabase();
+}
+
+void Window::onPlaybackStopped(int lid, int position)
+{
+	LOG(QString("Playback stopped: LID %1 at position %2s").arg(lid).arg(position));
+}
+
+QString Window::getFilePathForPlayback(int lid)
+{
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		return QString();
+	}
+	
+	// First try to get the file path from local_files table
+	QSqlQuery q(db);
+	q.prepare("SELECT lf.path FROM mylist m "
+			  "LEFT JOIN local_files lf ON m.local_file = lf.id "
+			  "WHERE m.lid = ?");
+	q.addBindValue(lid);
+	
+	if (q.exec() && q.next()) {
+		QString path = q.value(0).toString();
+		if (!path.isEmpty()) {
+			return path;
+		}
+	}
+	
+	// If not found, try to get storage path from mylist table
+	q.prepare("SELECT storage FROM mylist WHERE lid = ?");
+	q.addBindValue(lid);
+	
+	if (q.exec() && q.next()) {
+		QString storage = q.value(0).toString();
+		if (!storage.isEmpty()) {
+			return storage;
+		}
+	}
+	
+	return QString();
+}
+
+void Window::updatePlayButtonStates()
+{
+	// This function would update the play button icons based on watched status
+	// For now, we'll use text indicators
+	// This will be called after loading mylist data
 }
