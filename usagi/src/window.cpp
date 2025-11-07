@@ -2977,10 +2977,37 @@ void Window::onPlayButtonClicked()
 		}
 		LOG("Cannot play: no video file found for episode");
 	}
-	// Otherwise it's an anime item - find the first episode with a video file
+	// Otherwise it's an anime item - find the first unwatched episode with a video file
 	else if (!parent) {
 		// This is an anime item
 		int childCount = item->childCount();
+		
+		// First pass: find first unwatched episode
+		for (int i = 0; i < childCount; i++) {
+			QTreeWidgetItem *episodeItem = item->child(i);
+			
+			// Check if episode is watched (has checkmark)
+			QString playIcon = episodeItem->text(PLAY_COLUMN);
+			if (playIcon == "✓") {
+				continue; // Skip watched episodes
+			}
+			
+			// Find a video file in this unwatched episode
+			int fileCount = episodeItem->childCount();
+			for (int j = 0; j < fileCount; j++) {
+				QTreeWidgetItem *fileItem = episodeItem->child(j);
+				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
+				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
+					int lid = fileItem->text(MYLIST_ID_COLUMN).toInt();
+					if (lid > 0) {
+						startPlaybackForFile(lid);
+						return;
+					}
+				}
+			}
+		}
+		
+		// If no unwatched episodes found, fall back to first episode (for rewatching)
 		for (int i = 0; i < childCount; i++) {
 			QTreeWidgetItem *episodeItem = item->child(i);
 			int fileCount = episodeItem->childCount();
@@ -3008,9 +3035,12 @@ void Window::onPlaybackPositionUpdated(int lid, int position, int duration)
 
 void Window::onPlaybackCompleted(int lid)
 {
-	LOG(QString("Playback completed: LID %1").arg(lid));
+	LOG(QString("Playback completed: LID %1 - Refreshing mylist tree").arg(lid));
 	// Update the mylist tree to reflect the watched status
-	loadMylistFromDatabase();
+	// Use a slight delay to ensure database writes are flushed
+	QTimer::singleShot(100, this, [this]() {
+		loadMylistFromDatabase();
+	});
 }
 
 void Window::onPlaybackStopped(int lid, int position)
