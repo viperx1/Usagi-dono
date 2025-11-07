@@ -2958,7 +2958,7 @@ void Window::onPlayButtonClicked()
 	QTreeWidgetItem *parent = item->parent();
 	if (parent && parent->parent()) {
 		// This is a file item
-		int lid = item->data(MYLIST_ID_COLUMN, Qt::DisplayRole).toInt();
+		int lid = item->text(MYLIST_ID_COLUMN).toInt();
 		if (lid > 0) {
 			QString filePath = getFilePathForPlayback(lid);
 			if (!filePath.isEmpty()) {
@@ -2989,7 +2989,7 @@ void Window::onPlayButtonClicked()
 			QTreeWidgetItem *fileItem = item->child(i);
 			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-				int lid = fileItem->data(MYLIST_ID_COLUMN, Qt::DisplayRole).toInt();
+				int lid = fileItem->text(MYLIST_ID_COLUMN).toInt();
 				if (lid > 0) {
 					QString filePath = getFilePathForPlayback(lid);
 					if (!filePath.isEmpty()) {
@@ -3025,7 +3025,7 @@ void Window::onPlayButtonClicked()
 				QTreeWidgetItem *fileItem = episodeItem->child(j);
 				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-					int lid = fileItem->data(MYLIST_ID_COLUMN, Qt::DisplayRole).toInt();
+					int lid = fileItem->text(MYLIST_ID_COLUMN).toInt();
 					if (lid > 0) {
 						QString filePath = getFilePathForPlayback(lid);
 						if (!filePath.isEmpty()) {

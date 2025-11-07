@@ -52,6 +52,11 @@ public:
      */
     static void setMediaPlayerPath(const QString &path);
     
+    /**
+     * @brief Get the default media player path
+     */
+    static QString getDefaultMediaPlayerPath();
+    
 signals:
     /**
      * @brief Emitted when playback position is updated

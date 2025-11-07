@@ -217,15 +217,16 @@ void PlaybackManager::savePlaybackPosition(int position, int duration)
     }
 }
 
+QString PlaybackManager::getDefaultMediaPlayerPath()
+{
+    return "C:\\Program Files (x86)\\K-Lite Codec Pack\\MPC-HC64\\mpc-hc64_nvo.exe";
+}
+
 QString PlaybackManager::getMediaPlayerPath()
 {
-    // Default player path constant
-    static const QString DEFAULT_MEDIA_PLAYER_PATH = 
-        "C:\\Program Files (x86)\\K-Lite Codec Pack\\MPC-HC64\\mpc-hc64_nvo.exe";
-    
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        return DEFAULT_MEDIA_PLAYER_PATH;
+        return getDefaultMediaPlayerPath();
     }
     
     QSqlQuery q(db);
@@ -236,7 +237,7 @@ QString PlaybackManager::getMediaPlayerPath()
     }
     
     // Return default path if not set
-    return DEFAULT_MEDIA_PLAYER_PATH;
+    return getDefaultMediaPlayerPath();
 }
 
 void PlaybackManager::setMediaPlayerPath(const QString &path)
