@@ -87,12 +87,17 @@ bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resume
 void PlaybackManager::stopTracking()
 {
     if (m_tracking) {
+        LOG(QString("Stopping playback tracking for LID %1 (position: %2s, duration: %3s)")
+            .arg(m_currentLid).arg(m_lastPosition).arg(m_lastDuration));
+        
         m_statusTimer->stop();
         
-        // Save final position
-        if (m_lastPosition > 0 && m_lastDuration > 0) {
+        // Save final position (even if 0, to record that playback was attempted)
+        if (m_lastDuration > 0) {
             savePlaybackPosition(m_lastPosition, m_lastDuration);
             emit playbackStopped(m_currentLid, m_lastPosition);
+        } else {
+            LOG("No duration recorded - playback data not saved");
         }
         
         m_tracking = false;
@@ -106,8 +111,11 @@ void PlaybackManager::stopTracking()
 void PlaybackManager::checkPlaybackStatus()
 {
     if (!m_tracking) {
+        LOG("checkPlaybackStatus: Not tracking");
         return;
     }
+    
+    LOG(QString("Checking playback status for LID %1...").arg(m_currentLid));
     
     // Request status from MPC-HC web interface
     QUrl url(m_mpcStatusUrl);
@@ -120,6 +128,7 @@ void PlaybackManager::handleStatusReply()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) {
+        LOG("handleStatusReply: Reply is null");
         return;
     }
     
@@ -128,8 +137,11 @@ void PlaybackManager::handleStatusReply()
         // Check if we should stop tracking (after several failed attempts)
         m_failCount++;
         
+        LOG(QString("Failed to connect to MPC-HC web interface (attempt %1/%2): %3")
+            .arg(m_failCount).arg(MAX_CONSECUTIVE_FAILURES).arg(reply->errorString()));
+        
         if (m_failCount > MAX_CONSECUTIVE_FAILURES) {
-            LOG("Playback tracking stopped: Unable to connect to MPC-HC web interface");
+            LOG("Playback tracking stopped: Player closed or web interface not responding");
             stopTracking();
         }
         
@@ -146,6 +158,8 @@ void PlaybackManager::handleStatusReply()
     // We extract: state (capture 1), position_ms (capture 2), duration_ms (capture 3)
     QString response = QString::fromUtf8(reply->readAll());
     
+    LOG(QString("Received MPC-HC status response: %1").arg(response.left(200))); // Log first 200 chars
+    
     // Use regex to extract position and duration
     // Pattern matches: OnStatus("file", "state", pos_ms, "pos_str", dur_ms, "dur_str"...)
     QString pattern = "OnStatus\\([^,]+,\\s*\"([^\"]+)\",\\s*(\\d+),\\s*\"[^\"]+\",\\s*(\\d+),\\s*\"[^\"]+\"";
@@ -160,6 +174,9 @@ void PlaybackManager::handleStatusReply()
         int position = positionMs / 1000; // Convert to seconds
         int duration = durationMs / 1000;
         
+        LOG(QString("Parsed playback status: state=%1, position=%2s, duration=%3s")
+            .arg(state).arg(position).arg(duration));
+        
         // Update position if changed
         if (position != m_lastPosition || duration != m_lastDuration) {
             m_lastPosition = position;
@@ -167,6 +184,8 @@ void PlaybackManager::handleStatusReply()
             
             // Save to database periodically
             m_saveCounter++;
+            LOG(QString("Save counter: %1/%2").arg(m_saveCounter).arg(SAVE_INTERVAL_SECONDS));
+            
             if (m_saveCounter >= SAVE_INTERVAL_SECONDS) {
                 savePlaybackPosition(position, duration);
                 emit playbackPositionUpdated(m_currentLid, position, duration);
@@ -194,6 +213,8 @@ void PlaybackManager::handleStatusReply()
             
             stopTracking();
         }
+    } else {
+        LOG(QString("Failed to parse MPC-HC status response: %1").arg(response.left(200)));
     }
     
     reply->deleteLater();
