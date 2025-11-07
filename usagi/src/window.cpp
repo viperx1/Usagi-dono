@@ -137,9 +137,6 @@ Window::Window()
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pageMylist->addWidget(mylistTreeWidget);
     
-    // Connect tree widget click handler for play buttons
-    connect(mylistTreeWidget, &QTreeWidget::itemClicked, this, &Window::onPlayButtonClicked);
-    
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
     mylistStatusLabel->setAlignment(Qt::AlignCenter);
