@@ -29,6 +29,7 @@
 #include "aired.h"
 #include "directorywatcher.h"
 #include "playbackmanager.h"
+#include "playbuttondelegate.h"
 //#include "hasherthread.h"
 
 class hashes_ : public QTableWidget
@@ -160,8 +161,9 @@ private:
     QColor m_hashedFileColor; // Reusable color object for UI updates
     
     // MyList tree widget column indices
-    static const int MYLIST_ID_COLUMN = 6;   // Column index for LID
-    static const int PLAY_COLUMN = 9;         // Column index for play button
+    // New column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired
+    static const int PLAY_COLUMN = 1;         // Column index for play button (moved next to Anime)
+    static const int MYLIST_ID_COLUMN = 7;    // Column index for LID (shifted from 6)
     
 	// main layout
     QBoxLayout *layout;
@@ -251,8 +253,9 @@ private:
 	// Directory watcher
 	DirectoryWatcher *directoryWatcher;
 	
-	// Playback manager
+	// Playback manager and UI
 	PlaybackManager *playbackManager;
+	PlayButtonDelegate *playButtonDelegate;
 	
 	// Batch processing for hashed files
 	// Note: HashedFileData structure removed as identification now happens immediately
@@ -321,7 +324,7 @@ public slots:
     
     // Playback slots
     void onMediaPlayerBrowseClicked();
-    void onPlayButtonClicked();
+    void onPlayButtonClicked(const QModelIndex &index);
     void onPlaybackPositionUpdated(int lid, int position, int duration);
     void onPlaybackCompleted(int lid);
     void onPlaybackStopped(int lid, int position);
@@ -348,6 +351,8 @@ private:
     QString getFilePathForPlayback(int lid);
     int getPlaybackResumePosition(int lid);
     void startPlaybackForFile(int lid);
+    void updatePlayButtonForItem(QTreeWidgetItem *item);
+    void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
     
     // Helper method to determine file type from filetype string
     FileTreeWidgetItem::FileType determineFileType(const QString& filetype);

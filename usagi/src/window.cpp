@@ -118,14 +118,16 @@ Window::Window()
     // page mylist
     mylistTreeWidget = new QTreeWidget(this);
     mylistTreeWidget->setColumnCount(10);
-    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID" << "Type" << "Aired" << "Play");
-    mylistTreeWidget->setColumnWidth(0, 300);
-    mylistTreeWidget->setColumnWidth(1, 80);
-    mylistTreeWidget->setColumnWidth(2, 250);
-    mylistTreeWidget->setColumnWidth(3, 100);
-    mylistTreeWidget->setColumnWidth(4, 80);
-    mylistTreeWidget->setColumnWidth(5, 200);
-    mylistTreeWidget->setColumnWidth(6, 80);
+    // New column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired
+    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Play" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID" << "Type" << "Aired");
+    mylistTreeWidget->setColumnWidth(0, 300);  // Anime
+    mylistTreeWidget->setColumnWidth(1, 50);   // Play (narrow for button)
+    mylistTreeWidget->setColumnWidth(2, 80);   // Episode
+    mylistTreeWidget->setColumnWidth(3, 250);  // Episode Title
+    mylistTreeWidget->setColumnWidth(4, 100);  // State
+    mylistTreeWidget->setColumnWidth(5, 80);   // Viewed
+    mylistTreeWidget->setColumnWidth(6, 200);  // Storage
+    mylistTreeWidget->setColumnWidth(7, 80);   // Mylist ID
     mylistTreeWidget->setColumnWidth(7, 100);
     mylistTreeWidget->setColumnWidth(8, 180);
     mylistTreeWidget->setColumnWidth(9, 60);
@@ -319,6 +321,13 @@ Window::Window()
             this, &Window::onPlaybackCompleted);
     connect(playbackManager, &PlaybackManager::playbackStopped,
             this, &Window::onPlaybackStopped);
+    
+    // Initialize play button delegate for mylist tree
+    playButtonDelegate = new PlayButtonDelegate(this);
+    mylistTreeWidget->setItemDelegateForColumn(PLAY_COLUMN, playButtonDelegate);
+    connect(playButtonDelegate, &PlayButtonDelegate::playButtonClicked,
+            this, &Window::onPlayButtonClicked);
+    mylistTreeWidget->setMouseTracking(true); // Enable mouse tracking for hover effects
     
     // Initialize timer for deferred processing of already-hashed files
     hashedFilesProcessingTimer = new QTimer(this);
@@ -1466,28 +1475,28 @@ void Window::updateEpisodeInTree(int eid, int aid)
 						}
 						
 						// Display formatted episode number (with leading zeros removed)
-						episodeItem->setText(1, episodeNumber.toDisplayString());
-					}
-					else
-					{
-						episodeItem->setText(1, "Unknown");
-					}
-					
-					// Update episode name (Column 2)
-					if(!episodeName.isEmpty())
-					{
-						episodeItem->setText(2, episodeName);
+						episodeItem->setText(2, episodeNumber.toDisplayString());
 					}
 					else
 					{
 						episodeItem->setText(2, "Unknown");
 					}
 					
+					// Update episode name (Column 2)
+					if(!episodeName.isEmpty())
+					{
+						episodeItem->setText(3, episodeName);
+					}
+					else
+					{
+						episodeItem->setText(3, "Unknown");
+					}
+					
 					// Remove from tracking set since data has been loaded
 					episodesNeedingData.remove(eid);
 					
 					LOG(QString("Updated episode in tree: EID %1, epno: %2, name: %3")
-						.arg(eid).arg(episodeItem->text(1)).arg(episodeName));
+						.arg(eid).arg(episodeItem->text(2)).arg(episodeName));
 					return;
 				}
 			}
@@ -1602,12 +1611,12 @@ void Window::updateOrAddMylistEntry(int lid)
 		// Set Type and Aired for new anime items
 		if(!typeName.isEmpty())
 		{
-			animeItem->setText(7, typeName);
+			animeItem->setText(8, typeName);
 		}
 		if(!startDate.isEmpty())
 		{
 			aired airedDates(startDate, endDate);
-			animeItem->setText(8, airedDates.toDisplayString());
+			animeItem->setText(9, airedDates.toDisplayString());
 			animeItem->setAired(airedDates);
 		}
 	}
@@ -1617,14 +1626,14 @@ void Window::updateOrAddMylistEntry(int lid)
 		animeItemWasExpanded = animeItem->isExpanded();
 		
 		// Update Type and Aired if they're not already set
-		if(!typeName.isEmpty() && animeItem->text(7).isEmpty())
+		if(!typeName.isEmpty() && animeItem->text(8).isEmpty())
 		{
-			animeItem->setText(7, typeName);
+			animeItem->setText(8, typeName);
 		}
-		if(!startDate.isEmpty() && animeItem->text(8).isEmpty())
+		if(!startDate.isEmpty() && animeItem->text(9).isEmpty())
 		{
 			aired airedDates(startDate, endDate);
-			animeItem->setText(8, airedDates.toDisplayString());
+			animeItem->setText(9, airedDates.toDisplayString());
 			animeItem->setAired(airedDates);
 		}
 	}
@@ -1663,12 +1672,12 @@ void Window::updateOrAddMylistEntry(int lid)
 	{
 		::epno episodeNumber(epnoStr);
 		episodeItem->setEpno(episodeNumber);
-		episodeItem->setText(1, episodeNumber.toDisplayString());
+		episodeItem->setText(2, episodeNumber.toDisplayString());
 		episodeType = episodeNumber.type();
 	}
 	else
 	{
-		episodeItem->setText(1, "Loading...");
+		episodeItem->setText(2, "Loading...");
 		episodesNeedingData.insert(eid);
 	}
 	
@@ -1678,7 +1687,7 @@ void Window::updateOrAddMylistEntry(int lid)
 		episodeName = "Loading...";
 		episodesNeedingData.insert(eid);
 	}
-	episodeItem->setText(2, episodeName);
+	episodeItem->setText(3, episodeName);
 	
 	// Column 3: State
 	QString stateStr;
@@ -1690,16 +1699,16 @@ void Window::updateOrAddMylistEntry(int lid)
 		case 3: stateStr = "Deleted"; break;
 		default: stateStr = QString::number(state); break;
 	}
-	episodeItem->setText(3, stateStr);
+	episodeItem->setText(4, stateStr);
 	
 	// Column 4: Viewed
-	episodeItem->setText(4, viewed ? "Yes" : "No");
+	episodeItem->setText(5, viewed ? "Yes" : "No");
 	
 	// Column 5: Storage
-	episodeItem->setText(5, storage);
+	episodeItem->setText(6, storage);
 	
 	// Column 6: Mylist ID
-	episodeItem->setText(6, QString::number(lid));
+	episodeItem->setText(7, QString::number(lid));
 	
 	// Now recalculate anime parent statistics
 	// Count all episodes for this anime
@@ -1726,7 +1735,7 @@ void Window::updateOrAddMylistEntry(int lid)
 			childEpisodeType = childEpno.type();
 		}
 		
-		bool childViewed = (child->text(4) == "Yes");
+		bool childViewed = (child->text(5) == "Yes");
 		
 		animeEpisodeCount++;
 		if(childEpisodeType == 1)
@@ -1778,7 +1787,7 @@ void Window::updateOrAddMylistEntry(int lid)
 			episodeText = QString("%1/?").arg(normalEpisodes);
 		}
 	}
-	animeItem->setText(1, episodeText);
+	animeItem->setText(2, episodeText);
 	
 	// Column 4 (Viewed): show format "A/B+C"
 	QString viewedText;
@@ -1790,31 +1799,31 @@ void Window::updateOrAddMylistEntry(int lid)
 	{
 		viewedText = QString("%1/%2").arg(normalViewed).arg(normalEpisodes);
 	}
-	animeItem->setText(4, viewedText);
+	animeItem->setText(5, viewedText);
 	
 	// Column 9 (Play button): Show checkmark if all normal episodes are watched
 	bool allNormalWatched = (eps > 0 && normalViewed >= eps);
 	if(allNormalWatched)
 	{
-		animeItem->setText(9, "✓"); // Checkmark for fully watched
+		animeItem->setText(2, "✓"); // Checkmark for fully watched
 	}
 	else if(normalEpisodes > 0 || otherEpisodes > 0)
 	{
-		animeItem->setText(9, "▶"); // Play button
+		animeItem->setText(2, "▶"); // Play button
 	}
 	else
 	{
-		animeItem->setText(9, ""); // No button if no episodes
+		animeItem->setText(2, ""); // No button if no episodes
 	}
 	
 	// Update episode play button
 	if(viewed)
 	{
-		episodeItem->setText(9, "✓"); // Checkmark for watched
+		episodeItem->setText(2, "✓"); // Checkmark for watched
 	}
 	else
 	{
-		episodeItem->setText(9, "▶"); // Play button
+		episodeItem->setText(2, "▶"); // Play button
 	}
 	
 	// Restore expanded state
@@ -1831,7 +1840,7 @@ void Window::updateOrAddMylistEntry(int lid)
 	}
 	
 	LOG(QString("Updated mylist entry: lid=%1, aid=%2, eid=%3, anime=%4, episode=%5")
-		.arg(lid).arg(aid).arg(eid).arg(animeName).arg(episodeItem->text(1)));
+		.arg(lid).arg(aid).arg(eid).arg(animeName).arg(episodeItem->text(2)));
 }
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash)
@@ -1995,16 +2004,16 @@ void Window::loadMylistFromDatabase()
 		}
 		
 		// Set Type column (column 7) for anime parent item
-		if(!typeName.isEmpty() && animeItem->text(7).isEmpty())
+		if(!typeName.isEmpty() && animeItem->text(8).isEmpty())
 		{
-			animeItem->setText(7, typeName);
+			animeItem->setText(8, typeName);
 		}
 		
 		// Set Aired column (column 8) for anime parent item
-		if(!startDate.isEmpty() && animeItem->text(8).isEmpty())
+		if(!startDate.isEmpty() && animeItem->text(9).isEmpty())
 		{
 			aired airedDates(startDate, endDate);
-			animeItem->setText(8, airedDates.toDisplayString());
+			animeItem->setText(9, airedDates.toDisplayString());
 			animeItem->setAired(airedDates);
 		}
 		
@@ -2029,12 +2038,12 @@ void Window::loadMylistFromDatabase()
 			{
 				::epno episodeNumber(epno);
 				episodeItem->setEpno(episodeNumber);
-				episodeItem->setText(1, episodeNumber.toDisplayString());
+				episodeItem->setText(2, episodeNumber.toDisplayString());
 				episodeType = episodeNumber.type();
 			}
 			else
 			{
-				episodeItem->setText(1, "Loading...");
+				episodeItem->setText(2, "Loading...");
 				episodesNeedingData.insert(eid);
 			}
 			
@@ -2044,13 +2053,13 @@ void Window::loadMylistFromDatabase()
 				episodeName = "Loading...";
 				episodesNeedingData.insert(eid);
 			}
-			episodeItem->setText(2, episodeName);
+			episodeItem->setText(3, episodeName);
 			
 			// Empty columns 3-6 for episode items (will be shown in file children)
-			episodeItem->setText(3, "");
 			episodeItem->setText(4, "");
 			episodeItem->setText(5, "");
 			episodeItem->setText(6, "");
+			episodeItem->setText(7, "");
 			
 			episodeItems[episodeKey] = episodeItem;
 			
@@ -2116,13 +2125,13 @@ void Window::loadMylistFromDatabase()
 			}
 		}
 		
-		fileItem->setText(1, fileInfo);
+		fileItem->setText(2, fileInfo);
 		
 		// Column 2: Show file type
 		// Use constant for default file type
 		static const QString DEFAULT_FILETYPE = "video";
 		QString fileTypeDisplay = filetype.isEmpty() ? DEFAULT_FILETYPE : filetype;
-		fileItem->setText(2, fileTypeDisplay);
+		fileItem->setText(3, fileTypeDisplay);
 		
 		// Determine file type for color coding using helper method
 		FileTreeWidgetItem::FileType type = determineFileType(filetype);
@@ -2165,22 +2174,22 @@ void Window::loadMylistFromDatabase()
 			case 3: stateStr = "Deleted"; break;
 			default: stateStr = QString::number(state); break;
 		}
-		fileItem->setText(3, stateStr);
+		fileItem->setText(4, stateStr);
 		
 		// Viewed status
-		fileItem->setText(4, viewed ? "Yes" : "No");
-		fileItem->setText(5, storage);
-		fileItem->setText(6, QString::number(lid));
+		fileItem->setText(5, viewed ? "Yes" : "No");
+		fileItem->setText(6, storage);
+		fileItem->setText(7, QString::number(lid));
 		
 		// Add play button text indicator (column 9)
 		if (type == FileTreeWidgetItem::Video) {
 			if (viewed) {
-				fileItem->setText(9, "✓"); // Checkmark for watched
+				fileItem->setText(2, "✓"); // Checkmark for watched
 			} else {
-				fileItem->setText(9, "▶"); // Play button
+				fileItem->setText(2, "▶"); // Play button
 			}
 		} else {
-			fileItem->setText(9, ""); // No button for non-video files
+			fileItem->setText(2, ""); // No button for non-video files
 		}
 		
 		fileItem->setData(0, Qt::UserRole, fid);
@@ -2211,7 +2220,7 @@ void Window::loadMylistFromDatabase()
 			if(file && file->getFileType() == FileTreeWidgetItem::Video)
 			{
 				hasVideoFile = true;
-				if(fileItem->text(4) == "Yes")
+				if(fileItem->text(5) == "Yes")
 				{
 					episodeViewed = true;
 					break;
@@ -2224,16 +2233,16 @@ void Window::loadMylistFromDatabase()
 		{
 			if(episodeViewed)
 			{
-				episodeItem->setText(9, "✓"); // Checkmark for watched
+				episodeItem->setText(2, "✓"); // Checkmark for watched
 			}
 			else
 			{
-				episodeItem->setText(9, "▶"); // Play button
+				episodeItem->setText(2, "▶"); // Play button
 			}
 		}
 		else
 		{
-			episodeItem->setText(9, ""); // No button if no video file
+			episodeItem->setText(2, ""); // No button if no video file
 		}
 		
 		if(episodeViewed && !viewedEpisodes.contains(episodeKey))
@@ -2295,7 +2304,7 @@ void Window::loadMylistFromDatabase()
 				episodeText = QString("%1/?").arg(normalEpisodes);
 			}
 		}
-		animeItem->setText(1, episodeText);
+		animeItem->setText(2, episodeText);
 		
 		// Column 4 (Viewed): show format "A/B+C"
 		QString viewedText;
@@ -2307,21 +2316,21 @@ void Window::loadMylistFromDatabase()
 		{
 			viewedText = QString("%1/%2").arg(normalViewed).arg(normalEpisodes);
 		}
-		animeItem->setText(4, viewedText);
+		animeItem->setText(5, viewedText);
 		
 		// Column 9 (Play button): Show checkmark if all normal episodes are watched
 		bool allNormalWatched = (totalNormalEpisodes > 0 && normalViewed >= totalNormalEpisodes);
 		if(allNormalWatched)
 		{
-			animeItem->setText(9, "✓"); // Checkmark for fully watched
+			animeItem->setText(2, "✓"); // Checkmark for fully watched
 		}
 		else if(normalEpisodes > 0 || otherEpisodes > 0)
 		{
-			animeItem->setText(9, "▶"); // Play button
+			animeItem->setText(2, "▶"); // Play button
 		}
 		else
 		{
-			animeItem->setText(9, ""); // No button if no episodes
+			animeItem->setText(2, ""); // No button if no episodes
 		}
 	}
 	
@@ -2937,18 +2946,15 @@ void Window::onMediaPlayerBrowseClicked()
 	}
 }
 
-void Window::onPlayButtonClicked()
+void Window::onPlayButtonClicked(const QModelIndex &index)
 {
-	QTreeWidgetItem *item = mylistTreeWidget->currentItem();
-	if (!item) {
+	if (!index.isValid()) {
 		return;
 	}
 	
-	// Get the column that was clicked
-	int column = mylistTreeWidget->currentColumn();
-	
-	// Only handle clicks on the Play column
-	if (column != PLAY_COLUMN) {
+	// Get the item from the model index
+	QTreeWidgetItem *item = mylistTreeWidget->itemFromIndex(index);
+	if (!item) {
 		return;
 	}
 	
@@ -3033,14 +3039,137 @@ void Window::onPlaybackPositionUpdated(int lid, int position, int duration)
 	// The position is already saved by PlaybackManager, no need to do anything here
 }
 
+void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
+{
+	if (!item) return;
+	
+	// Determine item type and update button accordingly
+	QTreeWidgetItem *parent = item->parent();
+	
+	if (parent && parent->parent()) {
+		// This is a file item
+		FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(item);
+		if (file && file->getFileType() == FileTreeWidgetItem::Video) {
+			bool viewed = (item->text(5) == "Yes");
+			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
+		}
+	}
+	else if (parent && !parent->parent()) {
+		// This is an episode item
+		bool episodeViewed = false;
+		bool hasVideoFile = false;
+		for (int i = 0; i < item->childCount(); i++) {
+			QTreeWidgetItem *fileItem = item->child(i);
+			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
+			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
+				hasVideoFile = true;
+				if (fileItem->text(5) == "Yes") {
+					episodeViewed = true;
+					break;
+				}
+			}
+		}
+		
+		if (hasVideoFile) {
+			item->setText(PLAY_COLUMN, episodeViewed ? "✓" : "▶");
+		} else {
+			item->setText(PLAY_COLUMN, "");
+		}
+		
+		// Also update parent anime
+		if (parent) {
+			updatePlayButtonForItem(parent);
+		}
+	}
+	else if (!parent) {
+		// This is an anime item
+		int totalEpisodes = 0;
+		int viewedEpisodes = 0;
+		
+		for (int i = 0; i < item->childCount(); i++) {
+			QTreeWidgetItem *episodeItem = item->child(i);
+			bool episodeViewed = false;
+			bool hasVideoFile = false;
+			
+			for (int j = 0; j < episodeItem->childCount(); j++) {
+				QTreeWidgetItem *fileItem = episodeItem->child(j);
+				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
+				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
+					hasVideoFile = true;
+					if (fileItem->text(5) == "Yes") {
+						episodeViewed = true;
+						break;
+					}
+				}
+			}
+			
+			if (hasVideoFile) {
+				totalEpisodes++;
+				if (episodeViewed) {
+					viewedEpisodes++;
+				}
+			}
+		}
+		
+		if (totalEpisodes > 0) {
+			if (viewedEpisodes == totalEpisodes) {
+				item->setText(PLAY_COLUMN, "✓");
+			} else {
+				item->setText(PLAY_COLUMN, "▶");
+			}
+		} else {
+			item->setText(PLAY_COLUMN, "");
+		}
+	}
+}
+
+void Window::updatePlayButtonsInTree(QTreeWidgetItem *rootItem)
+{
+	if (!rootItem) {
+		// Update all items in tree
+		int topLevelCount = mylistTreeWidget->topLevelItemCount();
+		for (int i = 0; i < topLevelCount; i++) {
+			updatePlayButtonsInTree(mylistTreeWidget->topLevelItem(i));
+		}
+		return;
+	}
+	
+	// Update this item
+	updatePlayButtonForItem(rootItem);
+	
+	// Recursively update children
+	for (int i = 0; i < rootItem->childCount(); i++) {
+		updatePlayButtonsInTree(rootItem->child(i));
+	}
+}
+
 void Window::onPlaybackCompleted(int lid)
 {
-	LOG(QString("Playback completed: LID %1 - Refreshing mylist tree").arg(lid));
-	// Update the mylist tree to reflect the watched status
-	// Use a slight delay to ensure database writes are flushed
-	QTimer::singleShot(100, this, [this]() {
-		loadMylistFromDatabase();
-	});
+	LOG(QString("Playback completed: LID %1 - Updating play buttons").arg(lid));
+	
+	// Find the file item with this LID and update its play button and parents
+	QTreeWidgetItemIterator it(mylistTreeWidget);
+	while (*it) {
+		QTreeWidgetItem *item = *it;
+		if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
+			// Found the file - update it and its parents
+			updatePlayButtonForItem(item);
+			
+			// Update episode parent if exists
+			QTreeWidgetItem *episodeItem = item->parent();
+			if (episodeItem) {
+				updatePlayButtonForItem(episodeItem);
+				
+				// Update anime parent if exists
+				QTreeWidgetItem *animeItem = episodeItem->parent();
+				if (animeItem) {
+					updatePlayButtonForItem(animeItem);
+				}
+			}
+			break;
+		}
+		++it;
+	}
 }
 
 void Window::onPlaybackStopped(int lid, int position)

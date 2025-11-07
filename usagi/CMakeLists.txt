@@ -48,6 +48,7 @@ set(SOURCES
     src/directorywatcher.cpp
     src/logger.cpp
     src/playbackmanager.cpp
+    src/playbuttondelegate.cpp
 )
 
 # Header files
@@ -65,6 +66,7 @@ set(HEADERS
     src/directorywatcher.h
     src/logger.h
     src/playbackmanager.h
+    src/playbuttondelegate.h
 )
 
 # Create executable
