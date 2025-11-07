@@ -158,11 +158,12 @@ void PlaybackManager::handleStatusReply()
     // We extract: state (capture 1), position_ms (capture 2), duration_ms (capture 3)
     QString response = QString::fromUtf8(reply->readAll());
     
-    LOG(QString("Received MPC-HC status response: %1").arg(response.left(200))); // Log first 200 chars
+    LOG(QString("Received MPC-HC status response (length %1): %2").arg(response.length()).arg(response));
     
     // Use regex to extract position and duration
     // Pattern matches: OnStatus("file", "state", pos_ms, "pos_str", dur_ms, "dur_str"...)
-    QString pattern = "OnStatus\\([^,]+,\\s*\"([^\"]+)\",\\s*(\\d+),\\s*\"[^\"]+\",\\s*(\\d+),\\s*\"[^\"]+\"";
+    // The first field is a quoted filename (match \"...\"), then state, position, etc.
+    QString pattern = "OnStatus\\(\"[^\"]*\",\\s*\"([^\"]+)\",\\s*(\\d+),\\s*\"[^\"]+\",\\s*(\\d+),\\s*\"[^\"]+\"";
     QRegularExpression regex(pattern);
     QRegularExpressionMatch match = regex.match(response);
     
@@ -214,7 +215,8 @@ void PlaybackManager::handleStatusReply()
             stopTracking();
         }
     } else {
-        LOG(QString("Failed to parse MPC-HC status response: %1").arg(response.left(200)));
+        LOG(QString("Failed to parse MPC-HC status response (length %1). Response: %2").arg(response.length()).arg(response));
+        LOG(QString("Regex pattern used: %1").arg(pattern));
     }
     
     reply->deleteLater();
