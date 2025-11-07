@@ -1868,6 +1868,75 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 	return 0;
 }
 
+int AniDBApi::LinkLocalFileToMylist(qint64 size, QString ed2kHash, QString localPath)
+{
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		LOG("Database not available, cannot link local file to mylist");
+		return 0;
+	}
+	
+	// Find the lid using the file info
+	QSqlQuery lidQuery(db);
+	lidQuery.prepare("SELECT m.lid FROM mylist m "
+					 "INNER JOIN file f ON m.fid = f.fid "
+					 "WHERE f.size = ? AND f.ed2k = ?");
+	lidQuery.addBindValue(size);
+	lidQuery.addBindValue(ed2kHash);
+	
+	if(lidQuery.exec() && lidQuery.next())
+	{
+		int lid = lidQuery.value(0).toInt();
+		
+		// Get the local_file id from local_files table
+		QSqlQuery localFileQuery(db);
+		localFileQuery.prepare("SELECT id FROM local_files WHERE path = ?");
+		localFileQuery.addBindValue(localPath);
+		
+		if(localFileQuery.exec() && localFileQuery.next())
+		{
+			int localFileId = localFileQuery.value(0).toInt();
+			
+			// Update the local_file reference in mylist table
+			QSqlQuery updateQuery(db);
+			updateQuery.prepare("UPDATE `mylist` SET `local_file` = ? WHERE `lid` = ?");
+			updateQuery.addBindValue(localFileId);
+			updateQuery.addBindValue(lid);
+			
+			if(updateQuery.exec())
+			{
+				LOG(QString("Linked local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
+				
+				// Update status in local_files table to 2 (in anidb)
+				QSqlQuery statusQuery(db);
+				statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
+				statusQuery.addBindValue(localFileId);
+				statusQuery.exec();
+				
+				// Return the lid for use by the caller
+				return lid;
+			}
+			else
+			{
+				LOG("Failed to link local_file: " + updateQuery.lastError().text());
+			}
+		}
+		else
+		{
+			LOG("Could not find local_file entry for path=" + localPath);
+		}
+	}
+	else
+	{
+		LOG(QString("Could not find mylist entry for size=%1 ed2k=%2").arg(size).arg(ed2kHash));
+	}
+	
+	// Return 0 if we couldn't find or update the lid
+	return 0;
+}
+
+
 void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 {
 	// Check if database is valid and open before using it

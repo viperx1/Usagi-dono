@@ -820,9 +820,8 @@ void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
 				else
 				{
 					hashes->item(i, 6)->setText("0");
-					// File already in mylist - no API call needed
-					// Update status to 2 (in anidb) to prevent re-detection
-					adbapi->UpdateLocalFileStatus(filePath, 2);
+					// File already in mylist - link the local_file and update status
+					adbapi->LinkLocalFileToMylist(data.size, data.hexdigest, filePath);
 				}
 			}
 			else
