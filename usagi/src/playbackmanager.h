@@ -81,6 +81,7 @@ private slots:
 private:
     void savePlaybackPosition(int position, int duration);
     
+    // Playback state
     bool m_tracking;
     int m_currentLid;
     QString m_currentFilePath;
@@ -90,8 +91,14 @@ private:
     QTimer *m_statusTimer;
     QNetworkAccessManager *m_networkManager;
     
-    // MPC-HC web interface URL
+    // Configuration constants
     static const int MPC_WEB_PORT = 13579;
+    static const int STATUS_POLL_INTERVAL_MS = 1000;  // Poll every second
+    static const int PLAYER_STARTUP_DELAY_MS = 2000;  // Wait 2 seconds for player to start
+    static const int SAVE_INTERVAL_SECONDS = 5;       // Save position every 5 seconds
+    static const int COMPLETION_THRESHOLD_SECONDS = 5; // Mark complete within 5s of end
+    static const int MAX_CONSECUTIVE_FAILURES = 5;     // Stop tracking after 5 failures
+    
     QString m_mpcStatusUrl;
 };
 

@@ -2940,6 +2940,10 @@ void Window::onMediaPlayerBrowseClicked()
 
 void Window::onPlayButtonClicked()
 {
+	// Column indices constants
+	static const int MYLIST_ID_COLUMN = 6;
+	static const int PLAY_COLUMN = 9;
+	
 	QTreeWidgetItem *item = mylistTreeWidget->currentItem();
 	if (!item) {
 		return;
@@ -2948,8 +2952,8 @@ void Window::onPlayButtonClicked()
 	// Get the column that was clicked
 	int column = mylistTreeWidget->currentColumn();
 	
-	// Only handle clicks on the Play column (column 9)
-	if (column != 9) {
+	// Only handle clicks on the Play column
+	if (column != PLAY_COLUMN) {
 		return;
 	}
 	
@@ -2958,7 +2962,7 @@ void Window::onPlayButtonClicked()
 	QTreeWidgetItem *parent = item->parent();
 	if (parent && parent->parent()) {
 		// This is a file item
-		int lid = item->data(6, Qt::DisplayRole).toInt();
+		int lid = item->data(MYLIST_ID_COLUMN, Qt::DisplayRole).toInt();
 		if (lid > 0) {
 			QString filePath = getFilePathForPlayback(lid);
 			if (!filePath.isEmpty()) {
@@ -2989,7 +2993,7 @@ void Window::onPlayButtonClicked()
 			QTreeWidgetItem *fileItem = item->child(i);
 			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-				int lid = fileItem->data(6, Qt::DisplayRole).toInt();
+				int lid = fileItem->data(MYLIST_ID_COLUMN, Qt::DisplayRole).toInt();
 				if (lid > 0) {
 					QString filePath = getFilePathForPlayback(lid);
 					if (!filePath.isEmpty()) {
@@ -3025,7 +3029,7 @@ void Window::onPlayButtonClicked()
 				QTreeWidgetItem *fileItem = episodeItem->child(j);
 				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-					int lid = fileItem->data(6, Qt::DisplayRole).toInt();
+					int lid = fileItem->data(MYLIST_ID_COLUMN, Qt::DisplayRole).toInt();
 					if (lid > 0) {
 						QString filePath = getFilePathForPlayback(lid);
 						if (!filePath.isEmpty()) {

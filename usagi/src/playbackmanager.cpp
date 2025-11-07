@@ -15,7 +15,7 @@ PlaybackManager::PlaybackManager(QObject *parent)
     , m_mpcStatusUrl(QString("http://localhost:%1/status.html").arg(MPC_WEB_PORT))
 {
     m_statusTimer = new QTimer(this);
-    m_statusTimer->setInterval(1000); // Check every second
+    m_statusTimer->setInterval(STATUS_POLL_INTERVAL_MS);
     connect(m_statusTimer, &QTimer::timeout, this, &PlaybackManager::checkPlaybackStatus);
     
     m_networkManager = new QNetworkAccessManager(this);
@@ -73,7 +73,7 @@ bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resume
     m_lastDuration = 0;
     
     // Start status polling after a short delay to let player start
-    QTimer::singleShot(2000, this, [this]() {
+    QTimer::singleShot(PLAYER_STARTUP_DELAY_MS, this, [this]() {
         m_statusTimer->start();
     });
     
@@ -126,7 +126,7 @@ void PlaybackManager::handleStatusReply()
         // Check if we should stop tracking (after several failed attempts)
         failCount++;
         
-        if (failCount > 5) {
+        if (failCount > MAX_CONSECUTIVE_FAILURES) {
             LOG("Playback tracking stopped: Unable to connect to MPC-HC web interface");
             stopTracking();
             failCount = 0;
@@ -160,18 +160,18 @@ void PlaybackManager::handleStatusReply()
             m_lastPosition = position;
             m_lastDuration = duration;
             
-            // Save to database periodically (every 5 seconds)
+            // Save to database periodically
             static int saveCounter = 0;
             saveCounter++;
-            if (saveCounter >= 5) {
+            if (saveCounter >= SAVE_INTERVAL_SECONDS) {
                 savePlaybackPosition(position, duration);
                 emit playbackPositionUpdated(m_currentLid, position, duration);
                 saveCounter = 0;
             }
         }
         
-        // Check if playback completed (within last 5 seconds of file)
-        if (duration > 0 && position >= duration - 5) {
+        // Check if playback completed
+        if (duration > 0 && position >= duration - COMPLETION_THRESHOLD_SECONDS) {
             LOG(QString("Playback completed: LID %1").arg(m_currentLid));
             
             // Mark as fully watched
@@ -220,9 +220,13 @@ void PlaybackManager::savePlaybackPosition(int position, int duration)
 
 QString PlaybackManager::getMediaPlayerPath()
 {
+    // Default player path constant
+    static const QString DEFAULT_MEDIA_PLAYER_PATH = 
+        "C:\\Program Files (x86)\\K-Lite Codec Pack\\MPC-HC64\\mpc-hc64_nvo.exe";
+    
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        return QString();
+        return DEFAULT_MEDIA_PLAYER_PATH;
     }
     
     QSqlQuery q(db);
@@ -233,7 +237,7 @@ QString PlaybackManager::getMediaPlayerPath()
     }
     
     // Return default path if not set
-    return "C:\\Program Files (x86)\\K-Lite Codec Pack\\MPC-HC64\\mpc-hc64_nvo.exe";
+    return DEFAULT_MEDIA_PLAYER_PATH;
 }
 
 void PlaybackManager::setMediaPlayerPath(const QString &path)
