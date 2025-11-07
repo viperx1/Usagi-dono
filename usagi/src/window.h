@@ -346,7 +346,8 @@ private:
     
     // Helper methods for playback
     QString getFilePathForPlayback(int lid);
-    void updatePlayButtonStates();
+    int getPlaybackResumePosition(int lid);
+    void startPlaybackForFile(int lid);
     
     // Helper method to determine file type from filetype string
     FileTreeWidgetItem::FileType determineFileType(const QString& filetype);

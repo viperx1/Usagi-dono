@@ -141,6 +141,8 @@ void PlaybackManager::handleStatusReply()
     
     // Parse the status response
     // Format: OnStatus("filename", "state", position_ms, "position_str", duration_ms, "duration_str", muted, volume, "filepath")
+    // Example: OnStatus("file.mkv", "Playing", 5298, "00:00:05", 1455038, "00:24:15", 0, 100, "D:\path\file.mkv")
+    // We extract: state (capture 1), position_ms (capture 2), duration_ms (capture 3)
     QString response = QString::fromUtf8(reply->readAll());
     
     // Use regex to extract position and duration

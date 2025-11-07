@@ -2959,27 +2959,7 @@ void Window::onPlayButtonClicked()
 	if (parent && parent->parent()) {
 		// This is a file item
 		int lid = item->text(MYLIST_ID_COLUMN).toInt();
-		if (lid > 0) {
-			QString filePath = getFilePathForPlayback(lid);
-			if (!filePath.isEmpty()) {
-				// Get playback position from database
-				QSqlDatabase db = QSqlDatabase::database();
-				if (db.isOpen()) {
-					QSqlQuery q(db);
-					q.prepare("SELECT playback_position FROM mylist WHERE lid = ?");
-					q.addBindValue(lid);
-					
-					int resumePosition = 0;
-					if (q.exec() && q.next()) {
-						resumePosition = q.value(0).toInt();
-					}
-					
-					playbackManager->startPlayback(filePath, lid, resumePosition);
-				}
-			} else {
-				LOG(QString("Cannot play: file path not found for LID %1").arg(lid));
-			}
-		}
+		startPlaybackForFile(lid);
 	}
 	// Check if this is an episode item (has a parent but no grandparent)
 	else if (parent && !parent->parent()) {
@@ -2991,24 +2971,8 @@ void Window::onPlayButtonClicked()
 			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 				int lid = fileItem->text(MYLIST_ID_COLUMN).toInt();
 				if (lid > 0) {
-					QString filePath = getFilePathForPlayback(lid);
-					if (!filePath.isEmpty()) {
-						// Get playback position from database
-						QSqlDatabase db = QSqlDatabase::database();
-						if (db.isOpen()) {
-							QSqlQuery q(db);
-							q.prepare("SELECT playback_position FROM mylist WHERE lid = ?");
-							q.addBindValue(lid);
-							
-							int resumePosition = 0;
-							if (q.exec() && q.next()) {
-								resumePosition = q.value(0).toInt();
-							}
-							
-							playbackManager->startPlayback(filePath, lid, resumePosition);
-						}
-						return;
-					}
+					startPlaybackForFile(lid);
+					return;
 				}
 			}
 		}
@@ -3027,24 +2991,8 @@ void Window::onPlayButtonClicked()
 				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 					int lid = fileItem->text(MYLIST_ID_COLUMN).toInt();
 					if (lid > 0) {
-						QString filePath = getFilePathForPlayback(lid);
-						if (!filePath.isEmpty()) {
-							// Get playback position from database
-							QSqlDatabase db = QSqlDatabase::database();
-							if (db.isOpen()) {
-								QSqlQuery q(db);
-								q.prepare("SELECT playback_position FROM mylist WHERE lid = ?");
-								q.addBindValue(lid);
-								
-								int resumePosition = 0;
-								if (q.exec() && q.next()) {
-									resumePosition = q.value(0).toInt();
-								}
-								
-								playbackManager->startPlayback(filePath, lid, resumePosition);
-							}
-							return;
-						}
+						startPlaybackForFile(lid);
+						return;
 					}
 				}
 			}
@@ -3106,9 +3054,35 @@ QString Window::getFilePathForPlayback(int lid)
 	return QString();
 }
 
-void Window::updatePlayButtonStates()
+int Window::getPlaybackResumePosition(int lid)
 {
-	// This function would update the play button icons based on watched status
-	// For now, we'll use text indicators
-	// This will be called after loading mylist data
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		return 0;
+	}
+	
+	QSqlQuery q(db);
+	q.prepare("SELECT playback_position FROM mylist WHERE lid = ?");
+	q.addBindValue(lid);
+	
+	if (q.exec() && q.next()) {
+		return q.value(0).toInt();
+	}
+	
+	return 0;
+}
+
+void Window::startPlaybackForFile(int lid)
+{
+	if (lid <= 0) {
+		return;
+	}
+	
+	QString filePath = getFilePathForPlayback(lid);
+	if (!filePath.isEmpty()) {
+		int resumePosition = getPlaybackResumePosition(lid);
+		playbackManager->startPlayback(filePath, lid, resumePosition);
+	} else {
+		LOG(QString("Cannot play: file path not found for LID %1").arg(lid));
+	}
 }
