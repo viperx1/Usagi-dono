@@ -1733,7 +1733,7 @@ void Window::updateOrAddMylistEntry(int lid)
 			childEpisodeType = childEpno.type();
 		}
 		
-		bool childViewed = (child->text(5) == "Yes");
+		bool childViewed = (child->text(COL_VIEWED) == "Yes");
 		
 		animeEpisodeCount++;
 		if(childEpisodeType == 1)
@@ -1803,25 +1803,25 @@ void Window::updateOrAddMylistEntry(int lid)
 	bool allNormalWatched = (eps > 0 && normalViewed >= eps);
 	if(allNormalWatched)
 	{
-		animeItem->setText(2, "✓"); // Checkmark for fully watched
+		animeItem->setText(COL_PLAY, "✓"); // Checkmark for fully watched
 	}
 	else if(normalEpisodes > 0 || otherEpisodes > 0)
 	{
-		animeItem->setText(2, "▶"); // Play button
+		animeItem->setText(COL_PLAY, "▶"); // Play button
 	}
 	else
 	{
-		animeItem->setText(2, ""); // No button if no episodes
+		animeItem->setText(COL_PLAY, ""); // No button if no episodes
 	}
 	
 	// Update episode play button
 	if(viewed)
 	{
-		episodeItem->setText(2, "✓"); // Checkmark for watched
+		episodeItem->setText(COL_PLAY, "✓"); // Checkmark for watched
 	}
 	else
 	{
-		episodeItem->setText(2, "▶"); // Play button
+		episodeItem->setText(COL_PLAY, "▶"); // Play button
 	}
 	
 	// Restore expanded state
@@ -2179,15 +2179,15 @@ void Window::loadMylistFromDatabase()
 		fileItem->setText(6, storage);
 		fileItem->setText(7, QString::number(lid));
 		
-		// Add play button text indicator (column 9)
+		// Add play button text indicator (column 1 - PLAY)
 		if (type == FileTreeWidgetItem::Video) {
 			if (viewed) {
-				fileItem->setText(2, "✓"); // Checkmark for watched
+				fileItem->setText(COL_PLAY, "✓"); // Checkmark for watched
 			} else {
-				fileItem->setText(2, "▶"); // Play button
+				fileItem->setText(COL_PLAY, "▶"); // Play button
 			}
 		} else {
-			fileItem->setText(2, ""); // No button for non-video files
+			fileItem->setText(COL_PLAY, ""); // No button for non-video files
 		}
 		
 		fileItem->setData(0, Qt::UserRole, fid);
@@ -2218,7 +2218,7 @@ void Window::loadMylistFromDatabase()
 			if(file && file->getFileType() == FileTreeWidgetItem::Video)
 			{
 				hasVideoFile = true;
-				if(fileItem->text(5) == "Yes")
+				if(fileItem->text(COL_VIEWED) == "Yes")
 				{
 					episodeViewed = true;
 					break;
@@ -2231,16 +2231,16 @@ void Window::loadMylistFromDatabase()
 		{
 			if(episodeViewed)
 			{
-				episodeItem->setText(2, "✓"); // Checkmark for watched
+				episodeItem->setText(COL_PLAY, "✓"); // Checkmark for watched
 			}
 			else
 			{
-				episodeItem->setText(2, "▶"); // Play button
+				episodeItem->setText(COL_PLAY, "▶"); // Play button
 			}
 		}
 		else
 		{
-			episodeItem->setText(2, ""); // No button if no video file
+			episodeItem->setText(COL_PLAY, ""); // No button if no video file
 		}
 		
 		if(episodeViewed && !viewedEpisodes.contains(episodeKey))
@@ -2320,15 +2320,15 @@ void Window::loadMylistFromDatabase()
 		bool allNormalWatched = (totalNormalEpisodes > 0 && normalViewed >= totalNormalEpisodes);
 		if(allNormalWatched)
 		{
-			animeItem->setText(2, "✓"); // Checkmark for fully watched
+			animeItem->setText(COL_PLAY, "✓"); // Checkmark for fully watched
 		}
 		else if(normalEpisodes > 0 || otherEpisodes > 0)
 		{
-			animeItem->setText(2, "▶"); // Play button
+			animeItem->setText(COL_PLAY, "▶"); // Play button
 		}
 		else
 		{
-			animeItem->setText(2, ""); // No button if no episodes
+			animeItem->setText(COL_PLAY, ""); // No button if no episodes
 		}
 	}
 	
@@ -3048,7 +3048,7 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		// This is a file item
 		FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(item);
 		if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-			bool viewed = (item->text(5) == "Yes");
+			bool viewed = (item->text(COL_VIEWED) == "Yes");
 			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
 		}
 	}
@@ -3061,7 +3061,7 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 				hasVideoFile = true;
-				if (fileItem->text(5) == "Yes") {
+				if (fileItem->text(COL_VIEWED) == "Yes") {
 					episodeViewed = true;
 					break;
 				}
@@ -3094,7 +3094,7 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 					hasVideoFile = true;
-					if (fileItem->text(5) == "Yes") {
+					if (fileItem->text(COL_VIEWED) == "Yes") {
 						episodeViewed = true;
 						break;
 					}
