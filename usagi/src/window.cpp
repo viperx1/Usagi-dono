@@ -3,6 +3,7 @@
 #include "hasherthread.h"
 #include "crashlog.h"
 #include "logger.h"
+#include "playbuttondelegate.h"
 #include <QElapsedTimer>
 
 HasherThread hasherThread;

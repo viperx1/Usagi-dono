@@ -29,8 +29,10 @@
 #include "aired.h"
 #include "directorywatcher.h"
 #include "playbackmanager.h"
-#include "playbuttondelegate.h"
 //#include "hasherthread.h"
+
+// Forward declarations
+class PlayButtonDelegate;
 
 class hashes_ : public QTableWidget
 {
