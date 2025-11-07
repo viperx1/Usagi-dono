@@ -12,6 +12,8 @@ PlaybackManager::PlaybackManager(QObject *parent)
     , m_currentLid(0)
     , m_lastPosition(0)
     , m_lastDuration(0)
+    , m_failCount(0)
+    , m_saveCounter(0)
     , m_mpcStatusUrl(QString("http://localhost:%1/status.html").arg(MPC_WEB_PORT))
 {
     m_statusTimer = new QTimer(this);
@@ -71,6 +73,8 @@ bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resume
     m_currentFilePath = filePath;
     m_lastPosition = resumePosition;
     m_lastDuration = 0;
+    m_failCount = 0;          // Reset fail count
+    m_saveCounter = 0;        // Reset save counter
     
     // Start status polling after a short delay to let player start
     QTimer::singleShot(PLAYER_STARTUP_DELAY_MS, this, [this]() {
@@ -118,18 +122,14 @@ void PlaybackManager::handleStatusReply()
         return;
     }
     
-    // Static variable to track consecutive failures
-    static int failCount = 0;
-    
     if (reply->error() != QNetworkReply::NoError) {
         // Player might have closed or web interface is not enabled
         // Check if we should stop tracking (after several failed attempts)
-        failCount++;
+        m_failCount++;
         
-        if (failCount > MAX_CONSECUTIVE_FAILURES) {
+        if (m_failCount > MAX_CONSECUTIVE_FAILURES) {
             LOG("Playback tracking stopped: Unable to connect to MPC-HC web interface");
             stopTracking();
-            failCount = 0;
         }
         
         reply->deleteLater();
@@ -137,7 +137,7 @@ void PlaybackManager::handleStatusReply()
     }
     
     // Reset fail count on success
-    failCount = 0;
+    m_failCount = 0;
     
     // Parse the status response
     // Format: OnStatus("filename", "state", position_ms, "position_str", duration_ms, "duration_str", muted, volume, "filepath")
@@ -161,12 +161,11 @@ void PlaybackManager::handleStatusReply()
             m_lastDuration = duration;
             
             // Save to database periodically
-            static int saveCounter = 0;
-            saveCounter++;
-            if (saveCounter >= SAVE_INTERVAL_SECONDS) {
+            m_saveCounter++;
+            if (m_saveCounter >= SAVE_INTERVAL_SECONDS) {
                 savePlaybackPosition(position, duration);
                 emit playbackPositionUpdated(m_currentLid, position, duration);
-                saveCounter = 0;
+                m_saveCounter = 0;
             }
         }
         

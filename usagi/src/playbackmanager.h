@@ -87,6 +87,8 @@ private:
     QString m_currentFilePath;
     int m_lastPosition;
     int m_lastDuration;
+    int m_failCount;          // Track consecutive connection failures
+    int m_saveCounter;        // Counter for periodic position saves
     
     QTimer *m_statusTimer;
     QNetworkAccessManager *m_networkManager;

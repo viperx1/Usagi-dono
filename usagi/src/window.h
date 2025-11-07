@@ -159,6 +159,10 @@ private:
     static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
     QColor m_hashedFileColor; // Reusable color object for UI updates
     
+    // MyList tree widget column indices
+    static const int MYLIST_ID_COLUMN = 6;   // Column index for LID
+    static const int PLAY_COLUMN = 9;         // Column index for play button
+    
 	// main layout
     QBoxLayout *layout;
     QTabWidget *tabwidget;

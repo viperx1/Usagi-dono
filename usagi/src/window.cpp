@@ -2940,10 +2940,6 @@ void Window::onMediaPlayerBrowseClicked()
 
 void Window::onPlayButtonClicked()
 {
-	// Column indices constants
-	static const int MYLIST_ID_COLUMN = 6;
-	static const int PLAY_COLUMN = 9;
-	
 	QTreeWidgetItem *item = mylistTreeWidget->currentItem();
 	if (!item) {
 		return;
