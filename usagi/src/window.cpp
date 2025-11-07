@@ -1793,6 +1793,31 @@ void Window::updateOrAddMylistEntry(int lid)
 	}
 	animeItem->setText(4, viewedText);
 	
+	// Column 9 (Play button): Show checkmark if all normal episodes are watched
+	bool allNormalWatched = (eps > 0 && normalViewed >= eps);
+	if(allNormalWatched)
+	{
+		animeItem->setText(9, "✓"); // Checkmark for fully watched
+	}
+	else if(normalEpisodes > 0 || otherEpisodes > 0)
+	{
+		animeItem->setText(9, "▶"); // Play button
+	}
+	else
+	{
+		animeItem->setText(9, ""); // No button if no episodes
+	}
+	
+	// Update episode play button
+	if(viewed)
+	{
+		episodeItem->setText(9, "✓"); // Checkmark for watched
+	}
+	else
+	{
+		episodeItem->setText(9, "▶"); // Play button
+	}
+	
 	// Restore expanded state
 	if(animeItemWasExpanded)
 	{

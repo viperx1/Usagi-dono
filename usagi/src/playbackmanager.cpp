@@ -118,10 +118,12 @@ void PlaybackManager::handleStatusReply()
         return;
     }
     
+    // Static variable to track consecutive failures
+    static int failCount = 0;
+    
     if (reply->error() != QNetworkReply::NoError) {
         // Player might have closed or web interface is not enabled
         // Check if we should stop tracking (after several failed attempts)
-        static int failCount = 0;
         failCount++;
         
         if (failCount > 5) {
@@ -135,7 +137,6 @@ void PlaybackManager::handleStatusReply()
     }
     
     // Reset fail count on success
-    static int failCount = 0;
     failCount = 0;
     
     // Parse the status response
