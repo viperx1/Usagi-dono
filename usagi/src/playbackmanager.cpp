@@ -110,7 +110,8 @@ void PlaybackManager::checkPlaybackStatus()
     }
     
     // Request status from MPC-HC web interface
-    QNetworkRequest request(QUrl(m_mpcStatusUrl));
+    QUrl url(m_mpcStatusUrl);
+    QNetworkRequest request(url);
     QNetworkReply *reply = m_networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this, &PlaybackManager::handleStatusReply);
 }
@@ -146,7 +147,9 @@ void PlaybackManager::handleStatusReply()
     QString response = QString::fromUtf8(reply->readAll());
     
     // Use regex to extract position and duration
-    QRegularExpression regex(R"(OnStatus\([^,]+,\s*"([^"]+)",\s*(\d+),\s*"[^"]+",\s*(\d+),\s*"[^"]+")");
+    // Pattern matches: OnStatus("file", "state", pos_ms, "pos_str", dur_ms, "dur_str"...)
+    QString pattern = "OnStatus\\([^,]+,\\s*\"([^\"]+)\",\\s*(\\d+),\\s*\"[^\"]+\",\\s*(\\d+),\\s*\"[^\"]+\"";
+    QRegularExpression regex(pattern);
     QRegularExpressionMatch match = regex.match(response);
     
     if (match.hasMatch()) {
