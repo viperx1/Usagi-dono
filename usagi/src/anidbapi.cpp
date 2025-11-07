@@ -405,10 +405,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				aid = fileQuery.value(2).toString();
 				gid = fileQuery.value(3).toString();
 				
-				// Insert into mylist table
+				// Insert into mylist table, preserving local_file and playback data if they exist
 				q = QString("INSERT OR REPLACE INTO `mylist` "
-					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`, `local_file`, `playback_position`, `playback_duration`, `last_played`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8', "
+					"(SELECT `local_file` FROM `mylist` WHERE `lid` = %1), "
+					"COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = %1), 0))")
 					.arg(lid)
 					.arg(fid.isEmpty() ? "0" : fid)
 					.arg(eid.isEmpty() ? "0" : eid)
@@ -618,7 +622,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Note: lid is NOT included in the response - it's extracted from the query command
 		if(token2.size() >= 11 && !lid.isEmpty())
 		{
-			q = QString("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13')")
+			q = QString("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`, `local_file`, `playback_position`, `playback_duration`, `last_played`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13', (SELECT `local_file` FROM `mylist` WHERE `lid` = '%1'), COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = '%1'), 0), COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = '%1'), 0), COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = '%1'), 0))")
 						.arg(lid)
 						.arg(QString(token2.at(0)).replace("'", "''"))
 						.arg(QString(token2.at(1)).replace("'", "''"))
@@ -760,10 +764,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				aid = fileQuery.value(2).toString();
 				gid = fileQuery.value(3).toString();
 				
-				// Update mylist table
+				// Update mylist table, preserving local_file and playback data if they exist
 				q = QString("INSERT OR REPLACE INTO `mylist` "
-					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`, `local_file`, `playback_position`, `playback_duration`, `last_played`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8', "
+					"(SELECT `local_file` FROM `mylist` WHERE `lid` = %1), "
+					"COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = %1), 0))")
 					.arg(lid)
 					.arg(fid.isEmpty() ? "0" : fid)
 					.arg(eid.isEmpty() ? "0" : eid)
