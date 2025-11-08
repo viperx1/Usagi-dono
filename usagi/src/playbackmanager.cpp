@@ -15,7 +15,6 @@ PlaybackManager::PlaybackManager(QObject *parent)
     , m_failCount(0)
     , m_saveCounter(0)
     , m_completionSaved(false)
-    , m_completionSaved(false)
     , m_mpcStatusUrl(QString("http://localhost:%1/status.html").arg(MPC_WEB_PORT))
 {
     m_statusTimer = new QTimer(this);
