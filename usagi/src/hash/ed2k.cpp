@@ -66,7 +66,7 @@ int ed2k::ed2khash(QString filepath)
 	QFileInfo fileinfo(filepath);
 	unsigned int i = 0;
 	QFile file(fileinfo.absoluteFilePath());
-	file.open(QIODevice::ReadOnly);
+	(void)file.open(QIODevice::ReadOnly);
 
 	ed2khashstr.clear();
 	Init();
