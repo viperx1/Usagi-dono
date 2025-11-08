@@ -720,7 +720,7 @@ QString CrashLog::getLogFilePath()
     QDir dir(logDir);
     if (!dir.exists())
     {
-        QDir().mkpath(logDir);
+        dir.mkpath(logDir);
     }
     
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss");
@@ -733,7 +733,7 @@ void CrashLog::logMessage(const QString &message)
     QDir dir(logDir);
     if (!dir.exists())
     {
-        QDir().mkpath(logDir);
+        dir.mkpath(logDir);
     }
     
     QString logPath = logDir + "/usagi.log";

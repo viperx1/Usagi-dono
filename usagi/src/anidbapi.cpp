@@ -56,7 +56,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	if(db.databaseName().isEmpty())
 	{
 		QString path = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-		QDir().mkpath(path); // make sure it exists
+		QDir dir;
+		dir.mkpath(path); // make sure it exists
 		QString dbPath = path + "/usagi.sqlite";
 		
 		db.setDatabaseName(dbPath);

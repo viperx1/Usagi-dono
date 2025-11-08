@@ -39,8 +39,9 @@ void TestHashDuplicateReuse::testDuplicateFileHashReuse()
     QString filePath2 = tempDir.path() + "/dir2/video.mkv";
     
     // Create directories
-    QDir().mkpath(tempDir.path() + "/dir1");
-    QDir().mkpath(tempDir.path() + "/dir2");
+    QDir dir;
+    dir.mkpath(tempDir.path() + "/dir1");
+    dir.mkpath(tempDir.path() + "/dir2");
     
     // Create files with identical content
     QFile file1(filePath1);
@@ -130,8 +131,9 @@ void TestHashDuplicateReuse::testDuplicateFileWithDifferentSizeNoReuse()
     QString filePath2 = tempDir.path() + "/dir2/video.mkv";
     
     // Create directories
-    QDir().mkpath(tempDir.path() + "/dir1");
-    QDir().mkpath(tempDir.path() + "/dir2");
+    QDir dir;
+    dir.mkpath(tempDir.path() + "/dir1");
+    dir.mkpath(tempDir.path() + "/dir2");
     
     // Create files with different content (different sizes)
     QFile file1(filePath1);

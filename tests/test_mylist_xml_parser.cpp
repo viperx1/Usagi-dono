@@ -151,7 +151,8 @@ void TestMylistXMLParser::testXMLParsing()
     
     // Extract tar.gz
     QString tempDir = QDir::tempPath() + "/test_extract_" + QString::number(QDateTime::currentMSecsSinceEpoch());
-    QDir().mkpath(tempDir);
+    QDir dir;
+    dir.mkpath(tempDir);
     
     QProcess tarProcess;
     tarProcess.setWorkingDirectory(tempDir);
