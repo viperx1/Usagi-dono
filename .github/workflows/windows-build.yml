@@ -12,16 +12,16 @@ on:
 jobs:
   build-llvm-mingw:
     runs-on: windows-latest
-    name: Build with LLVM/Clang (Qt 6.9.2 MinGW)
+    name: Build with LLVM/Clang (Qt 6.10 MinGW)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Qt 6.9.2 (LLVM MinGW)
+      - name: Install Qt 6.10 (LLVM MinGW)
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.9.2'
+          version: '6.10'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_llvm_mingw'
