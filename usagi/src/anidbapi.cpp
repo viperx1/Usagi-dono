@@ -100,6 +100,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `notifications`(`nid` INTEGER PRIMARY KEY, `type` TEXT, `from_user_id` INTEGER, `from_user_name` TEXT, `date` INTEGER, `message_type` INTEGER, `title` TEXT, `body` TEXT, `received_at` INTEGER, `acknowledged` BOOL DEFAULT 0);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
 		
+		// Add playback tracking columns to mylist if they don't exist
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `playback_position` INTEGER DEFAULT 0");
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `playback_duration` INTEGER DEFAULT 0");
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `last_played` INTEGER DEFAULT 0");
+		
 		Logger::log("[AniDB Init] Committing database transaction", __FILE__, __LINE__);
 		db.commit();
 		Logger::log("[AniDB Init] Database transaction committed", __FILE__, __LINE__);
@@ -400,10 +405,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				aid = fileQuery.value(2).toString();
 				gid = fileQuery.value(3).toString();
 				
-				// Insert into mylist table
+				// Insert into mylist table, preserving local_file and playback data if they exist
 				q = QString("INSERT OR REPLACE INTO `mylist` "
-					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`, `local_file`, `playback_position`, `playback_duration`, `last_played`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8', "
+					"(SELECT `local_file` FROM `mylist` WHERE `lid` = %1), "
+					"COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = %1), 0))")
 					.arg(lid)
 					.arg(fid.isEmpty() ? "0" : fid)
 					.arg(eid.isEmpty() ? "0" : eid)
@@ -613,7 +622,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Note: lid is NOT included in the response - it's extracted from the query command
 		if(token2.size() >= 11 && !lid.isEmpty())
 		{
-			q = QString("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13')")
+			q = QString("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`, `local_file`, `playback_position`, `playback_duration`, `last_played`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13', (SELECT `local_file` FROM `mylist` WHERE `lid` = '%1'), COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = '%1'), 0), COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = '%1'), 0), COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = '%1'), 0))")
 						.arg(lid)
 						.arg(QString(token2.at(0)).replace("'", "''"))
 						.arg(QString(token2.at(1)).replace("'", "''"))
@@ -755,10 +764,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				aid = fileQuery.value(2).toString();
 				gid = fileQuery.value(3).toString();
 				
-				// Update mylist table
+				// Update mylist table, preserving local_file and playback data if they exist
 				q = QString("INSERT OR REPLACE INTO `mylist` "
-					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`, `local_file`, `playback_position`, `playback_duration`, `last_played`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8', "
+					"(SELECT `local_file` FROM `mylist` WHERE `lid` = %1), "
+					"COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = %1), 0))")
 					.arg(lid)
 					.arg(fid.isEmpty() ? "0" : fid)
 					.arg(eid.isEmpty() ? "0" : eid)
@@ -1854,6 +1867,75 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 	// Return 0 if we couldn't find or update the lid
 	return 0;
 }
+
+int AniDBApi::LinkLocalFileToMylist(qint64 size, QString ed2kHash, QString localPath)
+{
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		LOG("Database not available, cannot link local file to mylist");
+		return 0;
+	}
+	
+	// Find the lid using the file info
+	QSqlQuery lidQuery(db);
+	lidQuery.prepare("SELECT m.lid FROM mylist m "
+					 "INNER JOIN file f ON m.fid = f.fid "
+					 "WHERE f.size = ? AND f.ed2k = ?");
+	lidQuery.addBindValue(size);
+	lidQuery.addBindValue(ed2kHash);
+	
+	if(lidQuery.exec() && lidQuery.next())
+	{
+		int lid = lidQuery.value(0).toInt();
+		
+		// Get the local_file id from local_files table
+		QSqlQuery localFileQuery(db);
+		localFileQuery.prepare("SELECT id FROM local_files WHERE path = ?");
+		localFileQuery.addBindValue(localPath);
+		
+		if(localFileQuery.exec() && localFileQuery.next())
+		{
+			int localFileId = localFileQuery.value(0).toInt();
+			
+			// Update the local_file reference in mylist table
+			QSqlQuery updateQuery(db);
+			updateQuery.prepare("UPDATE `mylist` SET `local_file` = ? WHERE `lid` = ?");
+			updateQuery.addBindValue(localFileId);
+			updateQuery.addBindValue(lid);
+			
+			if(updateQuery.exec())
+			{
+				LOG(QString("Linked local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
+				
+				// Update status in local_files table to 2 (in anidb)
+				QSqlQuery statusQuery(db);
+				statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
+				statusQuery.addBindValue(localFileId);
+				statusQuery.exec();
+				
+				// Return the lid for use by the caller
+				return lid;
+			}
+			else
+			{
+				LOG("Failed to link local_file: " + updateQuery.lastError().text());
+			}
+		}
+		else
+		{
+			LOG("Could not find local_file entry for path=" + localPath);
+		}
+	}
+	else
+	{
+		LOG(QString("Could not find mylist entry for size=%1 ed2k=%2").arg(size).arg(ed2kHash));
+	}
+	
+	// Return 0 if we couldn't find or update the lid
+	return 0;
+}
+
 
 void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 {

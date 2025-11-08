@@ -28,7 +28,11 @@
 #include "epno.h"
 #include "aired.h"
 #include "directorywatcher.h"
+#include "playbackmanager.h"
 //#include "hasherthread.h"
+
+// Forward declarations
+class PlayButtonDelegate;
 
 class hashes_ : public QTableWidget
 {
@@ -158,6 +162,25 @@ private:
     static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
     QColor m_hashedFileColor; // Reusable color object for UI updates
     
+    // MyList tree widget column indices (using enum for type safety and maintainability)
+    // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired
+    enum MyListColumn {
+        COL_ANIME = 0,
+        COL_PLAY = 1,
+        COL_EPISODE = 2,
+        COL_EPISODE_TITLE = 3,
+        COL_STATE = 4,
+        COL_VIEWED = 5,
+        COL_STORAGE = 6,
+        COL_MYLIST_ID = 7,
+        COL_TYPE = 8,
+        COL_AIRED = 9
+    };
+    
+    // Legacy constants for backward compatibility (deprecated, use enum instead)
+    static const int PLAY_COLUMN = COL_PLAY;
+    static const int MYLIST_ID_COLUMN = COL_MYLIST_ID;
+    
 	// main layout
     QBoxLayout *layout;
     QTabWidget *tabwidget;
@@ -223,6 +246,10 @@ private:
     QPushButton *watcherBrowseButton;
     QCheckBox *watcherAutoStart;
     QLabel *watcherStatusLabel;
+    
+    // Playback settings
+    QLineEdit *mediaPlayerPath;
+    QPushButton *mediaPlayerBrowseButton;
 
 	// page notify
 	QTextEdit *notifyOutput;
@@ -241,6 +268,12 @@ private:
 	
 	// Directory watcher
 	DirectoryWatcher *directoryWatcher;
+	
+	// Playback manager and UI
+	PlaybackManager *playbackManager;
+	PlayButtonDelegate *playButtonDelegate;
+	QMap<int, int> m_playingItems; // lid -> animation frame (0, 1, 2)
+	QTimer *m_animationTimer;
 	
 	// Batch processing for hashed files
 	// Note: HashedFileData structure removed as identification now happens immediately
@@ -307,6 +340,15 @@ public slots:
     void onWatcherBrowseClicked();
     void onWatcherNewFilesDetected(const QStringList &filePaths);
     
+    // Playback slots
+    void onMediaPlayerBrowseClicked();
+    void onPlayButtonClicked(const QModelIndex &index);
+    void onPlaybackPositionUpdated(int lid, int position, int duration);
+    void onPlaybackCompleted(int lid);
+    void onPlaybackStopped(int lid, int position);
+    void onPlaybackStateChanged(int lid, bool isPlaying);
+    void onAnimationTimerTimeout();
+    
     // Hasher slots
     void provideNextFileToHash();
 
@@ -324,6 +366,14 @@ private:
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();
+    
+    // Helper methods for playback
+    QString getFilePathForPlayback(int lid);
+    int getPlaybackResumePosition(int lid);
+    void startPlaybackForFile(int lid);
+    void updatePlayButtonForItem(QTreeWidgetItem *item);
+    void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
+    bool isItemPlaying(QTreeWidgetItem *item) const;
     
     // Helper method to determine file type from filetype string
     FileTreeWidgetItem::FileType determineFileType(const QString& filetype);
