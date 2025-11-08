@@ -73,6 +73,13 @@ signals:
     void playbackCompleted(int lid);
     
     /**
+     * @brief Emitted when playback state changes (started/stopped)
+     * @param lid MyList ID
+     * @param isPlaying true if playback started, false if stopped
+     */
+    void playbackStateChanged(int lid, bool isPlaying);
+    
+    /**
      * @brief Emitted when playback stops (file closed or player closed)
      * @param lid MyList ID
      * @param position Last known position in seconds
@@ -91,9 +98,11 @@ private:
     int m_currentLid;
     QString m_currentFilePath;
     int m_lastPosition;
+    bool m_completionSaved;  // Flag to prevent double-saving at completion
     int m_lastDuration;
     int m_failCount;          // Track consecutive connection failures
     int m_saveCounter;        // Counter for periodic position saves
+    bool m_completionSaved;   // Track if completion save already happened
     
     QTimer *m_statusTimer;
     QNetworkAccessManager *m_networkManager;

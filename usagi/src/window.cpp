@@ -319,12 +319,19 @@ Window::Window()
             this, &Window::onPlaybackCompleted);
     connect(playbackManager, &PlaybackManager::playbackStopped,
             this, &Window::onPlaybackStopped);
+    connect(playbackManager, &PlaybackManager::playbackStateChanged,
+            this, &Window::onPlaybackStateChanged);
     
     // Initialize play button delegate for mylist tree
     playButtonDelegate = new PlayButtonDelegate(this);
     mylistTreeWidget->setItemDelegateForColumn(PLAY_COLUMN, playButtonDelegate);
     connect(playButtonDelegate, &PlayButtonDelegate::playButtonClicked,
             this, &Window::onPlayButtonClicked);
+    
+    // Setup animation timer for play button animation
+    m_animationTimer = new QTimer(this);
+    m_animationTimer->setInterval(300);  // 300ms between animation frames
+    connect(m_animationTimer, &QTimer::timeout, this, &Window::onAnimationTimerTimeout);
     mylistTreeWidget->setMouseTracking(true); // Enable mouse tracking for hover effects
     
     // Initialize timer for deferred processing of already-hashed files
@@ -3145,6 +3152,12 @@ void Window::onPlaybackCompleted(int lid)
 {
 	LOG(QString("Playback completed: LID %1 - Updating play buttons").arg(lid));
 	
+	// Remove from playing items
+	m_playingItems.remove(lid);
+	if (m_playingItems.isEmpty()) {
+		m_animationTimer->stop();
+	}
+	
 	// Find the file item with this LID and update its play button and parents
 	QTreeWidgetItemIterator it(mylistTreeWidget);
 	while (*it) {
@@ -3173,6 +3186,51 @@ void Window::onPlaybackCompleted(int lid)
 void Window::onPlaybackStopped(int lid, int position)
 {
 	LOG(QString("Playback stopped: LID %1 at position %2s").arg(lid).arg(position));
+	
+	// Remove from playing items
+	m_playingItems.remove(lid);
+	if (m_playingItems.isEmpty()) {
+		m_animationTimer->stop();
+	}
+}
+
+void Window::onPlaybackStateChanged(int lid, bool isPlaying)
+{
+	if (isPlaying) {
+		// Add to playing items with initial animation frame
+		m_playingItems[lid] = 0;
+		if (!m_animationTimer->isActive()) {
+			m_animationTimer->start();
+		}
+	} else {
+		// Remove from playing items
+		m_playingItems.remove(lid);
+		if (m_playingItems.isEmpty()) {
+			m_animationTimer->stop();
+		}
+	}
+	
+	// Update the play button for this item
+	QTreeWidgetItemIterator it(mylistTreeWidget);
+	while (*it) {
+		QTreeWidgetItem *item = *it;
+		if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
+			updatePlayButtonForItem(item);
+			break;
+		}
+		++it;
+	}
+}
+
+void Window::onAnimationTimerTimeout()
+{
+	// Update animation frames for all playing items
+	for (auto it = m_playingItems.begin(); it != m_playingItems.end(); ++it) {
+		it.value() = (it.value() + 1) % 3;  // Cycle through 0, 1, 2
+	}
+	
+	// Trigger repaint of play column
+	mylistTreeWidget->viewport()->update();
 }
 
 QString Window::getFilePathForPlayback(int lid)

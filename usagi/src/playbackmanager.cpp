@@ -14,6 +14,8 @@ PlaybackManager::PlaybackManager(QObject *parent)
     , m_lastDuration(0)
     , m_failCount(0)
     , m_saveCounter(0)
+    , m_completionSaved(false)
+    , m_completionSaved(false)
     , m_mpcStatusUrl(QString("http://localhost:%1/status.html").arg(MPC_WEB_PORT))
 {
     m_statusTimer = new QTimer(this);
@@ -75,10 +77,15 @@ bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resume
     m_lastDuration = 0;
     m_failCount = 0;          // Reset fail count
     m_saveCounter = 0;        // Reset save counter
+    m_completionSaved = false; // Reset completion flag
+    
+    // Emit state change signal to indicate playback started
+    emit playbackStateChanged(lid, true);
     
     // Start status polling after a short delay to let player start
     QTimer::singleShot(PLAYER_STARTUP_DELAY_MS, this, [this]() {
         m_statusTimer->start();
+        emit playbackStateChanged(m_currentLid, true);
     });
     
     return true;
@@ -87,17 +94,23 @@ bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resume
 void PlaybackManager::stopTracking()
 {
     if (m_tracking) {
+        int lid = m_currentLid;  // Save lid before clearing
         LOG(QString("Stopping playback tracking for LID %1 (position: %2s, duration: %3s)")
             .arg(m_currentLid).arg(m_lastPosition).arg(m_lastDuration));
         
         m_statusTimer->stop();
         
-        // Save final position (even if 0, to record that playback was attempted)
-        if (m_lastDuration > 0) {
+        // Save final position only if not already saved at completion
+        // (to avoid overwriting completion position with earlier position)
+        if (m_lastDuration > 0 && !m_completionSaved) {
             savePlaybackPosition(m_lastPosition, m_lastDuration);
-            emit playbackStopped(m_currentLid, m_lastPosition);
+            emit playbackStopped(lid, m_lastPosition);
+        } else if (m_completionSaved) {
+            LOG("Completion position already saved - skipping redundant save");
+            emit playbackStopped(lid, m_lastDuration);
         } else {
             LOG("No duration recorded - playback data not saved");
+            emit playbackStopped(lid, 0);
         }
         
         m_tracking = false;
@@ -105,6 +118,12 @@ void PlaybackManager::stopTracking()
         m_currentFilePath.clear();
         m_lastPosition = 0;
         m_lastDuration = 0;
+        m_failCount = 0;
+        m_saveCounter = 0;
+        m_completionSaved = false;
+        
+        // Emit state change signal
+        emit playbackStateChanged(lid, false);
     }
 }
 
@@ -200,6 +219,7 @@ void PlaybackManager::handleStatusReply()
             
             // Mark as fully watched
             savePlaybackPosition(duration, duration);
+            m_completionSaved = true;  // Mark that we've saved completion position
             emit playbackCompleted(m_currentLid);
             
             // Update viewed status in mylist

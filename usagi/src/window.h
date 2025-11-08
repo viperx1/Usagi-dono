@@ -272,6 +272,8 @@ private:
 	// Playback manager and UI
 	PlaybackManager *playbackManager;
 	PlayButtonDelegate *playButtonDelegate;
+	QMap<int, int> m_playingItems; // lid -> animation frame (0, 1, 2)
+	QTimer *m_animationTimer;
 	
 	// Batch processing for hashed files
 	// Note: HashedFileData structure removed as identification now happens immediately
@@ -344,6 +346,8 @@ public slots:
     void onPlaybackPositionUpdated(int lid, int position, int duration);
     void onPlaybackCompleted(int lid);
     void onPlaybackStopped(int lid, int position);
+    void onPlaybackStateChanged(int lid, bool isPlaying);
+    void onAnimationTimerTimeout();
     
     // Hasher slots
     void provideNextFileToHash();
@@ -369,6 +373,7 @@ private:
     void startPlaybackForFile(int lid);
     void updatePlayButtonForItem(QTreeWidgetItem *item);
     void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
+    bool isItemPlaying(QTreeWidgetItem *item) const;
     
     // Helper method to determine file type from filetype string
     FileTreeWidgetItem::FileType determineFileType(const QString& filetype);
