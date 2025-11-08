@@ -82,10 +82,7 @@ bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resume
     emit playbackStateChanged(lid, true);
     
     // Start status polling after a short delay to let player start
-    QTimer::singleShot(PLAYER_STARTUP_DELAY_MS, this, [this]() {
-        m_statusTimer->start();
-        emit playbackStateChanged(m_currentLid, true);
-    });
+    QTimer::singleShot(PLAYER_STARTUP_DELAY_MS, this, SLOT(startStatusPolling()));
     
     return true;
 }
@@ -301,4 +298,10 @@ void PlaybackManager::setMediaPlayerPath(const QString &path)
     if (!q.exec()) {
         LOG(QString("Error saving media player path: %1").arg(q.lastError().text()));
     }
+}
+
+void PlaybackManager::startStatusPolling()
+{
+    m_statusTimer->start();
+    emit playbackStateChanged(m_currentLid, true);
 }

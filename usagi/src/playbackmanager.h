@@ -89,6 +89,7 @@ signals:
 private slots:
     void checkPlaybackStatus();
     void handleStatusReply();
+    void startStatusPolling();
     
 private:
     void savePlaybackPosition(int position, int duration);
