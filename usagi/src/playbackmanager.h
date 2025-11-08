@@ -98,7 +98,6 @@ private:
     int m_currentLid;
     QString m_currentFilePath;
     int m_lastPosition;
-    bool m_completionSaved;  // Flag to prevent double-saving at completion
     int m_lastDuration;
     int m_failCount;          // Track consecutive connection failures
     int m_saveCounter;        // Counter for periodic position saves
