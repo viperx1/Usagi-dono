@@ -209,7 +209,7 @@ void TestCrashLog::testCompleteProcessWithDataTypeConversions()
     QDir dir(logDir);
     if (!dir.exists())
     {
-        QDir().mkpath(logDir);
+        dir.mkpath(logDir);
     }
     
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss");
