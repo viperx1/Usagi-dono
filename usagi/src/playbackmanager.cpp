@@ -82,10 +82,16 @@ bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resume
     emit playbackStateChanged(lid, true);
     
     // Start status polling after a short delay to let player start
-    QTimer::singleShot(PLAYER_STARTUP_DELAY_MS, this, [this]() {
+    // Use QTimer with single-shot mode instead of QTimer::singleShot to avoid chrono overload
+    // The chrono overload is not available in static Qt 6.10 builds with LLVM MinGW
+    QTimer *startupTimer = new QTimer(this);
+    startupTimer->setSingleShot(true);
+    connect(startupTimer, &QTimer::timeout, this, [this]() {
         m_statusTimer->start();
         emit playbackStateChanged(m_currentLid, true);
     });
+    connect(startupTimer, &QTimer::timeout, startupTimer, &QTimer::deleteLater);
+    startupTimer->start(PLAYER_STARTUP_DELAY_MS);
     
     return true;
 }

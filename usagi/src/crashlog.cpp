@@ -717,10 +717,10 @@ void CrashLog::install()
 QString CrashLog::getLogFilePath()
 {
     QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir dir;
-    if (!dir.exists(logDir))
+    QDir dir(logDir);
+    if (!dir.exists())
     {
-        dir.mkpath(logDir);
+        dir.mkpath(".");
     }
     
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss");
@@ -730,10 +730,10 @@ QString CrashLog::getLogFilePath()
 void CrashLog::logMessage(const QString &message)
 {
     QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir dir;
-    if (!dir.exists(logDir))
+    QDir dir(logDir);
+    if (!dir.exists())
     {
-        dir.mkpath(logDir);
+        dir.mkpath(".");
     }
     
     QString logPath = logDir + "/usagi.log";
