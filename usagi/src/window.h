@@ -94,14 +94,23 @@ public:
             qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
             
             // Entries with timestamp 0 (never played) should always be at the bottom
+            // regardless of sort order (ascending or descending)
+            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
+            
             if(thisTimestamp == 0 && otherTimestamp == 0) {
                 return false; // Both never played, keep current order
             }
             if(thisTimestamp == 0) {
-                return false; // This is never played, should come after other
+                // This is never played - should be at bottom
+                // In ascending order, return false (not less than, so comes after)
+                // In descending order, return true (less than, so comes after when reversed)
+                return (order == Qt::DescendingOrder);
             }
             if(otherTimestamp == 0) {
-                return true; // Other is never played, this should come before
+                // Other is never played - should be at bottom
+                // In ascending order, return true (this is less than, so comes before)
+                // In descending order, return false (not less than, so comes before when reversed)
+                return (order == Qt::AscendingOrder);
             }
             
             return thisTimestamp < otherTimestamp;
@@ -162,14 +171,23 @@ public:
             qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
             
             // Entries with timestamp 0 (never played) should always be at the bottom
+            // regardless of sort order (ascending or descending)
+            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
+            
             if(thisTimestamp == 0 && otherTimestamp == 0) {
                 return false; // Both never played, keep current order
             }
             if(thisTimestamp == 0) {
-                return false; // This is never played, should come after other
+                // This is never played - should be at bottom
+                // In ascending order, return false (not less than, so comes after)
+                // In descending order, return true (less than, so comes after when reversed)
+                return (order == Qt::DescendingOrder);
             }
             if(otherTimestamp == 0) {
-                return true; // Other is never played, this should come before
+                // Other is never played - should be at bottom
+                // In ascending order, return true (this is less than, so comes before)
+                // In descending order, return false (not less than, so comes before when reversed)
+                return (order == Qt::AscendingOrder);
             }
             
             return thisTimestamp < otherTimestamp;
@@ -227,15 +245,23 @@ public:
             qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
             
             // Entries with timestamp 0 (never played) should always be at the bottom
-            // regardless of sort order
+            // regardless of sort order (ascending or descending)
+            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
+            
             if(thisTimestamp == 0 && otherTimestamp == 0) {
                 return false; // Both never played, keep current order
             }
             if(thisTimestamp == 0) {
-                return false; // This is never played, should come after other
+                // This is never played - should be at bottom
+                // In ascending order, return false (not less than, so comes after)
+                // In descending order, return true (less than, so comes after when reversed)
+                return (order == Qt::DescendingOrder);
             }
             if(otherTimestamp == 0) {
-                return true; // Other is never played, this should come before
+                // Other is never played - should be at bottom
+                // In ascending order, return true (this is less than, so comes before)
+                // In descending order, return false (not less than, so comes before when reversed)
+                return (order == Qt::AscendingOrder);
             }
             
             return thisTimestamp < otherTimestamp;
