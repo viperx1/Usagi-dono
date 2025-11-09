@@ -446,6 +446,7 @@ public slots:
 	void getNotifyExportAlreadyInQueue(QString tag);
 	void getNotifyExportNoSuchTemplate(QString tag);
 	void getNotifyEpisodeUpdated(int eid, int aid);
+	void getNotifyAnimeUpdated(int aid);
 	void onMylistItemExpanded(QTreeWidgetItem *item);
     void safeClose();
     void loadMylistFromDatabase();

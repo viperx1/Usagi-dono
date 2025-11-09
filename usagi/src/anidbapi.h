@@ -185,6 +185,7 @@ public:
 	QString NotifyGet(int nid);
 	QString MylistExport(QString template_name = "xml-plain-cs");
 	QString Episode(int eid);
+	QString Anime(int aid);
 	
 	// Command builders - return formatted command strings for testing
 	QString buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc);
@@ -198,6 +199,7 @@ public:
 	QString buildNotifyGetCommand(int nid);
 	QString buildMylistExportCommand(QString template_name);
 	QString buildEpisodeCommand(int eid);
+	QString buildAnimeCommand(int aid);
 	/* Api End === */
 
 	/**
@@ -284,6 +286,7 @@ signals:
 	void notifyExportAlreadyInQueue(QString tag);
 	void notifyExportNoSuchTemplate(QString tag);
 	void notifyEpisodeUpdated(int eid, int aid);
+	void notifyAnimeUpdated(int aid);
 };
 
 #endif // ANIDBAPI_H

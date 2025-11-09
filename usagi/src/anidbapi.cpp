@@ -686,6 +686,64 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		token2.pop_front();
 		Logger::log("[AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first(), __FILE__, __LINE__);
 	}
+	else if(ReplyID == "230"){ // 230 ANIME
+		// Response format based on amask: aid|year|type|romaji|kanji|english|other|short|synonyms|...
+		// With our amask (b2f0e0fc000000), we get common metadata fields
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		token2 = token2.first().split("|");
+		
+		if(token2.size() >= 1)
+		{
+			QString aid = token2.at(0);
+			// Based on amask b2f0e0fc000000, the fields should be:
+			// aid|year|type|romaji|kanji|english|other|short|synonyms|eps|epcount|startdate|enddate|...
+			QString year = token2.size() > 1 ? token2.at(1) : "";
+			QString type = token2.size() > 2 ? token2.at(2) : "";
+			QString nameromaji = token2.size() > 3 ? token2.at(3) : "";
+			QString namekanji = token2.size() > 4 ? token2.at(4) : "";
+			QString nameenglish = token2.size() > 5 ? token2.at(5) : "";
+			QString nameother = token2.size() > 6 ? token2.at(6) : "";
+			QString nameshort = token2.size() > 7 ? token2.at(7) : "";
+			QString synonyms = token2.size() > 8 ? token2.at(8) : "";
+			QString eps = token2.size() > 9 ? token2.at(9) : "";
+			QString eptotal = token2.size() > 10 ? token2.at(10) : "";
+			QString startdate = token2.size() > 11 ? token2.at(11) : "";
+			QString enddate = token2.size() > 12 ? token2.at(12) : "";
+			
+			// Convert type code to typename string
+			QString typename;
+			if(type == "1") typename = "TV Series";
+			else if(type == "2") typename = "OVA";
+			else if(type == "3") typename = "Movie";
+			else if(type == "4") typename = "Other";
+			else if(type == "5") typename = "Web";
+			else if(type == "6") typename = "TV Special";
+			
+			// Update anime table with metadata (typename, startdate, enddate)
+			// Only update these specific fields, don't overwrite other data
+			if(!aid.isEmpty())
+			{
+				QSqlQuery query(db);
+				query.prepare("UPDATE `anime` SET `typename` = ?, `startdate` = ?, `enddate` = ? WHERE `aid` = ?");
+				query.addBindValue(typename.isEmpty() ? QVariant() : typename);
+				query.addBindValue(startdate.isEmpty() ? QVariant() : startdate);
+				query.addBindValue(enddate.isEmpty() ? QVariant() : enddate);
+				query.addBindValue(aid.toInt());
+				
+				if(!query.exec())
+				{
+					LOG("Anime metadata update error: " + query.lastError().text());
+				}
+				else
+				{
+					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typename + " Start: " + startdate, __FILE__, __LINE__);
+					// Emit signal to notify UI that anime data was updated
+					emit notifyAnimeUpdated(aid.toInt());
+				}
+			}
+		}
+	}
 	else if(ReplyID == "240"){ // 240 EPISODE
 		// Response format: eid|aid|length|rating|votes|epno|eng|romaji|kanji|aired|type
 		QStringList token2 = Message.split("\n");
@@ -1338,6 +1396,21 @@ QString AniDBApi::Episode(int eid)
 	return GetTag(msg);
 }
 
+QString AniDBApi::Anime(int aid)
+{
+	// Request anime information by anime ID
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	Logger::log("[AniDB API] Requesting ANIME data for AID: " + QString::number(aid), __FILE__, __LINE__);
+	QString msg = buildAnimeCommand(aid);
+	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query(db);
+	query.exec(q);
+	return GetTag(msg);
+}
+
 /* === Command Builders === */
 // These methods build formatted command strings for testing and reuse
 
@@ -1416,6 +1489,19 @@ QString AniDBApi::buildEpisodeCommand(int eid)
 	// EPISODE eid={int4 eid}
 	// Request episode information for a specific episode ID
 	return QString("EPISODE eid=%1").arg(eid);
+}
+
+QString AniDBApi::buildAnimeCommand(int aid)
+{
+	// ANIME aid={int4 aid}&amask={hexstr amask}
+	// Request anime information for a specific anime ID
+	// amask defines what fields to return - we want typename, dates, etc.
+	// According to AniDB API, relevant amask bits for metadata:
+	// Bit 13 (0x00002000): air date (start date)
+	// Bit 12 (0x00001000): end date
+	// Bit 20 (0x00100000): type
+	// We'll use a simple amask to get common metadata
+	return QString("ANIME aid=%1&amask=b2f0e0fc000000").arg(aid);
 }
 
 /* === End Command Builders === */

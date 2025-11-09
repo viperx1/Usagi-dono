@@ -303,6 +303,7 @@ Window::Window()
 	connect(adbapi, SIGNAL(notifyExportAlreadyInQueue(QString)), this, SLOT(getNotifyExportAlreadyInQueue(QString)));
 	connect(adbapi, SIGNAL(notifyExportNoSuchTemplate(QString)), this, SLOT(getNotifyExportNoSuchTemplate(QString)));
 	connect(adbapi, SIGNAL(notifyEpisodeUpdated(int,int)), this, SLOT(getNotifyEpisodeUpdated(int,int)));
+	connect(adbapi, SIGNAL(notifyAnimeUpdated(int)), this, SLOT(getNotifyAnimeUpdated(int)));
 	connect(mylistTreeWidget, SIGNAL(itemExpanded(QTreeWidgetItem*)), this, SLOT(onMylistItemExpanded(QTreeWidgetItem*)));
 	connect(mylistTreeWidget->header(), SIGNAL(sortIndicatorChanged(int,Qt::SortOrder)), this, SLOT(onMylistSortChanged(int,Qt::SortOrder)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
@@ -1781,21 +1782,9 @@ void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 	if(animeNeedingMetadata.contains(aid))
 	{
 		LOG(QString("Requesting anime metadata update for AID %1").arg(aid));
-		// Query database to get a file from this anime to trigger FILE API call
-		QSqlDatabase db = QSqlDatabase::database();
-		QSqlQuery query(db);
-		query.prepare("SELECT size, ed2k FROM file WHERE aid = ? LIMIT 1");
-		query.bindValue(0, aid);
-		if(query.exec() && query.next())
-		{
-			qint64 size = query.value(0).toLongLong();
-			QString ed2k = query.value(1).toString();
-			if(size > 0 && !ed2k.isEmpty())
-			{
-				adbapi->File(size, ed2k);
-				animeNeedingMetadata.remove(aid);  // Remove from tracking set
-			}
-		}
+		// Use ANIME command to fetch anime metadata directly
+		adbapi->Anime(aid);
+		animeNeedingMetadata.remove(aid);  // Remove from tracking set
 	}
 	
 	// Iterate through child episodes and queue API requests for missing data
@@ -1820,6 +1809,14 @@ void Window::getNotifyEpisodeUpdated(int eid, int aid)
 	// Episode data was updated in the database, update only the specific episode item
 	LOG(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
 	updateEpisodeInTree(eid, aid);
+}
+
+void Window::getNotifyAnimeUpdated(int aid)
+{
+	// Anime metadata was updated in the database, reload the mylist to reflect changes
+	LOG(QString("Anime metadata received for AID %1, reloading mylist...").arg(aid));
+	loadMylistFromDatabase();
+	animeNeedingMetadata.remove(aid);  // Remove from tracking set if present
 }
 
 void Window::updateEpisodeInTree(int eid, int aid)
