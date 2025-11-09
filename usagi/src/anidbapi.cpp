@@ -748,6 +748,31 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			else if(type == "5") typenameStr = "Web";
 			else if(type == "6") typenameStr = "TV Special";
 			
+			// Convert Unix timestamps to ISO 8601 date format (YYYY-MM-DDZ)
+			// The mylist tree widget expects dates in this format, not Unix timestamps
+			QString startdateFormatted;
+			QString enddateFormatted;
+			if(!airdate.isEmpty())
+			{
+				bool ok;
+				qint64 timestamp = airdate.toLongLong(&ok);
+				if(ok && timestamp > 0)
+				{
+					QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
+					startdateFormatted = dt.toString("yyyy-MM-dd") + "Z";
+				}
+			}
+			if(!enddate.isEmpty())
+			{
+				bool ok;
+				qint64 timestamp = enddate.toLongLong(&ok);
+				if(ok && timestamp > 0)
+				{
+					QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
+					enddateFormatted = dt.toString("yyyy-MM-dd") + "Z";
+				}
+			}
+			
 			// Update anime table with metadata (typename, startdate, enddate)
 			// Only update these specific fields, don't overwrite other data
 			if(!aid.isEmpty())
@@ -755,8 +780,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				QSqlQuery query(db);
 				query.prepare("UPDATE `anime` SET `typename` = ?, `startdate` = ?, `enddate` = ? WHERE `aid` = ?");
 				query.addBindValue(typenameStr.isEmpty() ? QVariant() : typenameStr);
-				query.addBindValue(airdate.isEmpty() ? QVariant() : airdate);
-				query.addBindValue(enddate.isEmpty() ? QVariant() : enddate);
+				query.addBindValue(startdateFormatted.isEmpty() ? QVariant() : startdateFormatted);
+				query.addBindValue(enddateFormatted.isEmpty() ? QVariant() : enddateFormatted);
 				query.addBindValue(aid.toInt());
 				
 				if(!query.exec())
