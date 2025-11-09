@@ -687,8 +687,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Logger::log("[AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first(), __FILE__, __LINE__);
 	}
 	else if(ReplyID == "230"){ // 230 ANIME
-		// Response format based on amask: aid|year|type|romaji|kanji|english|other|short|synonyms|...
-		// With our amask (b2f0e0fc000000), we get common metadata fields
+		// Response format based on amask c3f31800:
+		// aid|year|type|romaji|kanji|english|other|short|synonyms|high_ep_count|ep_count|startdate|enddate
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
@@ -696,8 +696,20 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(token2.size() >= 1)
 		{
 			QString aid = token2.at(0);
-			// Based on amask b2f0e0fc000000, the fields should be:
-			// aid|year|type|romaji|kanji|english|other|short|synonyms|eps|epcount|startdate|enddate|...
+			// Field order with amask c3f31800:
+			// 0: aid
+			// 1: year
+			// 2: type
+			// 3: romaji name
+			// 4: kanji name
+			// 5: english name
+			// 6: other names
+			// 7: short names
+			// 8: synonyms
+			// 9: high episode count
+			// 10: episode count
+			// 11: start date
+			// 12: end date
 			QString year = token2.size() > 1 ? token2.at(1) : "";
 			QString type = token2.size() > 2 ? token2.at(2) : "";
 			QString nameromaji = token2.size() > 3 ? token2.at(3) : "";
@@ -706,8 +718,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString nameother = token2.size() > 6 ? token2.at(6) : "";
 			QString nameshort = token2.size() > 7 ? token2.at(7) : "";
 			QString synonyms = token2.size() > 8 ? token2.at(8) : "";
-			QString eps = token2.size() > 9 ? token2.at(9) : "";
-			QString eptotal = token2.size() > 10 ? token2.at(10) : "";
+			QString high_ep_count = token2.size() > 9 ? token2.at(9) : "";
+			QString ep_count = token2.size() > 10 ? token2.at(10) : "";
 			QString startdate = token2.size() > 11 ? token2.at(11) : "";
 			QString enddate = token2.size() > 12 ? token2.at(12) : "";
 			
@@ -737,7 +749,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				}
 				else
 				{
-					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typenameStr + " Start: " + startdate, __FILE__, __LINE__);
+					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typenameStr + " Start: " + startdate + " End: " + enddate, __FILE__, __LINE__);
 					// Emit signal to notify UI that anime data was updated
 					emit notifyAnimeUpdated(aid.toInt());
 				}
@@ -1496,12 +1508,21 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	// ANIME aid={int4 aid}&amask={hexstr amask}
 	// Request anime information for a specific anime ID
 	// amask defines what fields to return - we want typename, dates, etc.
-	// According to AniDB API, relevant amask bits for metadata:
-	// Bit 13 (0x00002000): air date (start date)
-	// Bit 12 (0x00001000): end date
-	// Bit 20 (0x00100000): type
-	// We'll use a simple amask to get common metadata
-	return QString("ANIME aid=%1&amask=b2f0e0fc000000").arg(aid);
+	// According to AniDB API documentation, amask bits for ANIME command:
+	// Bit 31 (0x80000000): year
+	// Bit 30 (0x40000000): type
+	// Bit 25 (0x02000000): romaji name
+	// Bit 24 (0x01000000): kanji name
+	// Bit 23 (0x00800000): english name
+	// Bit 22 (0x00400000): other names
+	// Bit 21 (0x00200000): short names
+	// Bit 20 (0x00100000): synonyms
+	// Bit 17 (0x00020000): high episode count
+	// Bit 16 (0x00010000): episode count
+	// Bit 12 (0x00001000): start date
+	// Bit 11 (0x00000800): end date
+	// Combined: 0xc3f31800
+	return QString("ANIME aid=%1&amask=c3f31800").arg(aid);
 }
 
 /* === End Command Builders === */
