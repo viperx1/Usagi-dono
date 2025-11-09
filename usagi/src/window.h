@@ -34,6 +34,22 @@
 // Forward declarations
 class PlayButtonDelegate;
 
+// MyList tree widget column indices (using enum for type safety and maintainability)
+// Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
+enum MyListColumn {
+    COL_ANIME = 0,
+    COL_PLAY = 1,
+    COL_EPISODE = 2,
+    COL_EPISODE_TITLE = 3,
+    COL_STATE = 4,
+    COL_VIEWED = 5,
+    COL_STORAGE = 6,
+    COL_MYLIST_ID = 7,
+    COL_TYPE = 8,
+    COL_AIRED = 9,
+    COL_LAST_PLAYED = 10
+};
+
 class hashes_ : public QTableWidget
 {
 public:
@@ -177,22 +193,6 @@ private:
     static const int HASHED_FILES_BATCH_SIZE = 5; // Process 5 files per timer tick
     static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
     QColor m_hashedFileColor; // Reusable color object for UI updates
-    
-    // MyList tree widget column indices (using enum for type safety and maintainability)
-    // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
-    enum MyListColumn {
-        COL_ANIME = 0,
-        COL_PLAY = 1,
-        COL_EPISODE = 2,
-        COL_EPISODE_TITLE = 3,
-        COL_STATE = 4,
-        COL_VIEWED = 5,
-        COL_STORAGE = 6,
-        COL_MYLIST_ID = 7,
-        COL_TYPE = 8,
-        COL_AIRED = 9,
-        COL_LAST_PLAYED = 10
-    };
     
     // Legacy constants for backward compatibility (deprecated, use enum instead)
     static const int PLAY_COLUMN = COL_PLAY;
