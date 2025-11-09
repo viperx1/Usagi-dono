@@ -84,8 +84,8 @@ public:
     {
         int column = treeWidget()->sortColumn();
         
-        // If sorting by Aired column (column 8) and both items have aired data
-        if(column == 8)
+        // If sorting by Aired column (column 9) and both items have aired data
+        if(column == COL_AIRED)
         {
             const AnimeTreeWidgetItem *otherAnime = dynamic_cast<const AnimeTreeWidgetItem*>(&other);
             if(otherAnime && m_aired.isValid() && otherAnime->m_aired.isValid())
@@ -136,6 +136,22 @@ public:
     void setGroupName(const QString& group) { m_groupName = group; }
     QString getGroupName() const { return m_groupName; }
     
+    bool operator<(const QTreeWidgetItem &other) const override
+    {
+        int column = treeWidget()->sortColumn();
+        
+        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        if(column == COL_LAST_PLAYED)
+        {
+            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            return thisTimestamp < otherTimestamp;
+        }
+        
+        // Default comparison for other columns
+        return QTreeWidgetItem::operator<(other);
+    }
+    
 private:
     FileType m_fileType;
     QString m_resolution;
@@ -163,7 +179,7 @@ private:
     QColor m_hashedFileColor; // Reusable color object for UI updates
     
     // MyList tree widget column indices (using enum for type safety and maintainability)
-    // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired
+    // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
     enum MyListColumn {
         COL_ANIME = 0,
         COL_PLAY = 1,
@@ -174,7 +190,8 @@ private:
         COL_STORAGE = 6,
         COL_MYLIST_ID = 7,
         COL_TYPE = 8,
-        COL_AIRED = 9
+        COL_AIRED = 9,
+        COL_LAST_PLAYED = 10
     };
     
     // Legacy constants for backward compatibility (deprecated, use enum instead)
@@ -334,6 +351,9 @@ public slots:
     bool isMylistFirstRunComplete();
     void setMylistFirstRunComplete();
     void requestMylistExportManually();
+    void saveMylistSorting();
+    void restoreMylistSorting();
+    void onMylistSortChanged(int column, Qt::SortOrder order);
     
     // Directory watcher slots
     void onWatcherEnabledChanged(int state);
