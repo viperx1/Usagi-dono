@@ -486,6 +486,7 @@ public:
 	~Window();
 private:
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
+    void debugPrintDatabaseInfoForLid(int lid);
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();
