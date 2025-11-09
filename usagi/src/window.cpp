@@ -2315,6 +2315,8 @@ void Window::loadMylistFromDatabase()
 		bool episodeViewed = false;
 		bool hasVideoFile = false;
 		bool hasAvailableFile = false; // At least one file exists
+		qint64 mostRecentPlayed = 0; // Track most recent playback for this episode
+		
 		for(int i = 0; i < episodeItem->childCount(); i++)
 		{
 			QTreeWidgetItem *fileItem = episodeItem->child(i);
@@ -2330,9 +2332,28 @@ void Window::loadMylistFromDatabase()
 				if(fileItem->text(COL_VIEWED) == "Yes")
 				{
 					episodeViewed = true;
-					break;
+				}
+				
+				// Track most recent playback
+				qint64 filePlayed = fileItem->data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+				if(filePlayed > mostRecentPlayed)
+				{
+					mostRecentPlayed = filePlayed;
 				}
 			}
+		}
+		
+		// Set last played for episode (most recent file)
+		if(mostRecentPlayed > 0)
+		{
+			QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(mostRecentPlayed);
+			episodeItem->setText(COL_LAST_PLAYED, lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+			episodeItem->setData(COL_LAST_PLAYED, Qt::UserRole, mostRecentPlayed);
+		}
+		else
+		{
+			episodeItem->setText(COL_LAST_PLAYED, "Never");
+			episodeItem->setData(COL_LAST_PLAYED, Qt::UserRole, 0);
 		}
 		
 		// Set play button for episode
@@ -2433,16 +2454,36 @@ void Window::loadMylistFromDatabase()
 		// Column 1 (Play button): Check if any episodes have available files
 		bool allNormalWatched = (totalNormalEpisodes > 0 && normalViewed >= totalNormalEpisodes);
 		bool hasAnyAvailableFile = false;
+		qint64 mostRecentPlayed = 0; // Track most recent playback for this anime
 		
-		// Check all episodes for this anime to see if any have available files
+		// Check all episodes for this anime to see if any have available files and track last played
 		for(int i = 0; i < animeItem->childCount(); i++)
 		{
 			QTreeWidgetItem *episodeItem = animeItem->child(i);
 			if(episodeItem && episodeItem->text(COL_PLAY) != "" && episodeItem->text(COL_PLAY) != "✗")
 			{
 				hasAnyAvailableFile = true;
-				break;
 			}
+			
+			// Track most recent playback from episodes
+			qint64 episodePlayed = episodeItem->data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+			if(episodePlayed > mostRecentPlayed)
+			{
+				mostRecentPlayed = episodePlayed;
+			}
+		}
+		
+		// Set last played for anime (most recent episode)
+		if(mostRecentPlayed > 0)
+		{
+			QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(mostRecentPlayed);
+			animeItem->setText(COL_LAST_PLAYED, lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+			animeItem->setData(COL_LAST_PLAYED, Qt::UserRole, mostRecentPlayed);
+		}
+		else
+		{
+			animeItem->setText(COL_LAST_PLAYED, "Never");
+			animeItem->setData(COL_LAST_PLAYED, Qt::UserRole, 0);
 		}
 		
 		if(!hasAnyAvailableFile && (normalEpisodes > 0 || otherEpisodes > 0))
@@ -3331,12 +3372,28 @@ void Window::onPlaybackStateChanged(int lid, bool isPlaying)
 			m_animationTimer->start();
 		}
 		
-		// Set initial animation frame immediately
+		// Set initial animation frame immediately for file and parent items
 		QTreeWidgetItemIterator it(mylistTreeWidget);
 		while (*it) {
 			QTreeWidgetItem *item = *it;
 			if (item->data(0, Qt::UserRole + 1).toInt() == lid) {
 				item->setText(COL_PLAY, "▶");
+				
+				// Also set initial frame for parent episode
+				QTreeWidgetItem *episodeItem = item->parent();
+				if (episodeItem) {
+					if (!episodeItem->text(COL_PLAY).isEmpty() && episodeItem->text(COL_PLAY) != "✗") {
+						episodeItem->setText(COL_PLAY, "▶");
+					}
+					
+					// Also set initial frame for parent anime
+					QTreeWidgetItem *animeItem = episodeItem->parent();
+					if (animeItem) {
+						if (!animeItem->text(COL_PLAY).isEmpty() && animeItem->text(COL_PLAY) != "✗") {
+							animeItem->setText(COL_PLAY, "▶");
+						}
+					}
+				}
 				break;
 			}
 			++it;
@@ -3348,12 +3405,24 @@ void Window::onPlaybackStateChanged(int lid, bool isPlaying)
 			m_animationTimer->stop();
 		}
 		
-		// Update the play button for this item
+		// Update the play button for this item and its parents
 		QTreeWidgetItemIterator it(mylistTreeWidget);
 		while (*it) {
 			QTreeWidgetItem *item = *it;
 			if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
 				updatePlayButtonForItem(item);
+				
+				// Update parent episode
+				QTreeWidgetItem *episodeItem = item->parent();
+				if (episodeItem) {
+					updatePlayButtonForItem(episodeItem);
+					
+					// Update parent anime
+					QTreeWidgetItem *animeItem = episodeItem->parent();
+					if (animeItem) {
+						updatePlayButtonForItem(animeItem);
+					}
+				}
 				break;
 			}
 			++it;
@@ -3369,15 +3438,34 @@ void Window::onAnimationTimerTimeout()
 		int frame = (it.value() + 1) % 3;  // Cycle through 0, 1, 2
 		it.value() = frame;
 		
-		// Find the item and update its play button with animation
+		// Animation frames: ▶ ▷ ▸ (different arrow styles)
+		QString animationFrames[] = {"▶", "▷", "▸"};
+		
+		// Find the file item and update its play button with animation
 		QTreeWidgetItemIterator itemIt(mylistTreeWidget);
 		while (*itemIt) {
 			QTreeWidgetItem *item = *itemIt;
 			if (item->data(0, Qt::UserRole + 1).toInt() == lid) {
-				// Update play button text with animation
-				// Animation frames: ▶ ▷ ▸ (different arrow styles)
-				QString animationFrames[] = {"▶", "▷", "▸"};
+				// Update file item
 				item->setText(COL_PLAY, animationFrames[frame]);
+				
+				// Also update parent episode item if it exists
+				QTreeWidgetItem *episodeItem = item->parent();
+				if (episodeItem) {
+					// Only animate if the episode has a play button
+					if (!episodeItem->text(COL_PLAY).isEmpty() && episodeItem->text(COL_PLAY) != "✗") {
+						episodeItem->setText(COL_PLAY, animationFrames[frame]);
+					}
+					
+					// Also update parent anime item if it exists
+					QTreeWidgetItem *animeItem = episodeItem->parent();
+					if (animeItem) {
+						// Only animate if the anime has a play button
+						if (!animeItem->text(COL_PLAY).isEmpty() && animeItem->text(COL_PLAY) != "✗") {
+							animeItem->setText(COL_PLAY, animationFrames[frame]);
+						}
+					}
+				}
 				break;
 			}
 			++itemIt;
