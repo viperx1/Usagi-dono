@@ -712,13 +712,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString enddate = token2.size() > 12 ? token2.at(12) : "";
 			
 			// Convert type code to typename string
-			QString typename;
-			if(type == "1") typename = "TV Series";
-			else if(type == "2") typename = "OVA";
-			else if(type == "3") typename = "Movie";
-			else if(type == "4") typename = "Other";
-			else if(type == "5") typename = "Web";
-			else if(type == "6") typename = "TV Special";
+			QString typenameStr;
+			if(type == "1") typenameStr = "TV Series";
+			else if(type == "2") typenameStr = "OVA";
+			else if(type == "3") typenameStr = "Movie";
+			else if(type == "4") typenameStr = "Other";
+			else if(type == "5") typenameStr = "Web";
+			else if(type == "6") typenameStr = "TV Special";
 			
 			// Update anime table with metadata (typename, startdate, enddate)
 			// Only update these specific fields, don't overwrite other data
@@ -726,7 +726,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			{
 				QSqlQuery query(db);
 				query.prepare("UPDATE `anime` SET `typename` = ?, `startdate` = ?, `enddate` = ? WHERE `aid` = ?");
-				query.addBindValue(typename.isEmpty() ? QVariant() : typename);
+				query.addBindValue(typenameStr.isEmpty() ? QVariant() : typenameStr);
 				query.addBindValue(startdate.isEmpty() ? QVariant() : startdate);
 				query.addBindValue(enddate.isEmpty() ? QVariant() : enddate);
 				query.addBindValue(aid.toInt());
@@ -737,7 +737,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				}
 				else
 				{
-					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typename + " Start: " + startdate, __FILE__, __LINE__);
+					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typenameStr + " Start: " + startdate, __FILE__, __LINE__);
 					// Emit signal to notify UI that anime data was updated
 					emit notifyAnimeUpdated(aid.toInt());
 				}
