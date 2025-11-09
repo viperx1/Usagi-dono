@@ -691,7 +691,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// aid|year|type|romaji|kanji|english|other|short|synonyms|episodes|highest_ep|airdate|enddate
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
-		token2 = token2.first().split("|");
+		QString responseData = token2.first();
+		token2 = responseData.split("|");
+		
+		// Debug logging to see what we received
+		Logger::log("[AniDB Response] 230 ANIME raw data: " + responseData, __FILE__, __LINE__);
+		Logger::log("[AniDB Response] 230 ANIME field count: " + QString::number(token2.size()), __FILE__, __LINE__);
+		for(int i = 0; i < token2.size() && i < 15; i++)
+		{
+			Logger::log("[AniDB Response] 230 ANIME field[" + QString::number(i) + "]: '" + token2.at(i) + "'", __FILE__, __LINE__);
+		}
 		
 		if(token2.size() >= 1)
 		{
@@ -722,6 +731,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString highest_ep = token2.size() > 10 ? token2.at(10) : "";
 			QString airdate = token2.size() > 11 ? token2.at(11) : "";
 			QString enddate = token2.size() > 12 ? token2.at(12) : "";
+			
+			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + year + "' Type: '" + type + "' AirDate: '" + airdate + "' EndDate: '" + enddate + "'", __FILE__, __LINE__);
 			
 			// Convert type code to typename string
 			QString typenameStr;

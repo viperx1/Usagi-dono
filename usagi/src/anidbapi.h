@@ -183,11 +183,6 @@ private:
 		ANIME_PARODY_COUNT =		0x00000020   // Bit 5: Parody count
 	};
 
-	// Legacy enum names for backward compatibility (deprecated, use file_fmask_codes instead)
-	typedef file_fmask_codes fcodes;
-	// Legacy enum names for backward compatibility (deprecated, use file_amask_codes instead)
-	typedef file_amask_codes acodes;
-
 	//wxDatagramSocket *Socket; // UDP socket
 	//wxIPV4address addrLocal; // local address/port
 	//wxIPV4address addrPeer; // remote address/port
