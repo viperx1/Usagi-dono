@@ -3432,6 +3432,12 @@ void Window::onPlaybackStateChanged(int lid, bool isPlaying)
 
 void Window::onAnimationTimerTimeout()
 {
+	// Temporarily disable sorting to prevent items from moving during animation
+	bool sortingWasEnabled = mylistTreeWidget->isSortingEnabled();
+	if (sortingWasEnabled) {
+		mylistTreeWidget->setSortingEnabled(false);
+	}
+	
 	// Update animation frames for all playing items and update their display
 	for (auto it = m_playingItems.begin(); it != m_playingItems.end(); ++it) {
 		int lid = it.key();
@@ -3470,6 +3476,11 @@ void Window::onAnimationTimerTimeout()
 			}
 			++itemIt;
 		}
+	}
+	
+	// Re-enable sorting if it was enabled
+	if (sortingWasEnabled) {
+		mylistTreeWidget->setSortingEnabled(true);
 	}
 	
 	// Trigger repaint of play column

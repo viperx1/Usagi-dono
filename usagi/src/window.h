@@ -69,14 +69,34 @@ public:
     {
         int column = treeWidget()->sortColumn();
         
-        // If sorting by episode number column (column 1) and both items have epno data
-        if(column == 1)
+        // If sorting by episode number column (column 2) and both items have epno data
+        if(column == COL_EPISODE)
         {
             const EpisodeTreeWidgetItem *otherEpisode = dynamic_cast<const EpisodeTreeWidgetItem*>(&other);
             if(otherEpisode && m_epno.isValid() && otherEpisode->m_epno.isValid())
             {
                 return m_epno < otherEpisode->m_epno;
             }
+        }
+        
+        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        if(column == COL_LAST_PLAYED)
+        {
+            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            
+            // Entries with timestamp 0 (never played) should always be at the bottom
+            if(thisTimestamp == 0 && otherTimestamp == 0) {
+                return false; // Both never played, keep current order
+            }
+            if(thisTimestamp == 0) {
+                return false; // This is never played, should come after other
+            }
+            if(otherTimestamp == 0) {
+                return true; // Other is never played, this should come before
+            }
+            
+            return thisTimestamp < otherTimestamp;
         }
         
         // Default comparison for other columns
@@ -117,6 +137,26 @@ public:
             {
                 return false; // other item comes before this
             }
+        }
+        
+        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        if(column == COL_LAST_PLAYED)
+        {
+            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            
+            // Entries with timestamp 0 (never played) should always be at the bottom
+            if(thisTimestamp == 0 && otherTimestamp == 0) {
+                return false; // Both never played, keep current order
+            }
+            if(thisTimestamp == 0) {
+                return false; // This is never played, should come after other
+            }
+            if(otherTimestamp == 0) {
+                return true; // Other is never played, this should come before
+            }
+            
+            return thisTimestamp < otherTimestamp;
         }
         
         // Default comparison for other columns
@@ -161,6 +201,19 @@ public:
         {
             qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
             qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            
+            // Entries with timestamp 0 (never played) should always be at the bottom
+            // regardless of sort order
+            if(thisTimestamp == 0 && otherTimestamp == 0) {
+                return false; // Both never played, keep current order
+            }
+            if(thisTimestamp == 0) {
+                return false; // This is never played, should come after other
+            }
+            if(otherTimestamp == 0) {
+                return true; // Other is never played, this should come before
+            }
+            
             return thisTimestamp < otherTimestamp;
         }
         
