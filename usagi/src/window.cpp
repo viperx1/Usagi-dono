@@ -2284,17 +2284,17 @@ void Window::loadMylistFromDatabase()
 			if (!fileExists) {
 				fileItem->setText(COL_PLAY, "✗"); // X for file not found
 				fileItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red))); // Red color for disabled
-				fileItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for unavailable
+				fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 			} else if (viewed) {
 				fileItem->setText(COL_PLAY, "✓"); // Checkmark for watched
-				fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for viewed
+				fileItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 			} else {
 				fileItem->setText(COL_PLAY, "▶"); // Play button
-				fileItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for not viewed
+				fileItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for not viewed
 			}
 		} else {
 			fileItem->setText(COL_PLAY, ""); // No button for non-video files
-			fileItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for unavailable
+			fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 		
 		fileItem->setData(0, Qt::UserRole, fid);
@@ -2367,23 +2367,23 @@ void Window::loadMylistFromDatabase()
 			{
 				episodeItem->setText(COL_PLAY, "✗"); // X if no files exist
 				episodeItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red)));
-				episodeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for unavailable
+				episodeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 			}
 			else if(episodeViewed)
 			{
 				episodeItem->setText(COL_PLAY, "✓"); // Checkmark for watched
-				episodeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for viewed
+				episodeItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 			}
 			else
 			{
 				episodeItem->setText(COL_PLAY, "▶"); // Play button
-				episodeItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for not viewed
+				episodeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for not viewed
 			}
 		}
 		else
 		{
 			episodeItem->setText(COL_PLAY, ""); // No button if no video file
-			episodeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for unavailable
+			episodeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 		
 		if(episodeViewed && !viewedEpisodes.contains(episodeKey))
@@ -2498,22 +2498,22 @@ void Window::loadMylistFromDatabase()
 		{
 			animeItem->setText(COL_PLAY, "✗"); // X if no files exist for any episode
 			animeItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red)));
-			animeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for unavailable
+			animeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 		else if(allNormalWatched)
 		{
 			animeItem->setText(COL_PLAY, "✓"); // Checkmark for fully watched
-			animeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for viewed
+			animeItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 		}
 		else if(normalEpisodes > 0 || otherEpisodes > 0)
 		{
 			animeItem->setText(COL_PLAY, "▶"); // Play button
-			animeItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for not viewed
+			animeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for not viewed
 		}
 		else
 		{
 			animeItem->setText(COL_PLAY, ""); // No button if no episodes
-			animeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for unavailable
+			animeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 	}
 	
@@ -3234,11 +3234,11 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 			// Check if file doesn't exist
 			QString currentText = item->text(PLAY_COLUMN);
 			if (currentText == "✗") {
-				// Keep the X if file doesn't exist (sort key already set to 0)
+				// Keep the X if file doesn't exist (sort key already set to 2)
 				return;
 			}
 			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
-			item->setData(PLAY_COLUMN, Qt::UserRole, viewed ? 2 : 1); // Update sort key
+			item->setData(PLAY_COLUMN, Qt::UserRole, viewed ? 1 : 0); // Update sort key
 		}
 	}
 	else if (parent && !parent->parent()) {
@@ -3259,10 +3259,10 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		
 		if (hasVideoFile) {
 			item->setText(PLAY_COLUMN, episodeViewed ? "✓" : "▶");
-			item->setData(PLAY_COLUMN, Qt::UserRole, episodeViewed ? 2 : 1); // Update sort key
+			item->setData(PLAY_COLUMN, Qt::UserRole, episodeViewed ? 1 : 0); // Update sort key
 		} else {
 			item->setText(PLAY_COLUMN, "");
-			item->setData(PLAY_COLUMN, Qt::UserRole, 0); // Update sort key (unavailable)
+			item->setData(PLAY_COLUMN, Qt::UserRole, 2); // Update sort key (unavailable)
 		}
 		
 		// Also update parent anime
@@ -3303,14 +3303,14 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		if (totalEpisodes > 0) {
 			if (viewedEpisodes == totalEpisodes) {
 				item->setText(PLAY_COLUMN, "✓");
-				item->setData(PLAY_COLUMN, Qt::UserRole, 2); // Update sort key
+				item->setData(PLAY_COLUMN, Qt::UserRole, 1); // Update sort key
 			} else {
 				item->setText(PLAY_COLUMN, "▶");
-				item->setData(PLAY_COLUMN, Qt::UserRole, 1); // Update sort key
+				item->setData(PLAY_COLUMN, Qt::UserRole, 0); // Update sort key
 			}
 		} else {
 			item->setText(PLAY_COLUMN, "");
-			item->setData(PLAY_COLUMN, Qt::UserRole, 0); // Update sort key (unavailable)
+			item->setData(PLAY_COLUMN, Qt::UserRole, 2); // Update sort key (unavailable)
 		}
 	}
 }
