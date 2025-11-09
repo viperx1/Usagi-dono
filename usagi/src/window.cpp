@@ -2360,8 +2360,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 	
 	// Extract tar.gz to temporary directory
 	QString tempDir = QDir::tempPath() + "/usagi_mylist_" + QString::number(QDateTime::currentMSecsSinceEpoch());
-	QDir dir;
-	dir.mkpath(tempDir);
+	QDir::mkpath(tempDir);
 	
 	// Use QProcess to extract tar.gz
 	QProcess tarProcess;
