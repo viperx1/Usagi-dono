@@ -152,35 +152,47 @@ private:
 	};
 
 	// ANIME command amask (anime data fields)
+	// Bits are numbered in reverse order compared to FILE command!
+	// Byte 7 (bits 63-56), Byte 6 (bits 55-48), ..., Byte 0 (bits 7-0)
+	// But we only use lower 4-5 bytes for actual fields
 	enum anime_amask_codes
 	{
-		ANIME_YEAR =				0x80000000,  // Bit 31: Year
-		ANIME_TYPE =				0x40000000,  // Bit 30: Type
-		ANIME_RELATED_AID_LIST =	0x20000000,  // Bit 29: Related anime ID list
-		ANIME_RELATED_AID_TYPE =	0x10000000,  // Bit 28: Related anime ID type
-		ANIME_CATEGORY_LIST =		0x08000000,  // Bit 27: Category list
-		ANIME_RESERVED_26 =			0x04000000,  // Bit 26: Reserved
-		ANIME_ROMAJI_NAME =			0x02000000,  // Bit 25: Romaji name
-		ANIME_KANJI_NAME =			0x01000000,  // Bit 24: Kanji name
-		ANIME_ENGLISH_NAME =		0x00800000,  // Bit 23: English name
-		ANIME_OTHER_NAME =			0x00400000,  // Bit 22: Other name
-		ANIME_SHORT_NAME_LIST =		0x00200000,  // Bit 21: Short name list
-		ANIME_SYNONYM_LIST =		0x00100000,  // Bit 20: Synonym list
-		ANIME_RESERVED_19 =			0x00080000,  // Bit 19: Reserved
-		ANIME_RESERVED_18 =			0x00040000,  // Bit 18: Reserved
-		ANIME_EPISODES =			0x00020000,  // Bit 17: Episodes
-		ANIME_HIGHEST_EPISODE =		0x00010000,  // Bit 16: Highest episode number
-		ANIME_SPECIAL_EP_COUNT =	0x00008000,  // Bit 15: Special episode count
-		ANIME_AIR_DATE =			0x00004000,  // Bit 14: Air date
-		ANIME_END_DATE =			0x00002000,  // Bit 13: End date
-		ANIME_PICNAME =				0x00001000,  // Bit 12: Picture name
-		ANIME_NSFW =				0x00000800,  // Bit 11: NSFW flag
-		ANIME_CHARACTERID_LIST =	0x00000400,  // Bit 10: Character ID list
-		ANIME_SPECIALS_COUNT =		0x00000200,  // Bit 9: Specials count
-		ANIME_CREDITS_COUNT =		0x00000100,  // Bit 8: Credits count
-		ANIME_OTHER_COUNT =			0x00000080,  // Bit 7: Other count
-		ANIME_TRAILER_COUNT =		0x00000040,  // Bit 6: Trailer count
-		ANIME_PARODY_COUNT =		0x00000020   // Bit 5: Parody count
+		// Byte 3 (bits 31-24)
+		ANIME_TOTAL_EPISODES =		0x80000000,  // Byte 3, bit 7 (31)
+		ANIME_HIGHEST_EPISODE =		0x40000000,  // Byte 3, bit 6 (30)
+		ANIME_YEAR =				0x20000000,  // Byte 3, bit 5 (29)
+		ANIME_TYPE =				0x10000000,  // Byte 3, bit 4 (28)
+		ANIME_RELATED_AID_LIST =	0x08000000,  // Byte 3, bit 3 (27)
+		ANIME_RELATED_AID_TYPE =	0x04000000,  // Byte 3, bit 2 (26)
+		ANIME_CATEGORY_LIST =		0x02000000,  // Byte 3, bit 1 (25)
+		// ANIME_RESERVED =			0x01000000,  // Byte 3, bit 0 (24) - unused
+		
+		// Byte 2 (bits 23-16)
+		ANIME_ROMAJI_NAME =			0x00800000,  // Byte 2, bit 7 (23)
+		ANIME_KANJI_NAME =			0x00400000,  // Byte 2, bit 6 (22)
+		ANIME_ENGLISH_NAME =		0x00200000,  // Byte 2, bit 5 (21)
+		ANIME_OTHER_NAME =			0x00100000,  // Byte 2, bit 4 (20)
+		ANIME_SHORT_NAME_LIST =		0x00080000,  // Byte 2, bit 3 (19)
+		ANIME_SYNONYM_LIST =		0x00040000,  // Byte 2, bit 2 (18)
+		// bits 17-16 reserved
+		
+		// Byte 1 (bits 15-8)
+		ANIME_EPISODES =			0x00008000,  // Byte 1, bit 7 (15) - Normal episode count
+		ANIME_SPECIAL_EP_COUNT =	0x00004000,  // Byte 1, bit 6 (14)
+		ANIME_AIR_DATE =			0x00002000,  // Byte 1, bit 5 (13)
+		ANIME_END_DATE =			0x00001000,  // Byte 1, bit 4 (12)
+		ANIME_PICNAME =				0x00000800,  // Byte 1, bit 3 (11)
+		ANIME_NSFW =				0x00000400,  // Byte 1, bit 2 (10)
+		// bits 9-8 reserved
+		
+		// Byte 0 (bits 7-0)
+		ANIME_CHARACTERID_LIST =	0x00000080,  // Byte 0, bit 7 (7)
+		ANIME_SPECIALS_COUNT =		0x00000040,  // Byte 0, bit 6 (6)
+		ANIME_CREDITS_COUNT =		0x00000020,  // Byte 0, bit 5 (5)
+		ANIME_OTHER_COUNT =			0x00000010,  // Byte 0, bit 4 (4)
+		ANIME_TRAILER_COUNT =		0x00000008,  // Byte 0, bit 3 (3)
+		ANIME_PARODY_COUNT =		0x00000004   // Byte 0, bit 2 (2)
+		// bits 1-0 reserved
 	};
 
 	//wxDatagramSocket *Socket; // UDP socket

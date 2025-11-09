@@ -688,7 +688,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	}
 	else if(ReplyID == "230"){ // 230 ANIME
 		// Response format based on amask built from anime_amask_codes enum:
-		// aid|year|type|romaji|kanji|english|other|short|synonyms|episodes|highest_ep|airdate|enddate
+		// Field order matches bit order (high to low):
+		// aid|total_eps|highest_ep|year|type|romaji|kanji|english|other|short|synonyms|episodes|special_count|airdate|enddate
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		QString responseData = token2.first();
@@ -697,7 +698,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Debug logging to see what we received
 		Logger::log("[AniDB Response] 230 ANIME raw data: " + responseData, __FILE__, __LINE__);
 		Logger::log("[AniDB Response] 230 ANIME field count: " + QString::number(token2.size()), __FILE__, __LINE__);
-		for(int i = 0; i < token2.size() && i < 15; i++)
+		for(int i = 0; i < token2.size() && i < 20; i++)
 		{
 			Logger::log("[AniDB Response] 230 ANIME field[" + QString::number(i) + "]: '" + token2.at(i) + "'", __FILE__, __LINE__);
 		}
@@ -705,32 +706,36 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(token2.size() >= 1)
 		{
 			QString aid = token2.at(0);
-			// Field order with amask (ANIME_YEAR|ANIME_TYPE|...):
+			// Field order with corrected amask:
 			// 0: aid
-			// 1: year (bit 31)
-			// 2: type (bit 30)
-			// 3: romaji name (bit 25)
-			// 4: kanji name (bit 24)
-			// 5: english name (bit 23)
-			// 6: other name (bit 22)
-			// 7: short name list (bit 21)
-			// 8: synonym list (bit 20)
-			// 9: episodes (bit 17)
-			// 10: highest episode (bit 16)
-			// 11: air date (bit 14)
-			// 12: end date (bit 13)
-			QString year = token2.size() > 1 ? token2.at(1) : "";
-			QString type = token2.size() > 2 ? token2.at(2) : "";
-			QString nameromaji = token2.size() > 3 ? token2.at(3) : "";
-			QString namekanji = token2.size() > 4 ? token2.at(4) : "";
-			QString nameenglish = token2.size() > 5 ? token2.at(5) : "";
-			QString nameother = token2.size() > 6 ? token2.at(6) : "";
-			QString nameshort = token2.size() > 7 ? token2.at(7) : "";
-			QString synonyms = token2.size() > 8 ? token2.at(8) : "";
-			QString episodes = token2.size() > 9 ? token2.at(9) : "";
-			QString highest_ep = token2.size() > 10 ? token2.at(10) : "";
-			QString airdate = token2.size() > 11 ? token2.at(11) : "";
-			QString enddate = token2.size() > 12 ? token2.at(12) : "";
+			// 1: total_episodes (bit 31)
+			// 2: highest_episode (bit 30)
+			// 3: year (bit 29)
+			// 4: type (bit 28)
+			// 5: romaji name (bit 23)
+			// 6: kanji name (bit 22)
+			// 7: english name (bit 21)
+			// 8: other name (bit 20)
+			// 9: short name list (bit 19)
+			// 10: synonym list (bit 18)
+			// 11: episodes (bit 15)
+			// 12: special_ep_count (bit 14)
+			// 13: air date (bit 13)
+			// 14: end date (bit 12)
+			QString total_eps = token2.size() > 1 ? token2.at(1) : "";
+			QString highest_ep = token2.size() > 2 ? token2.at(2) : "";
+			QString year = token2.size() > 3 ? token2.at(3) : "";
+			QString type = token2.size() > 4 ? token2.at(4) : "";
+			QString nameromaji = token2.size() > 5 ? token2.at(5) : "";
+			QString namekanji = token2.size() > 6 ? token2.at(6) : "";
+			QString nameenglish = token2.size() > 7 ? token2.at(7) : "";
+			QString nameother = token2.size() > 8 ? token2.at(8) : "";
+			QString nameshort = token2.size() > 9 ? token2.at(9) : "";
+			QString synonyms = token2.size() > 10 ? token2.at(10) : "";
+			QString episodes = token2.size() > 11 ? token2.at(11) : "";
+			QString special_count = token2.size() > 12 ? token2.at(12) : "";
+			QString airdate = token2.size() > 13 ? token2.at(13) : "";
+			QString enddate = token2.size() > 14 ? token2.at(14) : "";
 			
 			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + year + "' Type: '" + type + "' AirDate: '" + airdate + "' EndDate: '" + enddate + "'", __FILE__, __LINE__);
 			
@@ -1519,10 +1524,12 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	// ANIME aid={int4 aid}&amask={hexstr amask}
 	// Request anime information for a specific anime ID
 	// Build amask using the anime_amask_codes enum for clarity
-	unsigned int amask = ANIME_YEAR | ANIME_TYPE | 
+	// Note: ANIME amask bits are numbered differently than FILE amask!
+	unsigned int amask = ANIME_TOTAL_EPISODES | ANIME_HIGHEST_EPISODE |
+						 ANIME_YEAR | ANIME_TYPE |
 						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
 						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
-						 ANIME_EPISODES | ANIME_HIGHEST_EPISODE |
+						 ANIME_EPISODES | ANIME_SPECIAL_EP_COUNT |
 						 ANIME_AIR_DATE | ANIME_END_DATE;
 	
 	// Convert to hex string (no leading zeros for AniDB API)
