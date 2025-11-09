@@ -206,7 +206,8 @@ void TestCrashLog::testCompleteProcessWithDataTypeConversions()
     
     // Step 1: Simulate generateCrashLog with QString → QTextStream conversion
     QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (!QDir(logDir).exists())
+    QDir dir(logDir);
+    if (!dir.exists())
     {
         QDir().mkpath(logDir);
     }
