@@ -3173,6 +3173,10 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 {
 	if (!item) return;
 	
+	// Get the LID for this item to check if it's playing
+	int lid = item->data(0, Qt::UserRole + 1).toInt();
+	bool isPlaying = m_playingItems.contains(lid);
+	
 	// Determine item type and update button accordingly
 	QTreeWidgetItem *parent = item->parent();
 	
@@ -3180,8 +3184,19 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		// This is a file item
 		FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(item);
 		if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-			bool viewed = (item->text(COL_VIEWED) == "Yes");
-			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
+			if (isPlaying) {
+				// Show first animation frame for playing items
+				item->setText(PLAY_COLUMN, "▶");
+			} else {
+				bool viewed = (item->text(COL_VIEWED) == "Yes");
+				// Check if file doesn't exist
+				QString currentText = item->text(PLAY_COLUMN);
+				if (currentText == "✗") {
+					// Keep the X if file doesn't exist
+					return;
+				}
+				item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
+			}
 		}
 	}
 	else if (parent && !parent->parent()) {
@@ -3349,9 +3364,25 @@ void Window::onPlaybackStateChanged(int lid, bool isPlaying)
 
 void Window::onAnimationTimerTimeout()
 {
-	// Update animation frames for all playing items
+	// Update animation frames for all playing items and update their display
 	for (auto it = m_playingItems.begin(); it != m_playingItems.end(); ++it) {
-		it.value() = (it.value() + 1) % 3;  // Cycle through 0, 1, 2
+		int lid = it.key();
+		int frame = (it.value() + 1) % 3;  // Cycle through 0, 1, 2
+		it.value() = frame;
+		
+		// Find the item and update its play button with animation
+		QTreeWidgetItemIterator itemIt(mylistTreeWidget);
+		while (*itemIt) {
+			QTreeWidgetItem *item = *itemIt;
+			if (item->data(0, Qt::UserRole + 1).toInt() == lid) {
+				// Update play button text with animation
+				// Animation frames: ▶ ▷ ▸ (different arrow styles)
+				QString animationFrames[] = {"▶", "▷", "▸"};
+				item->setText(COL_PLAY, animationFrames[frame]);
+				break;
+			}
+			++itemIt;
+		}
 	}
 	
 	// Trigger repaint of play column
