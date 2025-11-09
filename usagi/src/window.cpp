@@ -642,6 +642,78 @@ void Window::debugPrintDatabaseInfoForLid(int lid)
 	LOG("=================================================================");
 }
 
+void Window::insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeItem, const QMap<QPair<int, int>, QTreeWidgetItem*>& episodeItems)
+{
+	// Collect all episode numbers that exist for this anime
+	QSet<int> existingEpisodes;
+	for(QMap<QPair<int, int>, QTreeWidgetItem*>::const_iterator it = episodeItems.constBegin(); 
+		it != episodeItems.constEnd(); ++it)
+	{
+		if(it.key().first == aid) // Check if episode belongs to this anime
+		{
+			EpisodeTreeWidgetItem* episodeItem = static_cast<EpisodeTreeWidgetItem*>(it.value());
+			if(episodeItem->getEpno().isValid() && episodeItem->getEpno().type() == 1)
+			{
+				existingEpisodes.insert(episodeItem->getEpno().number());
+			}
+		}
+	}
+	
+	if(existingEpisodes.isEmpty())
+		return; // No episodes to work with
+	
+	// Find min and max episode numbers
+	int minEp = *std::min_element(existingEpisodes.begin(), existingEpisodes.end());
+	int maxEp = *std::max_element(existingEpisodes.begin(), existingEpisodes.end());
+	
+	// Find gaps and create placeholder rows
+	QList<int> sortedEpisodes = existingEpisodes.values();
+	std::sort(sortedEpisodes.begin(), sortedEpisodes.end());
+	
+	for(int expectedEp = minEp; expectedEp <= maxEp; expectedEp++)
+	{
+		if(!existingEpisodes.contains(expectedEp))
+		{
+			// Found a missing episode, create a range
+			int rangeStart = expectedEp;
+			int rangeEnd = expectedEp;
+			
+			// Extend the range to include consecutive missing episodes
+			while(rangeEnd + 1 <= maxEp && !existingEpisodes.contains(rangeEnd + 1))
+			{
+				rangeEnd++;
+			}
+			
+			// Create placeholder item
+			QTreeWidgetItem* placeholderItem = new QTreeWidgetItem(animeItem);
+			placeholderItem->setText(0, "");
+			
+			// Column 2: Episode number(s) in red
+			QString epRange;
+			if(rangeStart == rangeEnd)
+			{
+				epRange = QString::number(rangeStart);
+			}
+			else
+			{
+				epRange = QString("%1-%2").arg(rangeStart).arg(rangeEnd);
+			}
+			placeholderItem->setText(COL_EPISODE, epRange);
+			placeholderItem->setForeground(COL_EPISODE, QBrush(QColor(Qt::red)));
+			
+			// Column 3: Episode title in red
+			placeholderItem->setText(COL_EPISODE_TITLE, "Missing");
+			placeholderItem->setForeground(COL_EPISODE_TITLE, QBrush(QColor(Qt::red)));
+			
+			// Set data for sorting - use negative value to sort before real episodes
+			placeholderItem->setData(0, Qt::UserRole, -rangeStart);
+			
+			// Skip to the end of the range
+			expectedEp = rangeEnd;
+		}
+	}
+}
+
 void Window::Button1Click() // add files
 {
     QStringList files = QFileDialog::getOpenFileNames(0, 0, adbapi->getLastDirectory());
@@ -1696,7 +1768,7 @@ void Window::getNotifyExportNoSuchTemplate(QString tag)
 
 void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 {
-	// When an anime item is expanded, queue EPISODE API requests for missing data
+	// When an anime item is expanded, queue API requests for missing data
 	if(!item)
 		return;
 	
@@ -1704,6 +1776,27 @@ void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 	int aid = item->data(0, Qt::UserRole).toInt();
 	if(aid == 0)
 		return;  // Not an anime item (might be an episode child)
+	
+	// Check if anime metadata needs updating
+	if(animeNeedingMetadata.contains(aid))
+	{
+		LOG(QString("Requesting anime metadata update for AID %1").arg(aid));
+		// Query database to get a file from this anime to trigger FILE API call
+		QSqlDatabase db = QSqlDatabase::database();
+		QSqlQuery query(db);
+		query.prepare("SELECT size, ed2k FROM file WHERE aid = ? LIMIT 1");
+		query.bindValue(0, aid);
+		if(query.exec() && query.next())
+		{
+			qint64 size = query.value(0).toLongLong();
+			QString ed2k = query.value(1).toString();
+			if(size > 0 && !ed2k.isEmpty())
+			{
+				adbapi->File(size, ed2k);
+				animeNeedingMetadata.remove(aid);  // Remove from tracking set
+			}
+		}
+	}
 	
 	// Iterate through child episodes and queue API requests for missing data
 	int childCount = item->childCount();
@@ -2195,6 +2288,7 @@ void Window::loadMylistFromDatabase()
 {
 	mylistTreeWidget->clear();
 	episodesNeedingData.clear();  // Clear tracking set
+	animeNeedingMetadata.clear();  // Clear tracking set
 	
 	// Query the database for mylist entries joined with anime, episode, and file data
 	// Structure: anime -> episode -> file (three-level hierarchy)
@@ -2339,6 +2433,11 @@ void Window::loadMylistFromDatabase()
 		{
 			animeItem->setText(8, typeName);
 		}
+		else if(typeName.isEmpty() && animeItem->text(8).isEmpty())
+		{
+			// Mark anime as needing metadata if typename is missing
+			animeNeedingMetadata.insert(aid);
+		}
 		
 		// Set Aired column (column 8) for anime parent item
 		if(!startDate.isEmpty() && animeItem->text(9).isEmpty())
@@ -2346,6 +2445,11 @@ void Window::loadMylistFromDatabase()
 			aired airedDates(startDate, endDate);
 			animeItem->setText(9, airedDates.toDisplayString());
 			animeItem->setAired(airedDates);
+		}
+		else if(startDate.isEmpty() && animeItem->text(9).isEmpty())
+		{
+			// Mark anime as needing metadata if startdate is missing
+			animeNeedingMetadata.insert(aid);
 		}
 		
 		// Get or create the episode item
@@ -2651,6 +2755,14 @@ void Window::loadMylistFromDatabase()
 				animeOtherViewedCount[aid]++;
 			}
 		}
+	}
+	
+	// Insert placeholder rows for missing episodes
+	for(QMap<int, QTreeWidgetItem*>::const_iterator it = animeItems.constBegin(); it != animeItems.constEnd(); ++it)
+	{
+		int aid = it.key();
+		QTreeWidgetItem *animeItem = it.value();
+		insertMissingEpisodePlaceholders(aid, animeItem, episodeItems);
 	}
 	
 	// Update anime rows with aggregate statistics

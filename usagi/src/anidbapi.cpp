@@ -606,6 +606,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					LOG("Group database query error: " + query.lastError().text());
 				}
 			}
+			
+			// Check if episode data is missing (no epno) and queue EPISODE API request
+			if(!eid.isEmpty() && eid != "0" && epno.isEmpty())
+			{
+				LOG(QString("Episode data incomplete for EID %1, queuing EPISODE API request").arg(eid));
+				Episode(eid.toInt());
+			}
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
