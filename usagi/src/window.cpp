@@ -118,9 +118,9 @@ Window::Window()
 
     // page mylist
     mylistTreeWidget = new QTreeWidget(this);
-    mylistTreeWidget->setColumnCount(10);
-    // New column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired
-    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Play" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID" << "Type" << "Aired");
+    mylistTreeWidget->setColumnCount(11);
+    // New column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
+    mylistTreeWidget->setHeaderLabels(QStringList() << "Anime" << "Play" << "Episode" << "Episode Title" << "State" << "Viewed" << "Storage" << "Mylist ID" << "Type" << "Aired" << "Last Played");
     mylistTreeWidget->setColumnWidth(0, 300);  // Anime
     mylistTreeWidget->setColumnWidth(1, 50);   // Play (narrow for button)
     mylistTreeWidget->setColumnWidth(2, 80);   // Episode
@@ -128,10 +128,10 @@ Window::Window()
     mylistTreeWidget->setColumnWidth(4, 100);  // State
     mylistTreeWidget->setColumnWidth(5, 80);   // Viewed
     mylistTreeWidget->setColumnWidth(6, 200);  // Storage
-    mylistTreeWidget->setColumnWidth(7, 80);   // Mylist ID
-    mylistTreeWidget->setColumnWidth(7, 100);
-    mylistTreeWidget->setColumnWidth(8, 180);
-    mylistTreeWidget->setColumnWidth(9, 60);
+    mylistTreeWidget->setColumnWidth(7, 100);  // Mylist ID
+    mylistTreeWidget->setColumnWidth(8, 180);  // Type
+    mylistTreeWidget->setColumnWidth(9, 120);  // Aired
+    mylistTreeWidget->setColumnWidth(10, 120); // Last Played
     mylistTreeWidget->setAlternatingRowColors(true);
     mylistTreeWidget->setSortingEnabled(true);
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -304,6 +304,7 @@ Window::Window()
 	connect(adbapi, SIGNAL(notifyExportNoSuchTemplate(QString)), this, SLOT(getNotifyExportNoSuchTemplate(QString)));
 	connect(adbapi, SIGNAL(notifyEpisodeUpdated(int,int)), this, SLOT(getNotifyEpisodeUpdated(int,int)));
 	connect(mylistTreeWidget, SIGNAL(itemExpanded(QTreeWidgetItem*)), this, SLOT(onMylistItemExpanded(QTreeWidgetItem*)));
+	connect(mylistTreeWidget->header(), SIGNAL(sortIndicatorChanged(int,Qt::SortOrder)), this, SLOT(onMylistSortChanged(int,Qt::SortOrder)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
     
     // Initialize directory watcher
@@ -860,8 +861,74 @@ void Window::startupInitialization()
     // to allow the UI to be fully initialized before loading data
     mylistStatusLabel->setText("MyList Status: Loading from database...");
     loadMylistFromDatabase();
+    
+    // Restore sorting preferences from database or use default
+    restoreMylistSorting();
+    
     mylistStatusLabel->setText("MyList Status: Ready");
 }
+
+void Window::saveMylistSorting()
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return;
+    }
+    
+    int sortColumn = mylistTreeWidget->sortColumn();
+    Qt::SortOrder sortOrder = mylistTreeWidget->header()->sortIndicatorOrder();
+    
+    QSqlQuery q(db);
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_sort_column', ?)");
+    q.addBindValue(sortColumn);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_sort_order', ?)");
+    q.addBindValue(static_cast<int>(sortOrder));
+    q.exec();
+    
+    LOG(QString("Saved mylist sorting: column=%1, order=%2").arg(sortColumn).arg(sortOrder));
+}
+
+void Window::restoreMylistSorting()
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        // Use default sorting if database is not available
+        mylistTreeWidget->sortByColumn(COL_ANIME, Qt::AscendingOrder);
+        return;
+    }
+    
+    // Try to load saved sorting preferences
+    QSqlQuery q(db);
+    q.prepare("SELECT value FROM settings WHERE name = 'mylist_sort_column'");
+    
+    int sortColumn = COL_ANIME; // Default to Anime column
+    Qt::SortOrder sortOrder = Qt::AscendingOrder; // Default to ascending
+    
+    if (q.exec() && q.next()) {
+        sortColumn = q.value(0).toInt();
+    }
+    
+    q.prepare("SELECT value FROM settings WHERE name = 'mylist_sort_order'");
+    if (q.exec() && q.next()) {
+        sortOrder = static_cast<Qt::SortOrder>(q.value(0).toInt());
+    }
+    
+    // Apply the sorting
+    mylistTreeWidget->sortByColumn(sortColumn, sortOrder);
+    
+    LOG(QString("Restored mylist sorting: column=%1, order=%2").arg(sortColumn).arg(sortOrder));
+}
+
+void Window::onMylistSortChanged(int column, Qt::SortOrder order)
+{
+    Q_UNUSED(column);
+    Q_UNUSED(order);
+    // Save sorting preferences when user changes sorting
+    saveMylistSorting();
+}
+
 
 void Window::hasherFinished()
 {
@@ -1904,11 +1971,13 @@ void Window::loadMylistFromDatabase()
 					"a.eps, a.typename, a.startdate, a.enddate, "
 					"f.filetype, f.resolution, f.quality, "
 					"(SELECT name FROM `group` WHERE gid = m.gid) as group_name, "
-					"f.filename, m.gid "
+					"f.filename, m.gid, m.last_played, "
+					"lf.path as local_file_path "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
 					"LEFT JOIN file f ON m.fid = f.fid "
+					"LEFT JOIN local_files lf ON m.local_file = lf.id "
 					"ORDER BY a.nameromaji, m.eid, m.lid";
 	
 	QSqlQuery q(db);
@@ -1963,6 +2032,19 @@ void Window::loadMylistFromDatabase()
 		QString groupName = q.value(20).toString();
 		QString filename = q.value(21).toString();
 		int gid = q.value(22).toInt();
+		qint64 lastPlayed = q.value(23).toLongLong();
+		QString localFilePath = q.value(24).toString();
+		
+		// Check if file exists
+		bool fileExists = false;
+		if (!localFilePath.isEmpty()) {
+			QFileInfo fileInfo(localFilePath);
+			fileExists = fileInfo.exists() && fileInfo.isFile();
+		} else if (!storage.isEmpty()) {
+			// Fallback to storage path if local_file not set
+			QFileInfo fileInfo(storage);
+			fileExists = fileInfo.exists() && fileInfo.isFile();
+		}
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -2186,15 +2268,33 @@ void Window::loadMylistFromDatabase()
 		fileItem->setText(6, storage);
 		fileItem->setText(7, QString::number(lid));
 		
+		// Last played column (column 10)
+		if (lastPlayed > 0) {
+			QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(lastPlayed);
+			fileItem->setText(COL_LAST_PLAYED, lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+			// Store the timestamp for sorting
+			fileItem->setData(COL_LAST_PLAYED, Qt::UserRole, lastPlayed);
+		} else {
+			fileItem->setText(COL_LAST_PLAYED, "Never");
+			fileItem->setData(COL_LAST_PLAYED, Qt::UserRole, 0);
+		}
+		
 		// Add play button text indicator (column 1 - PLAY)
 		if (type == FileTreeWidgetItem::Video) {
-			if (viewed) {
+			if (!fileExists) {
+				fileItem->setText(COL_PLAY, "✗"); // X for file not found
+				fileItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red))); // Red color for disabled
+				fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
+			} else if (viewed) {
 				fileItem->setText(COL_PLAY, "✓"); // Checkmark for watched
+				fileItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 			} else {
 				fileItem->setText(COL_PLAY, "▶"); // Play button
+				fileItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for not viewed
 			}
 		} else {
 			fileItem->setText(COL_PLAY, ""); // No button for non-video files
+			fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 		
 		fileItem->setData(0, Qt::UserRole, fid);
@@ -2218,6 +2318,9 @@ void Window::loadMylistFromDatabase()
 		// Check if any file for this episode is viewed
 		bool episodeViewed = false;
 		bool hasVideoFile = false;
+		bool hasAvailableFile = false; // At least one file exists
+		qint64 mostRecentPlayed = 0; // Track most recent playback for this episode
+		
 		for(int i = 0; i < episodeItem->childCount(); i++)
 		{
 			QTreeWidgetItem *fileItem = episodeItem->child(i);
@@ -2225,29 +2328,62 @@ void Window::loadMylistFromDatabase()
 			if(file && file->getFileType() == FileTreeWidgetItem::Video)
 			{
 				hasVideoFile = true;
+				// Check if file is available (not marked with X)
+				if(fileItem->text(COL_PLAY) != "✗")
+				{
+					hasAvailableFile = true;
+				}
 				if(fileItem->text(COL_VIEWED) == "Yes")
 				{
 					episodeViewed = true;
-					break;
+				}
+				
+				// Track most recent playback
+				qint64 filePlayed = fileItem->data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+				if(filePlayed > mostRecentPlayed)
+				{
+					mostRecentPlayed = filePlayed;
 				}
 			}
+		}
+		
+		// Set last played for episode (most recent file)
+		if(mostRecentPlayed > 0)
+		{
+			QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(mostRecentPlayed);
+			episodeItem->setText(COL_LAST_PLAYED, lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+			episodeItem->setData(COL_LAST_PLAYED, Qt::UserRole, mostRecentPlayed);
+		}
+		else
+		{
+			episodeItem->setText(COL_LAST_PLAYED, "Never");
+			episodeItem->setData(COL_LAST_PLAYED, Qt::UserRole, 0);
 		}
 		
 		// Set play button for episode
 		if(hasVideoFile)
 		{
-			if(episodeViewed)
+			if(!hasAvailableFile)
+			{
+				episodeItem->setText(COL_PLAY, "✗"); // X if no files exist
+				episodeItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red)));
+				episodeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
+			}
+			else if(episodeViewed)
 			{
 				episodeItem->setText(COL_PLAY, "✓"); // Checkmark for watched
+				episodeItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 			}
 			else
 			{
 				episodeItem->setText(COL_PLAY, "▶"); // Play button
+				episodeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for not viewed
 			}
 		}
 		else
 		{
 			episodeItem->setText(COL_PLAY, ""); // No button if no video file
+			episodeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 		
 		if(episodeViewed && !viewedEpisodes.contains(episodeKey))
@@ -2323,27 +2459,66 @@ void Window::loadMylistFromDatabase()
 		}
 		animeItem->setText(5, viewedText);
 		
-		// Column 9 (Play button): Show checkmark if all normal episodes are watched
+		// Column 1 (Play button): Check if any episodes have available files
 		bool allNormalWatched = (totalNormalEpisodes > 0 && normalViewed >= totalNormalEpisodes);
-		if(allNormalWatched)
+		bool hasAnyAvailableFile = false;
+		qint64 mostRecentPlayed = 0; // Track most recent playback for this anime
+		
+		// Check all episodes for this anime to see if any have available files and track last played
+		for(int i = 0; i < animeItem->childCount(); i++)
+		{
+			QTreeWidgetItem *episodeItem = animeItem->child(i);
+			if(episodeItem && episodeItem->text(COL_PLAY) != "" && episodeItem->text(COL_PLAY) != "✗")
+			{
+				hasAnyAvailableFile = true;
+			}
+			
+			// Track most recent playback from episodes
+			qint64 episodePlayed = episodeItem->data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+			if(episodePlayed > mostRecentPlayed)
+			{
+				mostRecentPlayed = episodePlayed;
+			}
+		}
+		
+		// Set last played for anime (most recent episode)
+		if(mostRecentPlayed > 0)
+		{
+			QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(mostRecentPlayed);
+			animeItem->setText(COL_LAST_PLAYED, lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+			animeItem->setData(COL_LAST_PLAYED, Qt::UserRole, mostRecentPlayed);
+		}
+		else
+		{
+			animeItem->setText(COL_LAST_PLAYED, "Never");
+			animeItem->setData(COL_LAST_PLAYED, Qt::UserRole, 0);
+		}
+		
+		if(!hasAnyAvailableFile && (normalEpisodes > 0 || otherEpisodes > 0))
+		{
+			animeItem->setText(COL_PLAY, "✗"); // X if no files exist for any episode
+			animeItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red)));
+			animeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
+		}
+		else if(allNormalWatched)
 		{
 			animeItem->setText(COL_PLAY, "✓"); // Checkmark for fully watched
+			animeItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 		}
 		else if(normalEpisodes > 0 || otherEpisodes > 0)
 		{
 			animeItem->setText(COL_PLAY, "▶"); // Play button
+			animeItem->setData(COL_PLAY, Qt::UserRole, 0); // Sort key for not viewed
 		}
 		else
 		{
 			animeItem->setText(COL_PLAY, ""); // No button if no episodes
+			animeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 	}
 	
 	LOG(QString("Loaded %1 files for %2 episodes in %3 anime").arg(totalFiles).arg(episodeItems.size()).arg(animeItems.size()));
 	mylistStatusLabel->setText(QString("MyList Status: %1 files loaded").arg(totalFiles));
-	
-	// Set default sort order to ascending by episode column (column 1)
-	mylistTreeWidget->sortByColumn(1, Qt::AscendingOrder);
 }
 
 int Window::parseMylistExport(const QString &tarGzPath)
@@ -3056,7 +3231,14 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(item);
 		if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 			bool viewed = (item->text(COL_VIEWED) == "Yes");
+			// Check if file doesn't exist
+			QString currentText = item->text(PLAY_COLUMN);
+			if (currentText == "✗") {
+				// Keep the X if file doesn't exist (sort key already set to 2)
+				return;
+			}
 			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
+			item->setData(PLAY_COLUMN, Qt::UserRole, viewed ? 1 : 0); // Update sort key
 		}
 	}
 	else if (parent && !parent->parent()) {
@@ -3077,8 +3259,10 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		
 		if (hasVideoFile) {
 			item->setText(PLAY_COLUMN, episodeViewed ? "✓" : "▶");
+			item->setData(PLAY_COLUMN, Qt::UserRole, episodeViewed ? 1 : 0); // Update sort key
 		} else {
 			item->setText(PLAY_COLUMN, "");
+			item->setData(PLAY_COLUMN, Qt::UserRole, 2); // Update sort key (unavailable)
 		}
 		
 		// Also update parent anime
@@ -3119,11 +3303,14 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		if (totalEpisodes > 0) {
 			if (viewedEpisodes == totalEpisodes) {
 				item->setText(PLAY_COLUMN, "✓");
+				item->setData(PLAY_COLUMN, Qt::UserRole, 1); // Update sort key
 			} else {
 				item->setText(PLAY_COLUMN, "▶");
+				item->setData(PLAY_COLUMN, Qt::UserRole, 0); // Update sort key
 			}
 		} else {
 			item->setText(PLAY_COLUMN, "");
+			item->setData(PLAY_COLUMN, Qt::UserRole, 2); // Update sort key (unavailable)
 		}
 	}
 }
@@ -3202,31 +3389,116 @@ void Window::onPlaybackStateChanged(int lid, bool isPlaying)
 		if (!m_animationTimer->isActive()) {
 			m_animationTimer->start();
 		}
+		
+		// Set initial animation frame immediately for file and parent items
+		QTreeWidgetItemIterator it(mylistTreeWidget);
+		while (*it) {
+			QTreeWidgetItem *item = *it;
+			if (item->data(0, Qt::UserRole + 1).toInt() == lid) {
+				item->setText(COL_PLAY, "▶");
+				
+				// Also set initial frame for parent episode
+				QTreeWidgetItem *episodeItem = item->parent();
+				if (episodeItem) {
+					if (!episodeItem->text(COL_PLAY).isEmpty() && episodeItem->text(COL_PLAY) != "✗") {
+						episodeItem->setText(COL_PLAY, "▶");
+					}
+					
+					// Also set initial frame for parent anime
+					QTreeWidgetItem *animeItem = episodeItem->parent();
+					if (animeItem) {
+						if (!animeItem->text(COL_PLAY).isEmpty() && animeItem->text(COL_PLAY) != "✗") {
+							animeItem->setText(COL_PLAY, "▶");
+						}
+					}
+				}
+				break;
+			}
+			++it;
+		}
 	} else {
 		// Remove from playing items
 		m_playingItems.remove(lid);
 		if (m_playingItems.isEmpty()) {
 			m_animationTimer->stop();
 		}
-	}
-	
-	// Update the play button for this item
-	QTreeWidgetItemIterator it(mylistTreeWidget);
-	while (*it) {
-		QTreeWidgetItem *item = *it;
-		if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
-			updatePlayButtonForItem(item);
-			break;
+		
+		// Update the play button for this item and its parents
+		QTreeWidgetItemIterator it(mylistTreeWidget);
+		while (*it) {
+			QTreeWidgetItem *item = *it;
+			if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
+				updatePlayButtonForItem(item);
+				
+				// Update parent episode
+				QTreeWidgetItem *episodeItem = item->parent();
+				if (episodeItem) {
+					updatePlayButtonForItem(episodeItem);
+					
+					// Update parent anime
+					QTreeWidgetItem *animeItem = episodeItem->parent();
+					if (animeItem) {
+						updatePlayButtonForItem(animeItem);
+					}
+				}
+				break;
+			}
+			++it;
 		}
-		++it;
 	}
 }
 
 void Window::onAnimationTimerTimeout()
 {
-	// Update animation frames for all playing items
+	// Temporarily disable sorting to prevent items from moving during animation
+	bool sortingWasEnabled = mylistTreeWidget->isSortingEnabled();
+	if (sortingWasEnabled) {
+		mylistTreeWidget->setSortingEnabled(false);
+	}
+	
+	// Update animation frames for all playing items and update their display
 	for (auto it = m_playingItems.begin(); it != m_playingItems.end(); ++it) {
-		it.value() = (it.value() + 1) % 3;  // Cycle through 0, 1, 2
+		int lid = it.key();
+		int frame = (it.value() + 1) % 3;  // Cycle through 0, 1, 2
+		it.value() = frame;
+		
+		// Animation frames: ▶ ▷ ▸ (different arrow styles)
+		QString animationFrames[] = {"▶", "▷", "▸"};
+		
+		// Find the file item and update its play button with animation
+		QTreeWidgetItemIterator itemIt(mylistTreeWidget);
+		while (*itemIt) {
+			QTreeWidgetItem *item = *itemIt;
+			if (item->data(0, Qt::UserRole + 1).toInt() == lid) {
+				// Update file item
+				item->setText(COL_PLAY, animationFrames[frame]);
+				
+				// Also update parent episode item if it exists
+				QTreeWidgetItem *episodeItem = item->parent();
+				if (episodeItem) {
+					// Only animate if the episode has a play button
+					if (!episodeItem->text(COL_PLAY).isEmpty() && episodeItem->text(COL_PLAY) != "✗") {
+						episodeItem->setText(COL_PLAY, animationFrames[frame]);
+					}
+					
+					// Also update parent anime item if it exists
+					QTreeWidgetItem *animeItem = episodeItem->parent();
+					if (animeItem) {
+						// Only animate if the anime has a play button
+						if (!animeItem->text(COL_PLAY).isEmpty() && animeItem->text(COL_PLAY) != "✗") {
+							animeItem->setText(COL_PLAY, animationFrames[frame]);
+						}
+					}
+				}
+				break;
+			}
+			++itemIt;
+		}
+	}
+	
+	// Re-enable sorting if it was enabled
+	if (sortingWasEnabled) {
+		mylistTreeWidget->setSortingEnabled(true);
 	}
 	
 	// Trigger repaint of play column

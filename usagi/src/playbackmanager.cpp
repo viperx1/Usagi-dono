@@ -31,6 +31,11 @@ PlaybackManager::~PlaybackManager()
 
 bool PlaybackManager::startPlayback(const QString &filePath, int lid, int resumePosition)
 {
+    // Stop tracking any currently playing file first
+    if (m_tracking) {
+        stopTracking();
+    }
+    
     // Check if file exists
     QFileInfo fileInfo(filePath);
     if (!fileInfo.exists()) {

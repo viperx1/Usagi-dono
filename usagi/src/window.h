@@ -34,6 +34,22 @@
 // Forward declarations
 class PlayButtonDelegate;
 
+// MyList tree widget column indices (using enum for type safety and maintainability)
+// Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
+enum MyListColumn {
+    COL_ANIME = 0,
+    COL_PLAY = 1,
+    COL_EPISODE = 2,
+    COL_EPISODE_TITLE = 3,
+    COL_STATE = 4,
+    COL_VIEWED = 5,
+    COL_STORAGE = 6,
+    COL_MYLIST_ID = 7,
+    COL_TYPE = 8,
+    COL_AIRED = 9,
+    COL_LAST_PLAYED = 10
+};
+
 class hashes_ : public QTableWidget
 {
 public:
@@ -53,14 +69,51 @@ public:
     {
         int column = treeWidget()->sortColumn();
         
-        // If sorting by episode number column (column 1) and both items have epno data
-        if(column == 1)
+        // If sorting by episode number column (column 2) and both items have epno data
+        if(column == COL_EPISODE)
         {
             const EpisodeTreeWidgetItem *otherEpisode = dynamic_cast<const EpisodeTreeWidgetItem*>(&other);
             if(otherEpisode && m_epno.isValid() && otherEpisode->m_epno.isValid())
             {
                 return m_epno < otherEpisode->m_epno;
             }
+        }
+        
+        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        if(column == COL_PLAY)
+        {
+            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
+            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
+            return thisSortKey < otherSortKey;
+        }
+        
+        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        if(column == COL_LAST_PLAYED)
+        {
+            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            
+            // Entries with timestamp 0 (never played) should always be at the bottom
+            // regardless of sort order (ascending or descending)
+            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
+            
+            if(thisTimestamp == 0 && otherTimestamp == 0) {
+                return false; // Both never played, keep current order
+            }
+            if(thisTimestamp == 0) {
+                // This is never played - should be at bottom
+                // In ascending order, return false (not less than, so comes after)
+                // In descending order, return true (less than, so comes after when reversed)
+                return (order == Qt::DescendingOrder);
+            }
+            if(otherTimestamp == 0) {
+                // Other is never played - should be at bottom
+                // In ascending order, return true (this is less than, so comes before)
+                // In descending order, return false (not less than, so comes before when reversed)
+                return (order == Qt::AscendingOrder);
+            }
+            
+            return thisTimestamp < otherTimestamp;
         }
         
         // Default comparison for other columns
@@ -84,8 +137,8 @@ public:
     {
         int column = treeWidget()->sortColumn();
         
-        // If sorting by Aired column (column 8) and both items have aired data
-        if(column == 8)
+        // If sorting by Aired column (column 9) and both items have aired data
+        if(column == COL_AIRED)
         {
             const AnimeTreeWidgetItem *otherAnime = dynamic_cast<const AnimeTreeWidgetItem*>(&other);
             if(otherAnime && m_aired.isValid() && otherAnime->m_aired.isValid())
@@ -101,6 +154,43 @@ public:
             {
                 return false; // other item comes before this
             }
+        }
+        
+        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        if(column == COL_PLAY)
+        {
+            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
+            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
+            return thisSortKey < otherSortKey;
+        }
+        
+        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        if(column == COL_LAST_PLAYED)
+        {
+            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            
+            // Entries with timestamp 0 (never played) should always be at the bottom
+            // regardless of sort order (ascending or descending)
+            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
+            
+            if(thisTimestamp == 0 && otherTimestamp == 0) {
+                return false; // Both never played, keep current order
+            }
+            if(thisTimestamp == 0) {
+                // This is never played - should be at bottom
+                // In ascending order, return false (not less than, so comes after)
+                // In descending order, return true (less than, so comes after when reversed)
+                return (order == Qt::DescendingOrder);
+            }
+            if(otherTimestamp == 0) {
+                // Other is never played - should be at bottom
+                // In ascending order, return true (this is less than, so comes before)
+                // In descending order, return false (not less than, so comes before when reversed)
+                return (order == Qt::AscendingOrder);
+            }
+            
+            return thisTimestamp < otherTimestamp;
         }
         
         // Default comparison for other columns
@@ -136,6 +226,51 @@ public:
     void setGroupName(const QString& group) { m_groupName = group; }
     QString getGroupName() const { return m_groupName; }
     
+    bool operator<(const QTreeWidgetItem &other) const override
+    {
+        int column = treeWidget()->sortColumn();
+        
+        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        if(column == COL_PLAY)
+        {
+            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
+            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
+            return thisSortKey < otherSortKey;
+        }
+        
+        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        if(column == COL_LAST_PLAYED)
+        {
+            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
+            
+            // Entries with timestamp 0 (never played) should always be at the bottom
+            // regardless of sort order (ascending or descending)
+            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
+            
+            if(thisTimestamp == 0 && otherTimestamp == 0) {
+                return false; // Both never played, keep current order
+            }
+            if(thisTimestamp == 0) {
+                // This is never played - should be at bottom
+                // In ascending order, return false (not less than, so comes after)
+                // In descending order, return true (less than, so comes after when reversed)
+                return (order == Qt::DescendingOrder);
+            }
+            if(otherTimestamp == 0) {
+                // Other is never played - should be at bottom
+                // In ascending order, return true (this is less than, so comes before)
+                // In descending order, return false (not less than, so comes before when reversed)
+                return (order == Qt::AscendingOrder);
+            }
+            
+            return thisTimestamp < otherTimestamp;
+        }
+        
+        // Default comparison for other columns
+        return QTreeWidgetItem::operator<(other);
+    }
+    
 private:
     FileType m_fileType;
     QString m_resolution;
@@ -161,21 +296,6 @@ private:
     static const int HASHED_FILES_BATCH_SIZE = 5; // Process 5 files per timer tick
     static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
     QColor m_hashedFileColor; // Reusable color object for UI updates
-    
-    // MyList tree widget column indices (using enum for type safety and maintainability)
-    // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired
-    enum MyListColumn {
-        COL_ANIME = 0,
-        COL_PLAY = 1,
-        COL_EPISODE = 2,
-        COL_EPISODE_TITLE = 3,
-        COL_STATE = 4,
-        COL_VIEWED = 5,
-        COL_STORAGE = 6,
-        COL_MYLIST_ID = 7,
-        COL_TYPE = 8,
-        COL_AIRED = 9
-    };
     
     // Legacy constants for backward compatibility (deprecated, use enum instead)
     static const int PLAY_COLUMN = COL_PLAY;
@@ -334,6 +454,9 @@ public slots:
     bool isMylistFirstRunComplete();
     void setMylistFirstRunComplete();
     void requestMylistExportManually();
+    void saveMylistSorting();
+    void restoreMylistSorting();
+    void onMylistSortChanged(int column, Qt::SortOrder order);
     
     // Directory watcher slots
     void onWatcherEnabledChanged(int state);
