@@ -79,6 +79,14 @@ public:
             }
         }
         
+        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        if(column == COL_PLAY)
+        {
+            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
+            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
+            return thisSortKey < otherSortKey;
+        }
+        
         // If sorting by Last Played column, sort by timestamp stored in UserRole
         if(column == COL_LAST_PLAYED)
         {
@@ -139,6 +147,14 @@ public:
             }
         }
         
+        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        if(column == COL_PLAY)
+        {
+            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
+            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
+            return thisSortKey < otherSortKey;
+        }
+        
         // If sorting by Last Played column, sort by timestamp stored in UserRole
         if(column == COL_LAST_PLAYED)
         {
@@ -195,6 +211,14 @@ public:
     bool operator<(const QTreeWidgetItem &other) const override
     {
         int column = treeWidget()->sortColumn();
+        
+        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        if(column == COL_PLAY)
+        {
+            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
+            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
+            return thisSortKey < otherSortKey;
+        }
         
         // If sorting by Last Played column, sort by timestamp stored in UserRole
         if(column == COL_LAST_PLAYED)
