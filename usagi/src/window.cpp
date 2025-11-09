@@ -303,6 +303,7 @@ Window::Window()
 	connect(adbapi, SIGNAL(notifyExportAlreadyInQueue(QString)), this, SLOT(getNotifyExportAlreadyInQueue(QString)));
 	connect(adbapi, SIGNAL(notifyExportNoSuchTemplate(QString)), this, SLOT(getNotifyExportNoSuchTemplate(QString)));
 	connect(adbapi, SIGNAL(notifyEpisodeUpdated(int,int)), this, SLOT(getNotifyEpisodeUpdated(int,int)));
+	connect(adbapi, SIGNAL(notifyAnimeUpdated(int)), this, SLOT(getNotifyAnimeUpdated(int)));
 	connect(mylistTreeWidget, SIGNAL(itemExpanded(QTreeWidgetItem*)), this, SLOT(onMylistItemExpanded(QTreeWidgetItem*)));
 	connect(mylistTreeWidget->header(), SIGNAL(sortIndicatorChanged(int,Qt::SortOrder)), this, SLOT(onMylistSortChanged(int,Qt::SortOrder)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
@@ -403,6 +404,315 @@ bool Window::validateDatabaseConnection(const QSqlDatabase& db, const QString& m
 		return false;
 	}
 	return true;
+}
+
+void Window::debugPrintDatabaseInfoForLid(int lid)
+{
+	LOG("=================================================================");
+	LOG(QString("DEBUG: Database information for LID: %1").arg(lid));
+	LOG("=================================================================");
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	if(!validateDatabaseConnection(db, "debugPrintDatabaseInfoForLid"))
+	{
+		LOG("ERROR: Cannot debug database info - database not available");
+		return;
+	}
+	
+	// Query mylist table
+	LOG(QString("--- MYLIST TABLE (lid=%1) ---").arg(lid));
+	QSqlQuery mylistQuery(db);
+	mylistQuery.prepare("SELECT * FROM mylist WHERE lid = ?");
+	mylistQuery.bindValue(0, lid);
+	if(mylistQuery.exec() && mylistQuery.next())
+	{
+		LOG(QString("  lid: %1").arg(mylistQuery.value("lid").toString()));
+		LOG(QString("  fid: %1").arg(mylistQuery.value("fid").toString()));
+		LOG(QString("  eid: %1").arg(mylistQuery.value("eid").toString()));
+		LOG(QString("  aid: %1").arg(mylistQuery.value("aid").toString()));
+		LOG(QString("  gid: %1").arg(mylistQuery.value("gid").toString()));
+		LOG(QString("  date: %1").arg(mylistQuery.value("date").toString()));
+		LOG(QString("  state: %1").arg(mylistQuery.value("state").toString()));
+		LOG(QString("  viewed: %1").arg(mylistQuery.value("viewed").toString()));
+		LOG(QString("  viewdate: %1").arg(mylistQuery.value("viewdate").toString()));
+		LOG(QString("  storage: %1").arg(mylistQuery.value("storage").toString()));
+		LOG(QString("  source: %1").arg(mylistQuery.value("source").toString()));
+		LOG(QString("  other: %1").arg(mylistQuery.value("other").toString()));
+		LOG(QString("  filestate: %1").arg(mylistQuery.value("filestate").toString()));
+		LOG(QString("  local_file: %1").arg(mylistQuery.value("local_file").toString()));
+		LOG(QString("  playback_position: %1").arg(mylistQuery.value("playback_position").toString()));
+		LOG(QString("  playback_duration: %1").arg(mylistQuery.value("playback_duration").toString()));
+		LOG(QString("  last_played: %1").arg(mylistQuery.value("last_played").toString()));
+		
+		int fid = mylistQuery.value("fid").toInt();
+		int eid = mylistQuery.value("eid").toInt();
+		int aid = mylistQuery.value("aid").toInt();
+		int gid = mylistQuery.value("gid").toInt();
+		int local_file_id = mylistQuery.value("local_file").toInt();
+		
+		// Query file table
+		if(fid > 0)
+		{
+			LOG(QString("--- FILE TABLE (fid=%1) ---").arg(fid));
+			QSqlQuery fileQuery(db);
+			fileQuery.prepare("SELECT * FROM file WHERE fid = ?");
+			fileQuery.bindValue(0, fid);
+			if(fileQuery.exec() && fileQuery.next())
+			{
+				LOG(QString("  fid: %1").arg(fileQuery.value("fid").toString()));
+				LOG(QString("  aid: %1").arg(fileQuery.value("aid").toString()));
+				LOG(QString("  eid: %1").arg(fileQuery.value("eid").toString()));
+				LOG(QString("  gid: %1").arg(fileQuery.value("gid").toString()));
+				LOG(QString("  lid: %1").arg(fileQuery.value("lid").toString()));
+				LOG(QString("  othereps: %1").arg(fileQuery.value("othereps").toString()));
+				LOG(QString("  isdepr: %1").arg(fileQuery.value("isdepr").toString()));
+				LOG(QString("  state: %1").arg(fileQuery.value("state").toString()));
+				LOG(QString("  size: %1").arg(fileQuery.value("size").toString()));
+				LOG(QString("  ed2k: %1").arg(fileQuery.value("ed2k").toString()));
+				LOG(QString("  md5: %1").arg(fileQuery.value("md5").toString()));
+				LOG(QString("  sha1: %1").arg(fileQuery.value("sha1").toString()));
+				LOG(QString("  crc: %1").arg(fileQuery.value("crc").toString()));
+				LOG(QString("  quality: %1").arg(fileQuery.value("quality").toString()));
+				LOG(QString("  source: %1").arg(fileQuery.value("source").toString()));
+				LOG(QString("  codec_audio: %1").arg(fileQuery.value("codec_audio").toString()));
+				LOG(QString("  bitrate_audio: %1").arg(fileQuery.value("bitrate_audio").toString()));
+				LOG(QString("  codec_video: %1").arg(fileQuery.value("codec_video").toString()));
+				LOG(QString("  bitrate_video: %1").arg(fileQuery.value("bitrate_video").toString()));
+				LOG(QString("  resolution: %1").arg(fileQuery.value("resolution").toString()));
+				LOG(QString("  filetype: %1").arg(fileQuery.value("filetype").toString()));
+				LOG(QString("  lang_dub: %1").arg(fileQuery.value("lang_dub").toString()));
+				LOG(QString("  lang_sub: %1").arg(fileQuery.value("lang_sub").toString()));
+				LOG(QString("  length: %1").arg(fileQuery.value("length").toString()));
+				LOG(QString("  description: %1").arg(fileQuery.value("description").toString()));
+				LOG(QString("  airdate: %1").arg(fileQuery.value("airdate").toString()));
+				LOG(QString("  filename: %1").arg(fileQuery.value("filename").toString()));
+			}
+			else
+			{
+				LOG(QString("  No data found in file table for fid=%1").arg(fid));
+			}
+		}
+		else
+		{
+			LOG("--- FILE TABLE: fid is 0 or NULL, skipping ---");
+		}
+		
+		// Query anime table
+		if(aid > 0)
+		{
+			LOG(QString("--- ANIME TABLE (aid=%1) ---").arg(aid));
+			QSqlQuery animeQuery(db);
+			animeQuery.prepare("SELECT * FROM anime WHERE aid = ?");
+			animeQuery.bindValue(0, aid);
+			if(animeQuery.exec() && animeQuery.next())
+			{
+				LOG(QString("  aid: %1").arg(animeQuery.value("aid").toString()));
+				LOG(QString("  eptotal: %1").arg(animeQuery.value("eptotal").toString()));
+				LOG(QString("  eps: %1").arg(animeQuery.value("eps").toString()));
+				LOG(QString("  eplast: %1").arg(animeQuery.value("eplast").toString()));
+				LOG(QString("  year: %1").arg(animeQuery.value("year").toString()));
+				LOG(QString("  type: %1").arg(animeQuery.value("type").toString()));
+				LOG(QString("  relaidlist: %1").arg(animeQuery.value("relaidlist").toString()));
+				LOG(QString("  relaidtype: %1").arg(animeQuery.value("relaidtype").toString()));
+				LOG(QString("  category: %1").arg(animeQuery.value("category").toString()));
+				LOG(QString("  nameromaji: %1").arg(animeQuery.value("nameromaji").toString()));
+				LOG(QString("  namekanji: %1").arg(animeQuery.value("namekanji").toString()));
+				LOG(QString("  nameenglish: %1").arg(animeQuery.value("nameenglish").toString()));
+				LOG(QString("  nameother: %1").arg(animeQuery.value("nameother").toString()));
+				LOG(QString("  nameshort: %1").arg(animeQuery.value("nameshort").toString()));
+				LOG(QString("  synonyms: %1").arg(animeQuery.value("synonyms").toString()));
+				LOG(QString("  typename: %1").arg(animeQuery.value("typename").toString()));
+				LOG(QString("  startdate: %1").arg(animeQuery.value("startdate").toString()));
+				LOG(QString("  enddate: %1").arg(animeQuery.value("enddate").toString()));
+			}
+			else
+			{
+				LOG(QString("  No data found in anime table for aid=%1").arg(aid));
+			}
+			
+			// Query anime_titles table
+			LOG(QString("--- ANIME_TITLES TABLE (aid=%1) ---").arg(aid));
+			QSqlQuery titlesQuery(db);
+			titlesQuery.prepare("SELECT * FROM anime_titles WHERE aid = ? ORDER BY type, language");
+			titlesQuery.bindValue(0, aid);
+			if(titlesQuery.exec())
+			{
+				int titleCount = 0;
+				while(titlesQuery.next())
+				{
+					titleCount++;
+					LOG(QString("  Title #%1: type=%2, language=%3, title=%4")
+						.arg(titleCount)
+						.arg(titlesQuery.value("type").toString())
+						.arg(titlesQuery.value("language").toString())
+						.arg(titlesQuery.value("title").toString()));
+				}
+				if(titleCount == 0)
+				{
+					LOG(QString("  No titles found in anime_titles table for aid=%1").arg(aid));
+				}
+			}
+		}
+		else
+		{
+			LOG("--- ANIME TABLE: aid is 0 or NULL, skipping ---");
+		}
+		
+		// Query episode table
+		if(eid > 0)
+		{
+			LOG(QString("--- EPISODE TABLE (eid=%1) ---").arg(eid));
+			QSqlQuery episodeQuery(db);
+			episodeQuery.prepare("SELECT * FROM episode WHERE eid = ?");
+			episodeQuery.bindValue(0, eid);
+			if(episodeQuery.exec() && episodeQuery.next())
+			{
+				LOG(QString("  eid: %1").arg(episodeQuery.value("eid").toString()));
+				LOG(QString("  name: %1").arg(episodeQuery.value("name").toString()));
+				LOG(QString("  nameromaji: %1").arg(episodeQuery.value("nameromaji").toString()));
+				LOG(QString("  namekanji: %1").arg(episodeQuery.value("namekanji").toString()));
+				LOG(QString("  rating: %1").arg(episodeQuery.value("rating").toString()));
+				LOG(QString("  votecount: %1").arg(episodeQuery.value("votecount").toString()));
+				LOG(QString("  epno: %1").arg(episodeQuery.value("epno").toString()));
+			}
+			else
+			{
+				LOG(QString("  No data found in episode table for eid=%1").arg(eid));
+			}
+		}
+		else
+		{
+			LOG("--- EPISODE TABLE: eid is 0 or NULL, skipping ---");
+		}
+		
+		// Query group table
+		if(gid > 0)
+		{
+			LOG(QString("--- GROUP TABLE (gid=%1) ---").arg(gid));
+			QSqlQuery groupQuery(db);
+			groupQuery.prepare("SELECT * FROM `group` WHERE gid = ?");
+			groupQuery.bindValue(0, gid);
+			if(groupQuery.exec() && groupQuery.next())
+			{
+				LOG(QString("  gid: %1").arg(groupQuery.value("gid").toString()));
+				LOG(QString("  name: %1").arg(groupQuery.value("name").toString()));
+				LOG(QString("  shortname: %1").arg(groupQuery.value("shortname").toString()));
+			}
+			else
+			{
+				LOG(QString("  No data found in group table for gid=%1").arg(gid));
+			}
+		}
+		else
+		{
+			LOG("--- GROUP TABLE: gid is 0 or NULL, skipping ---");
+		}
+		
+		// Query local_files table
+		if(local_file_id > 0)
+		{
+			LOG(QString("--- LOCAL_FILES TABLE (id=%1) ---").arg(local_file_id));
+			QSqlQuery localFileQuery(db);
+			localFileQuery.prepare("SELECT * FROM local_files WHERE id = ?");
+			localFileQuery.bindValue(0, local_file_id);
+			if(localFileQuery.exec() && localFileQuery.next())
+			{
+				LOG(QString("  id: %1").arg(localFileQuery.value("id").toString()));
+				LOG(QString("  path: %1").arg(localFileQuery.value("path").toString()));
+				LOG(QString("  filename: %1").arg(localFileQuery.value("filename").toString()));
+				LOG(QString("  status: %1").arg(localFileQuery.value("status").toString()));
+				LOG(QString("  ed2k_hash: %1").arg(localFileQuery.value("ed2k_hash").toString()));
+			}
+			else
+			{
+				LOG(QString("  No data found in local_files table for id=%1").arg(local_file_id));
+			}
+		}
+		else
+		{
+			LOG("--- LOCAL_FILES TABLE: local_file is 0 or NULL, skipping ---");
+		}
+	}
+	else
+	{
+		LOG(QString("  No data found in mylist table for lid=%1").arg(lid));
+	}
+	
+	LOG("=================================================================");
+	LOG(QString("DEBUG: End of database information for LID: %1").arg(lid));
+	LOG("=================================================================");
+}
+
+void Window::insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeItem, const QMap<QPair<int, int>, QTreeWidgetItem*>& episodeItems)
+{
+	// Collect all episode numbers that exist for this anime
+	QSet<int> existingEpisodes;
+	for(QMap<QPair<int, int>, QTreeWidgetItem*>::const_iterator it = episodeItems.constBegin(); 
+		it != episodeItems.constEnd(); ++it)
+	{
+		if(it.key().first == aid) // Check if episode belongs to this anime
+		{
+			EpisodeTreeWidgetItem* episodeItem = static_cast<EpisodeTreeWidgetItem*>(it.value());
+			if(episodeItem->getEpno().isValid() && episodeItem->getEpno().type() == 1)
+			{
+				existingEpisodes.insert(episodeItem->getEpno().number());
+			}
+		}
+	}
+	
+	if(existingEpisodes.isEmpty())
+		return; // No episodes to work with
+	
+	// Find min and max episode numbers
+	int minEp = *std::min_element(existingEpisodes.begin(), existingEpisodes.end());
+	int maxEp = *std::max_element(existingEpisodes.begin(), existingEpisodes.end());
+	
+	// Find gaps and create placeholder rows
+	QList<int> sortedEpisodes = existingEpisodes.values();
+	std::sort(sortedEpisodes.begin(), sortedEpisodes.end());
+	
+	for(int expectedEp = minEp; expectedEp <= maxEp; expectedEp++)
+	{
+		if(!existingEpisodes.contains(expectedEp))
+		{
+			// Found a missing episode, create a range
+			int rangeStart = expectedEp;
+			int rangeEnd = expectedEp;
+			
+			// Extend the range to include consecutive missing episodes
+			while(rangeEnd + 1 <= maxEp && !existingEpisodes.contains(rangeEnd + 1))
+			{
+				rangeEnd++;
+			}
+			
+			// Create placeholder item
+			QTreeWidgetItem* placeholderItem = new QTreeWidgetItem(animeItem);
+			placeholderItem->setText(0, "");
+			
+			// Column 2: Episode number(s) in red
+			QString epRange;
+			if(rangeStart == rangeEnd)
+			{
+				epRange = QString::number(rangeStart);
+			}
+			else
+			{
+				epRange = QString("%1-%2").arg(rangeStart).arg(rangeEnd);
+			}
+			placeholderItem->setText(COL_EPISODE, epRange);
+			placeholderItem->setForeground(COL_EPISODE, QBrush(QColor(Qt::red)));
+			
+			// Column 3: Episode title in red
+			placeholderItem->setText(COL_EPISODE_TITLE, "Missing");
+			placeholderItem->setForeground(COL_EPISODE_TITLE, QBrush(QColor(Qt::red)));
+			
+			// Set data for sorting - use negative value to sort before real episodes
+			placeholderItem->setData(0, Qt::UserRole, -rangeStart);
+			
+			// Skip to the end of the range
+			expectedEp = rangeEnd;
+		}
+	}
 }
 
 void Window::Button1Click() // add files
@@ -859,6 +1169,13 @@ void Window::startupInitialization()
 {
     // This slot is called 1 second after the window is constructed
     // to allow the UI to be fully initialized before loading data
+    
+    // DEBUG: Print database info for specific lid values as requested in issue
+    LOG("DEBUG: Printing database information for requested lid values...");
+    debugPrintDatabaseInfoForLid(424374769);
+    debugPrintDatabaseInfoForLid(424184693);
+    LOG("DEBUG: Finished printing database information for requested lid values");
+    
     mylistStatusLabel->setText("MyList Status: Loading from database...");
     loadMylistFromDatabase();
     
@@ -1452,7 +1769,7 @@ void Window::getNotifyExportNoSuchTemplate(QString tag)
 
 void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 {
-	// When an anime item is expanded, queue EPISODE API requests for missing data
+	// When an anime item is expanded, queue API requests for missing data
 	if(!item)
 		return;
 	
@@ -1460,6 +1777,15 @@ void Window::onMylistItemExpanded(QTreeWidgetItem *item)
 	int aid = item->data(0, Qt::UserRole).toInt();
 	if(aid == 0)
 		return;  // Not an anime item (might be an episode child)
+	
+	// Check if anime metadata needs updating
+	if(animeNeedingMetadata.contains(aid))
+	{
+		LOG(QString("Requesting anime metadata update for AID %1").arg(aid));
+		// Use ANIME command to fetch anime metadata directly
+		adbapi->Anime(aid);
+		animeNeedingMetadata.remove(aid);  // Remove from tracking set
+	}
 	
 	// Iterate through child episodes and queue API requests for missing data
 	int childCount = item->childCount();
@@ -1483,6 +1809,14 @@ void Window::getNotifyEpisodeUpdated(int eid, int aid)
 	// Episode data was updated in the database, update only the specific episode item
 	LOG(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
 	updateEpisodeInTree(eid, aid);
+}
+
+void Window::getNotifyAnimeUpdated(int aid)
+{
+	// Anime metadata was updated in the database, reload the mylist to reflect changes
+	LOG(QString("Anime metadata received for AID %1, reloading mylist...").arg(aid));
+	loadMylistFromDatabase();
+	animeNeedingMetadata.remove(aid);  // Remove from tracking set if present
 }
 
 void Window::updateEpisodeInTree(int eid, int aid)
@@ -1951,6 +2285,7 @@ void Window::loadMylistFromDatabase()
 {
 	mylistTreeWidget->clear();
 	episodesNeedingData.clear();  // Clear tracking set
+	animeNeedingMetadata.clear();  // Clear tracking set
 	
 	// Query the database for mylist entries joined with anime, episode, and file data
 	// Structure: anime -> episode -> file (three-level hierarchy)
@@ -2095,6 +2430,11 @@ void Window::loadMylistFromDatabase()
 		{
 			animeItem->setText(8, typeName);
 		}
+		else if(typeName.isEmpty() && animeItem->text(8).isEmpty())
+		{
+			// Mark anime as needing metadata if typename is missing
+			animeNeedingMetadata.insert(aid);
+		}
 		
 		// Set Aired column (column 8) for anime parent item
 		if(!startDate.isEmpty() && animeItem->text(9).isEmpty())
@@ -2102,6 +2442,11 @@ void Window::loadMylistFromDatabase()
 			aired airedDates(startDate, endDate);
 			animeItem->setText(9, airedDates.toDisplayString());
 			animeItem->setAired(airedDates);
+		}
+		else if(startDate.isEmpty() && animeItem->text(9).isEmpty())
+		{
+			// Mark anime as needing metadata if startdate is missing
+			animeNeedingMetadata.insert(aid);
 		}
 		
 		// Get or create the episode item
@@ -2407,6 +2752,14 @@ void Window::loadMylistFromDatabase()
 				animeOtherViewedCount[aid]++;
 			}
 		}
+	}
+	
+	// Insert placeholder rows for missing episodes
+	for(QMap<int, QTreeWidgetItem*>::const_iterator it = animeItems.constBegin(); it != animeItems.constEnd(); ++it)
+	{
+		int aid = it.key();
+		QTreeWidgetItem *animeItem = it.value();
+		insertMissingEpisodePlaceholders(aid, animeItem, episodeItems);
 	}
 	
 	// Update anime rows with aggregate statistics

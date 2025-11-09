@@ -351,6 +351,7 @@ private:
     QTreeWidget *mylistTreeWidget;
     QLabel *mylistStatusLabel;
 	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
+	QSet<int> animeNeedingMetadata;  // Track AIDs that need metadata (typename, startdate, enddate)
 	// page settings
 
     QLabel *labelLogin;
@@ -445,6 +446,7 @@ public slots:
 	void getNotifyExportAlreadyInQueue(QString tag);
 	void getNotifyExportNoSuchTemplate(QString tag);
 	void getNotifyEpisodeUpdated(int eid, int aid);
+	void getNotifyAnimeUpdated(int aid);
 	void onMylistItemExpanded(QTreeWidgetItem *item);
     void safeClose();
     void loadMylistFromDatabase();
@@ -486,6 +488,8 @@ public:
 	~Window();
 private:
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
+    void debugPrintDatabaseInfoForLid(int lid);
+    void insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeItem, const QMap<QPair<int, int>, QTreeWidgetItem*>& episodeItems);
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();

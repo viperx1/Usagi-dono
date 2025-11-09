@@ -93,33 +93,8 @@ private:
         pFailed = 3
 	};
 
-	enum acodes
-	{
-		aEPISODE_TOTAL =			0x80000000,
-		aEPISODE_LAST =				0x40000000,
-		aANIME_YEAR =				0x20000000,
-		aANIME_TYPE =				0x10000000,
-		aANIME_RELATED_LIST =		0x08000000,
-		aANIME_RELATED_TYPE =		0x04000000,
-		aANIME_CATAGORY =			0x02000000,
-		aANIME_NAME_ROMAJI =		0x00800000,
-		aANIME_NAME_KANJI =			0x00400000,
-		aANIME_NAME_ENGLISH =		0x00200000,
-		aANIME_NAME_OTHER =			0x00100000,
-		aANIME_NAME_SHORT =			0x00080000,
-		aANIME_SYNONYMS =			0x00040000,
-		aEPISODE_NUMBER =			0x00008000,
-		aEPISODE_NAME =				0x00004000,
-		aEPISODE_NAME_ROMAJI =		0x00002000,
-		aEPISODE_NAME_KANJI =		0x00001000,
-		aEPISODE_RATING =			0x00000800,
-		aEPISODE_VOTE_COUNT =		0x00000400,
-		aGROUP_NAME =				0x00000080,
-		aGROUP_NAME_SHORT =			0x00000040,
-        aDATE_AID_RECORD_UPDATED =	0x00000001
-	};
-
-	enum fcodes
+	// FILE command fmask (file data fields)
+	enum file_fmask_codes
 	{
 		fAID =				0x40000000,
 		fEID =				0x20000000,
@@ -147,6 +122,77 @@ private:
 		fDESCRIPTION =		0x00000010,
 		fAIRDATE =			0x00000008,
         fFILENAME =			0x00000001
+	};
+
+	// FILE command amask (anime/episode data fields returned with file)
+	enum file_amask_codes
+	{
+		aEPISODE_TOTAL =			0x80000000,
+		aEPISODE_LAST =				0x40000000,
+		aANIME_YEAR =				0x20000000,
+		aANIME_TYPE =				0x10000000,
+		aANIME_RELATED_LIST =		0x08000000,
+		aANIME_RELATED_TYPE =		0x04000000,
+		aANIME_CATAGORY =			0x02000000,
+		aANIME_NAME_ROMAJI =		0x00800000,
+		aANIME_NAME_KANJI =			0x00400000,
+		aANIME_NAME_ENGLISH =		0x00200000,
+		aANIME_NAME_OTHER =			0x00100000,
+		aANIME_NAME_SHORT =			0x00080000,
+		aANIME_SYNONYMS =			0x00040000,
+		aEPISODE_NUMBER =			0x00008000,
+		aEPISODE_NAME =				0x00004000,
+		aEPISODE_NAME_ROMAJI =		0x00002000,
+		aEPISODE_NAME_KANJI =		0x00001000,
+		aEPISODE_RATING =			0x00000800,
+		aEPISODE_VOTE_COUNT =		0x00000400,
+		aGROUP_NAME =				0x00000080,
+		aGROUP_NAME_SHORT =			0x00000040,
+        aDATE_AID_RECORD_UPDATED =	0x00000001
+	};
+
+	// ANIME command amask (anime data fields)
+	// Bits are numbered in reverse order compared to FILE command!
+	// Byte 7 (bits 63-56), Byte 6 (bits 55-48), ..., Byte 0 (bits 7-0)
+	// But we only use lower 4-5 bytes for actual fields
+	enum anime_amask_codes
+	{
+		// Byte 3 (bits 31-24)
+		ANIME_TOTAL_EPISODES =		0x80000000,  // Byte 3, bit 7 (31)
+		ANIME_HIGHEST_EPISODE =		0x40000000,  // Byte 3, bit 6 (30)
+		ANIME_YEAR =				0x20000000,  // Byte 3, bit 5 (29)
+		ANIME_TYPE =				0x10000000,  // Byte 3, bit 4 (28)
+		ANIME_RELATED_AID_LIST =	0x08000000,  // Byte 3, bit 3 (27)
+		ANIME_RELATED_AID_TYPE =	0x04000000,  // Byte 3, bit 2 (26)
+		ANIME_CATEGORY_LIST =		0x02000000,  // Byte 3, bit 1 (25)
+		// ANIME_RESERVED =			0x01000000,  // Byte 3, bit 0 (24) - unused
+		
+		// Byte 2 (bits 23-16)
+		ANIME_ROMAJI_NAME =			0x00800000,  // Byte 2, bit 7 (23)
+		ANIME_KANJI_NAME =			0x00400000,  // Byte 2, bit 6 (22)
+		ANIME_ENGLISH_NAME =		0x00200000,  // Byte 2, bit 5 (21)
+		ANIME_OTHER_NAME =			0x00100000,  // Byte 2, bit 4 (20)
+		ANIME_SHORT_NAME_LIST =		0x00080000,  // Byte 2, bit 3 (19)
+		ANIME_SYNONYM_LIST =		0x00040000,  // Byte 2, bit 2 (18)
+		// bits 17-16 reserved
+		
+		// Byte 1 (bits 15-8)
+		ANIME_EPISODES =			0x00008000,  // Byte 1, bit 7 (15) - Normal episode count
+		ANIME_SPECIAL_EP_COUNT =	0x00004000,  // Byte 1, bit 6 (14)
+		ANIME_AIR_DATE =			0x00002000,  // Byte 1, bit 5 (13)
+		ANIME_END_DATE =			0x00001000,  // Byte 1, bit 4 (12)
+		ANIME_PICNAME =				0x00000800,  // Byte 1, bit 3 (11)
+		ANIME_NSFW =				0x00000400,  // Byte 1, bit 2 (10)
+		// bits 9-8 reserved
+		
+		// Byte 0 (bits 7-0)
+		ANIME_CHARACTERID_LIST =	0x00000080,  // Byte 0, bit 7 (7)
+		ANIME_SPECIALS_COUNT =		0x00000040,  // Byte 0, bit 6 (6)
+		ANIME_CREDITS_COUNT =		0x00000020,  // Byte 0, bit 5 (5)
+		ANIME_OTHER_COUNT =			0x00000010,  // Byte 0, bit 4 (4)
+		ANIME_TRAILER_COUNT =		0x00000008,  // Byte 0, bit 3 (3)
+		ANIME_PARODY_COUNT =		0x00000004   // Byte 0, bit 2 (2)
+		// bits 1-0 reserved
 	};
 
 	//wxDatagramSocket *Socket; // UDP socket
@@ -185,6 +231,7 @@ public:
 	QString NotifyGet(int nid);
 	QString MylistExport(QString template_name = "xml-plain-cs");
 	QString Episode(int eid);
+	QString Anime(int aid);
 	
 	// Command builders - return formatted command strings for testing
 	QString buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc);
@@ -198,6 +245,7 @@ public:
 	QString buildNotifyGetCommand(int nid);
 	QString buildMylistExportCommand(QString template_name);
 	QString buildEpisodeCommand(int eid);
+	QString buildAnimeCommand(int aid);
 	/* Api End === */
 
 	/**
@@ -284,6 +332,7 @@ signals:
 	void notifyExportAlreadyInQueue(QString tag);
 	void notifyExportNoSuchTemplate(QString tag);
 	void notifyEpisodeUpdated(int eid, int aid);
+	void notifyAnimeUpdated(int aid);
 };
 
 #endif // ANIDBAPI_H

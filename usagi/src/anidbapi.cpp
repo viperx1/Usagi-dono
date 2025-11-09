@@ -528,6 +528,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		{
 			QString aid = token2.size() > 1 ? token2.at(1) : "";
 			QString eid = token2.size() > 2 ? token2.at(2) : "";
+			QString gid = token2.size() > 3 ? token2.at(3) : "";
 			
 			// Anime data starts at index 27
 			QString eptotal = token2.size() > 27 ? token2.at(27) : "";
@@ -549,6 +550,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString epnamekanji = token2.size() > 43 ? token2.at(43) : "";
 			QString eprating = token2.size() > 44 ? token2.at(44) : "";
 			QString epvotecount = token2.size() > 45 ? token2.at(45) : "";
+			QString groupname = token2.size() > 46 ? token2.at(46) : "";
+			QString groupshortname = token2.size() > 47 ? token2.at(47) : "";
 			
 			// Store anime data
 			if(!aid.isEmpty())
@@ -589,6 +592,26 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				{
 					LOG("Episode database query error: " + query.lastError().text());
 				}
+			}
+			
+			// Store group data if available
+			if(!gid.isEmpty() && gid != "0" && (!groupname.isEmpty() || !groupshortname.isEmpty()))
+			{
+				QString q_group = QString("INSERT OR REPLACE INTO `group` (`gid`, `name`, `shortname`) VALUES ('%1', '%2', '%3')")
+					.arg(QString(gid).replace("'", "''"))
+					.arg(QString(groupname).replace("'", "''"))
+					.arg(QString(groupshortname).replace("'", "''"));
+				if(!query.exec(q_group))
+				{
+					LOG("Group database query error: " + query.lastError().text());
+				}
+			}
+			
+			// Check if episode data is missing (no epno) and queue EPISODE API request
+			if(!eid.isEmpty() && eid != "0" && epno.isEmpty())
+			{
+				LOG(QString("Episode data incomplete for EID %1, queuing EPISODE API request").arg(eid));
+				Episode(eid.toInt());
 			}
 		}
 	}
@@ -662,6 +685,117 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		Logger::log("[AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first(), __FILE__, __LINE__);
+	}
+	else if(ReplyID == "230"){ // 230 ANIME
+		// Response format based on amask built from anime_amask_codes enum:
+		// Field order matches bit order (high to low):
+		// aid|total_eps|highest_ep|year|type|romaji|kanji|english|other|short|synonyms|episodes|special_count|airdate|enddate
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		QString responseData = token2.first();
+		token2 = responseData.split("|");
+		
+		// Debug logging to see what we received
+		Logger::log("[AniDB Response] 230 ANIME raw data: " + responseData, __FILE__, __LINE__);
+		Logger::log("[AniDB Response] 230 ANIME field count: " + QString::number(token2.size()), __FILE__, __LINE__);
+		for(int i = 0; i < token2.size() && i < 20; i++)
+		{
+			Logger::log("[AniDB Response] 230 ANIME field[" + QString::number(i) + "]: '" + token2.at(i) + "'", __FILE__, __LINE__);
+		}
+		
+		if(token2.size() >= 1)
+		{
+			QString aid = token2.at(0);
+			// Field order with corrected amask:
+			// 0: aid
+			// 1: total_episodes (bit 31)
+			// 2: highest_episode (bit 30)
+			// 3: year (bit 29)
+			// 4: type (bit 28)
+			// 5: romaji name (bit 23)
+			// 6: kanji name (bit 22)
+			// 7: english name (bit 21)
+			// 8: other name (bit 20)
+			// 9: short name list (bit 19)
+			// 10: synonym list (bit 18)
+			// 11: episodes (bit 15)
+			// 12: special_ep_count (bit 14)
+			// 13: air date (bit 13)
+			// 14: end date (bit 12)
+			QString total_eps = token2.size() > 1 ? token2.at(1) : "";
+			QString highest_ep = token2.size() > 2 ? token2.at(2) : "";
+			QString year = token2.size() > 3 ? token2.at(3) : "";
+			QString type = token2.size() > 4 ? token2.at(4) : "";
+			QString nameromaji = token2.size() > 5 ? token2.at(5) : "";
+			QString namekanji = token2.size() > 6 ? token2.at(6) : "";
+			QString nameenglish = token2.size() > 7 ? token2.at(7) : "";
+			QString nameother = token2.size() > 8 ? token2.at(8) : "";
+			QString nameshort = token2.size() > 9 ? token2.at(9) : "";
+			QString synonyms = token2.size() > 10 ? token2.at(10) : "";
+			QString episodes = token2.size() > 11 ? token2.at(11) : "";
+			QString special_count = token2.size() > 12 ? token2.at(12) : "";
+			QString airdate = token2.size() > 13 ? token2.at(13) : "";
+			QString enddate = token2.size() > 14 ? token2.at(14) : "";
+			
+			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + year + "' Type: '" + type + "' AirDate: '" + airdate + "' EndDate: '" + enddate + "'", __FILE__, __LINE__);
+			
+			// Convert type code to typename string
+			QString typenameStr;
+			if(type == "1") typenameStr = "TV Series";
+			else if(type == "2") typenameStr = "OVA";
+			else if(type == "3") typenameStr = "Movie";
+			else if(type == "4") typenameStr = "Other";
+			else if(type == "5") typenameStr = "Web";
+			else if(type == "6") typenameStr = "TV Special";
+			
+			// Convert Unix timestamps to ISO 8601 date format (YYYY-MM-DDZ)
+			// The mylist tree widget expects dates in this format, not Unix timestamps
+			QString startdateFormatted;
+			QString enddateFormatted;
+			if(!airdate.isEmpty())
+			{
+				bool ok;
+				qint64 timestamp = airdate.toLongLong(&ok);
+				if(ok && timestamp > 0)
+				{
+					QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
+					startdateFormatted = dt.toString("yyyy-MM-dd") + "Z";
+				}
+			}
+			if(!enddate.isEmpty())
+			{
+				bool ok;
+				qint64 timestamp = enddate.toLongLong(&ok);
+				if(ok && timestamp > 0)
+				{
+					QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
+					enddateFormatted = dt.toString("yyyy-MM-dd") + "Z";
+				}
+			}
+			
+			// Update anime table with metadata (typename, startdate, enddate)
+			// Only update these specific fields, don't overwrite other data
+			if(!aid.isEmpty())
+			{
+				QSqlQuery query(db);
+				query.prepare("UPDATE `anime` SET `typename` = ?, `startdate` = ?, `enddate` = ? WHERE `aid` = ?");
+				query.addBindValue(typenameStr.isEmpty() ? QVariant() : typenameStr);
+				query.addBindValue(startdateFormatted.isEmpty() ? QVariant() : startdateFormatted);
+				query.addBindValue(enddateFormatted.isEmpty() ? QVariant() : enddateFormatted);
+				query.addBindValue(aid.toInt());
+				
+				if(!query.exec())
+				{
+					LOG("Anime metadata update error: " + query.lastError().text());
+				}
+				else
+				{
+					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typenameStr + " AirDate: " + airdate + " EndDate: " + enddate, __FILE__, __LINE__);
+					// Emit signal to notify UI that anime data was updated
+					emit notifyAnimeUpdated(aid.toInt());
+				}
+			}
+		}
 	}
 	else if(ReplyID == "240"){ // 240 EPISODE
 		// Response format: eid|aid|length|rating|votes|epno|eng|romaji|kanji|aired|type
@@ -1315,6 +1449,21 @@ QString AniDBApi::Episode(int eid)
 	return GetTag(msg);
 }
 
+QString AniDBApi::Anime(int aid)
+{
+	// Request anime information by anime ID
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	Logger::log("[AniDB API] Requesting ANIME data for AID: " + QString::number(aid), __FILE__, __LINE__);
+	QString msg = buildAnimeCommand(aid);
+	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query(db);
+	query.exec(q);
+	return GetTag(msg);
+}
+
 /* === Command Builders === */
 // These methods build formatted command strings for testing and reuse
 
@@ -1393,6 +1542,23 @@ QString AniDBApi::buildEpisodeCommand(int eid)
 	// EPISODE eid={int4 eid}
 	// Request episode information for a specific episode ID
 	return QString("EPISODE eid=%1").arg(eid);
+}
+
+QString AniDBApi::buildAnimeCommand(int aid)
+{
+	// ANIME aid={int4 aid}&amask={hexstr amask}
+	// Request anime information for a specific anime ID
+	// Build amask using the anime_amask_codes enum for clarity
+	// Note: ANIME amask bits are numbered differently than FILE amask!
+	unsigned int amask = ANIME_TOTAL_EPISODES | ANIME_HIGHEST_EPISODE |
+						 ANIME_YEAR | ANIME_TYPE |
+						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
+						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
+						 ANIME_EPISODES | ANIME_SPECIAL_EP_COUNT |
+						 ANIME_AIR_DATE | ANIME_END_DATE;
+	
+	// Convert to hex string (no leading zeros for AniDB API)
+	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);
 }
 
 /* === End Command Builders === */
