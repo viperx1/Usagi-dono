@@ -2466,9 +2466,6 @@ void Window::loadMylistFromDatabase()
 	
 	LOG(QString("Loaded %1 files for %2 episodes in %3 anime").arg(totalFiles).arg(episodeItems.size()).arg(animeItems.size()));
 	mylistStatusLabel->setText(QString("MyList Status: %1 files loaded").arg(totalFiles));
-	
-	// Set default sort order to ascending by episode column (column 1)
-	mylistTreeWidget->sortByColumn(1, Qt::AscendingOrder);
 }
 
 int Window::parseMylistExport(const QString &tarGzPath)
@@ -3173,10 +3170,6 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 {
 	if (!item) return;
 	
-	// Get the LID for this item to check if it's playing
-	int lid = item->data(0, Qt::UserRole + 1).toInt();
-	bool isPlaying = m_playingItems.contains(lid);
-	
 	// Determine item type and update button accordingly
 	QTreeWidgetItem *parent = item->parent();
 	
@@ -3184,19 +3177,14 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		// This is a file item
 		FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(item);
 		if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-			if (isPlaying) {
-				// Show first animation frame for playing items
-				item->setText(PLAY_COLUMN, "▶");
-			} else {
-				bool viewed = (item->text(COL_VIEWED) == "Yes");
-				// Check if file doesn't exist
-				QString currentText = item->text(PLAY_COLUMN);
-				if (currentText == "✗") {
-					// Keep the X if file doesn't exist
-					return;
-				}
-				item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
+			bool viewed = (item->text(COL_VIEWED) == "Yes");
+			// Check if file doesn't exist
+			QString currentText = item->text(PLAY_COLUMN);
+			if (currentText == "✗") {
+				// Keep the X if file doesn't exist
+				return;
 			}
+			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
 		}
 	}
 	else if (parent && !parent->parent()) {
@@ -3342,23 +3330,34 @@ void Window::onPlaybackStateChanged(int lid, bool isPlaying)
 		if (!m_animationTimer->isActive()) {
 			m_animationTimer->start();
 		}
+		
+		// Set initial animation frame immediately
+		QTreeWidgetItemIterator it(mylistTreeWidget);
+		while (*it) {
+			QTreeWidgetItem *item = *it;
+			if (item->data(0, Qt::UserRole + 1).toInt() == lid) {
+				item->setText(COL_PLAY, "▶");
+				break;
+			}
+			++it;
+		}
 	} else {
 		// Remove from playing items
 		m_playingItems.remove(lid);
 		if (m_playingItems.isEmpty()) {
 			m_animationTimer->stop();
 		}
-	}
-	
-	// Update the play button for this item
-	QTreeWidgetItemIterator it(mylistTreeWidget);
-	while (*it) {
-		QTreeWidgetItem *item = *it;
-		if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
-			updatePlayButtonForItem(item);
-			break;
+		
+		// Update the play button for this item
+		QTreeWidgetItemIterator it(mylistTreeWidget);
+		while (*it) {
+			QTreeWidgetItem *item = *it;
+			if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
+				updatePlayButtonForItem(item);
+				break;
+			}
+			++it;
 		}
-		++it;
 	}
 }
 
