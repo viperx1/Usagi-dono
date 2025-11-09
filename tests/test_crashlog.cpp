@@ -206,10 +206,9 @@ void TestCrashLog::testCompleteProcessWithDataTypeConversions()
     
     // Step 1: Simulate generateCrashLog with QString → QTextStream conversion
     QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir dir(logDir);
-    if (!dir.exists())
+    if (!QDir(logDir).exists())
     {
-        QDir::mkpath(logDir);
+        QDir().mkpath(logDir);
     }
     
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss");
