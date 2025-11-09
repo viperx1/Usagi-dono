@@ -93,7 +93,39 @@ private:
         pFailed = 3
 	};
 
-	enum acodes
+	// FILE command fmask (file data fields)
+	enum file_fmask_codes
+	{
+		fAID =				0x40000000,
+		fEID =				0x20000000,
+		fGID =				0x10000000,
+		fLID =				0x08000000,
+		fOTHEREPS =			0x04000000,
+		fISDEPR =			0x02000000,
+		fSTATE =			0x01000000,
+		fSIZE =				0x00800000,
+		fED2K =				0x00400000,
+		fMD5 =				0x00200000,
+		fSHA1 =				0x00100000,
+		fCRC32 =			0x00080000,
+		fQUALITY =			0x00008000,
+		fSOURCE =			0x00004000,
+		fCODEC_AUDIO =		0x00002000,
+		fBITRATE_AUDIO =	0x00001000,
+		fCODEC_VIDEO =		0x00000800,
+		fBITRATE_VIDEO =	0x00000400,
+		fRESOLUTION =		0x00000200,
+		fFILETYPE =			0x00000100,
+		fLANG_DUB =			0x00000080,
+		fLANG_SUB =			0x00000040,
+		fLENGTH =			0x00000020,
+		fDESCRIPTION =		0x00000010,
+		fAIRDATE =			0x00000008,
+        fFILENAME =			0x00000001
+	};
+
+	// FILE command amask (anime/episode data fields returned with file)
+	enum file_amask_codes
 	{
 		aEPISODE_TOTAL =			0x80000000,
 		aEPISODE_LAST =				0x40000000,
@@ -117,6 +149,38 @@ private:
 		aGROUP_NAME =				0x00000080,
 		aGROUP_NAME_SHORT =			0x00000040,
         aDATE_AID_RECORD_UPDATED =	0x00000001
+	};
+
+	// ANIME command amask (anime data fields)
+	enum anime_amask_codes
+	{
+		ANIME_YEAR =				0x80000000,  // Bit 31: Year
+		ANIME_TYPE =				0x40000000,  // Bit 30: Type
+		ANIME_RELATED_AID_LIST =	0x20000000,  // Bit 29: Related anime ID list
+		ANIME_RELATED_AID_TYPE =	0x10000000,  // Bit 28: Related anime ID type
+		ANIME_CATEGORY_LIST =		0x08000000,  // Bit 27: Category list
+		ANIME_RESERVED_26 =			0x04000000,  // Bit 26: Reserved
+		ANIME_ROMAJI_NAME =			0x02000000,  // Bit 25: Romaji name
+		ANIME_KANJI_NAME =			0x01000000,  // Bit 24: Kanji name
+		ANIME_ENGLISH_NAME =		0x00800000,  // Bit 23: English name
+		ANIME_OTHER_NAME =			0x00400000,  // Bit 22: Other name
+		ANIME_SHORT_NAME_LIST =		0x00200000,  // Bit 21: Short name list
+		ANIME_SYNONYM_LIST =		0x00100000,  // Bit 20: Synonym list
+		ANIME_RESERVED_19 =			0x00080000,  // Bit 19: Reserved
+		ANIME_RESERVED_18 =			0x00040000,  // Bit 18: Reserved
+		ANIME_EPISODES =			0x00020000,  // Bit 17: Episodes
+		ANIME_HIGHEST_EPISODE =		0x00010000,  // Bit 16: Highest episode number
+		ANIME_SPECIAL_EP_COUNT =	0x00008000,  // Bit 15: Special episode count
+		ANIME_AIR_DATE =			0x00004000,  // Bit 14: Air date
+		ANIME_END_DATE =			0x00002000,  // Bit 13: End date
+		ANIME_PICNAME =				0x00001000,  // Bit 12: Picture name
+		ANIME_NSFW =				0x00000800,  // Bit 11: NSFW flag
+		ANIME_CHARACTERID_LIST =	0x00000400,  // Bit 10: Character ID list
+		ANIME_SPECIALS_COUNT =		0x00000200,  // Bit 9: Specials count
+		ANIME_CREDITS_COUNT =		0x00000100,  // Bit 8: Credits count
+		ANIME_OTHER_COUNT =			0x00000080,  // Bit 7: Other count
+		ANIME_TRAILER_COUNT =		0x00000040,  // Bit 6: Trailer count
+		ANIME_PARODY_COUNT =		0x00000020   // Bit 5: Parody count
 	};
 
 	enum fcodes
@@ -147,6 +211,32 @@ private:
 		fDESCRIPTION =		0x00000010,
 		fAIRDATE =			0x00000008,
         fFILENAME =			0x00000001
+	};
+
+	enum acodes
+	{
+		aEPISODE_TOTAL =			0x80000000,
+		aEPISODE_LAST =				0x40000000,
+		aANIME_YEAR =				0x20000000,
+		aANIME_TYPE =				0x10000000,
+		aANIME_RELATED_LIST =		0x08000000,
+		aANIME_RELATED_TYPE =		0x04000000,
+		aANIME_CATAGORY =			0x02000000,
+		aANIME_NAME_ROMAJI =		0x00800000,
+		aANIME_NAME_KANJI =			0x00400000,
+		aANIME_NAME_ENGLISH =		0x00200000,
+		aANIME_NAME_OTHER =			0x00100000,
+		aANIME_NAME_SHORT =			0x00080000,
+		aANIME_SYNONYMS =			0x00040000,
+		aEPISODE_NUMBER =			0x00008000,
+		aEPISODE_NAME =				0x00004000,
+		aEPISODE_NAME_ROMAJI =		0x00002000,
+		aEPISODE_NAME_KANJI =		0x00001000,
+		aEPISODE_RATING =			0x00000800,
+		aEPISODE_VOTE_COUNT =		0x00000400,
+		aGROUP_NAME =				0x00000080,
+		aGROUP_NAME_SHORT =			0x00000040,
+        aDATE_AID_RECORD_UPDATED =	0x00000001
 	};
 
 	//wxDatagramSocket *Socket; // UDP socket
