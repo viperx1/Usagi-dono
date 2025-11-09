@@ -1,4 +1,4 @@
-name: Windows Build & Release (Qt 6.10 LLVM MinGW)
+name: Windows Build & Release (Qt 6.8 LTS LLVM MinGW)
 
 on:
   push:
@@ -12,16 +12,16 @@ on:
 jobs:
   build-llvm-mingw:
     runs-on: windows-latest
-    name: Build with LLVM/Clang (Qt 6.10 MinGW)
+    name: Build with LLVM/Clang (Qt 6.8 MinGW)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Qt 6.10 (LLVM MinGW)
+      - name: Install Qt 6.8 (LLVM MinGW)
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.10'
+          version: '6.8'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_llvm_mingw'
