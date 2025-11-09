@@ -528,6 +528,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		{
 			QString aid = token2.size() > 1 ? token2.at(1) : "";
 			QString eid = token2.size() > 2 ? token2.at(2) : "";
+			QString gid = token2.size() > 3 ? token2.at(3) : "";
 			
 			// Anime data starts at index 27
 			QString eptotal = token2.size() > 27 ? token2.at(27) : "";
@@ -549,6 +550,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString epnamekanji = token2.size() > 43 ? token2.at(43) : "";
 			QString eprating = token2.size() > 44 ? token2.at(44) : "";
 			QString epvotecount = token2.size() > 45 ? token2.at(45) : "";
+			QString groupname = token2.size() > 46 ? token2.at(46) : "";
+			QString groupshortname = token2.size() > 47 ? token2.at(47) : "";
 			
 			// Store anime data
 			if(!aid.isEmpty())
@@ -588,6 +591,19 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				if(!query.exec(q_episode))
 				{
 					LOG("Episode database query error: " + query.lastError().text());
+				}
+			}
+			
+			// Store group data if available
+			if(!gid.isEmpty() && gid != "0" && (!groupname.isEmpty() || !groupshortname.isEmpty()))
+			{
+				QString q_group = QString("INSERT OR REPLACE INTO `group` (`gid`, `name`, `shortname`) VALUES ('%1', '%2', '%3')")
+					.arg(QString(gid).replace("'", "''"))
+					.arg(QString(groupname).replace("'", "''"))
+					.arg(QString(groupshortname).replace("'", "''"));
+				if(!query.exec(q_group))
+				{
+					LOG("Group database query error: " + query.lastError().text());
 				}
 			}
 		}
