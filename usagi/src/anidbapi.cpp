@@ -641,79 +641,74 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Logger::log("[AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first(), __FILE__, __LINE__);
 	}
 	else if(ReplyID == "230"){ // 230 ANIME
-		// Response format based on ACTUAL API behavior (not all amask fields are returned):
-		// Field order: aid|year|type|romaji|kanji|english|other|short|synonyms
-		// NOTE: The AniDB UDP API does NOT return the following fields even when requested:
-		//   - total_episodes (bit 31) - not returned
-		//   - highest_ep (bit 30) - not returned
-		//   - episodes (bit 15) - not returned
-		//   - special_count (bit 14) - not returned  
-		//   - airdate (bit 13) - not returned
-		//   - enddate (bit 12) - not returned
-		// Also NOTE: type is returned as a STRING (e.g., "TV Series") not a numeric code.
+		// Get the original ANIME command to extract amask
+		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
+		QSqlQuery query(db);
+		unsigned int fmask = 0;  // Not used for ANIME commands
+		unsigned int amask = 0;
+		
+		if(query.exec(q) && query.next())
+		{
+			QString animeCmd = query.value(0).toString();
+			if(!extractMasksFromCommand(animeCmd, fmask, amask))
+			{
+				LOG("Failed to extract amask from ANIME command for Tag: " + Tag);
+				// Fall back to default amask
+				amask = ANIME_TOTAL_EPISODES | ANIME_YEAR | ANIME_TYPE |
+						ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
+						ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
+			}
+		}
+		else
+		{
+			LOG("Could not find packet for Tag: " + Tag);
+			// Use default amask
+			amask = ANIME_TOTAL_EPISODES | ANIME_YEAR | ANIME_TYPE |
+					ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
+					ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
+		}
+		
+		// Parse response using mask-aware parsing
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		QString responseData = token2.first();
 		token2 = responseData.split("|");
 		
-		// Debug logging to see what we received
+		// Debug logging
 		Logger::log("[AniDB Response] 230 ANIME raw data: " + responseData, __FILE__, __LINE__);
 		Logger::log("[AniDB Response] 230 ANIME field count: " + QString::number(token2.size()), __FILE__, __LINE__);
-		for(int i = 0; i < token2.size() && i < 20; i++)
-		{
-			Logger::log("[AniDB Response] 230 ANIME field[" + QString::number(i) + "]: '" + token2.at(i) + "'", __FILE__, __LINE__);
-		}
 		
 		if(token2.size() >= 1)
 		{
-			QString aid = token2.at(0);
-			// Field order based on ACTUAL API response:
-			// 0: aid
-			// 1: year (bit 29) - NOTE: total_episodes (bit 31) and highest_episode (bit 30) are NOT returned by API
-			// 2: type (bit 28) - returned as STRING (e.g. "TV Series") not numeric code!
-			// 3: romaji name (bit 23)
-			// 4: kanji name (bit 22)
-			// 5: english name (bit 21)
-			// 6: other name (bit 20)
-			// 7: short name list (bit 19)
-			// 8: synonym list (bit 18)
-			// NOTE: total_episodes, highest_episode, episodes, special_count, airdate, enddate are NOT returned by ANIME UDP API
+			QString aid = token2.at(0);  // AID is always first
+			int index = 1;  // Start parsing after AID
+			
+			// Parse anime data using amask
+			AnimeData animeData = parseAnimeMask(token2, amask, index);
+			animeData.aid = aid;  // Ensure aid is set
+			
+			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + animeData.year + "' Type: '" + animeData.type + "'", __FILE__, __LINE__);
+			
+			// NOTE: ANIME UDP API does not return certain fields even when requested:
+			//   - total_episodes, highest_episode, episodes, special_count, airdate, enddate
 			// These should be obtained from mylist HTTP export or FILE command instead.
-			QString year = token2.size() > 1 ? token2.at(1) : "";
-			QString type = token2.size() > 2 ? token2.at(2) : "";  // String, not numeric!
-			QString nameromaji = token2.size() > 3 ? token2.at(3) : "";
-			QString namekanji = token2.size() > 4 ? token2.at(4) : "";
-			QString nameenglish = token2.size() > 5 ? token2.at(5) : "";
-			QString nameother = token2.size() > 6 ? token2.at(6) : "";
-			QString nameshort = token2.size() > 7 ? token2.at(7) : "";
-			QString synonyms = token2.size() > 8 ? token2.at(8) : "";
 			
-			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + year + "' Type: '" + type + "'", __FILE__, __LINE__);
-			
-			// Type is already a string (e.g., "TV Series") in the API response
-			// Use it directly as typename
-			QString typenameStr = type;
-			
-			// NOTE: ANIME UDP API does not return airdate/enddate fields
-			// These dates should be populated from mylist HTTP export which has StartDate/EndDate
-			// For now, we only update typename from the ANIME command
-			
-			// Update anime table with metadata (typename only)
-			// startdate and enddate should come from mylist export
-			if(!aid.isEmpty())
+			// For ANIME command, we only update typename since other fields may not be returned
+			// The type field is returned as a string (e.g., "TV Series") by the API
+			if(!aid.isEmpty() && !animeData.type.isEmpty())
 			{
-				QSqlQuery query(db);
-				query.prepare("UPDATE `anime` SET `typename` = ? WHERE `aid` = ?");
-				query.addBindValue(typenameStr.isEmpty() ? QVariant() : typenameStr);
-				query.addBindValue(aid.toInt());
+				QSqlQuery updateQuery(db);
+				updateQuery.prepare("UPDATE `anime` SET `typename` = ? WHERE `aid` = ?");
+				updateQuery.addBindValue(animeData.type);
+				updateQuery.addBindValue(aid.toInt());
 				
-				if(!query.exec())
+				if(!updateQuery.exec())
 				{
-					LOG("Anime metadata update error: " + query.lastError().text());
+					LOG("Anime metadata update error: " + updateQuery.lastError().text());
 				}
 				else
 				{
-					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typenameStr, __FILE__, __LINE__);
+					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + animeData.type, __FILE__, __LINE__);
 					// Emit signal to notify UI that anime data was updated
 					emit notifyAnimeUpdated(aid.toInt());
 				}
@@ -3021,11 +3016,12 @@ void AniDBApi::storeGroupData(const GroupData& data)
 }
 
 /**
- * Extract fmask and amask values from a FILE command string.
- * Command format: "FILE size=X&ed2k=Y&fmask=ZZZZZZZZ&amask=WWWWWWWW"
+ * Extract fmask and amask values from a FILE command string, or amask from ANIME command.
+ * FILE format: "FILE size=X&ed2k=Y&fmask=ZZZZZZZZ&amask=WWWWWWWW"
+ * ANIME format: "ANIME aid=X&amask=YYYYYYYY"
  * 
- * @param command The FILE command string
- * @param fmask Output parameter for file mask (hex string converted to unsigned int)
+ * @param command The FILE or ANIME command string
+ * @param fmask Output parameter for file mask (hex string converted to unsigned int). Set to 0 for ANIME commands.
  * @param amask Output parameter for anime mask (hex string converted to unsigned int)
  * @return true if masks were successfully extracted, false otherwise
  */
@@ -3035,7 +3031,7 @@ bool AniDBApi::extractMasksFromCommand(const QString& command, unsigned int& fma
 	fmask = 0;
 	amask = 0;
 	
-	// Extract fmask using regex
+	// Extract fmask using regex (only for FILE commands)
 	QRegularExpression fmaskRegex("fmask=([0-9a-fA-F]+)");
 	QRegularExpressionMatch fmaskMatch = fmaskRegex.match(command);
 	
