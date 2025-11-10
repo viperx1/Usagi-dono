@@ -1503,18 +1503,40 @@ QString AniDBApi::buildAnimeCommand(int aid)
 {
 	// ANIME aid={int4 aid}&amask={hexstr amask}
 	// Request anime information for a specific anime ID
-	// Build amask using the anime_amask_codes enum
+	// Build amask using the anime_amask_codes enum (all 7 bytes)
 	// 
-	// ANIME command uses byte-oriented mask:
-	//   Byte 1 (bits 7-0): aid, dateflags, year, type, related lists
-	//   Byte 2 (bits 7-0): name variations (romaji, kanji, english, other, short, synonym)
+	// ANIME command uses byte-oriented mask (7 bytes):
+	//   Byte 1: aid, dateflags, year, type, related lists
+	//   Byte 2: name variations (romaji, kanji, english, other, short, synonym)
+	//   Byte 3: episodes, highest episode, special ep count, dates, url, picname
+	//   Byte 4: ratings, reviews, awards, is 18+ restricted
+	//   Byte 5: external IDs (ANN, allcinema, animenfo), tags, date updated
+	//   Byte 6: character ID list
+	//   Byte 7: episode type counts (specials, credits, other, trailer, parody)
 	// 
 	// We request all defined fields per API specification
-	unsigned int amask = ANIME_AID | ANIME_DATEFLAGS |
-						 ANIME_YEAR | ANIME_TYPE |
-						 ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
-						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
-						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
+	unsigned int amask = 
+		// Byte 1
+		ANIME_AID | ANIME_DATEFLAGS |
+		ANIME_YEAR | ANIME_TYPE |
+		ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
+		// Byte 2
+		ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
+		ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
+		// Byte 3
+		ANIME_EPISODES | ANIME_HIGHEST_EPISODE | ANIME_SPECIAL_EP_COUNT |
+		ANIME_AIR_DATE | ANIME_END_DATE | ANIME_URL | ANIME_PICNAME |
+		// Byte 4
+		ANIME_RATING | ANIME_VOTE_COUNT | ANIME_TEMP_RATING | ANIME_TEMP_VOTE_COUNT |
+		ANIME_AVG_REVIEW_RATING | ANIME_REVIEW_COUNT | ANIME_AWARD_LIST | ANIME_IS_18_RESTRICTED |
+		// Byte 5
+		ANIME_ANN_ID | ANIME_ALLCINEMA_ID | ANIME_ANIMENFO_ID |
+		ANIME_TAG_NAME_LIST | ANIME_TAG_ID_LIST | ANIME_TAG_WEIGHT_LIST | ANIME_DATE_RECORD_UPDATED |
+		// Byte 6
+		ANIME_CHARACTER_ID_LIST |
+		// Byte 7
+		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
+		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
 	// Convert to hex string (no leading zeros for AniDB API)
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);
@@ -2966,7 +2988,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	
 	// Note: The ANIME command response order is determined by the amask bits
 	// Process from highest bit to lowest bit (MSB to LSB) in strict order
-	// Byte 1 bits 7-0, then Byte 2 bits 7-0, etc.
+	// Byte 1 bits 7-0, then Byte 2 bits 7-0, then Byte 3 bits 7-0, etc.
 	// This ensures correctness even if individual if-statements are reordered
 	
 	// Define all mask bits in MSB to LSB order (bit 7 of each byte first)
@@ -2978,22 +3000,65 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	
 	MaskBit maskBits[] = {
 		// Byte 1 (bits 7-0) - basic anime info
-		{ANIME_AID,             &data.aid,           "AID"},                // Byte 1, bit 7 (dec 128)
-		{ANIME_DATEFLAGS,       nullptr,             "DATEFLAGS"},          // Byte 1, bit 6 (dec 64) - Not stored
-		{ANIME_YEAR,            &data.year,          "YEAR"},               // Byte 1, bit 5 (dec 32)
-		{ANIME_TYPE,            &data.type,          "TYPE"},               // Byte 1, bit 4 (dec 16)
-		{ANIME_RELATED_AID_LIST,&data.relaidlist,    "RELATED_AID_LIST"},   // Byte 1, bit 3 (dec 8)
-		{ANIME_RELATED_AID_TYPE,&data.relaidtype,    "RELATED_AID_TYPE"},   // Byte 1, bit 2 (dec 4)
+		{ANIME_AID,             &data.aid,                  "AID"},                   // Byte 1, bit 7 (dec 128)
+		{ANIME_DATEFLAGS,       &data.dateflags,            "DATEFLAGS"},             // Byte 1, bit 6 (dec 64)
+		{ANIME_YEAR,            &data.year,                 "YEAR"},                  // Byte 1, bit 5 (dec 32)
+		{ANIME_TYPE,            &data.type,                 "TYPE"},                  // Byte 1, bit 4 (dec 16)
+		{ANIME_RELATED_AID_LIST,&data.relaidlist,           "RELATED_AID_LIST"},      // Byte 1, bit 3 (dec 8)
+		{ANIME_RELATED_AID_TYPE,&data.relaidtype,           "RELATED_AID_TYPE"},      // Byte 1, bit 2 (dec 4)
 		// Byte 1, bits 1-0 are retired
 		
 		// Byte 2 (bits 7-0) - name variations
-		{ANIME_ROMAJI_NAME,     &data.nameromaji,    "ROMAJI_NAME"},        // Byte 2, bit 7 (dec 128)
-		{ANIME_KANJI_NAME,      &data.namekanji,     "KANJI_NAME"},         // Byte 2, bit 6 (dec 64)
-		{ANIME_ENGLISH_NAME,    &data.nameenglish,   "ENGLISH_NAME"},       // Byte 2, bit 5 (dec 32)
-		{ANIME_OTHER_NAME,      &data.nameother,     "OTHER_NAME"},         // Byte 2, bit 4 (dec 16)
-		{ANIME_SHORT_NAME_LIST, &data.nameshort,     "SHORT_NAME_LIST"},    // Byte 2, bit 3 (dec 8)
-		{ANIME_SYNONYM_LIST,    &data.synonyms,      "SYNONYM_LIST"}        // Byte 2, bit 2 (dec 4)
+		{ANIME_ROMAJI_NAME,     &data.nameromaji,           "ROMAJI_NAME"},           // Byte 2, bit 7 (dec 128)
+		{ANIME_KANJI_NAME,      &data.namekanji,            "KANJI_NAME"},            // Byte 2, bit 6 (dec 64)
+		{ANIME_ENGLISH_NAME,    &data.nameenglish,          "ENGLISH_NAME"},          // Byte 2, bit 5 (dec 32)
+		{ANIME_OTHER_NAME,      &data.nameother,            "OTHER_NAME"},            // Byte 2, bit 4 (dec 16)
+		{ANIME_SHORT_NAME_LIST, &data.nameshort,            "SHORT_NAME_LIST"},       // Byte 2, bit 3 (dec 8)
+		{ANIME_SYNONYM_LIST,    &data.synonyms,             "SYNONYM_LIST"},          // Byte 2, bit 2 (dec 4)
 		// Byte 2, bits 1-0 are retired
+		
+		// Byte 3 (bits 7-0) - episodes and dates
+		{ANIME_EPISODES,        &data.episodes,             "EPISODES"},              // Byte 3, bit 7 (dec 128)
+		{ANIME_HIGHEST_EPISODE, &data.highest_episode,      "HIGHEST_EPISODE"},       // Byte 3, bit 6 (dec 64)
+		{ANIME_SPECIAL_EP_COUNT,&data.special_ep_count,     "SPECIAL_EP_COUNT"},      // Byte 3, bit 5 (dec 32)
+		{ANIME_AIR_DATE,        &data.air_date,             "AIR_DATE"},              // Byte 3, bit 4 (dec 16)
+		{ANIME_END_DATE,        &data.end_date,             "END_DATE"},              // Byte 3, bit 3 (dec 8)
+		{ANIME_URL,             &data.url,                  "URL"},                   // Byte 3, bit 2 (dec 4)
+		{ANIME_PICNAME,         &data.picname,              "PICNAME"},               // Byte 3, bit 1 (dec 2)
+		// Byte 3, bit 0 is retired
+		
+		// Byte 4 (bits 7-0) - ratings and reviews
+		{ANIME_RATING,          &data.rating,               "RATING"},                // Byte 4, bit 7 (dec 128)
+		{ANIME_VOTE_COUNT,      &data.vote_count,           "VOTE_COUNT"},            // Byte 4, bit 6 (dec 64)
+		{ANIME_TEMP_RATING,     &data.temp_rating,          "TEMP_RATING"},           // Byte 4, bit 5 (dec 32)
+		{ANIME_TEMP_VOTE_COUNT, &data.temp_vote_count,      "TEMP_VOTE_COUNT"},       // Byte 4, bit 4 (dec 16)
+		{ANIME_AVG_REVIEW_RATING,&data.avg_review_rating,   "AVG_REVIEW_RATING"},     // Byte 4, bit 3 (dec 8)
+		{ANIME_REVIEW_COUNT,    &data.review_count,         "REVIEW_COUNT"},          // Byte 4, bit 2 (dec 4)
+		{ANIME_AWARD_LIST,      &data.award_list,           "AWARD_LIST"},            // Byte 4, bit 1 (dec 2)
+		{ANIME_IS_18_RESTRICTED,&data.is_18_restricted,     "IS_18_RESTRICTED"},      // Byte 4, bit 0 (dec 1)
+		
+		// Byte 5 (bits 7-0) - external IDs and tags
+		// Byte 5, bit 7 is retired
+		{ANIME_ANN_ID,          &data.ann_id,               "ANN_ID"},                // Byte 5, bit 6 (dec 64)
+		{ANIME_ALLCINEMA_ID,    &data.allcinema_id,         "ALLCINEMA_ID"},          // Byte 5, bit 5 (dec 32)
+		{ANIME_ANIMENFO_ID,     &data.animenfo_id,          "ANIMENFO_ID"},           // Byte 5, bit 4 (dec 16)
+		{ANIME_TAG_NAME_LIST,   &data.tag_name_list,        "TAG_NAME_LIST"},         // Byte 5, bit 3 (dec 8)
+		{ANIME_TAG_ID_LIST,     &data.tag_id_list,          "TAG_ID_LIST"},           // Byte 5, bit 2 (dec 4)
+		{ANIME_TAG_WEIGHT_LIST, &data.tag_weight_list,      "TAG_WEIGHT_LIST"},       // Byte 5, bit 1 (dec 2)
+		{ANIME_DATE_RECORD_UPDATED,&data.date_record_updated,"DATE_RECORD_UPDATED"},  // Byte 5, bit 0 (dec 1)
+		
+		// Byte 6 (bits 7-0) - characters
+		{ANIME_CHARACTER_ID_LIST,&data.character_id_list,   "CHARACTER_ID_LIST"},     // Byte 6, bit 7 (dec 128)
+		// Byte 6, bits 6-4 are retired
+		// Byte 6, bits 3-0 are unused
+		
+		// Byte 7 (bits 7-0) - episode type counts
+		{ANIME_SPECIALS_COUNT,  &data.specials_count,       "SPECIALS_COUNT"},        // Byte 7, bit 7 (dec 128)
+		{ANIME_CREDITS_COUNT,   &data.credits_count,        "CREDITS_COUNT"},         // Byte 7, bit 6 (dec 64)
+		{ANIME_OTHER_COUNT,     &data.other_count,          "OTHER_COUNT"},           // Byte 7, bit 5 (dec 32)
+		{ANIME_TRAILER_COUNT,   &data.trailer_count,        "TRAILER_COUNT"},         // Byte 7, bit 4 (dec 16)
+		{ANIME_PARODY_COUNT,    &data.parody_count,         "PARODY_COUNT"}           // Byte 7, bit 3 (dec 8)
+		// Byte 7, bits 2-0 are unused
 	};
 	
 	// Process mask bits in order using a loop
@@ -3016,6 +3081,10 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 			// else: field is not stored (marked with nullptr)
 		}
 	}
+	
+	// Set legacy fields for backward compatibility
+	data.eptotal = data.episodes;  // episodes (Byte 3, bit 7)
+	data.eplast = data.highest_episode;  // highest episode (Byte 3, bit 6)
 	
 	return data;
 }
