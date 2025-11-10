@@ -1477,12 +1477,19 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	//   - ANIME_AIR_DATE (bit 13) - not returned
 	//   - ANIME_END_DATE (bit 12) - not returned
 	// These fields should be obtained from mylist HTTP export or FILE command instead.
-	// We still include ANIME_TOTAL_EPISODES in the amask even though it's not returned,
-	// in case the API behavior changes in the future.
-	unsigned int amask = ANIME_TOTAL_EPISODES |
+	// We request all available fields to ensure complete parsing even if API behavior changes.
+	unsigned int amask = ANIME_TOTAL_EPISODES | ANIME_HIGHEST_EPISODE |
 						 ANIME_YEAR | ANIME_TYPE |
+						 ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
+						 ANIME_CATEGORY_LIST |
 						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
-						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
+						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
+						 ANIME_EPISODES | ANIME_SPECIAL_EP_COUNT |
+						 ANIME_AIR_DATE | ANIME_END_DATE |
+						 ANIME_PICNAME | ANIME_NSFW |
+						 ANIME_CHARACTERID_LIST |
+						 ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
+						 ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
 	// Convert to hex string (no leading zeros for AniDB API)
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);
@@ -2708,7 +2715,7 @@ void AniDBApi::checkForExistingExport()
 
 /**
  * Parse FILE command response using fmask to determine which fields are present.
- * Processes the mask bit by bit from MSB to LSB to extract fields in the correct order.
+ * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param fmask File mask indicating which fields are present
@@ -2719,46 +2726,66 @@ AniDBApi::FileData AniDBApi::parseFileMask(const QStringList& tokens, unsigned i
 {
 	FileData data;
 	
-	// Process fmask bits from MSB (bit 30) to LSB (bit 0)
-	// The fields appear in the response in the order of bits set in the mask
-	
-	if (fmask & fAID)            { data.aid = tokens.value(index++); }
-	if (fmask & fEID)            { data.eid = tokens.value(index++); }
-	if (fmask & fGID)            { data.gid = tokens.value(index++); }
-	if (fmask & fLID)            { data.lid = tokens.value(index++); }
-	if (fmask & fOTHEREPS)       { data.othereps = tokens.value(index++); }
-	if (fmask & fISDEPR)         { data.isdepr = tokens.value(index++); }
-	if (fmask & fSTATE)          { data.state = tokens.value(index++); }
-	if (fmask & fSIZE)           { data.size = tokens.value(index++); }
-	if (fmask & fED2K)           { data.ed2k = tokens.value(index++); }
-	if (fmask & fMD5)            { data.md5 = tokens.value(index++); }
-	if (fmask & fSHA1)           { data.sha1 = tokens.value(index++); }
-	if (fmask & fCRC32)          { data.crc = tokens.value(index++); }
-	if (fmask & fQUALITY)        { data.quality = tokens.value(index++); }
-	if (fmask & fSOURCE)         { data.source = tokens.value(index++); }
-	if (fmask & fCODEC_AUDIO)    { data.codec_audio = tokens.value(index++); }
-	if (fmask & fBITRATE_AUDIO)  { data.bitrate_audio = tokens.value(index++); }
-	if (fmask & fCODEC_VIDEO)    { data.codec_video = tokens.value(index++); }
-	if (fmask & fBITRATE_VIDEO)  { data.bitrate_video = tokens.value(index++); }
-	if (fmask & fRESOLUTION)     { data.resolution = tokens.value(index++); }
-	if (fmask & fFILETYPE)       { data.filetype = tokens.value(index++); }
-	if (fmask & fLANG_DUB)       { data.lang_dub = tokens.value(index++); }
-	if (fmask & fLANG_SUB)       { data.lang_sub = tokens.value(index++); }
-	if (fmask & fLENGTH)         { data.length = tokens.value(index++); }
-	if (fmask & fDESCRIPTION)    { data.description = tokens.value(index++); }
-	if (fmask & fAIRDATE)        { data.airdate = tokens.value(index++); }
-	// Note: bits 2-4 are reserved/unused
-	if (fmask & fFILENAME)       { data.filename = tokens.value(index++); }
-	
 	// FID is always returned first in FILE responses, regardless of mask
 	// It's not part of the fmask-controlled fields
 	data.fid = tokens.value(0);
+	
+	// Process fmask bits from MSB (bit 30) to LSB (bit 0) in strict order using a loop
+	// This ensures correctness even if individual if-statements are reordered
+	
+	// Define all mask bits in MSB to LSB order
+	struct MaskBit {
+		unsigned int bit;
+		QString* field;
+	};
+	
+	MaskBit maskBits[] = {
+		{fAID,            &data.aid},              // Bit 30
+		{fEID,            &data.eid},              // Bit 29
+		{fGID,            &data.gid},              // Bit 28
+		{fLID,            &data.lid},              // Bit 27
+		{fOTHEREPS,       &data.othereps},         // Bit 26
+		{fISDEPR,         &data.isdepr},           // Bit 25
+		{fSTATE,          &data.state},            // Bit 24
+		{fSIZE,           &data.size},             // Bit 23
+		{fED2K,           &data.ed2k},             // Bit 22
+		{fMD5,            &data.md5},              // Bit 21
+		{fSHA1,           &data.sha1},             // Bit 20
+		{fCRC32,          &data.crc},              // Bit 19
+		// Bits 18-16 reserved
+		{fQUALITY,        &data.quality},          // Bit 15
+		{fSOURCE,         &data.source},           // Bit 14
+		{fCODEC_AUDIO,    &data.codec_audio},      // Bit 13
+		{fBITRATE_AUDIO,  &data.bitrate_audio},    // Bit 12
+		{fCODEC_VIDEO,    &data.codec_video},      // Bit 11
+		{fBITRATE_VIDEO,  &data.bitrate_video},    // Bit 10
+		{fRESOLUTION,     &data.resolution},       // Bit 9
+		{fFILETYPE,       &data.filetype},         // Bit 8
+		{fLANG_DUB,       &data.lang_dub},         // Bit 7
+		{fLANG_SUB,       &data.lang_sub},         // Bit 6
+		{fLENGTH,         &data.length},           // Bit 5
+		{fDESCRIPTION,    &data.description},      // Bit 4
+		{fAIRDATE,        &data.airdate},          // Bit 3
+		// Bits 2-1 reserved
+		{fFILENAME,       &data.filename}          // Bit 0
+	};
+	
+	// Process mask bits in order using a loop
+	// This ensures fields are extracted in the correct sequence
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		if (fmask & maskBits[i].bit)
+		{
+			*(maskBits[i].field) = tokens.value(index++);
+		}
+	}
 	
 	return data;
 }
 
 /**
  * Parse anime data from FILE command response using file_amask.
+ * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which anime fields are present
@@ -2769,28 +2796,48 @@ AniDBApi::AnimeData AniDBApi::parseFileAmaskAnimeData(const QStringList& tokens,
 {
 	AnimeData data;
 	
-	// Process file_amask bits from MSB to LSB for anime data
-	if (amask & aEPISODE_TOTAL)      { data.eptotal = tokens.value(index++); }
-	if (amask & aEPISODE_LAST)       { data.eplast = tokens.value(index++); }
-	if (amask & aANIME_YEAR)         { data.year = tokens.value(index++); }
-	if (amask & aANIME_TYPE)         { data.type = tokens.value(index++); }
-	if (amask & aANIME_RELATED_LIST) { data.relaidlist = tokens.value(index++); }
-	if (amask & aANIME_RELATED_TYPE) { data.relaidtype = tokens.value(index++); }
-	if (amask & aANIME_CATAGORY)     { data.category = tokens.value(index++); }
-	// bit 24 is reserved
-	if (amask & aANIME_NAME_ROMAJI)  { data.nameromaji = tokens.value(index++); }
-	if (amask & aANIME_NAME_KANJI)   { data.namekanji = tokens.value(index++); }
-	if (amask & aANIME_NAME_ENGLISH) { data.nameenglish = tokens.value(index++); }
-	if (amask & aANIME_NAME_OTHER)   { data.nameother = tokens.value(index++); }
-	if (amask & aANIME_NAME_SHORT)   { data.nameshort = tokens.value(index++); }
-	if (amask & aANIME_SYNONYMS)     { data.synonyms = tokens.value(index++); }
-	// bits 16-14 are reserved
+	// Process file_amask bits from MSB to LSB for anime data using a loop
+	// This ensures correctness even if individual if-statements are reordered
+	
+	// Define all mask bits in MSB to LSB order
+	struct MaskBit {
+		unsigned int bit;
+		QString* field;
+	};
+	
+	MaskBit maskBits[] = {
+		{aEPISODE_TOTAL,      &data.eptotal},      // Bit 31
+		{aEPISODE_LAST,       &data.eplast},       // Bit 30
+		{aANIME_YEAR,         &data.year},         // Bit 29
+		{aANIME_TYPE,         &data.type},         // Bit 28
+		{aANIME_RELATED_LIST, &data.relaidlist},   // Bit 27
+		{aANIME_RELATED_TYPE, &data.relaidtype},   // Bit 26
+		{aANIME_CATAGORY,     &data.category},     // Bit 25
+		// Bit 24 reserved
+		{aANIME_NAME_ROMAJI,  &data.nameromaji},   // Bit 23
+		{aANIME_NAME_KANJI,   &data.namekanji},    // Bit 22
+		{aANIME_NAME_ENGLISH, &data.nameenglish},  // Bit 21
+		{aANIME_NAME_OTHER,   &data.nameother},    // Bit 20
+		{aANIME_NAME_SHORT,   &data.nameshort},    // Bit 19
+		{aANIME_SYNONYMS,     &data.synonyms}      // Bit 18
+		// Bits 17-14 reserved
+	};
+	
+	// Process mask bits in order using a loop
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		if (amask & maskBits[i].bit)
+		{
+			*(maskBits[i].field) = tokens.value(index++);
+		}
+	}
 	
 	return data;
 }
 
 /**
  * Parse episode data from FILE command response using file_amask.
+ * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which episode fields are present
@@ -2801,20 +2848,40 @@ AniDBApi::EpisodeData AniDBApi::parseFileAmaskEpisodeData(const QStringList& tok
 {
 	EpisodeData data;
 	
-	// Process file_amask bits for episode data
-	if (amask & aEPISODE_NUMBER)      { data.epno = tokens.value(index++); }
-	if (amask & aEPISODE_NAME)        { data.epname = tokens.value(index++); }
-	if (amask & aEPISODE_NAME_ROMAJI) { data.epnameromaji = tokens.value(index++); }
-	if (amask & aEPISODE_NAME_KANJI)  { data.epnamekanji = tokens.value(index++); }
-	if (amask & aEPISODE_RATING)      { data.eprating = tokens.value(index++); }
-	if (amask & aEPISODE_VOTE_COUNT)  { data.epvotecount = tokens.value(index++); }
-	// bits 9-8 are reserved
+	// Process file_amask bits for episode data using a loop
+	// This ensures correctness even if individual if-statements are reordered
+	
+	// Define all mask bits in MSB to LSB order
+	struct MaskBit {
+		unsigned int bit;
+		QString* field;
+	};
+	
+	MaskBit maskBits[] = {
+		{aEPISODE_NUMBER,      &data.epno},         // Bit 15
+		{aEPISODE_NAME,        &data.epname},       // Bit 14
+		{aEPISODE_NAME_ROMAJI, &data.epnameromaji}, // Bit 13
+		{aEPISODE_NAME_KANJI,  &data.epnamekanji},  // Bit 12
+		{aEPISODE_RATING,      &data.eprating},     // Bit 11
+		{aEPISODE_VOTE_COUNT,  &data.epvotecount}   // Bit 10
+		// Bits 9-8 reserved
+	};
+	
+	// Process mask bits in order using a loop
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		if (amask & maskBits[i].bit)
+		{
+			*(maskBits[i].field) = tokens.value(index++);
+		}
+	}
 	
 	return data;
 }
 
 /**
  * Parse group data from FILE command response using file_amask.
+ * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which group fields are present
@@ -2825,17 +2892,42 @@ AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens,
 {
 	GroupData data;
 	
-	// Process file_amask bits for group data
-	if (amask & aGROUP_NAME)       { data.groupname = tokens.value(index++); }
-	if (amask & aGROUP_NAME_SHORT) { data.groupshortname = tokens.value(index++); }
-	// bits 6-1 are reserved
-	if (amask & aDATE_AID_RECORD_UPDATED) { index++; } // Skip this field, we don't store it
+	// Process file_amask bits for group data using a loop
+	// This ensures correctness even if individual if-statements are reordered
+	
+	// Define all mask bits in MSB to LSB order
+	struct MaskBit {
+		unsigned int bit;
+		QString* field;
+	};
+	
+	MaskBit maskBits[] = {
+		{aGROUP_NAME,              &data.groupname},      // Bit 7
+		{aGROUP_NAME_SHORT,        &data.groupshortname}, // Bit 6
+		// Bits 5-1 reserved
+		{aDATE_AID_RECORD_UPDATED, nullptr}              // Bit 0 - Not stored
+	};
+	
+	// Process mask bits in order using a loop
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		if (amask & maskBits[i].bit)
+		{
+			QString value = tokens.value(index++);
+			if (maskBits[i].field != nullptr)
+			{
+				*(maskBits[i].field) = value;
+			}
+			// else: field is not stored (marked with nullptr)
+		}
+	}
 	
 	return data;
 }
 
 /**
  * Parse anime data from ANIME command response using anime_amask.
+ * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which anime fields are present
@@ -2847,33 +2939,70 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	AnimeData data;
 	
 	// Note: The ANIME command response order is determined by the amask bits
-	// Process from MSB to LSB (bit 31 to bit 0)
+	// Process from MSB to LSB (bit 31 to bit 0) in strict order using a loop
+	// This ensures correctness even if individual if-statements are reordered
 	
-	// Byte 3 (bits 31-24)
-	if (amask & ANIME_TOTAL_EPISODES)  { data.eptotal = tokens.value(index++); }
-	if (amask & ANIME_HIGHEST_EPISODE) { data.eplast = tokens.value(index++); }
-	if (amask & ANIME_YEAR)            { data.year = tokens.value(index++); }
-	if (amask & ANIME_TYPE)            { data.type = tokens.value(index++); }
-	if (amask & ANIME_RELATED_AID_LIST){ data.relaidlist = tokens.value(index++); }
-	if (amask & ANIME_RELATED_AID_TYPE){ data.relaidtype = tokens.value(index++); }
-	if (amask & ANIME_CATEGORY_LIST)   { data.category = tokens.value(index++); }
-	// bit 24 is reserved
+	// Define all mask bits in MSB to LSB order
+	struct MaskBit {
+		unsigned int bit;
+		QString* field;
+	};
 	
-	// Byte 2 (bits 23-16)
-	if (amask & ANIME_ROMAJI_NAME)     { data.nameromaji = tokens.value(index++); }
-	if (amask & ANIME_KANJI_NAME)      { data.namekanji = tokens.value(index++); }
-	if (amask & ANIME_ENGLISH_NAME)    { data.nameenglish = tokens.value(index++); }
-	if (amask & ANIME_OTHER_NAME)      { data.nameother = tokens.value(index++); }
-	if (amask & ANIME_SHORT_NAME_LIST) { data.nameshort = tokens.value(index++); }
-	if (amask & ANIME_SYNONYM_LIST)    { data.synonyms = tokens.value(index++); }
-	// bits 17-16 are reserved
+	MaskBit maskBits[] = {
+		// Byte 3 (bits 31-24)
+		{ANIME_TOTAL_EPISODES,  &data.eptotal},       // Bit 31
+		{ANIME_HIGHEST_EPISODE, &data.eplast},        // Bit 30
+		{ANIME_YEAR,            &data.year},          // Bit 29
+		{ANIME_TYPE,            &data.type},          // Bit 28
+		{ANIME_RELATED_AID_LIST,&data.relaidlist},    // Bit 27
+		{ANIME_RELATED_AID_TYPE,&data.relaidtype},    // Bit 26
+		{ANIME_CATEGORY_LIST,   &data.category},      // Bit 25
+		// Bit 24 is reserved
+		
+		// Byte 2 (bits 23-16)
+		{ANIME_ROMAJI_NAME,     &data.nameromaji},    // Bit 23
+		{ANIME_KANJI_NAME,      &data.namekanji},     // Bit 22
+		{ANIME_ENGLISH_NAME,    &data.nameenglish},   // Bit 21
+		{ANIME_OTHER_NAME,      &data.nameother},     // Bit 20
+		{ANIME_SHORT_NAME_LIST, &data.nameshort},     // Bit 19
+		{ANIME_SYNONYM_LIST,    &data.synonyms},      // Bit 18
+		// Bits 17-16 reserved
+		
+		// Byte 1 (bits 15-8) - episode counts and dates
+		// Note: These fields are mostly not returned by ANIME UDP API
+		// but we handle them in case API behavior changes
+		{ANIME_EPISODES,        nullptr},             // Bit 15 - Not stored (use eptotal)
+		{ANIME_SPECIAL_EP_COUNT,nullptr},             // Bit 14 - Not stored
+		{ANIME_AIR_DATE,        nullptr},             // Bit 13 - Not stored (use startdate)
+		{ANIME_END_DATE,        nullptr},             // Bit 12 - Not stored (use enddate)
+		{ANIME_PICNAME,         nullptr},             // Bit 11 - Not stored
+		{ANIME_NSFW,            nullptr},             // Bit 10 - Not stored
+		// Bits 9-8 reserved
+		
+		// Byte 0 (bits 7-0) - episode type counts
+		{ANIME_CHARACTERID_LIST,nullptr},             // Bit 7 - Not stored
+		{ANIME_SPECIALS_COUNT,  nullptr},             // Bit 6 - Not stored
+		{ANIME_CREDITS_COUNT,   nullptr},             // Bit 5 - Not stored
+		{ANIME_OTHER_COUNT,     nullptr},             // Bit 4 - Not stored
+		{ANIME_TRAILER_COUNT,   nullptr},             // Bit 3 - Not stored
+		{ANIME_PARODY_COUNT,    nullptr}              // Bit 2 - Not stored
+		// Bits 1-0 reserved
+	};
 	
-	// Byte 1 (bits 15-8) - mostly not returned by ANIME command API
-	// These fields are typically only available from FILE command or HTTP export
-	// bits 15-8 are not processed as API doesn't return them
-	
-	// Byte 0 (bits 7-0) - character/episode counts
-	// bits 7-0 are not processed as API doesn't return them
+	// Process mask bits in order using a loop
+	// This ensures fields are extracted in the correct sequence
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		if (amask & maskBits[i].bit)
+		{
+			QString value = tokens.value(index++);
+			if (maskBits[i].field != nullptr)
+			{
+				*(maskBits[i].field) = value;
+			}
+			// else: field is not stored (marked with nullptr)
+		}
+	}
 	
 	return data;
 }
