@@ -1503,27 +1503,18 @@ QString AniDBApi::buildAnimeCommand(int aid)
 {
 	// ANIME aid={int4 aid}&amask={hexstr amask}
 	// Request anime information for a specific anime ID
-	// Build amask using the anime_amask_codes enum for clarity
-	// Note: ANIME amask bits are numbered differently than FILE amask!
+	// Build amask using the anime_amask_codes enum
 	// 
-	// NOTE: The AniDB UDP API may not return all requested fields:
-	//   - ANIME_TOTAL_EPISODES (bit 31) - often not returned
-	//   - ANIME_HIGHEST_EPISODE (bit 30) - often not returned
-	//   - Bits 15-0 (Byte 1 and Byte 0) - may not be returned
-	// However, we request all defined fields as the API spec allows them.
-	// The parser handles missing fields gracefully by consuming empty values.
-	unsigned int amask = ANIME_TOTAL_EPISODES | ANIME_HIGHEST_EPISODE |
+	// ANIME command uses byte-oriented mask:
+	//   Byte 1 (bits 7-0): aid, dateflags, year, type, related lists
+	//   Byte 2 (bits 7-0): name variations (romaji, kanji, english, other, short, synonym)
+	// 
+	// We request all defined fields per API specification
+	unsigned int amask = ANIME_AID | ANIME_DATEFLAGS |
 						 ANIME_YEAR | ANIME_TYPE |
 						 ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
-						 ANIME_CATEGORY_LIST |
 						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
-						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
-						 ANIME_EPISODES | ANIME_SPECIAL_EP_COUNT |
-						 ANIME_AIR_DATE | ANIME_END_DATE |
-						 ANIME_PICNAME | ANIME_NSFW |
-						 ANIME_CHARACTERID_LIST |
-						 ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
-						 ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
+						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
 	
 	// Convert to hex string (no leading zeros for AniDB API)
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);
@@ -2974,10 +2965,11 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	AnimeData data;
 	
 	// Note: The ANIME command response order is determined by the amask bits
-	// Process from MSB to LSB (bit 31 to bit 0) in strict order using a loop
+	// Process from highest bit to lowest bit (MSB to LSB) in strict order
+	// Byte 1 bits 7-0, then Byte 2 bits 7-0, etc.
 	// This ensures correctness even if individual if-statements are reordered
 	
-	// Define all mask bits in MSB to LSB order
+	// Define all mask bits in MSB to LSB order (bit 7 of each byte first)
 	struct MaskBit {
 		unsigned int bit;
 		QString* field;
@@ -2985,44 +2977,23 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	};
 	
 	MaskBit maskBits[] = {
-		// Byte 3 (bits 31-24)
-		{ANIME_TOTAL_EPISODES,  &data.eptotal,       "TOTAL_EPISODES"},     // Bit 31
-		{ANIME_HIGHEST_EPISODE, &data.eplast,        "HIGHEST_EPISODE"},    // Bit 30
-		{ANIME_YEAR,            &data.year,          "YEAR"},               // Bit 29
-		{ANIME_TYPE,            &data.type,          "TYPE"},               // Bit 28
-		{ANIME_RELATED_AID_LIST,&data.relaidlist,    "RELATED_AID_LIST"},   // Bit 27
-		{ANIME_RELATED_AID_TYPE,&data.relaidtype,    "RELATED_AID_TYPE"},   // Bit 26
-		{ANIME_CATEGORY_LIST,   &data.category,      "CATEGORY_LIST"},      // Bit 25
-		// Bit 24 is reserved
+		// Byte 1 (bits 7-0) - basic anime info
+		{ANIME_AID,             &data.aid,           "AID"},                // Byte 1, bit 7 (dec 128)
+		{ANIME_DATEFLAGS,       nullptr,             "DATEFLAGS"},          // Byte 1, bit 6 (dec 64) - Not stored
+		{ANIME_YEAR,            &data.year,          "YEAR"},               // Byte 1, bit 5 (dec 32)
+		{ANIME_TYPE,            &data.type,          "TYPE"},               // Byte 1, bit 4 (dec 16)
+		{ANIME_RELATED_AID_LIST,&data.relaidlist,    "RELATED_AID_LIST"},   // Byte 1, bit 3 (dec 8)
+		{ANIME_RELATED_AID_TYPE,&data.relaidtype,    "RELATED_AID_TYPE"},   // Byte 1, bit 2 (dec 4)
+		// Byte 1, bits 1-0 are retired
 		
-		// Byte 2 (bits 23-16)
-		{ANIME_ROMAJI_NAME,     &data.nameromaji,    "ROMAJI_NAME"},        // Bit 23
-		{ANIME_KANJI_NAME,      &data.namekanji,     "KANJI_NAME"},         // Bit 22
-		{ANIME_ENGLISH_NAME,    &data.nameenglish,   "ENGLISH_NAME"},       // Bit 21
-		{ANIME_OTHER_NAME,      &data.nameother,     "OTHER_NAME"},         // Bit 20
-		{ANIME_SHORT_NAME_LIST, &data.nameshort,     "SHORT_NAME_LIST"},    // Bit 19
-		{ANIME_SYNONYM_LIST,    &data.synonyms,      "SYNONYM_LIST"},       // Bit 18
-		// Bits 17-16 reserved
-		
-		// Byte 1 (bits 15-8) - episode counts and dates
-		// Note: These fields are mostly not returned by ANIME UDP API
-		// but we handle them in case API behavior changes
-		{ANIME_EPISODES,        nullptr,             "EPISODES"},           // Bit 15 - Not stored
-		{ANIME_SPECIAL_EP_COUNT,nullptr,             "SPECIAL_EP_COUNT"},   // Bit 14 - Not stored
-		{ANIME_AIR_DATE,        nullptr,             "AIR_DATE"},           // Bit 13 - Not stored
-		{ANIME_END_DATE,        nullptr,             "END_DATE"},           // Bit 12 - Not stored
-		{ANIME_PICNAME,         nullptr,             "PICNAME"},            // Bit 11 - Not stored
-		{ANIME_NSFW,            nullptr,             "NSFW"},               // Bit 10 - Not stored
-		// Bits 9-8 reserved
-		
-		// Byte 0 (bits 7-0) - episode type counts
-		{ANIME_CHARACTERID_LIST,nullptr,             "CHARACTERID_LIST"},   // Bit 7 - Not stored
-		{ANIME_SPECIALS_COUNT,  nullptr,             "SPECIALS_COUNT"},     // Bit 6 - Not stored
-		{ANIME_CREDITS_COUNT,   nullptr,             "CREDITS_COUNT"},      // Bit 5 - Not stored
-		{ANIME_OTHER_COUNT,     nullptr,             "OTHER_COUNT"},        // Bit 4 - Not stored
-		{ANIME_TRAILER_COUNT,   nullptr,             "TRAILER_COUNT"},      // Bit 3 - Not stored
-		{ANIME_PARODY_COUNT,    nullptr,             "PARODY_COUNT"}        // Bit 2 - Not stored
-		// Bits 1-0 reserved
+		// Byte 2 (bits 7-0) - name variations
+		{ANIME_ROMAJI_NAME,     &data.nameromaji,    "ROMAJI_NAME"},        // Byte 2, bit 7 (dec 128)
+		{ANIME_KANJI_NAME,      &data.namekanji,     "KANJI_NAME"},         // Byte 2, bit 6 (dec 64)
+		{ANIME_ENGLISH_NAME,    &data.nameenglish,   "ENGLISH_NAME"},       // Byte 2, bit 5 (dec 32)
+		{ANIME_OTHER_NAME,      &data.nameother,     "OTHER_NAME"},         // Byte 2, bit 4 (dec 16)
+		{ANIME_SHORT_NAME_LIST, &data.nameshort,     "SHORT_NAME_LIST"},    // Byte 2, bit 3 (dec 8)
+		{ANIME_SYNONYM_LIST,    &data.synonyms,      "SYNONYM_LIST"}        // Byte 2, bit 2 (dec 4)
+		// Byte 2, bits 1-0 are retired
 	};
 	
 	// Process mask bits in order using a loop
