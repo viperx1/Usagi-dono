@@ -650,6 +650,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(query.exec(q) && query.next())
 		{
 			QString animeCmd = query.value(0).toString();
+			Logger::log("[AniDB Response] 230 ANIME command: " + animeCmd, __FILE__, __LINE__);
 			if(!extractMasksFromCommand(animeCmd, fmask, amask))
 			{
 				LOG("Failed to extract amask from ANIME command for Tag: " + Tag);
@@ -658,6 +659,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
 						ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
 			}
+			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + QString::number(amask, 16), __FILE__, __LINE__);
 		}
 		else
 		{
@@ -666,6 +668,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			amask = ANIME_TOTAL_EPISODES | ANIME_YEAR | ANIME_TYPE |
 					ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
 					ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
+			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + QString::number(amask, 16), __FILE__, __LINE__);
 		}
 		
 		// Parse response using mask-aware parsing
@@ -678,15 +681,23 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Logger::log("[AniDB Response] 230 ANIME raw data: " + responseData, __FILE__, __LINE__);
 		Logger::log("[AniDB Response] 230 ANIME field count: " + QString::number(token2.size()), __FILE__, __LINE__);
 		
+		// Log first few fields for debugging
+		for(int i = 0; i < qMin(10, token2.size()); i++)
+		{
+			Logger::log("[AniDB Response] 230 ANIME token[" + QString::number(i) + "]: '" + token2.at(i) + "'", __FILE__, __LINE__);
+		}
+		
 		if(token2.size() >= 1)
 		{
 			QString aid = token2.at(0);  // AID is always first
 			int index = 1;  // Start parsing after AID
+			int startIndex = index;
 			
 			// Parse anime data using amask
 			AnimeData animeData = parseAnimeMask(token2, amask, index);
 			animeData.aid = aid;  // Ensure aid is set
 			
+			Logger::log("[AniDB Response] 230 ANIME parsed " + QString::number(index - startIndex) + " fields (index: " + QString::number(startIndex) + " -> " + QString::number(index) + ")", __FILE__, __LINE__);
 			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + animeData.year + "' Type: '" + animeData.type + "'", __FILE__, __LINE__);
 			
 			// NOTE: ANIME UDP API does not return certain fields even when requested:
@@ -1574,11 +1585,12 @@ int AniDBApi::Recv()
 	while(Socket->hasPendingDatagrams())
 	{
 		data.resize(Socket->pendingDatagramSize());
-		Socket->readDatagram(data.data(), data.size());
+		qint64 bytesRead = Socket->readDatagram(data.data(), data.size());
 //		result = codec->toUnicode(data);
 //		result.toUtf8();
         result = QString::fromUtf8(data.data());
 		LOG("AniDBApi: Recv: " + result);
+		Logger::log(QString("[AniDB Recv] Datagram size: %1 bytes, Read: %2 bytes, Result length: %3 chars").arg(data.size()).arg(bytesRead).arg(result.length()), __FILE__, __LINE__);
     }
 	if(result.length() > 0)
 	{
@@ -2946,46 +2958,47 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	struct MaskBit {
 		unsigned int bit;
 		QString* field;
+		const char* name;  // For debug logging
 	};
 	
 	MaskBit maskBits[] = {
 		// Byte 3 (bits 31-24)
-		{ANIME_TOTAL_EPISODES,  &data.eptotal},       // Bit 31
-		{ANIME_HIGHEST_EPISODE, &data.eplast},        // Bit 30
-		{ANIME_YEAR,            &data.year},          // Bit 29
-		{ANIME_TYPE,            &data.type},          // Bit 28
-		{ANIME_RELATED_AID_LIST,&data.relaidlist},    // Bit 27
-		{ANIME_RELATED_AID_TYPE,&data.relaidtype},    // Bit 26
-		{ANIME_CATEGORY_LIST,   &data.category},      // Bit 25
+		{ANIME_TOTAL_EPISODES,  &data.eptotal,       "TOTAL_EPISODES"},     // Bit 31
+		{ANIME_HIGHEST_EPISODE, &data.eplast,        "HIGHEST_EPISODE"},    // Bit 30
+		{ANIME_YEAR,            &data.year,          "YEAR"},               // Bit 29
+		{ANIME_TYPE,            &data.type,          "TYPE"},               // Bit 28
+		{ANIME_RELATED_AID_LIST,&data.relaidlist,    "RELATED_AID_LIST"},   // Bit 27
+		{ANIME_RELATED_AID_TYPE,&data.relaidtype,    "RELATED_AID_TYPE"},   // Bit 26
+		{ANIME_CATEGORY_LIST,   &data.category,      "CATEGORY_LIST"},      // Bit 25
 		// Bit 24 is reserved
 		
 		// Byte 2 (bits 23-16)
-		{ANIME_ROMAJI_NAME,     &data.nameromaji},    // Bit 23
-		{ANIME_KANJI_NAME,      &data.namekanji},     // Bit 22
-		{ANIME_ENGLISH_NAME,    &data.nameenglish},   // Bit 21
-		{ANIME_OTHER_NAME,      &data.nameother},     // Bit 20
-		{ANIME_SHORT_NAME_LIST, &data.nameshort},     // Bit 19
-		{ANIME_SYNONYM_LIST,    &data.synonyms},      // Bit 18
+		{ANIME_ROMAJI_NAME,     &data.nameromaji,    "ROMAJI_NAME"},        // Bit 23
+		{ANIME_KANJI_NAME,      &data.namekanji,     "KANJI_NAME"},         // Bit 22
+		{ANIME_ENGLISH_NAME,    &data.nameenglish,   "ENGLISH_NAME"},       // Bit 21
+		{ANIME_OTHER_NAME,      &data.nameother,     "OTHER_NAME"},         // Bit 20
+		{ANIME_SHORT_NAME_LIST, &data.nameshort,     "SHORT_NAME_LIST"},    // Bit 19
+		{ANIME_SYNONYM_LIST,    &data.synonyms,      "SYNONYM_LIST"},       // Bit 18
 		// Bits 17-16 reserved
 		
 		// Byte 1 (bits 15-8) - episode counts and dates
 		// Note: These fields are mostly not returned by ANIME UDP API
 		// but we handle them in case API behavior changes
-		{ANIME_EPISODES,        nullptr},             // Bit 15 - Not stored (use eptotal)
-		{ANIME_SPECIAL_EP_COUNT,nullptr},             // Bit 14 - Not stored
-		{ANIME_AIR_DATE,        nullptr},             // Bit 13 - Not stored (use startdate)
-		{ANIME_END_DATE,        nullptr},             // Bit 12 - Not stored (use enddate)
-		{ANIME_PICNAME,         nullptr},             // Bit 11 - Not stored
-		{ANIME_NSFW,            nullptr},             // Bit 10 - Not stored
+		{ANIME_EPISODES,        nullptr,             "EPISODES"},           // Bit 15 - Not stored
+		{ANIME_SPECIAL_EP_COUNT,nullptr,             "SPECIAL_EP_COUNT"},   // Bit 14 - Not stored
+		{ANIME_AIR_DATE,        nullptr,             "AIR_DATE"},           // Bit 13 - Not stored
+		{ANIME_END_DATE,        nullptr,             "END_DATE"},           // Bit 12 - Not stored
+		{ANIME_PICNAME,         nullptr,             "PICNAME"},            // Bit 11 - Not stored
+		{ANIME_NSFW,            nullptr,             "NSFW"},               // Bit 10 - Not stored
 		// Bits 9-8 reserved
 		
 		// Byte 0 (bits 7-0) - episode type counts
-		{ANIME_CHARACTERID_LIST,nullptr},             // Bit 7 - Not stored
-		{ANIME_SPECIALS_COUNT,  nullptr},             // Bit 6 - Not stored
-		{ANIME_CREDITS_COUNT,   nullptr},             // Bit 5 - Not stored
-		{ANIME_OTHER_COUNT,     nullptr},             // Bit 4 - Not stored
-		{ANIME_TRAILER_COUNT,   nullptr},             // Bit 3 - Not stored
-		{ANIME_PARODY_COUNT,    nullptr}              // Bit 2 - Not stored
+		{ANIME_CHARACTERID_LIST,nullptr,             "CHARACTERID_LIST"},   // Bit 7 - Not stored
+		{ANIME_SPECIALS_COUNT,  nullptr,             "SPECIALS_COUNT"},     // Bit 6 - Not stored
+		{ANIME_CREDITS_COUNT,   nullptr,             "CREDITS_COUNT"},      // Bit 5 - Not stored
+		{ANIME_OTHER_COUNT,     nullptr,             "OTHER_COUNT"},        // Bit 4 - Not stored
+		{ANIME_TRAILER_COUNT,   nullptr,             "TRAILER_COUNT"},      // Bit 3 - Not stored
+		{ANIME_PARODY_COUNT,    nullptr,             "PARODY_COUNT"}        // Bit 2 - Not stored
 		// Bits 1-0 reserved
 	};
 	
@@ -2995,7 +3008,13 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	{
 		if (amask & maskBits[i].bit)
 		{
-			QString value = tokens.value(index++);
+			QString value = tokens.value(index);
+			Logger::log(QString("[AniDB parseAnimeMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
+				.arg(maskBits[i].name)
+				.arg(maskBits[i].bit, 0, 16)
+				.arg(index)
+				.arg(value), __FILE__, __LINE__);
+			index++;
 			if (maskBits[i].field != nullptr)
 			{
 				*(maskBits[i].field) = value;
