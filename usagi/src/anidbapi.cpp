@@ -688,9 +688,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	}
 	else if(ReplyID == "230"){ // 230 ANIME
 		// Response format based on ACTUAL API behavior (not all amask fields are returned):
-		// Field order: aid|total_eps|year|type|romaji|kanji|english|other|short|synonyms
+		// Field order: aid|year|type|romaji|kanji|english|other|short|synonyms
 		// NOTE: The AniDB UDP API does NOT return the following fields even when requested:
-		//   - highest_ep (bit 30) - omitted by API
+		//   - total_episodes (bit 31) - not returned
+		//   - highest_ep (bit 30) - not returned
 		//   - episodes (bit 15) - not returned
 		//   - special_count (bit 14) - not returned  
 		//   - airdate (bit 13) - not returned
@@ -712,28 +713,26 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(token2.size() >= 1)
 		{
 			QString aid = token2.at(0);
-			// Field order based on actual API response (after removing unsupported fields from amask):
+			// Field order based on ACTUAL API response:
 			// 0: aid
-			// 1: total_episodes (bit 31)
-			// 2: year (bit 29) - NOTE: highest_episode (bit 30) is NOT returned by API
-			// 3: type (bit 28) - returned as STRING (e.g. "TV Series") not numeric code!
-			// 4: romaji name (bit 23)
-			// 5: kanji name (bit 22)
-			// 6: english name (bit 21)
-			// 7: other name (bit 20)
-			// 8: short name list (bit 19)
-			// 9: synonym list (bit 18)
-			// NOTE: episodes, special_count, airdate, enddate are NOT returned by ANIME UDP API
-			// These should be obtained from mylist HTTP export instead.
-			QString total_eps = token2.size() > 1 ? token2.at(1) : "";
-			QString year = token2.size() > 2 ? token2.at(2) : "";
-			QString type = token2.size() > 3 ? token2.at(3) : "";  // String, not numeric!
-			QString nameromaji = token2.size() > 4 ? token2.at(4) : "";
-			QString namekanji = token2.size() > 5 ? token2.at(5) : "";
-			QString nameenglish = token2.size() > 6 ? token2.at(6) : "";
-			QString nameother = token2.size() > 7 ? token2.at(7) : "";
-			QString nameshort = token2.size() > 8 ? token2.at(8) : "";
-			QString synonyms = token2.size() > 9 ? token2.at(9) : "";
+			// 1: year (bit 29) - NOTE: total_episodes (bit 31) and highest_episode (bit 30) are NOT returned by API
+			// 2: type (bit 28) - returned as STRING (e.g. "TV Series") not numeric code!
+			// 3: romaji name (bit 23)
+			// 4: kanji name (bit 22)
+			// 5: english name (bit 21)
+			// 6: other name (bit 20)
+			// 7: short name list (bit 19)
+			// 8: synonym list (bit 18)
+			// NOTE: total_episodes, highest_episode, episodes, special_count, airdate, enddate are NOT returned by ANIME UDP API
+			// These should be obtained from mylist HTTP export or FILE command instead.
+			QString year = token2.size() > 1 ? token2.at(1) : "";
+			QString type = token2.size() > 2 ? token2.at(2) : "";  // String, not numeric!
+			QString nameromaji = token2.size() > 3 ? token2.at(3) : "";
+			QString namekanji = token2.size() > 4 ? token2.at(4) : "";
+			QString nameenglish = token2.size() > 5 ? token2.at(5) : "";
+			QString nameother = token2.size() > 6 ? token2.at(6) : "";
+			QString nameshort = token2.size() > 7 ? token2.at(7) : "";
+			QString synonyms = token2.size() > 8 ? token2.at(8) : "";
 			
 			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + year + "' Type: '" + type + "'", __FILE__, __LINE__);
 			
@@ -1522,12 +1521,15 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	// Note: ANIME amask bits are numbered differently than FILE amask!
 	// 
 	// NOTE: The AniDB UDP API does NOT return the following fields even when requested:
-	//   - ANIME_HIGHEST_EPISODE (bit 30) - appears to be skipped/omitted
+	//   - ANIME_TOTAL_EPISODES (bit 31) - not returned
+	//   - ANIME_HIGHEST_EPISODE (bit 30) - not returned
 	//   - ANIME_EPISODES (bit 15) - not returned
 	//   - ANIME_SPECIAL_EP_COUNT (bit 14) - not returned
 	//   - ANIME_AIR_DATE (bit 13) - not returned
 	//   - ANIME_END_DATE (bit 12) - not returned
-	// These fields should be obtained from mylist HTTP export instead.
+	// These fields should be obtained from mylist HTTP export or FILE command instead.
+	// We still include ANIME_TOTAL_EPISODES in the amask even though it's not returned,
+	// in case the API behavior changes in the future.
 	unsigned int amask = ANIME_TOTAL_EPISODES |
 						 ANIME_YEAR | ANIME_TYPE |
 						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
