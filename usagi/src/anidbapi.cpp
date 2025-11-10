@@ -654,8 +654,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			if(!extractMasksFromCommand(animeCmd, fmask, amask))
 			{
 				LOG("Failed to extract amask from ANIME command for Tag: " + Tag);
-				// Fall back to default amask
-				amask = ANIME_TOTAL_EPISODES | ANIME_YEAR | ANIME_TYPE |
+				// Fall back to default amask (only fields actually returned by API)
+				amask = ANIME_YEAR | ANIME_TYPE |
+						ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE | ANIME_CATEGORY_LIST |
 						ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
 						ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
 			}
@@ -664,14 +665,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		else
 		{
 			LOG("Could not find packet for Tag: " + Tag);
-			// Use default amask
-			amask = ANIME_TOTAL_EPISODES | ANIME_YEAR | ANIME_TYPE |
+			// Use default amask (only fields actually returned by API)
+			amask = ANIME_YEAR | ANIME_TYPE |
+					ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE | ANIME_CATEGORY_LIST |
 					ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
 					ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
 			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + QString::number(amask, 16), __FILE__, __LINE__);
 		}
 		
 		// Parse response using mask-aware parsing
+		// NOTE: UDP responses are limited to ~1400 bytes. Long anime titles may be truncated.
+		// The AniDB API returns fields in mask bit order (MSB to LSB).
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		QString responseData = token2.first();
@@ -693,6 +697,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			int index = 1;  // Start parsing after AID
 			int startIndex = index;
 			
+			// Check if response might be truncated (UDP 1400 byte limit)
+			if(responseData.length() >= 1350)
+			{
+				Logger::log("[AniDB Response] 230 ANIME WARNING: Response near UDP size limit (" + 
+					QString::number(responseData.length()) + " chars), may be truncated", __FILE__, __LINE__);
+			}
+			
 			// Parse anime data using amask
 			AnimeData animeData = parseAnimeMask(token2, amask, index);
 			animeData.aid = aid;  // Ensure aid is set
@@ -700,9 +711,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Logger::log("[AniDB Response] 230 ANIME parsed " + QString::number(index - startIndex) + " fields (index: " + QString::number(startIndex) + " -> " + QString::number(index) + ")", __FILE__, __LINE__);
 			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + animeData.year + "' Type: '" + animeData.type + "'", __FILE__, __LINE__);
 			
-			// NOTE: ANIME UDP API does not return certain fields even when requested:
-			//   - total_episodes, highest_episode, episodes, special_count, airdate, enddate
-			// These should be obtained from mylist HTTP export or FILE command instead.
+			// NOTE: UDP responses are limited to ~1400 bytes
+			// Long anime titles can be truncated. The last field in a truncated response
+			// will be incomplete. This is a known limitation of the AniDB UDP API.
+			// Alternative: Use HTTP API or mylist export for complete data.
 			
 			// For ANIME command, we only update typename since other fields may not be returned
 			// The type field is returned as a string (e.g., "TV Series") by the API
@@ -1480,29 +1492,25 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	// Build amask using the anime_amask_codes enum for clarity
 	// Note: ANIME amask bits are numbered differently than FILE amask!
 	// 
-	// NOTE: The AniDB UDP API does NOT return the following fields even when requested:
-	//   - ANIME_TOTAL_EPISODES (bit 31) - not returned
-	//   - ANIME_HIGHEST_EPISODE (bit 30) - not returned
-	//   - ANIME_EPISODES (bit 15) - not returned
-	//   - ANIME_SPECIAL_EP_COUNT (bit 14) - not returned
-	//   - ANIME_AIR_DATE (bit 13) - not returned
-	//   - ANIME_END_DATE (bit 12) - not returned
-	// These fields should be obtained from mylist HTTP export or FILE command instead.
-	// We request all available fields to ensure complete parsing even if API behavior changes.
-	unsigned int amask = ANIME_TOTAL_EPISODES | ANIME_HIGHEST_EPISODE |
-						 ANIME_YEAR | ANIME_TYPE |
+	// CRITICAL: The AniDB UDP API does NOT return the following fields even when requested:
+	//   - ANIME_TOTAL_EPISODES (bit 31) - not returned by ANIME command (use FILE command instead)
+	//   - ANIME_HIGHEST_EPISODE (bit 30) - not returned by ANIME command
+	//   - All bits 15-0 (Byte 1 and Byte 0) - NEVER returned by ANIME UDP API
+	// 
+	// Only request fields that are actually returned (bits 29-25, 23-18):
+	// - Bits 29-28: Year, Type
+	// - Bits 27-25: Related lists, category
+	// - Bits 23-18: All name variations (romaji, kanji, english, other, short, synonyms)
+	// 
+	// DO NOT request bits 31, 30, 24, or 15-0 as they cause field offset mismatches
+	unsigned int amask = ANIME_YEAR | ANIME_TYPE |
 						 ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
 						 ANIME_CATEGORY_LIST |
 						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
-						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
-						 ANIME_EPISODES | ANIME_SPECIAL_EP_COUNT |
-						 ANIME_AIR_DATE | ANIME_END_DATE |
-						 ANIME_PICNAME | ANIME_NSFW |
-						 ANIME_CHARACTERID_LIST |
-						 ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
-						 ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
+						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
 	
 	// Convert to hex string (no leading zeros for AniDB API)
+	// Expected mask value: 0x3efcfc00 (only bits 29-25, 23-18)
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);
 }
 
