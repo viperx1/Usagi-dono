@@ -687,9 +687,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Logger::log("[AniDB Response] 223 WISHLIST - Tag: " + Tag + " Data: " + token2.first(), __FILE__, __LINE__);
 	}
 	else if(ReplyID == "230"){ // 230 ANIME
-		// Response format based on amask built from anime_amask_codes enum:
-		// Field order matches bit order (high to low):
-		// aid|total_eps|highest_ep|year|type|romaji|kanji|english|other|short|synonyms|episodes|special_count|airdate|enddate
+		// Response format based on ACTUAL API behavior (not all amask fields are returned):
+		// Field order: aid|year|type|romaji|kanji|english|other|short|synonyms
+		// NOTE: The AniDB UDP API does NOT return the following fields even when requested:
+		//   - total_episodes (bit 31) - not returned
+		//   - highest_ep (bit 30) - not returned
+		//   - episodes (bit 15) - not returned
+		//   - special_count (bit 14) - not returned  
+		//   - airdate (bit 13) - not returned
+		//   - enddate (bit 12) - not returned
+		// Also NOTE: type is returned as a STRING (e.g., "TV Series") not a numeric code.
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		QString responseData = token2.first();
@@ -706,82 +713,44 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(token2.size() >= 1)
 		{
 			QString aid = token2.at(0);
-			// Field order with corrected amask:
+			// Field order based on ACTUAL API response:
 			// 0: aid
-			// 1: total_episodes (bit 31)
-			// 2: highest_episode (bit 30)
-			// 3: year (bit 29)
-			// 4: type (bit 28)
-			// 5: romaji name (bit 23)
-			// 6: kanji name (bit 22)
-			// 7: english name (bit 21)
-			// 8: other name (bit 20)
-			// 9: short name list (bit 19)
-			// 10: synonym list (bit 18)
-			// 11: episodes (bit 15)
-			// 12: special_ep_count (bit 14)
-			// 13: air date (bit 13)
-			// 14: end date (bit 12)
-			QString total_eps = token2.size() > 1 ? token2.at(1) : "";
-			QString highest_ep = token2.size() > 2 ? token2.at(2) : "";
-			QString year = token2.size() > 3 ? token2.at(3) : "";
-			QString type = token2.size() > 4 ? token2.at(4) : "";
-			QString nameromaji = token2.size() > 5 ? token2.at(5) : "";
-			QString namekanji = token2.size() > 6 ? token2.at(6) : "";
-			QString nameenglish = token2.size() > 7 ? token2.at(7) : "";
-			QString nameother = token2.size() > 8 ? token2.at(8) : "";
-			QString nameshort = token2.size() > 9 ? token2.at(9) : "";
-			QString synonyms = token2.size() > 10 ? token2.at(10) : "";
-			QString episodes = token2.size() > 11 ? token2.at(11) : "";
-			QString special_count = token2.size() > 12 ? token2.at(12) : "";
-			QString airdate = token2.size() > 13 ? token2.at(13) : "";
-			QString enddate = token2.size() > 14 ? token2.at(14) : "";
+			// 1: year (bit 29) - NOTE: total_episodes (bit 31) and highest_episode (bit 30) are NOT returned by API
+			// 2: type (bit 28) - returned as STRING (e.g. "TV Series") not numeric code!
+			// 3: romaji name (bit 23)
+			// 4: kanji name (bit 22)
+			// 5: english name (bit 21)
+			// 6: other name (bit 20)
+			// 7: short name list (bit 19)
+			// 8: synonym list (bit 18)
+			// NOTE: total_episodes, highest_episode, episodes, special_count, airdate, enddate are NOT returned by ANIME UDP API
+			// These should be obtained from mylist HTTP export or FILE command instead.
+			QString year = token2.size() > 1 ? token2.at(1) : "";
+			QString type = token2.size() > 2 ? token2.at(2) : "";  // String, not numeric!
+			QString nameromaji = token2.size() > 3 ? token2.at(3) : "";
+			QString namekanji = token2.size() > 4 ? token2.at(4) : "";
+			QString nameenglish = token2.size() > 5 ? token2.at(5) : "";
+			QString nameother = token2.size() > 6 ? token2.at(6) : "";
+			QString nameshort = token2.size() > 7 ? token2.at(7) : "";
+			QString synonyms = token2.size() > 8 ? token2.at(8) : "";
 			
-			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + year + "' Type: '" + type + "' AirDate: '" + airdate + "' EndDate: '" + enddate + "'", __FILE__, __LINE__);
+			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + year + "' Type: '" + type + "'", __FILE__, __LINE__);
 			
-			// Convert type code to typename string
-			QString typenameStr;
-			if(type == "1") typenameStr = "TV Series";
-			else if(type == "2") typenameStr = "OVA";
-			else if(type == "3") typenameStr = "Movie";
-			else if(type == "4") typenameStr = "Other";
-			else if(type == "5") typenameStr = "Web";
-			else if(type == "6") typenameStr = "TV Special";
+			// Type is already a string (e.g., "TV Series") in the API response
+			// Use it directly as typename
+			QString typenameStr = type;
 			
-			// Convert Unix timestamps to ISO 8601 date format (YYYY-MM-DDZ)
-			// The mylist tree widget expects dates in this format, not Unix timestamps
-			QString startdateFormatted;
-			QString enddateFormatted;
-			if(!airdate.isEmpty())
-			{
-				bool ok;
-				qint64 timestamp = airdate.toLongLong(&ok);
-				if(ok && timestamp > 0)
-				{
-					QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
-					startdateFormatted = dt.toString("yyyy-MM-dd") + "Z";
-				}
-			}
-			if(!enddate.isEmpty())
-			{
-				bool ok;
-				qint64 timestamp = enddate.toLongLong(&ok);
-				if(ok && timestamp > 0)
-				{
-					QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
-					enddateFormatted = dt.toString("yyyy-MM-dd") + "Z";
-				}
-			}
+			// NOTE: ANIME UDP API does not return airdate/enddate fields
+			// These dates should be populated from mylist HTTP export which has StartDate/EndDate
+			// For now, we only update typename from the ANIME command
 			
-			// Update anime table with metadata (typename, startdate, enddate)
-			// Only update these specific fields, don't overwrite other data
+			// Update anime table with metadata (typename only)
+			// startdate and enddate should come from mylist export
 			if(!aid.isEmpty())
 			{
 				QSqlQuery query(db);
-				query.prepare("UPDATE `anime` SET `typename` = ?, `startdate` = ?, `enddate` = ? WHERE `aid` = ?");
+				query.prepare("UPDATE `anime` SET `typename` = ? WHERE `aid` = ?");
 				query.addBindValue(typenameStr.isEmpty() ? QVariant() : typenameStr);
-				query.addBindValue(startdateFormatted.isEmpty() ? QVariant() : startdateFormatted);
-				query.addBindValue(enddateFormatted.isEmpty() ? QVariant() : enddateFormatted);
 				query.addBindValue(aid.toInt());
 				
 				if(!query.exec())
@@ -790,7 +759,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				}
 				else
 				{
-					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typenameStr + " AirDate: " + airdate + " EndDate: " + enddate, __FILE__, __LINE__);
+					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + typenameStr, __FILE__, __LINE__);
 					// Emit signal to notify UI that anime data was updated
 					emit notifyAnimeUpdated(aid.toInt());
 				}
@@ -1550,12 +1519,21 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	// Request anime information for a specific anime ID
 	// Build amask using the anime_amask_codes enum for clarity
 	// Note: ANIME amask bits are numbered differently than FILE amask!
-	unsigned int amask = ANIME_TOTAL_EPISODES | ANIME_HIGHEST_EPISODE |
+	// 
+	// NOTE: The AniDB UDP API does NOT return the following fields even when requested:
+	//   - ANIME_TOTAL_EPISODES (bit 31) - not returned
+	//   - ANIME_HIGHEST_EPISODE (bit 30) - not returned
+	//   - ANIME_EPISODES (bit 15) - not returned
+	//   - ANIME_SPECIAL_EP_COUNT (bit 14) - not returned
+	//   - ANIME_AIR_DATE (bit 13) - not returned
+	//   - ANIME_END_DATE (bit 12) - not returned
+	// These fields should be obtained from mylist HTTP export or FILE command instead.
+	// We still include ANIME_TOTAL_EPISODES in the amask even though it's not returned,
+	// in case the API behavior changes in the future.
+	unsigned int amask = ANIME_TOTAL_EPISODES |
 						 ANIME_YEAR | ANIME_TYPE |
 						 ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
-						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
-						 ANIME_EPISODES | ANIME_SPECIAL_EP_COUNT |
-						 ANIME_AIR_DATE | ANIME_END_DATE;
+						 ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST;
 	
 	// Convert to hex string (no leading zeros for AniDB API)
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);

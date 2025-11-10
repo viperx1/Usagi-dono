@@ -1172,8 +1172,8 @@ void Window::startupInitialization()
     
     // DEBUG: Print database info for specific lid values as requested in issue
     LOG("DEBUG: Printing database information for requested lid values...");
-    debugPrintDatabaseInfoForLid(424374769);
-    debugPrintDatabaseInfoForLid(424184693);
+//    debugPrintDatabaseInfoForLid(424374769);
+//    debugPrintDatabaseInfoForLid(424184693);
     LOG("DEBUG: Finished printing database information for requested lid values");
     
     mylistStatusLabel->setText("MyList Status: Loading from database...");
