@@ -195,6 +195,43 @@ private:
 		// bits 1-0 reserved
 	};
 
+	// Data structures for parsed responses
+	struct FileData {
+		QString fid, aid, eid, gid, lid;
+		QString othereps, isdepr, state, size, ed2k, md5, sha1, crc;
+		QString quality, source, codec_audio, bitrate_audio;
+		QString codec_video, bitrate_video, resolution, filetype;
+		QString lang_dub, lang_sub, length, description, airdate, filename;
+	};
+	
+	struct AnimeData {
+		QString aid, eptotal, eplast, year, type;
+		QString relaidlist, relaidtype, category;
+		QString nameromaji, namekanji, nameenglish, nameother, nameshort, synonyms;
+	};
+	
+	struct EpisodeData {
+		QString eid, epno, epname, epnameromaji, epnamekanji, eprating, epvotecount;
+	};
+	
+	struct GroupData {
+		QString gid, groupname, groupshortname;
+	};
+
+	// Helper methods for mask processing
+	FileData parseFileMask(const QStringList& tokens, unsigned int fmask, int& index);
+	AnimeData parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index);
+	EpisodeData parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index);
+	GroupData parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
+	AnimeData parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index);
+	
+	void storeFileData(const FileData& data);
+	void storeAnimeData(const AnimeData& data);
+	void storeEpisodeData(const EpisodeData& data);
+	void storeGroupData(const GroupData& data);
+	
+	bool extractMasksFromCommand(const QString& command, unsigned int& fmask, unsigned int& amask);
+
 	//wxDatagramSocket *Socket; // UDP socket
 	//wxIPV4address addrLocal; // local address/port
 	//wxIPV4address addrPeer; // remote address/port

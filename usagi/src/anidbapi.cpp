@@ -4,6 +4,7 @@
 #include <cmath>
 #include <QThread>
 #include <QElapsedTimer>
+#include <QRegularExpression>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
@@ -481,138 +482,91 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// No export is currently queued or being processed
 	}
 	else if(ReplyID == "220"){ // 220 FILE
+		// Get the original FILE command to extract masks
+		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
+		QSqlQuery query(db);
+		unsigned int fmask = 0;
+		unsigned int amask = 0;
+		
+		if(query.exec(q) && query.next())
+		{
+			QString fileCmd = query.value(0).toString();
+			if(!extractMasksFromCommand(fileCmd, fmask, amask))
+			{
+				LOG("Failed to extract masks from FILE command for Tag: " + Tag);
+				// Fall back to default masks (all fields)
+				fmask = fAID | fEID | fGID | fLID | fOTHEREPS | fISDEPR | fSTATE | fSIZE | fED2K | fMD5 | fSHA1 |
+						fCRC32 | fQUALITY | fSOURCE | fCODEC_AUDIO | fBITRATE_AUDIO | fCODEC_VIDEO | fBITRATE_VIDEO |
+						fRESOLUTION | fFILETYPE | fLANG_DUB | fLANG_SUB | fLENGTH | fDESCRIPTION | fAIRDATE | fFILENAME;
+				amask = aEPISODE_TOTAL | aEPISODE_LAST | aANIME_YEAR | aANIME_TYPE | aANIME_RELATED_LIST |
+						aANIME_RELATED_TYPE | aANIME_CATAGORY | aANIME_NAME_ROMAJI | aANIME_NAME_KANJI |
+						aANIME_NAME_ENGLISH | aANIME_NAME_OTHER | aANIME_NAME_SHORT | aANIME_SYNONYMS |
+						aEPISODE_NUMBER | aEPISODE_NAME | aEPISODE_NAME_ROMAJI | aEPISODE_NAME_KANJI |
+						aEPISODE_RATING | aEPISODE_VOTE_COUNT | aGROUP_NAME | aGROUP_NAME_SHORT |
+						aDATE_AID_RECORD_UPDATED;
+			}
+		}
+		else
+		{
+			LOG("Could not find packet for Tag: " + Tag);
+			// Use default masks
+			fmask = fAID | fEID | fGID | fLID | fOTHEREPS | fISDEPR | fSTATE | fSIZE | fED2K | fMD5 | fSHA1 |
+					fCRC32 | fQUALITY | fSOURCE | fCODEC_AUDIO | fBITRATE_AUDIO | fCODEC_VIDEO | fBITRATE_VIDEO |
+					fRESOLUTION | fFILETYPE | fLANG_DUB | fLANG_SUB | fLENGTH | fDESCRIPTION | fAIRDATE | fFILENAME;
+			amask = aEPISODE_TOTAL | aEPISODE_LAST | aANIME_YEAR | aANIME_TYPE | aANIME_RELATED_LIST |
+					aANIME_RELATED_TYPE | aANIME_CATAGORY | aANIME_NAME_ROMAJI | aANIME_NAME_KANJI |
+					aANIME_NAME_ENGLISH | aANIME_NAME_OTHER | aANIME_NAME_SHORT | aANIME_SYNONYMS |
+					aEPISODE_NUMBER | aEPISODE_NAME | aEPISODE_NAME_ROMAJI | aEPISODE_NAME_KANJI |
+					aEPISODE_RATING | aEPISODE_VOTE_COUNT | aGROUP_NAME | aGROUP_NAME_SHORT |
+					aDATE_AID_RECORD_UPDATED;
+		}
+		
+		// Parse response using mask-aware parsing
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
 		
-		// Parse file data (indices 0-26)
-		QString q = QString("INSERT OR REPLACE INTO `file` (`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, `size`, `ed2k`, `md5`, `sha1`, `crc`, `quality`, `source`, `codec_audio`, `bitrate_audio`, `codec_video`, `bitrate_video`, `resolution`, `filetype`, `lang_dub`, `lang_sub`, `length`, `description`, `airdate`, `filename`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13', '%14', '%15', '%16', '%17', '%18', '%19', '%20', '%21', '%22', '%23', '%24', '%25', '%26', '%27')")
-					.arg(QString(token2.at(0)).replace("'", "''"))
-					.arg(QString(token2.at(1)).replace("'", "''"))
-					.arg(QString(token2.at(2)).replace("'", "''"))
-					.arg(QString(token2.at(3)).replace("'", "''"))
-					.arg(QString(token2.at(4)).replace("'", "''"))
-					.arg(QString(token2.at(5)).replace("'", "''"))
-					.arg(QString(token2.at(6)).replace("'", "''"))
-					.arg(QString(token2.at(7)).replace("'", "''"))
-					.arg(QString(token2.at(8)).replace("'", "''"))
-					.arg(QString(token2.at(9)).replace("'", "''"))
-					.arg(QString(token2.at(10)).replace("'", "''"))
-					.arg(QString(token2.at(11)).replace("'", "''"))
-					.arg(QString(token2.at(12)).replace("'", "''"))
-					.arg(QString(token2.at(13)).replace("'", "''"))
-					.arg(QString(token2.at(14)).replace("'", "''"))
-					.arg(QString(token2.at(15)).replace("'", "''"))
-					.arg(QString(token2.at(16)).replace("'", "''"))
-					.arg(QString(token2.at(17)).replace("'", "''"))
-					.arg(QString(token2.at(18)).replace("'", "''"))
-					.arg(QString(token2.at(19)).replace("'", "''"))
-					.arg(QString(token2.at(20)).replace("'", "''"))
-					.arg(QString(token2.at(21)).replace("'", "''"))
-					.arg(QString(token2.at(22)).replace("'", "''"))
-					.arg(QString(token2.at(23)).replace("'", "''"))
-					.arg(QString(token2.at(24)).replace("'", "''"))
-					.arg(QString(token2.at(25)).replace("'", "''"))
-					.arg(QString(token2.at(26)).replace("'", "''"));
-		QSqlQuery query(db);
-		if(!query.exec(q))
+		// FID is always the first field in FILE responses
+		int index = 1;  // Start parsing after FID
+		
+		// Parse file data using fmask
+		FileData fileData = parseFileMask(token2, fmask, index);
+		
+		// Parse anime data using amask
+		AnimeData animeData = parseFileAmaskAnimeData(token2, amask, index);
+		
+		// Parse episode data using amask
+		EpisodeData episodeData = parseFileAmaskEpisodeData(token2, amask, index);
+		
+		// Parse group data using amask
+		GroupData groupData = parseFileAmaskGroupData(token2, amask, index);
+		
+		// Store all parsed data
+		storeFileData(fileData);
+		
+		if(!animeData.aid.isEmpty())
 		{
-			LOG("Database query error: " + query.lastError().text());
+			animeData.aid = fileData.aid;  // Ensure aid is set from file data
+			storeAnimeData(animeData);
 		}
 		
-		// Parse anime/episode data if available (indices 27+)
-		// Anime data fields based on amask: eptotal|eplast|year|type|relaidlist|relaidtype|category|
-		//   nameromaji|namekanji|nameenglish|nameother|nameshort|synonyms|
-		//   epno|epname|epnameromaji|epnamekanji|eprating|epvotecount|groupname|groupshortname|dateaidrecordupdated
-		if(token2.size() > 27)
+		if(!episodeData.eid.isEmpty())
 		{
-			QString aid = token2.size() > 1 ? token2.at(1) : "";
-			QString eid = token2.size() > 2 ? token2.at(2) : "";
-			QString gid = token2.size() > 3 ? token2.at(3) : "";
-			
-			// Anime data starts at index 27
-			QString eptotal = token2.size() > 27 ? token2.at(27) : "";
-			QString eplast = token2.size() > 28 ? token2.at(28) : "";
-			QString year = token2.size() > 29 ? token2.at(29) : "";
-			QString type = token2.size() > 30 ? token2.at(30) : "";
-			QString relaidlist = token2.size() > 31 ? token2.at(31) : "";
-			QString relaidtype = token2.size() > 32 ? token2.at(32) : "";
-			QString category = token2.size() > 33 ? token2.at(33) : "";
-			QString nameromaji = token2.size() > 34 ? token2.at(34) : "";
-			QString namekanji = token2.size() > 35 ? token2.at(35) : "";
-			QString nameenglish = token2.size() > 36 ? token2.at(36) : "";
-			QString nameother = token2.size() > 37 ? token2.at(37) : "";
-			QString nameshort = token2.size() > 38 ? token2.at(38) : "";
-			QString synonyms = token2.size() > 39 ? token2.at(39) : "";
-			QString epno = token2.size() > 40 ? token2.at(40) : "";  // Episode number!
-			QString epname = token2.size() > 41 ? token2.at(41) : "";
-			QString epnameromaji = token2.size() > 42 ? token2.at(42) : "";
-			QString epnamekanji = token2.size() > 43 ? token2.at(43) : "";
-			QString eprating = token2.size() > 44 ? token2.at(44) : "";
-			QString epvotecount = token2.size() > 45 ? token2.at(45) : "";
-			QString groupname = token2.size() > 46 ? token2.at(46) : "";
-			QString groupshortname = token2.size() > 47 ? token2.at(47) : "";
-			
-			// Store anime data
-			if(!aid.isEmpty())
-			{
-				QString q_anime = QString("INSERT OR REPLACE INTO `anime` (`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, `relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, `nameother`, `nameshort`, `synonyms`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', '%9', '%10', '%11', '%12', '%13', '%14')")
-					.arg(QString(aid).replace("'", "''"))
-					.arg(QString(eptotal).replace("'", "''"))
-					.arg(QString(eplast).replace("'", "''"))
-					.arg(QString(year).replace("'", "''"))
-					.arg(QString(type).replace("'", "''"))
-					.arg(QString(relaidlist).replace("'", "''"))
-					.arg(QString(relaidtype).replace("'", "''"))
-					.arg(QString(category).replace("'", "''"))
-					.arg(QString(nameromaji).replace("'", "''"))
-					.arg(QString(namekanji).replace("'", "''"))
-					.arg(QString(nameenglish).replace("'", "''"))
-					.arg(QString(nameother).replace("'", "''"))
-					.arg(QString(nameshort).replace("'", "''"))
-					.arg(QString(synonyms).replace("'", "''"));
-				if(!query.exec(q_anime))
-				{
-					LOG("Anime database query error: " + query.lastError().text());
-				}
-			}
-			
-			// Store episode data including episode number
-			if(!eid.isEmpty())
-			{
-				QString q_episode = QString("INSERT OR REPLACE INTO `episode` (`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
-					.arg(QString(eid).replace("'", "''"))
-					.arg(QString(epname).replace("'", "''"))
-					.arg(QString(epnameromaji).replace("'", "''"))
-					.arg(QString(epnamekanji).replace("'", "''"))
-					.arg(QString(eprating).replace("'", "''"))
-					.arg(QString(epvotecount).replace("'", "''"))
-					.arg(QString(epno).replace("'", "''"));  // Store episode number!
-				if(!query.exec(q_episode))
-				{
-					LOG("Episode database query error: " + query.lastError().text());
-				}
-			}
-			
-			// Store group data if available
-			if(!gid.isEmpty() && gid != "0" && (!groupname.isEmpty() || !groupshortname.isEmpty()))
-			{
-				QString q_group = QString("INSERT OR REPLACE INTO `group` (`gid`, `name`, `shortname`) VALUES ('%1', '%2', '%3')")
-					.arg(QString(gid).replace("'", "''"))
-					.arg(QString(groupname).replace("'", "''"))
-					.arg(QString(groupshortname).replace("'", "''"));
-				if(!query.exec(q_group))
-				{
-					LOG("Group database query error: " + query.lastError().text());
-				}
-			}
-			
-			// Check if episode data is missing (no epno) and queue EPISODE API request
-			if(!eid.isEmpty() && eid != "0" && epno.isEmpty())
-			{
-				LOG(QString("Episode data incomplete for EID %1, queuing EPISODE API request").arg(eid));
-				Episode(eid.toInt());
-			}
+			episodeData.eid = fileData.eid;  // Ensure eid is set from file data
+			storeEpisodeData(episodeData);
+		}
+		
+		if(!groupData.gid.isEmpty())
+		{
+			groupData.gid = fileData.gid;  // Ensure gid is set from file data
+			storeGroupData(groupData);
+		}
+		
+		// Check if episode data is missing (no epno) and queue EPISODE API request
+		if(!fileData.eid.isEmpty() && fileData.eid != "0" && episodeData.epno.isEmpty())
+		{
+			LOG(QString("Episode data incomplete for EID %1, queuing EPISODE API request").arg(fileData.eid));
+			Episode(fileData.eid.toInt());
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
@@ -2753,4 +2707,360 @@ void AniDBApi::checkForExistingExport()
 		notifyCheckTimer->setInterval(notifyCheckIntervalMs);
 		notifyCheckTimer->start();
 	}
+}
+
+// ===== Mask Processing Helper Functions =====
+
+/**
+ * Parse FILE command response using fmask to determine which fields are present.
+ * Processes the mask bit by bit from MSB to LSB to extract fields in the correct order.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param fmask File mask indicating which fields are present
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return FileData structure with parsed fields
+ */
+AniDBApi::FileData AniDBApi::parseFileMask(const QStringList& tokens, unsigned int fmask, int& index)
+{
+	FileData data;
+	
+	// Process fmask bits from MSB (bit 30) to LSB (bit 0)
+	// The fields appear in the response in the order of bits set in the mask
+	
+	if (fmask & fAID)            { data.aid = tokens.value(index++); }
+	if (fmask & fEID)            { data.eid = tokens.value(index++); }
+	if (fmask & fGID)            { data.gid = tokens.value(index++); }
+	if (fmask & fLID)            { data.lid = tokens.value(index++); }
+	if (fmask & fOTHEREPS)       { data.othereps = tokens.value(index++); }
+	if (fmask & fISDEPR)         { data.isdepr = tokens.value(index++); }
+	if (fmask & fSTATE)          { data.state = tokens.value(index++); }
+	if (fmask & fSIZE)           { data.size = tokens.value(index++); }
+	if (fmask & fED2K)           { data.ed2k = tokens.value(index++); }
+	if (fmask & fMD5)            { data.md5 = tokens.value(index++); }
+	if (fmask & fSHA1)           { data.sha1 = tokens.value(index++); }
+	if (fmask & fCRC32)          { data.crc = tokens.value(index++); }
+	if (fmask & fQUALITY)        { data.quality = tokens.value(index++); }
+	if (fmask & fSOURCE)         { data.source = tokens.value(index++); }
+	if (fmask & fCODEC_AUDIO)    { data.codec_audio = tokens.value(index++); }
+	if (fmask & fBITRATE_AUDIO)  { data.bitrate_audio = tokens.value(index++); }
+	if (fmask & fCODEC_VIDEO)    { data.codec_video = tokens.value(index++); }
+	if (fmask & fBITRATE_VIDEO)  { data.bitrate_video = tokens.value(index++); }
+	if (fmask & fRESOLUTION)     { data.resolution = tokens.value(index++); }
+	if (fmask & fFILETYPE)       { data.filetype = tokens.value(index++); }
+	if (fmask & fLANG_DUB)       { data.lang_dub = tokens.value(index++); }
+	if (fmask & fLANG_SUB)       { data.lang_sub = tokens.value(index++); }
+	if (fmask & fLENGTH)         { data.length = tokens.value(index++); }
+	if (fmask & fDESCRIPTION)    { data.description = tokens.value(index++); }
+	if (fmask & fAIRDATE)        { data.airdate = tokens.value(index++); }
+	// Note: bits 2-4 are reserved/unused
+	if (fmask & fFILENAME)       { data.filename = tokens.value(index++); }
+	
+	// FID is always returned first in FILE responses, regardless of mask
+	// It's not part of the fmask-controlled fields
+	data.fid = tokens.value(0);
+	
+	return data;
+}
+
+/**
+ * Parse anime data from FILE command response using file_amask.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amask Anime mask indicating which anime fields are present
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return AnimeData structure with parsed anime fields
+ */
+AniDBApi::AnimeData AniDBApi::parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index)
+{
+	AnimeData data;
+	
+	// Process file_amask bits from MSB to LSB for anime data
+	if (amask & aEPISODE_TOTAL)      { data.eptotal = tokens.value(index++); }
+	if (amask & aEPISODE_LAST)       { data.eplast = tokens.value(index++); }
+	if (amask & aANIME_YEAR)         { data.year = tokens.value(index++); }
+	if (amask & aANIME_TYPE)         { data.type = tokens.value(index++); }
+	if (amask & aANIME_RELATED_LIST) { data.relaidlist = tokens.value(index++); }
+	if (amask & aANIME_RELATED_TYPE) { data.relaidtype = tokens.value(index++); }
+	if (amask & aANIME_CATAGORY)     { data.category = tokens.value(index++); }
+	// bit 24 is reserved
+	if (amask & aANIME_NAME_ROMAJI)  { data.nameromaji = tokens.value(index++); }
+	if (amask & aANIME_NAME_KANJI)   { data.namekanji = tokens.value(index++); }
+	if (amask & aANIME_NAME_ENGLISH) { data.nameenglish = tokens.value(index++); }
+	if (amask & aANIME_NAME_OTHER)   { data.nameother = tokens.value(index++); }
+	if (amask & aANIME_NAME_SHORT)   { data.nameshort = tokens.value(index++); }
+	if (amask & aANIME_SYNONYMS)     { data.synonyms = tokens.value(index++); }
+	// bits 16-14 are reserved
+	
+	return data;
+}
+
+/**
+ * Parse episode data from FILE command response using file_amask.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amask Anime mask indicating which episode fields are present
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return EpisodeData structure with parsed episode fields
+ */
+AniDBApi::EpisodeData AniDBApi::parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index)
+{
+	EpisodeData data;
+	
+	// Process file_amask bits for episode data
+	if (amask & aEPISODE_NUMBER)      { data.epno = tokens.value(index++); }
+	if (amask & aEPISODE_NAME)        { data.epname = tokens.value(index++); }
+	if (amask & aEPISODE_NAME_ROMAJI) { data.epnameromaji = tokens.value(index++); }
+	if (amask & aEPISODE_NAME_KANJI)  { data.epnamekanji = tokens.value(index++); }
+	if (amask & aEPISODE_RATING)      { data.eprating = tokens.value(index++); }
+	if (amask & aEPISODE_VOTE_COUNT)  { data.epvotecount = tokens.value(index++); }
+	// bits 9-8 are reserved
+	
+	return data;
+}
+
+/**
+ * Parse group data from FILE command response using file_amask.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amask Anime mask indicating which group fields are present
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return GroupData structure with parsed group fields
+ */
+AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index)
+{
+	GroupData data;
+	
+	// Process file_amask bits for group data
+	if (amask & aGROUP_NAME)       { data.groupname = tokens.value(index++); }
+	if (amask & aGROUP_NAME_SHORT) { data.groupshortname = tokens.value(index++); }
+	// bits 6-1 are reserved
+	if (amask & aDATE_AID_RECORD_UPDATED) { index++; } // Skip this field, we don't store it
+	
+	return data;
+}
+
+/**
+ * Parse anime data from ANIME command response using anime_amask.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amask Anime mask indicating which anime fields are present
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return AnimeData structure with parsed anime fields
+ */
+AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index)
+{
+	AnimeData data;
+	
+	// Note: The ANIME command response order is determined by the amask bits
+	// Process from MSB to LSB (bit 31 to bit 0)
+	
+	// Byte 3 (bits 31-24)
+	if (amask & ANIME_TOTAL_EPISODES)  { data.eptotal = tokens.value(index++); }
+	if (amask & ANIME_HIGHEST_EPISODE) { data.eplast = tokens.value(index++); }
+	if (amask & ANIME_YEAR)            { data.year = tokens.value(index++); }
+	if (amask & ANIME_TYPE)            { data.type = tokens.value(index++); }
+	if (amask & ANIME_RELATED_AID_LIST){ data.relaidlist = tokens.value(index++); }
+	if (amask & ANIME_RELATED_AID_TYPE){ data.relaidtype = tokens.value(index++); }
+	if (amask & ANIME_CATEGORY_LIST)   { data.category = tokens.value(index++); }
+	// bit 24 is reserved
+	
+	// Byte 2 (bits 23-16)
+	if (amask & ANIME_ROMAJI_NAME)     { data.nameromaji = tokens.value(index++); }
+	if (amask & ANIME_KANJI_NAME)      { data.namekanji = tokens.value(index++); }
+	if (amask & ANIME_ENGLISH_NAME)    { data.nameenglish = tokens.value(index++); }
+	if (amask & ANIME_OTHER_NAME)      { data.nameother = tokens.value(index++); }
+	if (amask & ANIME_SHORT_NAME_LIST) { data.nameshort = tokens.value(index++); }
+	if (amask & ANIME_SYNONYM_LIST)    { data.synonyms = tokens.value(index++); }
+	// bits 17-16 are reserved
+	
+	// Byte 1 (bits 15-8) - mostly not returned by ANIME command API
+	// These fields are typically only available from FILE command or HTTP export
+	// bits 15-8 are not processed as API doesn't return them
+	
+	// Byte 0 (bits 7-0) - character/episode counts
+	// bits 7-0 are not processed as API doesn't return them
+	
+	return data;
+}
+
+/**
+ * Store file data in the database.
+ */
+void AniDBApi::storeFileData(const FileData& data)
+{
+	QString q = QString("INSERT OR REPLACE INTO `file` "
+		"(`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, "
+		"`size`, `ed2k`, `md5`, `sha1`, `crc`, `quality`, `source`, "
+		"`codec_audio`, `bitrate_audio`, `codec_video`, `bitrate_video`, "
+		"`resolution`, `filetype`, `lang_dub`, `lang_sub`, `length`, "
+		"`description`, `airdate`, `filename`) "
+		"VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', "
+		"'%9', '%10', '%11', '%12', '%13', '%14', '%15', "
+		"'%16', '%17', '%18', '%19', "
+		"'%20', '%21', '%22', '%23', '%24', "
+		"'%25', '%26', '%27')")
+		.arg(QString(data.fid).replace("'", "''"))
+		.arg(QString(data.aid).replace("'", "''"))
+		.arg(QString(data.eid).replace("'", "''"))
+		.arg(QString(data.gid).replace("'", "''"))
+		.arg(QString(data.lid).replace("'", "''"))
+		.arg(QString(data.othereps).replace("'", "''"))
+		.arg(QString(data.isdepr).replace("'", "''"))
+		.arg(QString(data.state).replace("'", "''"))
+		.arg(QString(data.size).replace("'", "''"))
+		.arg(QString(data.ed2k).replace("'", "''"))
+		.arg(QString(data.md5).replace("'", "''"))
+		.arg(QString(data.sha1).replace("'", "''"))
+		.arg(QString(data.crc).replace("'", "''"))
+		.arg(QString(data.quality).replace("'", "''"))
+		.arg(QString(data.source).replace("'", "''"))
+		.arg(QString(data.codec_audio).replace("'", "''"))
+		.arg(QString(data.bitrate_audio).replace("'", "''"))
+		.arg(QString(data.codec_video).replace("'", "''"))
+		.arg(QString(data.bitrate_video).replace("'", "''"))
+		.arg(QString(data.resolution).replace("'", "''"))
+		.arg(QString(data.filetype).replace("'", "''"))
+		.arg(QString(data.lang_dub).replace("'", "''"))
+		.arg(QString(data.lang_sub).replace("'", "''"))
+		.arg(QString(data.length).replace("'", "''"))
+		.arg(QString(data.description).replace("'", "''"))
+		.arg(QString(data.airdate).replace("'", "''"))
+		.arg(QString(data.filename).replace("'", "''"));
+		
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		LOG("Database query error: " + query.lastError().text());
+	}
+}
+
+/**
+ * Store anime data in the database.
+ */
+void AniDBApi::storeAnimeData(const AnimeData& data)
+{
+	if(data.aid.isEmpty())
+		return;
+		
+	QString q = QString("INSERT OR REPLACE INTO `anime` "
+		"(`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, "
+		"`relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, "
+		"`nameother`, `nameshort`, `synonyms`) "
+		"VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', "
+		"'%9', '%10', '%11', '%12', '%13', '%14')")
+		.arg(QString(data.aid).replace("'", "''"))
+		.arg(QString(data.eptotal).replace("'", "''"))
+		.arg(QString(data.eplast).replace("'", "''"))
+		.arg(QString(data.year).replace("'", "''"))
+		.arg(QString(data.type).replace("'", "''"))
+		.arg(QString(data.relaidlist).replace("'", "''"))
+		.arg(QString(data.relaidtype).replace("'", "''"))
+		.arg(QString(data.category).replace("'", "''"))
+		.arg(QString(data.nameromaji).replace("'", "''"))
+		.arg(QString(data.namekanji).replace("'", "''"))
+		.arg(QString(data.nameenglish).replace("'", "''"))
+		.arg(QString(data.nameother).replace("'", "''"))
+		.arg(QString(data.nameshort).replace("'", "''"))
+		.arg(QString(data.synonyms).replace("'", "''"));
+		
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		LOG("Anime database query error: " + query.lastError().text());
+	}
+}
+
+/**
+ * Store episode data in the database.
+ */
+void AniDBApi::storeEpisodeData(const EpisodeData& data)
+{
+	if(data.eid.isEmpty())
+		return;
+		
+	QString q = QString("INSERT OR REPLACE INTO `episode` "
+		"(`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) "
+		"VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
+		.arg(QString(data.eid).replace("'", "''"))
+		.arg(QString(data.epname).replace("'", "''"))
+		.arg(QString(data.epnameromaji).replace("'", "''"))
+		.arg(QString(data.epnamekanji).replace("'", "''"))
+		.arg(QString(data.eprating).replace("'", "''"))
+		.arg(QString(data.epvotecount).replace("'", "''"))
+		.arg(QString(data.epno).replace("'", "''"));
+		
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		LOG("Episode database query error: " + query.lastError().text());
+	}
+}
+
+/**
+ * Store group data in the database.
+ */
+void AniDBApi::storeGroupData(const GroupData& data)
+{
+	if(data.gid.isEmpty() || data.gid == "0")
+		return;
+	if(data.groupname.isEmpty() && data.groupshortname.isEmpty())
+		return;
+		
+	QString q = QString("INSERT OR REPLACE INTO `group` "
+		"(`gid`, `name`, `shortname`) "
+		"VALUES ('%1', '%2', '%3')")
+		.arg(QString(data.gid).replace("'", "''"))
+		.arg(QString(data.groupname).replace("'", "''"))
+		.arg(QString(data.groupshortname).replace("'", "''"));
+		
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		LOG("Group database query error: " + query.lastError().text());
+	}
+}
+
+/**
+ * Extract fmask and amask values from a FILE command string.
+ * Command format: "FILE size=X&ed2k=Y&fmask=ZZZZZZZZ&amask=WWWWWWWW"
+ * 
+ * @param command The FILE command string
+ * @param fmask Output parameter for file mask (hex string converted to unsigned int)
+ * @param amask Output parameter for anime mask (hex string converted to unsigned int)
+ * @return true if masks were successfully extracted, false otherwise
+ */
+bool AniDBApi::extractMasksFromCommand(const QString& command, unsigned int& fmask, unsigned int& amask)
+{
+	// Default values
+	fmask = 0;
+	amask = 0;
+	
+	// Extract fmask using regex
+	QRegularExpression fmaskRegex("fmask=([0-9a-fA-F]+)");
+	QRegularExpressionMatch fmaskMatch = fmaskRegex.match(command);
+	
+	// Extract amask using regex
+	QRegularExpression amaskRegex("amask=([0-9a-fA-F]+)");
+	QRegularExpressionMatch amaskMatch = amaskRegex.match(command);
+	
+	bool success = false;
+	
+	if (fmaskMatch.hasMatch())
+	{
+		QString fmaskStr = fmaskMatch.captured(1);
+		bool ok;
+		fmask = fmaskStr.toUInt(&ok, 16);  // Parse as hexadecimal
+		success = ok;
+	}
+	
+	if (amaskMatch.hasMatch())
+	{
+		QString amaskStr = amaskMatch.captured(1);
+		bool ok;
+		amask = amaskStr.toUInt(&ok, 16);  // Parse as hexadecimal
+		if (!success)
+			success = ok;
+	}
+	
+	return success;
 }
