@@ -89,7 +89,7 @@ void TestTruncatedResponse::testTruncatedFileResponse()
     // Test that a truncated FILE response (220) is handled correctly
     // Create a simulated FILE command
     QString tag = "1001";
-    QString fileCmd = QString("FILE size=734003200&ed2k=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4&fmask=7ff8fef8&amask=f0f0f0f0");
+    QString fileCmd = QString("FILE size=734003200&ed2k=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4&fmask=7ff8fef9&amask=f0f0f0f0");
     
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
@@ -218,7 +218,7 @@ void TestTruncatedResponse::testNonTruncatedResponse()
 {
     // Test that a non-truncated response is processed normally
     QString tag = "1005";
-    QString fileCmd = QString("FILE size=734003200&ed2k=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4&fmask=7ff8fef8&amask=f0f0f0f0");
+    QString fileCmd = QString("FILE size=734003200&ed2k=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4&fmask=7ff8fef9&amask=f0f0f0f0");
     
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);
