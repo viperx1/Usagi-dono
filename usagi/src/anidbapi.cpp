@@ -723,6 +723,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			{
 				amaskString = amaskString.leftJustified(14, '0');
 			}
+			
+			// Create AnimeMask object for proper handling
+			AnimeMask originalMask(amaskString);
+			
 			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + amaskString, __FILE__, __LINE__);
 		}
 		else
@@ -804,26 +808,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
 				
 				// Calculate reduced mask with only missing fields
-				QString reducedMask = calculateReducedMask(amaskString, parsedMaskBytes);
+				AnimeMask reducedMask = calculateReducedMask(originalMask, parsedMaskBytes);
 				
-				// Check if there are any missing fields (mask should be 14 hex chars = 7 bytes)
-				// If all zeros, no fields are missing
-				bool hasMissingFields = false;
-				for (int i = 0; i < reducedMask.length(); i++)
-				{
-					if (reducedMask[i] != '0')
-					{
-						hasMissingFields = true;
-						break;
-					}
-				}
-				
-				if (hasMissingFields)
+				// Check if there are any missing fields
+				if (!reducedMask.isEmpty())
 				{
 					// Queue re-request with reduced mask to fetch missing fields
-					QString reRequestCmd = QString("ANIME aid=%1&amask=%2").arg(aid).arg(reducedMask);
+					QString reducedMaskString = reducedMask.toString();
+					QString reRequestCmd = QString("ANIME aid=%1&amask=%2").arg(aid).arg(reducedMaskString);
 					Logger::log(QString("[AniDB Response] 230 ANIME - Queueing re-request for missing fields with reduced mask: %1")
-						.arg(reducedMask), __FILE__, __LINE__);
+						.arg(reducedMaskString), __FILE__, __LINE__);
 					
 					// Insert re-request into packets table
 					QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(reRequestCmd);
@@ -1633,7 +1627,7 @@ QString AniDBApi::buildAnimeCommand(int aid)
 {
 	// ANIME aid={int4 aid}&amask={hexstr amask}
 	// Request anime information for a specific anime ID
-	// Build amask using the anime_amask_codes enum (all 7 bytes)
+	// Build amask using the anime_amask_codes enum and AnimeMask class (all 7 bytes)
 	// 
 	// ANIME command uses byte-oriented mask (7 bytes):
 	//   Byte 1: aid, dateflags, year, type, related lists
@@ -1668,10 +1662,11 @@ QString AniDBApi::buildAnimeCommand(int aid)
 		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
-	// Convert to hex string: format as 8 hex chars (32-bit uint), then pad on RIGHT to 14 chars (7 bytes)
-	// This ensures bytes 1-4 are in the correct positions and bytes 5-7 are padded with zeros
-	QString amaskHex = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
-	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amaskHex);
+	// Create AnimeMask from the 32-bit enum (covers bytes 1-4, bytes 5-7 are zero)
+	// The AnimeMask class properly handles all 7 bytes using quint64
+	AnimeMask mask(amask);
+	
+	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
 }
 
 /* === End Command Builders === */
@@ -3680,63 +3675,24 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
  * @param parsedMaskBytes 7-byte array marking which bits were successfully parsed
  * @return Reduced mask hex string containing only unparsed fields
  */
-QString AniDBApi::calculateReducedMask(const QString& originalMask, const QByteArray& parsedMaskBytes)
+AnimeMask AniDBApi::calculateReducedMask(const AnimeMask& originalMask, const QByteArray& parsedMaskBytes)
 {
-	// Parse original mask
-	QString paddedMask = originalMask.leftJustified(14, '0');
-	QByteArray originalBytes;
-	for (int i = 0; i < paddedMask.length(); i += 2)
+	// Build parsed mask from byte array
+	AnimeMask parsedAnimeMask;
+	for (int i = 0; i < parsedMaskBytes.size() && i < 7; i++)
 	{
-		bool ok;
-		unsigned char byte = paddedMask.mid(i, 2).toUInt(&ok, 16);
-		if (ok)
-			originalBytes.append(byte);
+		parsedAnimeMask.setByte(i, (quint8)parsedMaskBytes[i]);
 	}
-	
-	// Ensure we have 7 bytes
-	while (originalBytes.size() < 7)
-		originalBytes.append((char)0);
 	
 	// Calculate reduced mask: original AND NOT parsed
-	QByteArray reducedBytes;
-	for (int i = 0; i < 7 && i < originalBytes.size() && i < parsedMaskBytes.size(); i++)
-	{
-		unsigned char original = (unsigned char)originalBytes[i];
-		unsigned char parsed = (unsigned char)parsedMaskBytes[i];
-		unsigned char reduced = original & ~parsed; // Bits that were requested but not parsed
-		reducedBytes.append((char)reduced);
-	}
-	
-	// Convert back to hex string (remove trailing zeros)
-	QString result;
-	bool foundNonZero = false;
-	for (int i = reducedBytes.size() - 1; i >= 0; i--)
-	{
-		unsigned char byte = (unsigned char)reducedBytes[i];
-		if (byte != 0 || foundNonZero || i == 0)
-		{
-			foundNonZero = true;
-		}
-	}
-	
-	// Build hex string from all 7 bytes (ANIME amask must always be 14 hex chars = 7 bytes)
-	for (int i = 0; i < 7; i++)
-	{
-		if (i < reducedBytes.size())
-		{
-			result += QString("%1").arg((unsigned char)reducedBytes[i], 2, 16, QChar('0'));
-		}
-		else
-		{
-			result += "00";
-		}
-	}
+	// This gives us the bits that were requested but not successfully parsed
+	AnimeMask reducedAnimeMask = originalMask & (~parsedAnimeMask);
 	
 	Logger::log(QString("[AniDB calculateReducedMask] Original: %1 -> Reduced: %2")
-		.arg(originalMask)
-		.arg(result), __FILE__, __LINE__);
+		.arg(originalMask.toString())
+		.arg(reducedAnimeMask.toString()), __FILE__, __LINE__);
 	
-	return result;
+	return reducedAnimeMask;
 }
 
 /**

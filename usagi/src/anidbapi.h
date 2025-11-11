@@ -16,6 +16,7 @@
 #include <zlib.h>
 #include "hash/ed2k.h"
 #include "Qt-AES-master/qaesencryption.h"
+#include "animemask.h"
 
 
 /*struct status_codes_
@@ -277,7 +278,7 @@ private:
 	AnimeData parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index);
 	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
 	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
-	QString calculateReducedMask(const QString& originalMask, const QByteArray& parsedMaskBytes);
+	AnimeMask calculateReducedMask(const AnimeMask& originalMask, const QByteArray& parsedMaskBytes);
 	
 	void storeFileData(const FileData& data);
 	void storeAnimeData(const AnimeData& data);
