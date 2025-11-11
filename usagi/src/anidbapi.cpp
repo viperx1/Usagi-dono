@@ -715,9 +715,15 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						ANIME_CHARACTER_ID_LIST |
 						ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 						ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-				amaskString = QString("%1").arg(amask, 14, 16, QChar('0'));
+				// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
+				amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
 			}
-			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + QString("%1").arg(amask, 14, 16, QChar('0')), __FILE__, __LINE__);
+			// Ensure extracted amask string is 14 chars (7 bytes)
+			if (!amaskString.isEmpty())
+			{
+				amaskString = amaskString.leftJustified(14, '0');
+			}
+			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + amaskString, __FILE__, __LINE__);
 		}
 		else
 		{
@@ -736,8 +742,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					ANIME_CHARACTER_ID_LIST |
 					ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 					ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-			amaskString = QString("%1").arg(amask, 14, 16, QChar('0'));
-			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + QString("%1").arg(amask, 14, 16, QChar('0')), __FILE__, __LINE__);
+			// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
+			amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
+			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + amaskString, __FILE__, __LINE__);
 		}
 		
 		// Parse response using mask-aware parsing
@@ -1661,8 +1668,10 @@ QString AniDBApi::buildAnimeCommand(int aid)
 		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
-	// Convert to hex string with 7 bytes (14 hex characters) padding
-	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 14, 16, QChar('0'));
+	// Convert to hex string: format as 8 hex chars (32-bit uint), then pad on RIGHT to 14 chars (7 bytes)
+	// This ensures bytes 1-4 are in the correct positions and bytes 5-7 are padded with zeros
+	QString amaskHex = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
+	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amaskHex);
 }
 
 /* === End Command Builders === */
