@@ -299,7 +299,7 @@ int AniDBApi::CreateSocket()
 	return 1;
 }
 
-QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg)
+QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg, bool isTruncated)
 {
 	if(Message.length() == 0)
 	{
@@ -343,6 +343,12 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	else
 	{
 		Logger::log("[AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID, __FILE__, __LINE__);
+	}
+	
+	// Log truncation status
+	if(isTruncated)
+	{
+		Logger::log("[AniDB Response] TRUNCATED response detected for Tag: " + Tag + " ReplyID: " + ReplyID, __FILE__, __LINE__);
 	}
 
 	token.pop_front();
@@ -526,6 +532,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		token2.pop_front();
 		token2 = token2.first().split("|");
 		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 220 FILE - Truncated response, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 220 FILE - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
+		
 		// FID is always the first field in FILE responses
 		int index = 1;  // Start parsing after FID
 		
@@ -562,6 +578,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			storeGroupData(groupData);
 		}
 		
+		// Handle truncated response - log warning about incomplete data
+		if(isTruncated)
+		{
+			Logger::log(QString("[AniDB Response] 220 FILE - WARNING: Response was truncated, some fields may be missing. "
+				"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
+		}
+		
 		// Check if episode data is missing (no epno) and queue EPISODE API request
 		if(!fileData.eid.isEmpty() && fileData.eid != "0" && episodeData.epno.isEmpty())
 		{
@@ -595,6 +618,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
+		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 221 MYLIST - Truncated response, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 221 MYLIST - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
+		
 		// Parse mylist entry: fid|eid|aid|gid|date|state|viewdate|storage|source|other|filestate
 		// Note: lid is NOT included in the response - it's extracted from the query command
 		if(token2.size() >= 11 && !lid.isEmpty())
@@ -699,6 +733,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QString responseData = token2.first();
 		token2 = responseData.split("|");
 		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 230 ANIME - Truncated response detected, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 230 ANIME - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
+		
 		// Debug logging
 		Logger::log("[AniDB Response] 230 ANIME raw data: " + responseData, __FILE__, __LINE__);
 		Logger::log("[AniDB Response] 230 ANIME field count: " + QString::number(token2.size()), __FILE__, __LINE__);
@@ -716,7 +760,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			int startIndex = index;
 			
 			// Check if response might be truncated (UDP 1400 byte limit)
-			if(responseData.length() >= 1350)
+			if(responseData.length() >= 1350 && !isTruncated)
 			{
 				Logger::log("[AniDB Response] 230 ANIME WARNING: Response near UDP size limit (" + 
 					QString::number(responseData.length()) + " chars), may be truncated", __FILE__, __LINE__);
@@ -733,6 +777,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Long anime titles can be truncated. The last field in a truncated response
 			// will be incomplete. This is a known limitation of the AniDB UDP API.
 			// Alternative: Use HTTP API or mylist export for complete data.
+			
+			// Handle truncated response - log warning
+			if(isTruncated)
+			{
+				Logger::log(QString("[AniDB Response] 230 ANIME - WARNING: Response was truncated, some fields may be missing. "
+					"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
+			}
 			
 			// For ANIME command, we only update typename since other fields may not be returned
 			// The type field is returned as a string (e.g., "TV Series") by the API
@@ -761,6 +812,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
+		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 240 EPISODE - Truncated response, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 240 EPISODE - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
 		
 		if(token2.size() >= 7)
 		{
@@ -792,6 +853,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			else
 			{
 				Logger::log("[AniDB Response] 240 EPISODE stored - EID: " + eid + " AID: " + aid + " EPNO: " + epno + " Name: " + epname, __FILE__, __LINE__);
+				
+				// Log warning if truncated
+				if(isTruncated)
+				{
+					Logger::log(QString("[AniDB Response] 240 EPISODE - WARNING: Response was truncated, some fields may be missing"), __FILE__, __LINE__);
+				}
+				
 				// Emit signal to notify UI that episode data was updated
 				emit notifyEpisodeUpdated(eid.toInt(), aid.toInt());
 			}
@@ -1622,6 +1690,7 @@ int AniDBApi::Recv()
 	QByteArray data;
 //    Socket->waitForReadyRead(10000);
 	QString result;
+	bool isTruncated = false;
 	while(Socket->hasPendingDatagrams())
 	{
 		data.resize(Socket->pendingDatagramSize());
@@ -1631,10 +1700,18 @@ int AniDBApi::Recv()
         result = QString::fromUtf8(data.data());
 		LOG("AniDBApi: Recv: " + result);
 		Logger::log(QString("[AniDB Recv] Datagram size: %1 bytes, Read: %2 bytes, Result length: %3 chars").arg(data.size()).arg(bytesRead).arg(result.length()), __FILE__, __LINE__);
+		
+		// Detect truncation: UDP MTU limit is typically 1400 bytes
+		// If datagram size is exactly 1400 bytes, the response is likely truncated
+		if(data.size() >= 1400 || bytesRead >= 1400)
+		{
+			isTruncated = true;
+			Logger::log(QString("[AniDB Recv] TRUNCATION DETECTED: Datagram at MTU limit (%1 bytes), response is truncated").arg(data.size()), __FILE__, __LINE__);
+		}
     }
 	if(result.length() > 0)
 	{
-		ParseMessage(result,"", lastSentPacket);
+		ParseMessage(result,"", lastSentPacket, isTruncated);
 		return 1;
 	}
 	return 0;

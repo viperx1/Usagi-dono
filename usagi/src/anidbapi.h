@@ -68,6 +68,17 @@ private:
 	QString lastSentPacket;
 	QString currentTag; // Track the tag of the currently pending request
 	
+	// Truncated response handling
+	struct TruncatedResponseInfo {
+		bool isTruncated;
+		QString tag;
+		QString command;
+		int fieldsParsed;
+		unsigned int fmaskReceived;
+		unsigned int amaskReceived;
+		TruncatedResponseInfo() : isTruncated(false), fieldsParsed(0), fmaskReceived(0), amaskReceived(0) {}
+	} truncatedResponse;
+	
 	// Anime titles download and management
 	QNetworkAccessManager *networkManager;
 	QDateTime lastAnimeTitlesUpdate;
@@ -353,7 +364,7 @@ public:
 
 	/* === Socket Start */
 	int CreateSocket();
-	QString ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg);
+	QString ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg, bool isTruncated = false);
 	int Send(QString, QString, QString);
     struct _waitingForReply
     {
