@@ -276,6 +276,8 @@ private:
 	GroupData parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
 	AnimeData parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index);
 	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
+	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
+	QString calculateReducedMask(const QString& originalMask, const QByteArray& parsedMaskBytes);
 	
 	void storeFileData(const FileData& data);
 	void storeAnimeData(const AnimeData& data);

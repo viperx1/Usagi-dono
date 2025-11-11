@@ -782,22 +782,46 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 			
 			// Parse anime data using amask string for proper 7-byte handling
-			AnimeData animeData = parseAnimeMaskFromString(token2, amaskString, index);
+			// Track which fields were successfully parsed for re-request logic
+			QByteArray parsedMaskBytes;
+			AnimeData animeData = parseAnimeMaskFromString(token2, amaskString, index, parsedMaskBytes);
 			animeData.aid = aid;  // Ensure aid is set
 			
 			Logger::log("[AniDB Response] 230 ANIME parsed " + QString::number(index - startIndex) + " fields (index: " + QString::number(startIndex) + " -> " + QString::number(index) + ")", __FILE__, __LINE__);
 			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + animeData.year + "' Type: '" + animeData.type + "'", __FILE__, __LINE__);
 			
-			// NOTE: UDP responses are limited to ~1400 bytes
-			// Long anime titles can be truncated. The last field in a truncated response
-			// will be incomplete. This is a known limitation of the AniDB UDP API.
-			// Alternative: Use HTTP API or mylist export for complete data.
-			
-			// Handle truncated response - log warning
+			// Handle truncated response - calculate missing fields and re-request
 			if(isTruncated)
 			{
 				Logger::log(QString("[AniDB Response] 230 ANIME - WARNING: Response was truncated, some fields may be missing. "
 					"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
+				
+				// Calculate reduced mask with only missing fields
+				QString reducedMask = calculateReducedMask(amaskString, parsedMaskBytes);
+				
+				if (reducedMask != "0" && !reducedMask.isEmpty())
+				{
+					// Queue re-request with reduced mask to fetch missing fields
+					QString reRequestCmd = QString("ANIME aid=%1&amask=%2").arg(aid).arg(reducedMask);
+					Logger::log(QString("[AniDB Response] 230 ANIME - Queueing re-request for missing fields with reduced mask: %1")
+						.arg(reducedMask), __FILE__, __LINE__);
+					
+					// Insert re-request into packets table
+					QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(reRequestCmd);
+					QSqlQuery reRequestQuery(db);
+					if (reRequestQuery.exec(q))
+					{
+						Logger::log("[AniDB Response] 230 ANIME - Re-request queued successfully", __FILE__, __LINE__);
+					}
+					else
+					{
+						Logger::log("[AniDB Response] 230 ANIME - ERROR: Failed to queue re-request: " + reRequestQuery.lastError().text(), __FILE__, __LINE__);
+					}
+				}
+				else
+				{
+					Logger::log("[AniDB Response] 230 ANIME - No missing fields to re-request (all requested fields were received)", __FILE__, __LINE__);
+				}
 			}
 			
 			// For ANIME command, we only update typename since other fields may not be returned
@@ -3434,6 +3458,270 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 	data.eplast = data.highest_episode;
 	
 	return data;
+}
+
+/**
+ * Parse anime data from AniDB ANIME response using the mask hex string.
+ * This version tracks which bits were successfully parsed for re-request logic.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amaskHexString The anime mask as a hex string (e.g., "fffffcfc")
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @param parsedMaskBytes Output: 7-byte array marking which bits were successfully parsed
+ * @return AnimeData structure with parsed anime fields
+ */
+AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
+{
+	AnimeData data;
+	
+	// Parse the hex string into bytes
+	QString paddedMask = amaskHexString.leftJustified(14, '0');
+	QByteArray maskBytes;
+	for (int i = 0; i < paddedMask.length(); i += 2)
+	{
+		bool ok;
+		unsigned char byte = paddedMask.mid(i, 2).toUInt(&ok, 16);
+		if (ok)
+			maskBytes.append(byte);
+	}
+	
+	// Ensure we have 7 bytes
+	while (maskBytes.size() < 7)
+		maskBytes.append((char)0);
+	
+	// Initialize parsedMaskBytes to track what we successfully parse
+	parsedMaskBytes.clear();
+	for (int i = 0; i < 7; i++)
+		parsedMaskBytes.append((char)0);
+	
+	Logger::log(QString("[AniDB parseAnimeMaskFromString] Mask string: %1 -> %2 bytes")
+		.arg(amaskHexString)
+		.arg(maskBytes.size()), __FILE__, __LINE__);
+	
+	// Define all mask bits in MSB to LSB order with their byte positions
+	struct MaskBit {
+		int byteIndex;
+		unsigned char bitMask;
+		QString* field;
+		const char* name;
+	};
+	
+	MaskBit maskBits[] = {
+		// Byte 1 (byte 0 in array) - bits 7-0
+		{0, 0x80, &data.aid,                  "AID"},
+		{0, 0x40, &data.dateflags,            "DATEFLAGS"},
+		{0, 0x20, &data.year,                 "YEAR"},
+		{0, 0x10, &data.type,                 "TYPE"},
+		{0, 0x08, &data.relaidlist,           "RELATED_AID_LIST"},
+		{0, 0x04, &data.relaidtype,           "RELATED_AID_TYPE"},
+		{0, 0x02, nullptr,                    "RETIRED_BYTE1_BIT1"},
+		{0, 0x01, nullptr,                    "RETIRED_BYTE1_BIT0"},
+		
+		// Byte 2 (byte 1 in array) - bits 7-0
+		{1, 0x80, &data.nameromaji,           "ROMAJI_NAME"},
+		{1, 0x40, &data.namekanji,            "KANJI_NAME"},
+		{1, 0x20, &data.nameenglish,          "ENGLISH_NAME"},
+		{1, 0x10, &data.nameother,            "OTHER_NAME"},
+		{1, 0x08, &data.nameshort,            "SHORT_NAME_LIST"},
+		{1, 0x04, &data.synonyms,             "SYNONYM_LIST"},
+		{1, 0x02, nullptr,                    "RETIRED_BYTE2_BIT1"},
+		{1, 0x01, nullptr,                    "RETIRED_BYTE2_BIT0"},
+		
+		// Byte 3 (byte 2 in array) - bits 7-0
+		{2, 0x80, &data.episodes,             "EPISODES"},
+		{2, 0x40, &data.highest_episode,      "HIGHEST_EPISODE"},
+		{2, 0x20, &data.special_ep_count,     "SPECIAL_EP_COUNT"},
+		{2, 0x10, &data.air_date,             "AIR_DATE"},
+		{2, 0x08, &data.end_date,             "END_DATE"},
+		{2, 0x04, &data.url,                  "URL"},
+		{2, 0x02, &data.picname,              "PICNAME"},
+		{2, 0x01, nullptr,                    "RETIRED_BYTE3_BIT0"},
+		
+		// Byte 4 (byte 3 in array) - bits 7-0
+		{3, 0x80, &data.rating,               "RATING"},
+		{3, 0x40, &data.vote_count,           "VOTE_COUNT"},
+		{3, 0x20, &data.temp_rating,          "TEMP_RATING"},
+		{3, 0x10, &data.temp_vote_count,      "TEMP_VOTE_COUNT"},
+		{3, 0x08, &data.avg_review_rating,    "AVG_REVIEW_RATING"},
+		{3, 0x04, &data.review_count,         "REVIEW_COUNT"},
+		{3, 0x02, &data.award_list,           "AWARD_LIST"},
+		{3, 0x01, &data.is_18_restricted,     "IS_18_RESTRICTED"},
+		
+		// Byte 5 (byte 4 in array) - bits 7-0
+		{4, 0x80, nullptr,                    "RETIRED_BYTE5_BIT7"},
+		{4, 0x40, &data.ann_id,               "ANN_ID"},
+		{4, 0x20, &data.allcinema_id,         "ALLCINEMA_ID"},
+		{4, 0x10, &data.animenfo_id,          "ANIMENFO_ID"},
+		{4, 0x08, &data.tag_name_list,        "TAG_NAME_LIST"},
+		{4, 0x04, &data.tag_id_list,          "TAG_ID_LIST"},
+		{4, 0x02, &data.tag_weight_list,      "TAG_WEIGHT_LIST"},
+		{4, 0x01, &data.date_record_updated,  "DATE_RECORD_UPDATED"},
+		
+		// Byte 6 (byte 5 in array) - bits 7-0
+		{5, 0x80, &data.character_id_list,    "CHARACTER_ID_LIST"},
+		{5, 0x40, nullptr,                    "RETIRED_BYTE6_BIT6"},
+		{5, 0x20, nullptr,                    "RETIRED_BYTE6_BIT5"},
+		{5, 0x10, nullptr,                    "RETIRED_BYTE6_BIT4"},
+		{5, 0x08, nullptr,                    "UNUSED_BYTE6_BIT3"},
+		{5, 0x04, nullptr,                    "UNUSED_BYTE6_BIT2"},
+		{5, 0x02, nullptr,                    "UNUSED_BYTE6_BIT1"},
+		{5, 0x01, nullptr,                    "UNUSED_BYTE6_BIT0"},
+		
+		// Byte 7 (byte 6 in array) - bits 7-0
+		{6, 0x80, &data.specials_count,       "SPECIALS_COUNT"},
+		{6, 0x40, &data.credits_count,        "CREDITS_COUNT"},
+		{6, 0x20, &data.other_count,          "OTHER_COUNT"},
+		{6, 0x10, &data.trailer_count,        "TRAILER_COUNT"},
+		{6, 0x08, &data.parody_count,         "PARODY_COUNT"},
+		{6, 0x04, nullptr,                    "UNUSED_BYTE7_BIT2"},
+		{6, 0x02, nullptr,                    "UNUSED_BYTE7_BIT1"},
+		{6, 0x01, nullptr,                    "UNUSED_BYTE7_BIT0"}
+	};
+	
+	// Process each bit in order
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		int byteIdx = maskBits[i].byteIndex;
+		if (byteIdx >= maskBytes.size())
+			continue;
+			
+		unsigned char byte = (unsigned char)maskBytes[byteIdx];
+		
+		// Check if this bit is set in the mask
+		if (byte & maskBits[i].bitMask)
+		{
+			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
+			if (byteIdx == 0 && maskBits[i].bitMask == 0x80)
+			{
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
+				// Mark as parsed since AID is always available
+				parsedMaskBytes[byteIdx] |= maskBits[i].bitMask;
+				continue;
+			}
+			
+			// Check if we have a token available
+			if (index >= tokens.size())
+			{
+				// No more tokens available - this field was not received (truncation)
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] MISSING: %1 (byte %2, bit 0x%3) -> no token at index %4")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index), __FILE__, __LINE__);
+				break; // Stop processing - truncation point reached
+			}
+			
+			QString value = tokens.value(index);
+			
+			if (maskBits[i].field != nullptr)
+			{
+				// This is a defined field - store it
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index)
+					.arg(value.left(80)), __FILE__, __LINE__);
+				
+				*(maskBits[i].field) = value;
+			}
+			else
+			{
+				// Retired/unused bit - consume the token but don't store
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index)
+					.arg(value.left(80)), __FILE__, __LINE__);
+			}
+			
+			// Mark this bit as successfully parsed
+			parsedMaskBytes[byteIdx] |= maskBits[i].bitMask;
+			
+			// Always increment index for any bit set in the mask
+			index++;
+		}
+	}
+	
+	// Set legacy fields for backward compatibility
+	data.eptotal = data.episodes;
+	data.eplast = data.highest_episode;
+	
+	return data;
+}
+
+/**
+ * Calculate a reduced mask containing only the fields that were NOT successfully parsed.
+ * This is used for re-requesting missing data after truncation.
+ * 
+ * @param originalMask Original mask hex string (e.g., "fffffcfc")
+ * @param parsedMaskBytes 7-byte array marking which bits were successfully parsed
+ * @return Reduced mask hex string containing only unparsed fields
+ */
+QString AniDBApi::calculateReducedMask(const QString& originalMask, const QByteArray& parsedMaskBytes)
+{
+	// Parse original mask
+	QString paddedMask = originalMask.leftJustified(14, '0');
+	QByteArray originalBytes;
+	for (int i = 0; i < paddedMask.length(); i += 2)
+	{
+		bool ok;
+		unsigned char byte = paddedMask.mid(i, 2).toUInt(&ok, 16);
+		if (ok)
+			originalBytes.append(byte);
+	}
+	
+	// Ensure we have 7 bytes
+	while (originalBytes.size() < 7)
+		originalBytes.append((char)0);
+	
+	// Calculate reduced mask: original AND NOT parsed
+	QByteArray reducedBytes;
+	for (int i = 0; i < 7 && i < originalBytes.size() && i < parsedMaskBytes.size(); i++)
+	{
+		unsigned char original = (unsigned char)originalBytes[i];
+		unsigned char parsed = (unsigned char)parsedMaskBytes[i];
+		unsigned char reduced = original & ~parsed; // Bits that were requested but not parsed
+		reducedBytes.append((char)reduced);
+	}
+	
+	// Convert back to hex string (remove trailing zeros)
+	QString result;
+	bool foundNonZero = false;
+	for (int i = reducedBytes.size() - 1; i >= 0; i--)
+	{
+		unsigned char byte = (unsigned char)reducedBytes[i];
+		if (byte != 0 || foundNonZero || i == 0)
+		{
+			foundNonZero = true;
+		}
+	}
+	
+	// Build hex string from left to right, stopping at last non-zero byte
+	int lastNonZero = 0;
+	for (int i = reducedBytes.size() - 1; i >= 0; i--)
+	{
+		if ((unsigned char)reducedBytes[i] != 0)
+		{
+			lastNonZero = i;
+			break;
+		}
+	}
+	
+	for (int i = 0; i <= lastNonZero; i++)
+	{
+		result += QString("%1").arg((unsigned char)reducedBytes[i], 2, 16, QChar('0'));
+	}
+	
+	if (result.isEmpty())
+		result = "0";
+	
+	Logger::log(QString("[AniDB calculateReducedMask] Original: %1 -> Reduced: %2")
+		.arg(originalMask)
+		.arg(result), __FILE__, __LINE__);
+	
+	return result;
 }
 
 /**
