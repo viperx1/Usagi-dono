@@ -682,6 +682,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		unsigned int fmask = 0;  // Not used for ANIME commands
 		unsigned int amask = 0;
 		QString amaskString;
+		AnimeMask originalMask;  // Declare here so it's available throughout the entire block
 		
 		if(query.exec(q) && query.next())
 		{
@@ -724,8 +725,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				amaskString = amaskString.leftJustified(14, '0');
 			}
 			
-			// Create AnimeMask object for proper handling
-			AnimeMask originalMask(amaskString);
+			// Set AnimeMask object for proper handling
+			originalMask.setFromString(amaskString);
 			
 			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + amaskString, __FILE__, __LINE__);
 		}
@@ -749,6 +750,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
 			amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
 			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + amaskString, __FILE__, __LINE__);
+			
+			// Set AnimeMask object from the default amask
+			originalMask.setFromString(amaskString);
 		}
 		
 		// Parse response using mask-aware parsing

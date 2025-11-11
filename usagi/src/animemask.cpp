@@ -48,6 +48,24 @@ void AnimeMask::setValue(uint64_t value)
 	mask = value & 0x00FFFFFFFFFFFFFFULL;
 }
 
+void AnimeMask::setByte(int byteIndex, uint8_t value)
+{
+	if (byteIndex < 0 || byteIndex >= 7)
+	{
+		return; // Invalid index
+	}
+	
+	// Clear the target byte and set new value
+	// byteIndex 0 = rightmost byte (bits 0-7)
+	// byteIndex 6 = leftmost byte (bits 48-55)
+	int shiftAmount = byteIndex * 8;
+	uint64_t byteMask = 0xFFULL << shiftAmount;
+	mask = (mask & ~byteMask) | (static_cast<uint64_t>(value) << shiftAmount);
+	
+	// Ensure byte 8 stays 0
+	mask &= 0x00FFFFFFFFFFFFFFULL;
+}
+
 QString AnimeMask::toString() const
 {
 	// Format as 14 hex characters (7 bytes), always uppercase, zero-padded

@@ -57,6 +57,13 @@ public:
 	void setValue(uint64_t value);
 	
 	/**
+	 * @brief Set a specific byte in the mask (0-6)
+	 * @param byteIndex Index of the byte to set (0 = rightmost byte, 6 = leftmost byte)
+	 * @param value Byte value to set
+	 */
+	void setByte(int byteIndex, uint8_t value);
+	
+	/**
 	 * @brief Convert mask to hex string (always 14 characters for 7 bytes)
 	 * @return Hex string representation (e.g., "fffffcfc000000")
 	 */
