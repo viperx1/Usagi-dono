@@ -1135,10 +1135,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Logger::log("[AniDB Response] 291 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()), __FILE__, __LINE__);
 		
 		// Log all notification entries
-		for(int i = 0; i < token2.size(); i++)
+/*		for(int i = 0; i < token2.size(); i++)
 		{
 			Logger::log("[AniDB Response] 291 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i], __FILE__, __LINE__);
-		}
+        }*/
 		
 		// Collect all message notification IDs (M|nid entries)
 		// Export notifications could be in any of these messages, not just the last one
