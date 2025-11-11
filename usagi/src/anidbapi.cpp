@@ -2,6 +2,7 @@
 #include "anidbapi.h"
 #include "logger.h"
 #include <cmath>
+#include <map>
 #include <QThread>
 #include <QElapsedTimer>
 #include <QRegularExpression>
@@ -299,7 +300,7 @@ int AniDBApi::CreateSocket()
 	return 1;
 }
 
-QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg)
+QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg, bool isTruncated)
 {
 	if(Message.length() == 0)
 	{
@@ -343,6 +344,12 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	else
 	{
 		Logger::log("[AniDB Response] Tag: " + Tag + " ReplyID: " + ReplyID, __FILE__, __LINE__);
+	}
+	
+	// Log truncation status
+	if(isTruncated)
+	{
+		Logger::log("[AniDB Response] TRUNCATED response detected for Tag: " + Tag + " ReplyID: " + ReplyID, __FILE__, __LINE__);
 	}
 
 	token.pop_front();
@@ -526,6 +533,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		token2.pop_front();
 		token2 = token2.first().split("|");
 		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 220 FILE - Truncated response, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 220 FILE - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
+		
 		// FID is always the first field in FILE responses
 		int index = 1;  // Start parsing after FID
 		
@@ -562,6 +579,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			storeGroupData(groupData);
 		}
 		
+		// Handle truncated response - log warning about incomplete data
+		if(isTruncated)
+		{
+			Logger::log(QString("[AniDB Response] 220 FILE - WARNING: Response was truncated, some fields may be missing. "
+				"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
+		}
+		
 		// Check if episode data is missing (no epno) and queue EPISODE API request
 		if(!fileData.eid.isEmpty() && fileData.eid != "0" && episodeData.epno.isEmpty())
 		{
@@ -595,6 +619,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
+		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 221 MYLIST - Truncated response, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 221 MYLIST - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
+		
 		// Parse mylist entry: fid|eid|aid|gid|date|state|viewdate|storage|source|other|filestate
 		// Note: lid is NOT included in the response - it's extracted from the query command
 		if(token2.size() >= 11 && !lid.isEmpty())
@@ -646,11 +681,23 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QSqlQuery query(db);
 		unsigned int fmask = 0;  // Not used for ANIME commands
 		unsigned int amask = 0;
+		QString amaskString;
 		
 		if(query.exec(q) && query.next())
 		{
 			QString animeCmd = query.value(0).toString();
 			Logger::log("[AniDB Response] 230 ANIME command: " + animeCmd, __FILE__, __LINE__);
+			
+			// Extract amask as string for proper 7-byte parsing
+			QRegularExpression amaskRegex("amask=([0-9a-fA-F]+)");
+			QRegularExpressionMatch amaskMatch = amaskRegex.match(animeCmd);
+			if (amaskMatch.hasMatch())
+			{
+				amaskString = amaskMatch.captured(1);
+				Logger::log("[AniDB Response] 230 ANIME extracted amask string: " + amaskString, __FILE__, __LINE__);
+			}
+			
+			// Also extract as uint for fallback/logging
 			if(!extractMasksFromCommand(animeCmd, fmask, amask))
 			{
 				LOG("Failed to extract amask from ANIME command for Tag: " + Tag);
@@ -668,8 +715,19 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						ANIME_CHARACTER_ID_LIST |
 						ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 						ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
+				// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
+				amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
 			}
-			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + QString::number(amask, 16), __FILE__, __LINE__);
+			// Ensure extracted amask string is 14 chars (7 bytes)
+			if (!amaskString.isEmpty())
+			{
+				amaskString = amaskString.leftJustified(14, '0');
+			}
+			
+			// Create AnimeMask object for proper handling
+			AnimeMask originalMask(amaskString);
+			
+			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + amaskString, __FILE__, __LINE__);
 		}
 		else
 		{
@@ -688,7 +746,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					ANIME_CHARACTER_ID_LIST |
 					ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 					ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + QString::number(amask, 16), __FILE__, __LINE__);
+			// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
+			amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
+			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + amaskString, __FILE__, __LINE__);
 		}
 		
 		// Parse response using mask-aware parsing
@@ -698,6 +758,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		token2.pop_front();
 		QString responseData = token2.first();
 		token2 = responseData.split("|");
+		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 230 ANIME - Truncated response detected, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 230 ANIME - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
 		
 		// Debug logging
 		Logger::log("[AniDB Response] 230 ANIME raw data: " + responseData, __FILE__, __LINE__);
@@ -716,23 +786,56 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			int startIndex = index;
 			
 			// Check if response might be truncated (UDP 1400 byte limit)
-			if(responseData.length() >= 1350)
+			if(responseData.length() >= 1350 && !isTruncated)
 			{
 				Logger::log("[AniDB Response] 230 ANIME WARNING: Response near UDP size limit (" + 
 					QString::number(responseData.length()) + " chars), may be truncated", __FILE__, __LINE__);
 			}
 			
-			// Parse anime data using amask
-			AnimeData animeData = parseAnimeMask(token2, amask, index);
+			// Parse anime data using amask string for proper 7-byte handling
+			// Track which fields were successfully parsed for re-request logic
+			QByteArray parsedMaskBytes;
+			AnimeData animeData = parseAnimeMaskFromString(token2, amaskString, index, parsedMaskBytes);
 			animeData.aid = aid;  // Ensure aid is set
 			
 			Logger::log("[AniDB Response] 230 ANIME parsed " + QString::number(index - startIndex) + " fields (index: " + QString::number(startIndex) + " -> " + QString::number(index) + ")", __FILE__, __LINE__);
 			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + animeData.year + "' Type: '" + animeData.type + "'", __FILE__, __LINE__);
 			
-			// NOTE: UDP responses are limited to ~1400 bytes
-			// Long anime titles can be truncated. The last field in a truncated response
-			// will be incomplete. This is a known limitation of the AniDB UDP API.
-			// Alternative: Use HTTP API or mylist export for complete data.
+			// Handle truncated response - calculate missing fields and re-request
+			if(isTruncated)
+			{
+				Logger::log(QString("[AniDB Response] 230 ANIME - WARNING: Response was truncated, some fields may be missing. "
+					"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
+				
+				// Calculate reduced mask with only missing fields
+				AnimeMask reducedMask = calculateReducedMask(originalMask, parsedMaskBytes);
+				
+				// Check if there are any missing fields
+				if (!reducedMask.isEmpty())
+				{
+					// Queue re-request with reduced mask to fetch missing fields
+					QString reducedMaskString = reducedMask.toString();
+					QString reRequestCmd = QString("ANIME aid=%1&amask=%2").arg(aid).arg(reducedMaskString);
+					Logger::log(QString("[AniDB Response] 230 ANIME - Queueing re-request for missing fields with reduced mask: %1")
+						.arg(reducedMaskString), __FILE__, __LINE__);
+					
+					// Insert re-request into packets table
+					QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(reRequestCmd);
+					QSqlQuery reRequestQuery(db);
+					if (reRequestQuery.exec(q))
+					{
+						Logger::log("[AniDB Response] 230 ANIME - Re-request queued successfully", __FILE__, __LINE__);
+					}
+					else
+					{
+						Logger::log("[AniDB Response] 230 ANIME - ERROR: Failed to queue re-request: " + reRequestQuery.lastError().text(), __FILE__, __LINE__);
+					}
+				}
+				else
+				{
+					Logger::log("[AniDB Response] 230 ANIME - No missing fields to re-request (all requested fields were received)", __FILE__, __LINE__);
+				}
+			}
 			
 			// For ANIME command, we only update typename since other fields may not be returned
 			// The type field is returned as a string (e.g., "TV Series") by the API
@@ -761,6 +864,16 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QStringList token2 = Message.split("\n");
 		token2.pop_front();
 		token2 = token2.first().split("|");
+		
+		// Handle truncated responses - remove the last field as it's likely incomplete
+		if(isTruncated && token2.size() > 0)
+		{
+			Logger::log(QString("[AniDB Response] 240 EPISODE - Truncated response, removing last field (was: '%1')")
+				.arg(token2.last()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Response] 240 EPISODE - Original field count: %1, processing %2 fields")
+				.arg(token2.size()).arg(token2.size() - 1), __FILE__, __LINE__);
+			token2.removeLast();
+		}
 		
 		if(token2.size() >= 7)
 		{
@@ -792,6 +905,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			else
 			{
 				Logger::log("[AniDB Response] 240 EPISODE stored - EID: " + eid + " AID: " + aid + " EPNO: " + epno + " Name: " + epname, __FILE__, __LINE__);
+				
+				// Log warning if truncated
+				if(isTruncated)
+				{
+					Logger::log(QString("[AniDB Response] 240 EPISODE - WARNING: Response was truncated, some fields may be missing"), __FILE__, __LINE__);
+				}
+				
 				// Emit signal to notify UI that episode data was updated
 				emit notifyEpisodeUpdated(eid.toInt(), aid.toInt());
 			}
@@ -1028,10 +1148,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Logger::log("[AniDB Response] 291 NOTIFYLIST - Tag: " + Tag + " Entry count: " + QString::number(token2.size()), __FILE__, __LINE__);
 		
 		// Log all notification entries
-		for(int i = 0; i < token2.size(); i++)
+/*		for(int i = 0; i < token2.size(); i++)
 		{
 			Logger::log("[AniDB Response] 291 NOTIFYLIST Entry " + QString::number(i+1) + " of " + QString::number(token2.size()) + ": " + token2[i], __FILE__, __LINE__);
-		}
+        }*/
 		
 		// Collect all message notification IDs (M|nid entries)
 		// Export notifications could be in any of these messages, not just the last one
@@ -1507,7 +1627,7 @@ QString AniDBApi::buildAnimeCommand(int aid)
 {
 	// ANIME aid={int4 aid}&amask={hexstr amask}
 	// Request anime information for a specific anime ID
-	// Build amask using the anime_amask_codes enum (all 7 bytes)
+	// Build amask using the anime_amask_codes enum and AnimeMask class (all 7 bytes)
 	// 
 	// ANIME command uses byte-oriented mask (7 bytes):
 	//   Byte 1: aid, dateflags, year, type, related lists
@@ -1542,8 +1662,11 @@ QString AniDBApi::buildAnimeCommand(int aid)
 		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
-	// Convert to hex string (no leading zeros for AniDB API)
-	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);
+	// Create AnimeMask from the 32-bit enum (covers bytes 1-4, bytes 5-7 are zero)
+	// The AnimeMask class properly handles all 7 bytes using quint64
+	AnimeMask mask(amask);
+	
+	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
 }
 
 /* === End Command Builders === */
@@ -1622,6 +1745,7 @@ int AniDBApi::Recv()
 	QByteArray data;
 //    Socket->waitForReadyRead(10000);
 	QString result;
+	bool isTruncated = false;
 	while(Socket->hasPendingDatagrams())
 	{
 		data.resize(Socket->pendingDatagramSize());
@@ -1631,10 +1755,18 @@ int AniDBApi::Recv()
         result = QString::fromUtf8(data.data());
 		LOG("AniDBApi: Recv: " + result);
 		Logger::log(QString("[AniDB Recv] Datagram size: %1 bytes, Read: %2 bytes, Result length: %3 chars").arg(data.size()).arg(bytesRead).arg(result.length()), __FILE__, __LINE__);
+		
+		// Detect truncation: UDP MTU limit is typically 1400 bytes
+		// If datagram size is exactly 1400 bytes, the response is likely truncated
+		if(data.size() >= 1400 || bytesRead >= 1400)
+		{
+			isTruncated = true;
+			Logger::log(QString("[AniDB Recv] TRUNCATION DETECTED: Datagram at MTU limit (%1 bytes), response is truncated").arg(data.size()), __FILE__, __LINE__);
+		}
     }
 	if(result.length() > 0)
 	{
-		ParseMessage(result,"", lastSentPacket);
+		ParseMessage(result,"", lastSentPacket, isTruncated);
 		return 1;
 	}
 	return 0;
@@ -3065,22 +3197,94 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 		// Byte 7, bits 2-0 are unused
 	};
 	
-	// Process mask bits in order using a loop
-	// This ensures fields are extracted in the correct sequence
+	// Process ALL mask bits in strict MSB to LSB order, including retired/unused bits
+	// The AniDB server sends fields for ALL set bits in the mask, even retired ones
+	// We must check every bit position to maintain correct token alignment
+	//
+	// NOTE: The amask is a 7-byte (56-bit) value, but we're limited to 32 bits in the current
+	// implementation. This means bytes 5-7 are not properly handled. A full fix would require
+	// using uint64_t or string parsing. For now, we handle bytes 1-4 correctly.
+	
+	// Define all possible bit positions for bytes 1-4 in MSB to LSB order
+	unsigned int allBits[] = {
+		// Byte 1 (bits 7-0)
+		0x00000080, 0x00000040, 0x00000020, 0x00000010, 0x00000008, 0x00000004, 0x00000002, 0x00000001,
+		// Byte 2 (bits 15-8)
+		0x00008000, 0x00004000, 0x00002000, 0x00001000, 0x00000800, 0x00000400, 0x00000200, 0x00000100,
+		// Byte 3 (bits 23-16)
+		0x00800000, 0x00400000, 0x00200000, 0x00100000, 0x00080000, 0x00040000, 0x00020000, 0x00010000,
+		// Byte 4 (bits 31-24)
+		0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x08000000, 0x04000000, 0x02000000, 0x01000000
+	};
+	
+	// Create a map of bit values to field info for quick lookup
+	std::map<unsigned int, const MaskBit*> bitMap;
 	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
 	{
-		if (amask & maskBits[i].bit)
+		bitMap[maskBits[i].bit] = &maskBits[i];
+	}
+	
+	// Process all bits in order
+	for (size_t i = 0; i < sizeof(allBits) / sizeof(unsigned int); i++)
+	{
+		unsigned int currentBit = allBits[i];
+		
+		// Check if this bit is set in the mask
+		if (amask & currentBit)
 		{
 			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
-			// The caller sets index=1 to start after AID, so we shouldn't consume another token for it
-			if (maskBits[i].bit == ANIME_AID)
+			if (currentBit == ANIME_AID)
 			{
 				Logger::log(QString("[AniDB parseAnimeMask] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
 				continue;
 			}
 			
+			// Check if we have a defined field for this bit
+			auto it = bitMap.find(currentBit);
+			if (it != bitMap.end())
+			{
+				// This is a defined field
+				const MaskBit* maskBit = it->second;
+				QString value = tokens.value(index);
+				Logger::log(QString("[AniDB parseAnimeMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
+					.arg(maskBit->name)
+					.arg(currentBit, 0, 16)
+					.arg(index)
+					.arg(value), __FILE__, __LINE__);
+				
+				if (maskBit->field != nullptr)
+				{
+					*(maskBit->field) = value;
+				}
+			}
+			else
+			{
+				// This is a retired/unused bit - consume the token but don't store
+				QString value = tokens.value(index);
+				Logger::log(QString("[AniDB parseAnimeMask] Retired/unused bit 0x%1 -> token[%2] = '%3' (skipped)")
+					.arg(currentBit, 0, 16)
+					.arg(index)
+					.arg(value), __FILE__, __LINE__);
+			}
+			
+			// Always increment index for any bit set in the mask
+			index++;
+		}
+	}
+	
+	// Handle bytes 5-7 using the remaining maskBits entries
+	// These overlap with bytes 1-3 in the 32-bit representation, so we process them separately
+	// after bytes 1-4 are done
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		// Skip bits that belong to bytes 1-4 (already processed)
+		if (maskBits[i].bit <= 0x01000000)
+			continue;
+			
+		if (amask & maskBits[i].bit)
+		{
 			QString value = tokens.value(index);
-			Logger::log(QString("[AniDB parseAnimeMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
+			Logger::log(QString("[AniDB parseAnimeMask] Byte 5-7 field: %1 (bit 0x%2) -> token[%3] = '%4'")
 				.arg(maskBits[i].name)
 				.arg(maskBits[i].bit, 0, 16)
 				.arg(index)
@@ -3090,7 +3294,6 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 			{
 				*(maskBits[i].field) = value;
 			}
-			// else: field is not stored (marked with nullptr)
 		}
 	}
 	
@@ -3099,6 +3302,397 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	data.eplast = data.highest_episode;  // highest episode (Byte 3, bit 6)
 	
 	return data;
+}
+
+/**
+ * Parse anime data from AniDB ANIME response using the mask hex string.
+ * This properly handles all 7 bytes of the anime mask by parsing the hex string directly.
+ * 
+ * The AniDB anime mask is a 7-byte value sent as a hex string (e.g., "fffffcfc00" for 7 bytes).
+ * Each byte represents 8 bits, and fields are sent in MSB-to-LSB order across all bytes.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amaskHexString The anime mask as a hex string (e.g., "fffffcfc")
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return AnimeData structure with parsed anime fields
+ */
+AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index)
+{
+	AnimeData data;
+	
+	// Parse the hex string into bytes (pad to 14 hex chars = 7 bytes if shorter)
+	// The hex string represents bytes 1-7 from left to right, e.g., "fffffcfc" = FF FF FC FC (bytes 1-4), then 00 00 00 (bytes 5-7)
+	QString paddedMask = amaskHexString.leftJustified(14, '0');
+	QByteArray maskBytes;
+	for (int i = 0; i < paddedMask.length(); i += 2)
+	{
+		bool ok;
+		unsigned char byte = paddedMask.mid(i, 2).toUInt(&ok, 16);
+		if (ok)
+			maskBytes.append(byte);
+	}
+	
+	// Ensure we have 7 bytes
+	while (maskBytes.size() < 7)
+		maskBytes.append((char)0);
+	
+	Logger::log(QString("[AniDB parseAnimeMaskFromString] Mask string: %1 -> %2 bytes")
+		.arg(amaskHexString)
+		.arg(maskBytes.size()), __FILE__, __LINE__);
+	
+	// Define all mask bits in MSB to LSB order with their byte positions
+	struct MaskBit {
+		int byteIndex;     // 0-6 for bytes 1-7
+		unsigned char bitMask;  // Bit mask within the byte (0x80, 0x40, etc.)
+		QString* field;
+		const char* name;
+	};
+	
+	MaskBit maskBits[] = {
+		// Byte 1 (byte 0 in array) - bits 7-0
+		{0, 0x80, &data.aid,                  "AID"},
+		{0, 0x40, &data.dateflags,            "DATEFLAGS"},
+		{0, 0x20, &data.year,                 "YEAR"},
+		{0, 0x10, &data.type,                 "TYPE"},
+		{0, 0x08, &data.relaidlist,           "RELATED_AID_LIST"},
+		{0, 0x04, &data.relaidtype,           "RELATED_AID_TYPE"},
+		{0, 0x02, nullptr,                    "RETIRED_BYTE1_BIT1"},  // Retired
+		{0, 0x01, nullptr,                    "RETIRED_BYTE1_BIT0"},  // Retired
+		
+		// Byte 2 (byte 1 in array) - bits 7-0
+		{1, 0x80, &data.nameromaji,           "ROMAJI_NAME"},
+		{1, 0x40, &data.namekanji,            "KANJI_NAME"},
+		{1, 0x20, &data.nameenglish,          "ENGLISH_NAME"},
+		{1, 0x10, &data.nameother,            "OTHER_NAME"},
+		{1, 0x08, &data.nameshort,            "SHORT_NAME_LIST"},
+		{1, 0x04, &data.synonyms,             "SYNONYM_LIST"},
+		{1, 0x02, nullptr,                    "RETIRED_BYTE2_BIT1"},  // Retired
+		{1, 0x01, nullptr,                    "RETIRED_BYTE2_BIT0"},  // Retired
+		
+		// Byte 3 (byte 2 in array) - bits 7-0
+		{2, 0x80, &data.episodes,             "EPISODES"},
+		{2, 0x40, &data.highest_episode,      "HIGHEST_EPISODE"},
+		{2, 0x20, &data.special_ep_count,     "SPECIAL_EP_COUNT"},
+		{2, 0x10, &data.air_date,             "AIR_DATE"},
+		{2, 0x08, &data.end_date,             "END_DATE"},
+		{2, 0x04, &data.url,                  "URL"},
+		{2, 0x02, &data.picname,              "PICNAME"},
+		{2, 0x01, nullptr,                    "RETIRED_BYTE3_BIT0"},  // Retired
+		
+		// Byte 4 (byte 3 in array) - bits 7-0
+		{3, 0x80, &data.rating,               "RATING"},
+		{3, 0x40, &data.vote_count,           "VOTE_COUNT"},
+		{3, 0x20, &data.temp_rating,          "TEMP_RATING"},
+		{3, 0x10, &data.temp_vote_count,      "TEMP_VOTE_COUNT"},
+		{3, 0x08, &data.avg_review_rating,    "AVG_REVIEW_RATING"},
+		{3, 0x04, &data.review_count,         "REVIEW_COUNT"},
+		{3, 0x02, &data.award_list,           "AWARD_LIST"},
+		{3, 0x01, &data.is_18_restricted,     "IS_18_RESTRICTED"},
+		
+		// Byte 5 (byte 4 in array) - bits 7-0
+		{4, 0x80, nullptr,                    "RETIRED_BYTE5_BIT7"},  // Retired
+		{4, 0x40, &data.ann_id,               "ANN_ID"},
+		{4, 0x20, &data.allcinema_id,         "ALLCINEMA_ID"},
+		{4, 0x10, &data.animenfo_id,          "ANIMENFO_ID"},
+		{4, 0x08, &data.tag_name_list,        "TAG_NAME_LIST"},
+		{4, 0x04, &data.tag_id_list,          "TAG_ID_LIST"},
+		{4, 0x02, &data.tag_weight_list,      "TAG_WEIGHT_LIST"},
+		{4, 0x01, &data.date_record_updated,  "DATE_RECORD_UPDATED"},
+		
+		// Byte 6 (byte 5 in array) - bits 7-0
+		{5, 0x80, &data.character_id_list,    "CHARACTER_ID_LIST"},
+		{5, 0x40, nullptr,                    "RETIRED_BYTE6_BIT6"},  // Retired
+		{5, 0x20, nullptr,                    "RETIRED_BYTE6_BIT5"},  // Retired
+		{5, 0x10, nullptr,                    "RETIRED_BYTE6_BIT4"},  // Retired
+		{5, 0x08, nullptr,                    "UNUSED_BYTE6_BIT3"},   // Unused
+		{5, 0x04, nullptr,                    "UNUSED_BYTE6_BIT2"},   // Unused
+		{5, 0x02, nullptr,                    "UNUSED_BYTE6_BIT1"},   // Unused
+		{5, 0x01, nullptr,                    "UNUSED_BYTE6_BIT0"},   // Unused
+		
+		// Byte 7 (byte 6 in array) - bits 7-0
+		{6, 0x80, &data.specials_count,       "SPECIALS_COUNT"},
+		{6, 0x40, &data.credits_count,        "CREDITS_COUNT"},
+		{6, 0x20, &data.other_count,          "OTHER_COUNT"},
+		{6, 0x10, &data.trailer_count,        "TRAILER_COUNT"},
+		{6, 0x08, &data.parody_count,         "PARODY_COUNT"},
+		{6, 0x04, nullptr,                    "UNUSED_BYTE7_BIT2"},   // Unused
+		{6, 0x02, nullptr,                    "UNUSED_BYTE7_BIT1"},   // Unused
+		{6, 0x01, nullptr,                    "UNUSED_BYTE7_BIT0"}    // Unused
+	};
+	
+	// Process each bit in order
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		int byteIdx = maskBits[i].byteIndex;
+		if (byteIdx >= maskBytes.size())
+			continue;
+			
+		unsigned char byte = (unsigned char)maskBytes[byteIdx];
+		
+		// Check if this bit is set in the mask
+		if (byte & maskBits[i].bitMask)
+		{
+			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
+			if (byteIdx == 0 && maskBits[i].bitMask == 0x80)
+			{
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
+				continue;
+			}
+			
+			QString value = tokens.value(index);
+			
+			if (maskBits[i].field != nullptr)
+			{
+				// This is a defined field - store it
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index)
+					.arg(value.left(80)), __FILE__, __LINE__);
+				
+				*(maskBits[i].field) = value;
+			}
+			else
+			{
+				// Retired/unused bit - consume the token but don't store
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index)
+					.arg(value.left(80)), __FILE__, __LINE__);
+			}
+			
+			// Always increment index for any bit set in the mask
+			index++;
+		}
+	}
+	
+	// Set legacy fields for backward compatibility
+	data.eptotal = data.episodes;
+	data.eplast = data.highest_episode;
+	
+	return data;
+}
+
+/**
+ * Parse anime data from AniDB ANIME response using the mask hex string.
+ * This version tracks which bits were successfully parsed for re-request logic.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amaskHexString The anime mask as a hex string (e.g., "fffffcfc")
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @param parsedMaskBytes Output: 7-byte array marking which bits were successfully parsed
+ * @return AnimeData structure with parsed anime fields
+ */
+AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
+{
+	AnimeData data;
+	
+	// Parse the hex string into bytes
+	QString paddedMask = amaskHexString.leftJustified(14, '0');
+	QByteArray maskBytes;
+	for (int i = 0; i < paddedMask.length(); i += 2)
+	{
+		bool ok;
+		unsigned char byte = paddedMask.mid(i, 2).toUInt(&ok, 16);
+		if (ok)
+			maskBytes.append(byte);
+	}
+	
+	// Ensure we have 7 bytes
+	while (maskBytes.size() < 7)
+		maskBytes.append((char)0);
+	
+	// Initialize parsedMaskBytes to track what we successfully parse
+	parsedMaskBytes.clear();
+	for (int i = 0; i < 7; i++)
+		parsedMaskBytes.append((char)0);
+	
+	Logger::log(QString("[AniDB parseAnimeMaskFromString] Mask string: %1 -> %2 bytes")
+		.arg(amaskHexString)
+		.arg(maskBytes.size()), __FILE__, __LINE__);
+	
+	// Define all mask bits in MSB to LSB order with their byte positions
+	struct MaskBit {
+		int byteIndex;
+		unsigned char bitMask;
+		QString* field;
+		const char* name;
+	};
+	
+	MaskBit maskBits[] = {
+		// Byte 1 (byte 0 in array) - bits 7-0
+		{0, 0x80, &data.aid,                  "AID"},
+		{0, 0x40, &data.dateflags,            "DATEFLAGS"},
+		{0, 0x20, &data.year,                 "YEAR"},
+		{0, 0x10, &data.type,                 "TYPE"},
+		{0, 0x08, &data.relaidlist,           "RELATED_AID_LIST"},
+		{0, 0x04, &data.relaidtype,           "RELATED_AID_TYPE"},
+		{0, 0x02, nullptr,                    "RETIRED_BYTE1_BIT1"},
+		{0, 0x01, nullptr,                    "RETIRED_BYTE1_BIT0"},
+		
+		// Byte 2 (byte 1 in array) - bits 7-0
+		{1, 0x80, &data.nameromaji,           "ROMAJI_NAME"},
+		{1, 0x40, &data.namekanji,            "KANJI_NAME"},
+		{1, 0x20, &data.nameenglish,          "ENGLISH_NAME"},
+		{1, 0x10, &data.nameother,            "OTHER_NAME"},
+		{1, 0x08, &data.nameshort,            "SHORT_NAME_LIST"},
+		{1, 0x04, &data.synonyms,             "SYNONYM_LIST"},
+		{1, 0x02, nullptr,                    "RETIRED_BYTE2_BIT1"},
+		{1, 0x01, nullptr,                    "RETIRED_BYTE2_BIT0"},
+		
+		// Byte 3 (byte 2 in array) - bits 7-0
+		{2, 0x80, &data.episodes,             "EPISODES"},
+		{2, 0x40, &data.highest_episode,      "HIGHEST_EPISODE"},
+		{2, 0x20, &data.special_ep_count,     "SPECIAL_EP_COUNT"},
+		{2, 0x10, &data.air_date,             "AIR_DATE"},
+		{2, 0x08, &data.end_date,             "END_DATE"},
+		{2, 0x04, &data.url,                  "URL"},
+		{2, 0x02, &data.picname,              "PICNAME"},
+		{2, 0x01, nullptr,                    "RETIRED_BYTE3_BIT0"},
+		
+		// Byte 4 (byte 3 in array) - bits 7-0
+		{3, 0x80, &data.rating,               "RATING"},
+		{3, 0x40, &data.vote_count,           "VOTE_COUNT"},
+		{3, 0x20, &data.temp_rating,          "TEMP_RATING"},
+		{3, 0x10, &data.temp_vote_count,      "TEMP_VOTE_COUNT"},
+		{3, 0x08, &data.avg_review_rating,    "AVG_REVIEW_RATING"},
+		{3, 0x04, &data.review_count,         "REVIEW_COUNT"},
+		{3, 0x02, &data.award_list,           "AWARD_LIST"},
+		{3, 0x01, &data.is_18_restricted,     "IS_18_RESTRICTED"},
+		
+		// Byte 5 (byte 4 in array) - bits 7-0
+		{4, 0x80, nullptr,                    "RETIRED_BYTE5_BIT7"},
+		{4, 0x40, &data.ann_id,               "ANN_ID"},
+		{4, 0x20, &data.allcinema_id,         "ALLCINEMA_ID"},
+		{4, 0x10, &data.animenfo_id,          "ANIMENFO_ID"},
+		{4, 0x08, &data.tag_name_list,        "TAG_NAME_LIST"},
+		{4, 0x04, &data.tag_id_list,          "TAG_ID_LIST"},
+		{4, 0x02, &data.tag_weight_list,      "TAG_WEIGHT_LIST"},
+		{4, 0x01, &data.date_record_updated,  "DATE_RECORD_UPDATED"},
+		
+		// Byte 6 (byte 5 in array) - bits 7-0
+		{5, 0x80, &data.character_id_list,    "CHARACTER_ID_LIST"},
+		{5, 0x40, nullptr,                    "RETIRED_BYTE6_BIT6"},
+		{5, 0x20, nullptr,                    "RETIRED_BYTE6_BIT5"},
+		{5, 0x10, nullptr,                    "RETIRED_BYTE6_BIT4"},
+		{5, 0x08, nullptr,                    "UNUSED_BYTE6_BIT3"},
+		{5, 0x04, nullptr,                    "UNUSED_BYTE6_BIT2"},
+		{5, 0x02, nullptr,                    "UNUSED_BYTE6_BIT1"},
+		{5, 0x01, nullptr,                    "UNUSED_BYTE6_BIT0"},
+		
+		// Byte 7 (byte 6 in array) - bits 7-0
+		{6, 0x80, &data.specials_count,       "SPECIALS_COUNT"},
+		{6, 0x40, &data.credits_count,        "CREDITS_COUNT"},
+		{6, 0x20, &data.other_count,          "OTHER_COUNT"},
+		{6, 0x10, &data.trailer_count,        "TRAILER_COUNT"},
+		{6, 0x08, &data.parody_count,         "PARODY_COUNT"},
+		{6, 0x04, nullptr,                    "UNUSED_BYTE7_BIT2"},
+		{6, 0x02, nullptr,                    "UNUSED_BYTE7_BIT1"},
+		{6, 0x01, nullptr,                    "UNUSED_BYTE7_BIT0"}
+	};
+	
+	// Process each bit in order
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		int byteIdx = maskBits[i].byteIndex;
+		if (byteIdx >= maskBytes.size())
+			continue;
+			
+		unsigned char byte = (unsigned char)maskBytes[byteIdx];
+		
+		// Check if this bit is set in the mask
+		if (byte & maskBits[i].bitMask)
+		{
+			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
+			if (byteIdx == 0 && maskBits[i].bitMask == 0x80)
+			{
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
+				// Mark as parsed since AID is always available
+				parsedMaskBytes[byteIdx] |= maskBits[i].bitMask;
+				continue;
+			}
+			
+			// Check if we have a token available
+			if (index >= tokens.size())
+			{
+				// No more tokens available - this field was not received (truncation)
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] MISSING: %1 (byte %2, bit 0x%3) -> no token at index %4")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index), __FILE__, __LINE__);
+				break; // Stop processing - truncation point reached
+			}
+			
+			QString value = tokens.value(index);
+			
+			if (maskBits[i].field != nullptr)
+			{
+				// This is a defined field - store it
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index)
+					.arg(value.left(80)), __FILE__, __LINE__);
+				
+				*(maskBits[i].field) = value;
+			}
+			else
+			{
+				// Retired/unused bit - consume the token but don't store
+				Logger::log(QString("[AniDB parseAnimeMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
+					.arg(maskBits[i].name)
+					.arg(byteIdx + 1)
+					.arg(maskBits[i].bitMask, 0, 16)
+					.arg(index)
+					.arg(value.left(80)), __FILE__, __LINE__);
+			}
+			
+			// Mark this bit as successfully parsed
+			parsedMaskBytes[byteIdx] |= maskBits[i].bitMask;
+			
+			// Always increment index for any bit set in the mask
+			index++;
+		}
+	}
+	
+	// Set legacy fields for backward compatibility
+	data.eptotal = data.episodes;
+	data.eplast = data.highest_episode;
+	
+	return data;
+}
+
+/**
+ * Calculate a reduced mask containing only the fields that were NOT successfully parsed.
+ * This is used for re-requesting missing data after truncation.
+ * 
+ * @param originalMask Original mask hex string (e.g., "fffffcfc")
+ * @param parsedMaskBytes 7-byte array marking which bits were successfully parsed
+ * @return Reduced mask hex string containing only unparsed fields
+ */
+AnimeMask AniDBApi::calculateReducedMask(const AnimeMask& originalMask, const QByteArray& parsedMaskBytes)
+{
+	// Build parsed mask from byte array
+	AnimeMask parsedAnimeMask;
+	for (int i = 0; i < parsedMaskBytes.size() && i < 7; i++)
+	{
+		parsedAnimeMask.setByte(i, (quint8)parsedMaskBytes[i]);
+	}
+	
+	// Calculate reduced mask: original AND NOT parsed
+	// This gives us the bits that were requested but not successfully parsed
+	AnimeMask reducedAnimeMask = originalMask & (~parsedAnimeMask);
+	
+	Logger::log(QString("[AniDB calculateReducedMask] Original: %1 -> Reduced: %2")
+		.arg(originalMask.toString())
+		.arg(reducedAnimeMask.toString()), __FILE__, __LINE__);
+	
+	return reducedAnimeMask;
 }
 
 /**

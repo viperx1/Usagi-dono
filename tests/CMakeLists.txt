@@ -1098,3 +1098,54 @@ endif()
 
 add_test(NAME test_hasher_thread COMMAND test_hasher_thread -v2)
 
+
+# Test: Truncated API response handling
+set(TRUNCATED_RESPONSE_TEST_SOURCES
+    test_truncated_response.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(TRUNCATED_RESPONSE_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_truncated_response ${TRUNCATED_RESPONSE_TEST_SOURCES} ${TRUNCATED_RESPONSE_TEST_HEADERS})
+
+target_compile_definitions(test_truncated_response PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_truncated_response PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_truncated_response PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_truncated_response PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_truncated_response PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_truncated_response COMMAND test_truncated_response -v2)

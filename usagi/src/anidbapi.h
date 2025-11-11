@@ -16,6 +16,7 @@
 #include <zlib.h>
 #include "hash/ed2k.h"
 #include "Qt-AES-master/qaesencryption.h"
+#include "animemask.h"
 
 
 /*struct status_codes_
@@ -67,6 +68,17 @@ private:
 
 	QString lastSentPacket;
 	QString currentTag; // Track the tag of the currently pending request
+	
+	// Truncated response handling
+	struct TruncatedResponseInfo {
+		bool isTruncated;
+		QString tag;
+		QString command;
+		int fieldsParsed;
+		unsigned int fmaskReceived;
+		unsigned int amaskReceived;
+		TruncatedResponseInfo() : isTruncated(false), fieldsParsed(0), fmaskReceived(0), amaskReceived(0) {}
+	} truncatedResponse;
 	
 	// Anime titles download and management
 	QNetworkAccessManager *networkManager;
@@ -264,6 +276,9 @@ private:
 	EpisodeData parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index);
 	GroupData parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
 	AnimeData parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index);
+	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
+	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
+	AnimeMask calculateReducedMask(const AnimeMask& originalMask, const QByteArray& parsedMaskBytes);
 	
 	void storeFileData(const FileData& data);
 	void storeAnimeData(const AnimeData& data);
@@ -353,7 +368,7 @@ public:
 
 	/* === Socket Start */
 	int CreateSocket();
-	QString ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg);
+	QString ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg, bool isTruncated = false);
 	int Send(QString, QString, QString);
     struct _waitingForReply
     {

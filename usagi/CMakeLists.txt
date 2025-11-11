@@ -34,6 +34,7 @@ endif()
 # Source files
 set(SOURCES
     src/anidbapi.cpp
+    src/animemask.cpp
     src/myanidbapi.cpp
     src/main.cpp
     src/window.cpp
@@ -54,6 +55,7 @@ set(SOURCES
 # Header files
 set(HEADERS
     src/anidbapi.h
+    src/animemask.h
     src/main.h
     src/window.h
     src/hasherthread.h
