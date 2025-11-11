@@ -3281,7 +3281,8 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 	AnimeData data;
 	
 	// Parse the hex string into bytes (pad to 14 hex chars = 7 bytes if shorter)
-	QString paddedMask = amaskHexString.rightJustified(14, '0');
+	// The hex string represents bytes 1-7 from left to right, e.g., "fffffcfc" = FF FF FC FC (bytes 1-4), then 00 00 00 (bytes 5-7)
+	QString paddedMask = amaskHexString.leftJustified(14, '0');
 	QByteArray maskBytes;
 	for (int i = 0; i < paddedMask.length(); i += 2)
 	{
