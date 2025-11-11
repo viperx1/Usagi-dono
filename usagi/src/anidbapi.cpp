@@ -3071,6 +3071,14 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	{
 		if (amask & maskBits[i].bit)
 		{
+			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
+			// The caller sets index=1 to start after AID, so we shouldn't consume another token for it
+			if (maskBits[i].bit == ANIME_AID)
+			{
+				Logger::log(QString("[AniDB parseAnimeMask] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
+				continue;
+			}
+			
 			QString value = tokens.value(index);
 			Logger::log(QString("[AniDB parseAnimeMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
 				.arg(maskBits[i].name)
