@@ -2,6 +2,7 @@
 #include "anidbapi.h"
 #include "logger.h"
 #include <cmath>
+#include <map>
 #include <QThread>
 #include <QElapsedTimer>
 #include <QRegularExpression>
@@ -3142,22 +3143,94 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 		// Byte 7, bits 2-0 are unused
 	};
 	
-	// Process mask bits in order using a loop
-	// This ensures fields are extracted in the correct sequence
+	// Process ALL mask bits in strict MSB to LSB order, including retired/unused bits
+	// The AniDB server sends fields for ALL set bits in the mask, even retired ones
+	// We must check every bit position to maintain correct token alignment
+	//
+	// NOTE: The amask is a 7-byte (56-bit) value, but we're limited to 32 bits in the current
+	// implementation. This means bytes 5-7 are not properly handled. A full fix would require
+	// using uint64_t or string parsing. For now, we handle bytes 1-4 correctly.
+	
+	// Define all possible bit positions for bytes 1-4 in MSB to LSB order
+	unsigned int allBits[] = {
+		// Byte 1 (bits 7-0)
+		0x00000080, 0x00000040, 0x00000020, 0x00000010, 0x00000008, 0x00000004, 0x00000002, 0x00000001,
+		// Byte 2 (bits 15-8)
+		0x00008000, 0x00004000, 0x00002000, 0x00001000, 0x00000800, 0x00000400, 0x00000200, 0x00000100,
+		// Byte 3 (bits 23-16)
+		0x00800000, 0x00400000, 0x00200000, 0x00100000, 0x00080000, 0x00040000, 0x00020000, 0x00010000,
+		// Byte 4 (bits 31-24)
+		0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x08000000, 0x04000000, 0x02000000, 0x01000000
+	};
+	
+	// Create a map of bit values to field info for quick lookup
+	std::map<unsigned int, const MaskBit*> bitMap;
 	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
 	{
-		if (amask & maskBits[i].bit)
+		bitMap[maskBits[i].bit] = &maskBits[i];
+	}
+	
+	// Process all bits in order
+	for (size_t i = 0; i < sizeof(allBits) / sizeof(unsigned int); i++)
+	{
+		unsigned int currentBit = allBits[i];
+		
+		// Check if this bit is set in the mask
+		if (amask & currentBit)
 		{
 			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
-			// The caller sets index=1 to start after AID, so we shouldn't consume another token for it
-			if (maskBits[i].bit == ANIME_AID)
+			if (currentBit == ANIME_AID)
 			{
 				Logger::log(QString("[AniDB parseAnimeMask] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
 				continue;
 			}
 			
+			// Check if we have a defined field for this bit
+			auto it = bitMap.find(currentBit);
+			if (it != bitMap.end())
+			{
+				// This is a defined field
+				const MaskBit* maskBit = it->second;
+				QString value = tokens.value(index);
+				Logger::log(QString("[AniDB parseAnimeMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
+					.arg(maskBit->name)
+					.arg(currentBit, 0, 16)
+					.arg(index)
+					.arg(value), __FILE__, __LINE__);
+				
+				if (maskBit->field != nullptr)
+				{
+					*(maskBit->field) = value;
+				}
+			}
+			else
+			{
+				// This is a retired/unused bit - consume the token but don't store
+				QString value = tokens.value(index);
+				Logger::log(QString("[AniDB parseAnimeMask] Retired/unused bit 0x%1 -> token[%2] = '%3' (skipped)")
+					.arg(currentBit, 0, 16)
+					.arg(index)
+					.arg(value), __FILE__, __LINE__);
+			}
+			
+			// Always increment index for any bit set in the mask
+			index++;
+		}
+	}
+	
+	// Handle bytes 5-7 using the remaining maskBits entries
+	// These overlap with bytes 1-3 in the 32-bit representation, so we process them separately
+	// after bytes 1-4 are done
+	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
+	{
+		// Skip bits that belong to bytes 1-4 (already processed)
+		if (maskBits[i].bit <= 0x01000000)
+			continue;
+			
+		if (amask & maskBits[i].bit)
+		{
 			QString value = tokens.value(index);
-			Logger::log(QString("[AniDB parseAnimeMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
+			Logger::log(QString("[AniDB parseAnimeMask] Byte 5-7 field: %1 (bit 0x%2) -> token[%3] = '%4'")
 				.arg(maskBits[i].name)
 				.arg(maskBits[i].bit, 0, 16)
 				.arg(index)
@@ -3167,7 +3240,6 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 			{
 				*(maskBits[i].field) = value;
 			}
-			// else: field is not stored (marked with nullptr)
 		}
 	}
 	
