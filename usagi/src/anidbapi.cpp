@@ -799,7 +799,19 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				// Calculate reduced mask with only missing fields
 				QString reducedMask = calculateReducedMask(amaskString, parsedMaskBytes);
 				
-				if (reducedMask != "0" && !reducedMask.isEmpty())
+				// Check if there are any missing fields (mask should be 14 hex chars = 7 bytes)
+				// If all zeros, no fields are missing
+				bool hasMissingFields = false;
+				for (int i = 0; i < reducedMask.length(); i++)
+				{
+					if (reducedMask[i] != '0')
+					{
+						hasMissingFields = true;
+						break;
+					}
+				}
+				
+				if (hasMissingFields)
 				{
 					// Queue re-request with reduced mask to fetch missing fields
 					QString reRequestCmd = QString("ANIME aid=%1&amask=%2").arg(aid).arg(reducedMask);
@@ -3698,24 +3710,18 @@ QString AniDBApi::calculateReducedMask(const QString& originalMask, const QByteA
 		}
 	}
 	
-	// Build hex string from left to right, stopping at last non-zero byte
-	int lastNonZero = 0;
-	for (int i = reducedBytes.size() - 1; i >= 0; i--)
+	// Build hex string from all 7 bytes (ANIME amask must always be 14 hex chars = 7 bytes)
+	for (int i = 0; i < 7; i++)
 	{
-		if ((unsigned char)reducedBytes[i] != 0)
+		if (i < reducedBytes.size())
 		{
-			lastNonZero = i;
-			break;
+			result += QString("%1").arg((unsigned char)reducedBytes[i], 2, 16, QChar('0'));
+		}
+		else
+		{
+			result += "00";
 		}
 	}
-	
-	for (int i = 0; i <= lastNonZero; i++)
-	{
-		result += QString("%1").arg((unsigned char)reducedBytes[i], 2, 16, QChar('0'));
-	}
-	
-	if (result.isEmpty())
-		result = "0";
 	
 	Logger::log(QString("[AniDB calculateReducedMask] Original: %1 -> Reduced: %2")
 		.arg(originalMask)
