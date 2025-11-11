@@ -715,9 +715,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						ANIME_CHARACTER_ID_LIST |
 						ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 						ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-				amaskString = QString::number(amask, 16);
+				amaskString = QString("%1").arg(amask, 14, 16, QChar('0'));
 			}
-			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + QString::number(amask, 16), __FILE__, __LINE__);
+			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + QString("%1").arg(amask, 14, 16, QChar('0')), __FILE__, __LINE__);
 		}
 		else
 		{
@@ -736,8 +736,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					ANIME_CHARACTER_ID_LIST |
 					ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 					ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-			amaskString = QString::number(amask, 16);
-			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + QString::number(amask, 16), __FILE__, __LINE__);
+			amaskString = QString("%1").arg(amask, 14, 16, QChar('0'));
+			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + QString("%1").arg(amask, 14, 16, QChar('0')), __FILE__, __LINE__);
 		}
 		
 		// Parse response using mask-aware parsing
@@ -1661,8 +1661,8 @@ QString AniDBApi::buildAnimeCommand(int aid)
 		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
-	// Convert to hex string (no leading zeros for AniDB API)
-	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 0, 16);
+	// Convert to hex string with 7 bytes (14 hex characters) padding
+	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(amask, 14, 16, QChar('0'));
 }
 
 /* === End Command Builders === */
