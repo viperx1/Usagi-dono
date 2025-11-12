@@ -872,25 +872,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				}
 			}
 			
-			// For ANIME command, we only update typename since other fields may not be returned
-			// The type field is returned as a string (e.g., "TV Series") by the API
-			if(!aid.isEmpty() && !animeData.type.isEmpty())
+			// Store all anime data to database
+			if(!aid.isEmpty())
 			{
-				QSqlQuery updateQuery(db);
-				updateQuery.prepare("UPDATE `anime` SET `typename` = ? WHERE `aid` = ?");
-				updateQuery.addBindValue(animeData.type);
-				updateQuery.addBindValue(aid.toInt());
-				
-				if(!updateQuery.exec())
-				{
-					LOG("Anime metadata update error: " + updateQuery.lastError().text());
-				}
-				else
-				{
-					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + animeData.type, __FILE__, __LINE__);
-					// Emit signal to notify UI that anime data was updated
-					emit notifyAnimeUpdated(aid.toInt());
-				}
+				animeData.aid = aid;  // Ensure aid is set
+				storeAnimeData(animeData);
+				Logger::log("[AniDB Response] 230 ANIME metadata saved to database - AID: " + aid + " Type: " + animeData.type, __FILE__, __LINE__);
+				// Emit signal to notify UI that anime data was updated
+				emit notifyAnimeUpdated(aid.toInt());
 			}
 		}
 	}
@@ -3792,9 +3781,9 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 	QString q = QString("INSERT OR REPLACE INTO `anime` "
 		"(`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, "
 		"`relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, "
-		"`nameother`, `nameshort`, `synonyms`) "
+		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`) "
 		"VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', "
-		"'%9', '%10', '%11', '%12', '%13', '%14')")
+		"'%9', '%10', '%11', '%12', '%13', '%14', '%15', '%16', '%17')")
 		.arg(QString(data.aid).replace("'", "''"))
 		.arg(QString(data.eptotal).replace("'", "''"))
 		.arg(QString(data.eplast).replace("'", "''"))
@@ -3808,7 +3797,10 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 		.arg(QString(data.nameenglish).replace("'", "''"))
 		.arg(QString(data.nameother).replace("'", "''"))
 		.arg(QString(data.nameshort).replace("'", "''"))
-		.arg(QString(data.synonyms).replace("'", "''"));
+		.arg(QString(data.synonyms).replace("'", "''"))
+		.arg(QString(data.type).replace("'", "''"))
+		.arg(QString(data.air_date).replace("'", "''"))
+		.arg(QString(data.end_date).replace("'", "''"));
 		
 	QSqlQuery query(db);
 	if(!query.exec(q))
