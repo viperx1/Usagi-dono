@@ -3829,31 +3829,32 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 	QString startdate = convertToISODate(data.air_date);
 	QString enddate = convertToISODate(data.end_date);
 	
-	// Use INSERT OR REPLACE with COALESCE to preserve existing non-empty values
-	// This merges data from multiple responses (e.g., after truncation and re-request)
-	QString q = QString("INSERT OR REPLACE INTO `anime` "
+	// Use INSERT with ON CONFLICT DO UPDATE (UPSERT) to merge data from multiple responses
+	// COALESCE preserves existing non-empty values when new value is empty
+	QString q = QString("INSERT INTO `anime` "
 		"(`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, "
 		"`relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, "
 		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`) "
-		"VALUES ("
-		":aid, "
-		"COALESCE(NULLIF(:eptotal, ''), (SELECT `eptotal` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:eplast, ''), (SELECT `eplast` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:year, ''), (SELECT `year` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:type, ''), (SELECT `type` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:relaidlist, ''), (SELECT `relaidlist` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:relaidtype, ''), (SELECT `relaidtype` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:category, ''), (SELECT `category` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:nameromaji, ''), (SELECT `nameromaji` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:namekanji, ''), (SELECT `namekanji` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:nameenglish, ''), (SELECT `nameenglish` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:nameother, ''), (SELECT `nameother` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:nameshort, ''), (SELECT `nameshort` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:synonyms, ''), (SELECT `synonyms` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:typename, ''), (SELECT `typename` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:startdate, ''), (SELECT `startdate` FROM `anime` WHERE `aid` = :aid)), "
-		"COALESCE(NULLIF(:enddate, ''), (SELECT `enddate` FROM `anime` WHERE `aid` = :aid))"
-		")");
+		"VALUES (:aid, :eptotal, :eplast, :year, :type, :relaidlist, "
+		":relaidtype, :category, :nameromaji, :namekanji, :nameenglish, "
+		":nameother, :nameshort, :synonyms, :typename, :startdate, :enddate) "
+		"ON CONFLICT(`aid`) DO UPDATE SET "
+		"`eptotal` = COALESCE(NULLIF(excluded.`eptotal`, ''), `anime`.`eptotal`), "
+		"`eplast` = COALESCE(NULLIF(excluded.`eplast`, ''), `anime`.`eplast`), "
+		"`year` = COALESCE(NULLIF(excluded.`year`, ''), `anime`.`year`), "
+		"`type` = COALESCE(NULLIF(excluded.`type`, ''), `anime`.`type`), "
+		"`relaidlist` = COALESCE(NULLIF(excluded.`relaidlist`, ''), `anime`.`relaidlist`), "
+		"`relaidtype` = COALESCE(NULLIF(excluded.`relaidtype`, ''), `anime`.`relaidtype`), "
+		"`category` = COALESCE(NULLIF(excluded.`category`, ''), `anime`.`category`), "
+		"`nameromaji` = COALESCE(NULLIF(excluded.`nameromaji`, ''), `anime`.`nameromaji`), "
+		"`namekanji` = COALESCE(NULLIF(excluded.`namekanji`, ''), `anime`.`namekanji`), "
+		"`nameenglish` = COALESCE(NULLIF(excluded.`nameenglish`, ''), `anime`.`nameenglish`), "
+		"`nameother` = COALESCE(NULLIF(excluded.`nameother`, ''), `anime`.`nameother`), "
+		"`nameshort` = COALESCE(NULLIF(excluded.`nameshort`, ''), `anime`.`nameshort`), "
+		"`synonyms` = COALESCE(NULLIF(excluded.`synonyms`, ''), `anime`.`synonyms`), "
+		"`typename` = COALESCE(NULLIF(excluded.`typename`, ''), `anime`.`typename`), "
+		"`startdate` = COALESCE(NULLIF(excluded.`startdate`, ''), `anime`.`startdate`), "
+		"`enddate` = COALESCE(NULLIF(excluded.`enddate`, ''), `anime`.`enddate`)");
 	
 	QSqlQuery query(db);
 	query.prepare(q);
