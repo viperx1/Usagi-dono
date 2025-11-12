@@ -1,13 +1,13 @@
-#ifndef ANIMEMASK_H
-#define ANIMEMASK_H
+#ifndef MASK_H
+#define MASK_H
 
 #include <QString>
 #include <cstdint>
 
 /**
- * @brief AnimeMask class for proper handling of 7-byte anime masks
+ * @brief Mask class for proper handling of 7-byte masks
  * 
- * AniDB ANIME command uses a 7-byte mask (56 bits), but C++ enums
+ * AniDB ANIME and FILE commands use 7-byte masks (56 bits), but C++ enums
  * are typically 32-bit. This class uses uint64_t to properly represent
  * all 7 bytes and provides conversion to/from hex strings.
  * 
@@ -18,25 +18,25 @@
  * - Bytes 5-7: High 24 bits (would require enum extension or string parsing)
  * - Byte 8: Always 0 (unused, for alignment)
  */
-class AnimeMask
+class Mask
 {
 public:
 	/**
-	 * @brief Construct empty AnimeMask (all bits 0)
+	 * @brief Construct empty Mask (all bits 0)
 	 */
-	AnimeMask();
+	Mask();
 	
 	/**
-	 * @brief Construct AnimeMask from hex string
+	 * @brief Construct Mask from hex string
 	 * @param hexString Hex string representing 7 bytes (e.g., "fffffcfc000000")
 	 */
-	explicit AnimeMask(const QString& hexString);
+	explicit Mask(const QString& hexString);
 	
 	/**
-	 * @brief Construct AnimeMask from 64-bit value
+	 * @brief Construct Mask from 64-bit value
 	 * @param value 64-bit value where lower 56 bits represent the mask
 	 */
-	explicit AnimeMask(uint64_t value);
+	explicit Mask(uint64_t value);
 	
 	/**
 	 * @brief Set mask from 32-bit enum value (bytes 1-4)
@@ -84,40 +84,40 @@ public:
 	/**
 	 * @brief Bitwise OR operation
 	 */
-	AnimeMask operator|(const AnimeMask& other) const;
+	Mask operator|(const Mask& other) const;
 	
 	/**
 	 * @brief Bitwise AND operation
 	 */
-	AnimeMask operator&(const AnimeMask& other) const;
+	Mask operator&(const Mask& other) const;
 	
 	/**
 	 * @brief Bitwise NOT operation
 	 */
-	AnimeMask operator~() const;
+	Mask operator~() const;
 	
 	/**
 	 * @brief Bitwise OR assignment
 	 */
-	AnimeMask& operator|=(const AnimeMask& other);
+	Mask& operator|=(const Mask& other);
 	
 	/**
 	 * @brief Bitwise AND assignment
 	 */
-	AnimeMask& operator&=(const AnimeMask& other);
+	Mask& operator&=(const Mask& other);
 	
 	/**
 	 * @brief Equality comparison
 	 */
-	bool operator==(const AnimeMask& other) const;
+	bool operator==(const Mask& other) const;
 	
 	/**
 	 * @brief Inequality comparison
 	 */
-	bool operator!=(const AnimeMask& other) const;
+	bool operator!=(const Mask& other) const;
 
 private:
 	uint64_t mask; ///< 64-bit storage for 7-byte mask (byte 8 always 0)
 };
 
-#endif // ANIMEMASK_H
+#endif // MASK_H
