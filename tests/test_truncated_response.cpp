@@ -99,7 +99,8 @@ void TestTruncatedResponse::testTruncatedFileResponse()
     // Create a simulated truncated FILE response
     // Response format: 220 FILE\n{fid}|{aid}|{eid}|{gid}|...
     // Simulate truncation by cutting off the last field
-    QString truncatedResponse = tag + " 220 FILE\n12345|100|200|300|0|0|1|734003200|a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4|||||||H264|1500|H.264/AVC|1200|1920x1080|mkv|japanese|english|1440|Test file|0|test_truncat";
+    // Note: mask 0x7ff8fef9 does NOT include fFILETYPE, so "mkv" is omitted
+    QString truncatedResponse = tag + " 220 FILE\n12345|100|200|300|0|0|1|1|734003200|a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4||||||H.264/AVC|1500|H264|1200|1920x1080|japanese|english|1440|Test file|0|test_truncat";
     
     // Parse the message with truncation flag set to true
     api->ParseMessage(truncatedResponse, "", fileCmd, true);
@@ -134,7 +135,8 @@ void TestTruncatedResponse::testTruncatedAnimeResponse()
     
     // Create a simulated truncated ANIME response
     // The response should have fields cut off at the end
-    QString truncatedResponse = tag + " 230 ANIME\n100|0|2023|TV Series|Related list here|Type|Romaji Name|Kanji Name|English Name|Other|Short|Synon";
+    // Mask b2f0e0fc000000 includes: AID, YEAR, TYPE, ROMAJI_NAME, KANJI_NAME, ENGLISH_NAME, OTHER_NAME
+    QString truncatedResponse = tag + " 230 ANIME\n100|2023|TV Series|Romaji Name|Kanji Name|English Name|Other Name That Gets Trunca";
     
     // Parse the message with truncation flag set to true
     api->ParseMessage(truncatedResponse, "", animeCmd, true);
@@ -163,7 +165,8 @@ void TestTruncatedResponse::testTruncatedMylistResponse()
     
     // Create a simulated truncated MYLIST response
     // Response format: 221 MYLIST\n{fid}|{eid}|{aid}|{gid}|{date}|{state}|{viewdate}|{storage}|{source}|{other}|{filestate}
-    QString truncatedResponse = tag + " 221 MYLIST\n12345|200|100|300|1234567890|1|0|HDD Storage Name That Is Very Long And Gets Trunc";
+    // Need 12 fields (one more than minimum) so after truncation removal we have 11 fields
+    QString truncatedResponse = tag + " 221 MYLIST\n12345|200|100|300|1234567890|1|0|HDD|download|comment|0|extra field that is very long and gets trunca";
     
     // Parse the message with truncation flag set to true
     api->ParseMessage(truncatedResponse, "", mylistCmd, true);
@@ -226,7 +229,8 @@ void TestTruncatedResponse::testNonTruncatedResponse()
     QVERIFY(query.exec(q));
     
     // Create a simulated complete (non-truncated) FILE response
-    QString completeResponse = tag + " 220 FILE\n12346|101|201|301|0|0|1|734003200|a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4|||||||H264|1500|H.264/AVC|1200|1920x1080|mkv|japanese|english|1440|Test file complete|0|test_complete.mkv";
+    // Note: mask 0x7ff8fef9 does NOT include fFILETYPE, so "mkv" is omitted
+    QString completeResponse = tag + " 220 FILE\n12346|101|201|301|0|0|1|1|734003200|a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4||||||H.264/AVC|1500|H264|1200|1920x1080|japanese|english|1440|Test file complete|0|test_complete.mkv";
     
     // Parse the message with truncation flag set to false
     api->ParseMessage(completeResponse, "", fileCmd, false);
