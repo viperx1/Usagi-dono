@@ -293,6 +293,9 @@ private:
     int totalHashParts;
     int completedHashParts;
     
+    // Track last progress per thread to calculate deltas with throttled updates
+    QMap<int, int> lastThreadProgress;
+    
     // Mutex to protect file assignment from concurrent thread requests
     QMutex fileRequestMutex;
     

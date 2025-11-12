@@ -837,6 +837,7 @@ void Window::setupHashingProgress(const QStringList &files)
 {
 	totalHashParts = calculateTotalHashParts(files);
 	completedHashParts = 0;
+	lastThreadProgress.clear(); // Reset per-thread progress tracking
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
 	progressTotal->setFormat("ETA: calculating...");
@@ -1063,7 +1064,13 @@ void Window::markwatchedStateChanged(int state)
 
 void Window::getNotifyPartsDone(int threadId, int total, int done)
 {
-	completedHashParts++;
+	// Calculate the delta from last update for this thread
+	int lastProgress = lastThreadProgress.value(threadId, 0);
+	int delta = done - lastProgress;
+	lastThreadProgress[threadId] = done;
+	
+	// Update completed parts by the actual delta (not just +1)
+	completedHashParts += delta;
 	
 	// Update the specific thread's progress bar
 	if (threadId >= 0 && threadId < threadProgressBars.size()) {
