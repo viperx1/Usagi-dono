@@ -7,6 +7,7 @@
 #include <QString>
 #include <QVector>
 #include <QThread>
+#include "hash/ed2k.h"
 
 class HasherThread;
 
