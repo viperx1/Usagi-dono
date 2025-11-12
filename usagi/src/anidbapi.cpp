@@ -680,7 +680,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
 		QSqlQuery query(db);
 		unsigned int fmask = 0;  // Not used for ANIME commands
-		unsigned int amask = 0;
+		uint64_t amask = 0;
 		QString amaskString;
 		AnimeMask originalMask;  // Declare here so it's available throughout the entire block
 		
@@ -716,8 +716,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						ANIME_CHARACTER_ID_LIST |
 						ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 						ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-				// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
-				amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
+				// Convert uint64 to hex string (14 chars for 7-byte format)
+				amaskString = QString("%1").arg(amask, 14, 16, QChar('0'));
 			}
 			// Ensure extracted amask string is 14 chars (7 bytes)
 			if (!amaskString.isEmpty())
@@ -747,8 +747,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					ANIME_CHARACTER_ID_LIST |
 					ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 					ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-			// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
-			amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
+			// Convert uint64 to hex string (14 chars for 7-byte format)
+			amaskString = QString("%1").arg(amask, 14, 16, QChar('0'));
 			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + amaskString, __FILE__, __LINE__);
 			
 			// Set AnimeMask object from the default amask
@@ -3122,7 +3122,7 @@ AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens,
  * @param index Current index in tokens array (updated as fields are consumed)
  * @return AnimeData structure with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index)
+AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, uint64_t amask, int& index)
 {
 	AnimeData data;
 	
@@ -3133,7 +3133,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	
 	// Define all mask bits in MSB to LSB order (bit 7 of each byte first)
 	struct MaskBit {
-		unsigned int bit;
+		uint64_t bit;
 		QString* field;
 		const char* name;  // For debug logging
 	};
