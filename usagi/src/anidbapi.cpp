@@ -76,7 +76,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 //		Debug("AniDBApi: Database opened");
 		query = QSqlQuery(db);
 		query.exec("CREATE TABLE IF NOT EXISTS `mylist`(`lid` INTEGER PRIMARY KEY, `fid` INTEGER, `eid` INTEGER, `aid` INTEGER, `gid` INTEGER, `date` INTEGER, `state` INTEGER, `viewed` INTEGER, `viewdate` INTEGER, `storage` TEXT, `source` TEXT, `other` TEXT, `filestate` INTEGER)");
-		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT, `enddate` TEXT);");
+		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT CHECK(startdate IS NULL OR startdate = '' OR startdate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `enddate` TEXT CHECK(enddate IS NULL OR enddate = '' OR enddate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'));");
         query.exec("CREATE TABLE IF NOT EXISTS `file`(`fid` INTEGER PRIMARY KEY, `aid` INTEGER, `eid` INTEGER, `gid` INTEGER, `lid` INTEGER, `othereps` TEXT, `isdepr` INTEGER, `state` INTEGER, `size` BIGINT, `ed2k` TEXT, `md5` TEXT, `sha1` TEXT, `crc` TEXT, `quality` TEXT, `source` TEXT, `codec_audio` TEXT, `bitrate_audio` INTEGER, `codec_video` TEXT, `bitrate_video` INTEGER, `resolution` TEXT, `filetype` TEXT, `lang_dub` TEXT, `lang_sub` TEXT, `length` INTEGER, `description` TEXT, `airdate` INTEGER, `filename` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT);");
 		// Add epno column if it doesn't exist (for existing databases)
@@ -3772,6 +3772,51 @@ void AniDBApi::storeFileData(const FileData& data)
 }
 
 /**
+ * Convert date string to ISO format (YYYY-MM-DDZ) for database storage.
+ * Enforces consistent date format at fundamental level.
+ * 
+ * Handles:
+ * - Unix timestamps (e.g., "1759449600") -> converts to ISO format
+ * - ISO dates (e.g., "2025-07-06Z") -> returns as-is
+ * - Empty strings -> returns empty
+ * 
+ * @param dateStr Input date string (Unix timestamp or ISO format)
+ * @return Date in YYYY-MM-DDZ format, or empty string if input is invalid/empty
+ */
+QString AniDBApi::convertToISODate(const QString& dateStr)
+{
+	if(dateStr.isEmpty())
+		return QString();
+	
+	// Check if it's already in ISO format (YYYY-MM-DD with optional Z)
+	QRegularExpression isoRegex("^\\d{4}-\\d{2}-\\d{2}Z?$");
+	if(isoRegex.match(dateStr).hasMatch())
+	{
+		// Ensure it ends with Z
+		if(dateStr.endsWith("Z"))
+			return dateStr;
+		else
+			return dateStr + "Z";
+	}
+	
+	// Check if it's a Unix timestamp (all digits)
+	QRegularExpression timestampRegex("^\\d+$");
+	if(timestampRegex.match(dateStr).hasMatch())
+	{
+		bool ok;
+		qint64 timestamp = dateStr.toLongLong(&ok);
+		if(ok && timestamp > 0)
+		{
+			QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
+			return dt.toString("yyyy-MM-dd") + "Z";
+		}
+	}
+	
+	// Invalid format - return empty
+	return QString();
+}
+
+/**
  * Store anime data in the database.
  */
 void AniDBApi::storeAnimeData(const AnimeData& data)
@@ -3780,98 +3825,60 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 		return;
 	
 	// Convert Unix timestamps to YYYY-MM-DDZ format for consistency with mylist export
-	QString startdate = data.air_date;
-	QString enddate = data.end_date;
+	// This enforces the date format at the fundamental level before database storage
+	QString startdate = convertToISODate(data.air_date);
+	QString enddate = convertToISODate(data.end_date);
 	
-	// Check if dates are Unix timestamps (all digits) and convert them
-	if(!startdate.isEmpty() && startdate.contains(QRegularExpression("^\\d+$")))
+	// Use INSERT OR REPLACE with COALESCE to preserve existing non-empty values
+	// This merges data from multiple responses (e.g., after truncation and re-request)
+	QString q = QString("INSERT OR REPLACE INTO `anime` "
+		"(`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, "
+		"`relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, "
+		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`) "
+		"VALUES ("
+		":aid, "
+		"COALESCE(NULLIF(:eptotal, ''), (SELECT `eptotal` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:eplast, ''), (SELECT `eplast` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:year, ''), (SELECT `year` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:type, ''), (SELECT `type` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:relaidlist, ''), (SELECT `relaidlist` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:relaidtype, ''), (SELECT `relaidtype` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:category, ''), (SELECT `category` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:nameromaji, ''), (SELECT `nameromaji` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:namekanji, ''), (SELECT `namekanji` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:nameenglish, ''), (SELECT `nameenglish` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:nameother, ''), (SELECT `nameother` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:nameshort, ''), (SELECT `nameshort` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:synonyms, ''), (SELECT `synonyms` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:typename, ''), (SELECT `typename` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:startdate, ''), (SELECT `startdate` FROM `anime` WHERE `aid` = :aid)), "
+		"COALESCE(NULLIF(:enddate, ''), (SELECT `enddate` FROM `anime` WHERE `aid` = :aid))"
+		")");
+	
+	QSqlQuery query(db);
+	query.prepare(q);
+	
+	query.bindValue(":aid", data.aid.toInt());
+	query.bindValue(":eptotal", data.eptotal);
+	query.bindValue(":eplast", data.eplast);
+	query.bindValue(":year", data.year);
+	query.bindValue(":type", data.type);
+	query.bindValue(":relaidlist", data.relaidlist);
+	query.bindValue(":relaidtype", data.relaidtype);
+	query.bindValue(":category", data.category);
+	query.bindValue(":nameromaji", data.nameromaji);
+	query.bindValue(":namekanji", data.namekanji);
+	query.bindValue(":nameenglish", data.nameenglish);
+	query.bindValue(":nameother", data.nameother);
+	query.bindValue(":nameshort", data.nameshort);
+	query.bindValue(":synonyms", data.synonyms);
+	query.bindValue(":typename", data.type);  // typename mirrors type
+	query.bindValue(":startdate", startdate);
+	query.bindValue(":enddate", enddate);
+	
+	if(!query.exec())
 	{
-		bool ok;
-		qint64 timestamp = startdate.toLongLong(&ok);
-		if(ok && timestamp > 0)
-		{
-			QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
-			startdate = dt.toString("yyyy-MM-dd") + "Z";
-		}
-	}
-	
-	if(!enddate.isEmpty() && enddate.contains(QRegularExpression("^\\d+$")))
-	{
-		bool ok;
-		qint64 timestamp = enddate.toLongLong(&ok);
-		if(ok && timestamp > 0)
-		{
-			QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
-			enddate = dt.toString("yyyy-MM-dd") + "Z";
-		}
-	}
-	
-	// First ensure the anime record exists
-	QSqlQuery insertQuery(db);
-	insertQuery.prepare("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (?)");
-	insertQuery.addBindValue(data.aid.toInt());
-	if(!insertQuery.exec())
-	{
-		LOG("Anime database insert error: " + insertQuery.lastError().text());
-		return;
-	}
-	
-	// Build UPDATE query with only non-empty fields to preserve existing data
-	// This prevents data loss when multiple ANIME responses are received (e.g., after truncation)
-	QStringList updates;
-	QSqlQuery updateQuery(db);
-	
-	// Build the SET clause dynamically based on which fields have data
-	if(!data.eptotal.isEmpty()) updates << "`eptotal` = :eptotal";
-	if(!data.eplast.isEmpty()) updates << "`eplast` = :eplast";
-	if(!data.year.isEmpty()) updates << "`year` = :year";
-	if(!data.type.isEmpty()) {
-		updates << "`type` = :type";
-		updates << "`typename` = :typename";  // typename mirrors type
-	}
-	if(!data.relaidlist.isEmpty()) updates << "`relaidlist` = :relaidlist";
-	if(!data.relaidtype.isEmpty()) updates << "`relaidtype` = :relaidtype";
-	if(!data.category.isEmpty()) updates << "`category` = :category";
-	if(!data.nameromaji.isEmpty()) updates << "`nameromaji` = :nameromaji";
-	if(!data.namekanji.isEmpty()) updates << "`namekanji` = :namekanji";
-	if(!data.nameenglish.isEmpty()) updates << "`nameenglish` = :nameenglish";
-	if(!data.nameother.isEmpty()) updates << "`nameother` = :nameother";
-	if(!data.nameshort.isEmpty()) updates << "`nameshort` = :nameshort";
-	if(!data.synonyms.isEmpty()) updates << "`synonyms` = :synonyms";
-	if(!startdate.isEmpty()) updates << "`startdate` = :startdate";
-	if(!enddate.isEmpty()) updates << "`enddate` = :enddate";
-	
-	// If there are no fields to update, we're done
-	if(updates.isEmpty())
-		return;
-	
-	QString q = "UPDATE `anime` SET " + updates.join(", ") + " WHERE `aid` = :aid";
-	updateQuery.prepare(q);
-	
-	// Bind values for fields that are present
-	if(!data.eptotal.isEmpty()) updateQuery.bindValue(":eptotal", data.eptotal);
-	if(!data.eplast.isEmpty()) updateQuery.bindValue(":eplast", data.eplast);
-	if(!data.year.isEmpty()) updateQuery.bindValue(":year", data.year);
-	if(!data.type.isEmpty()) {
-		updateQuery.bindValue(":type", data.type);
-		updateQuery.bindValue(":typename", data.type);
-	}
-	if(!data.relaidlist.isEmpty()) updateQuery.bindValue(":relaidlist", data.relaidlist);
-	if(!data.relaidtype.isEmpty()) updateQuery.bindValue(":relaidtype", data.relaidtype);
-	if(!data.category.isEmpty()) updateQuery.bindValue(":category", data.category);
-	if(!data.nameromaji.isEmpty()) updateQuery.bindValue(":nameromaji", data.nameromaji);
-	if(!data.namekanji.isEmpty()) updateQuery.bindValue(":namekanji", data.namekanji);
-	if(!data.nameenglish.isEmpty()) updateQuery.bindValue(":nameenglish", data.nameenglish);
-	if(!data.nameother.isEmpty()) updateQuery.bindValue(":nameother", data.nameother);
-	if(!data.nameshort.isEmpty()) updateQuery.bindValue(":nameshort", data.nameshort);
-	if(!data.synonyms.isEmpty()) updateQuery.bindValue(":synonyms", data.synonyms);
-	if(!startdate.isEmpty()) updateQuery.bindValue(":startdate", startdate);
-	if(!enddate.isEmpty()) updateQuery.bindValue(":enddate", enddate);
-	updateQuery.bindValue(":aid", data.aid.toInt());
-	
-	if(!updateQuery.exec())
-	{
-		LOG("Anime database update error: " + updateQuery.lastError().text());
+		LOG("Anime database query error: " + query.lastError().text());
 	}
 }
 
