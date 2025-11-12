@@ -1,26 +1,26 @@
-#include "animemask.h"
+#include "mask.h"
 
-AnimeMask::AnimeMask() : mask(0)
+Mask::Mask() : mask(0)
 {
 }
 
-AnimeMask::AnimeMask(const QString& hexString) : mask(0)
+Mask::Mask(const QString& hexString) : mask(0)
 {
 	setFromString(hexString);
 }
 
-AnimeMask::AnimeMask(uint64_t value) : mask(value & 0x00FFFFFFFFFFFFFFULL)
+Mask::Mask(uint64_t value) : mask(value & 0x00FFFFFFFFFFFFFFULL)
 {
 	// Mask off byte 8 (keep only lower 56 bits)
 }
 
-void AnimeMask::setFrom32Bit(uint32_t value)
+void Mask::setFrom32Bit(uint32_t value)
 {
 	// 32-bit enum values go into bytes 1-4 (lower 32 bits)
 	mask = static_cast<uint64_t>(value);
 }
 
-void AnimeMask::setFromString(const QString& hexString)
+void Mask::setFromString(const QString& hexString)
 {
 	if (hexString.isEmpty())
 	{
@@ -43,12 +43,12 @@ void AnimeMask::setFromString(const QString& hexString)
 	mask &= 0x00FFFFFFFFFFFFFFULL;
 }
 
-void AnimeMask::setValue(uint64_t value)
+void Mask::setValue(uint64_t value)
 {
 	mask = value & 0x00FFFFFFFFFFFFFFULL;
 }
 
-void AnimeMask::setByte(int byteIndex, uint8_t value)
+void Mask::setByte(int byteIndex, uint8_t value)
 {
 	if (byteIndex < 0 || byteIndex >= 7)
 	{
@@ -66,56 +66,56 @@ void AnimeMask::setByte(int byteIndex, uint8_t value)
 	mask &= 0x00FFFFFFFFFFFFFFULL;
 }
 
-QString AnimeMask::toString() const
+QString Mask::toString() const
 {
 	// Format as 14 hex characters (7 bytes), always uppercase, zero-padded
 	return QString("%1").arg(mask, 14, 16, QChar('0')).toUpper();
 }
 
-uint64_t AnimeMask::getValue() const
+uint64_t Mask::getValue() const
 {
 	return mask;
 }
 
-bool AnimeMask::isEmpty() const
+bool Mask::isEmpty() const
 {
 	return mask == 0;
 }
 
-AnimeMask AnimeMask::operator|(const AnimeMask& other) const
+Mask Mask::operator|(const Mask& other) const
 {
-	return AnimeMask(mask | other.mask);
+	return Mask(mask | other.mask);
 }
 
-AnimeMask AnimeMask::operator&(const AnimeMask& other) const
+Mask Mask::operator&(const Mask& other) const
 {
-	return AnimeMask(mask & other.mask);
+	return Mask(mask & other.mask);
 }
 
-AnimeMask AnimeMask::operator~() const
+Mask Mask::operator~() const
 {
 	// NOT operation, but keep byte 8 as 0
-	return AnimeMask((~mask) & 0x00FFFFFFFFFFFFFFULL);
+	return Mask((~mask) & 0x00FFFFFFFFFFFFFFULL);
 }
 
-AnimeMask& AnimeMask::operator|=(const AnimeMask& other)
+Mask& Mask::operator|=(const Mask& other)
 {
 	mask |= other.mask;
 	return *this;
 }
 
-AnimeMask& AnimeMask::operator&=(const AnimeMask& other)
+Mask& Mask::operator&=(const Mask& other)
 {
 	mask &= other.mask;
 	return *this;
 }
 
-bool AnimeMask::operator==(const AnimeMask& other) const
+bool Mask::operator==(const Mask& other) const
 {
 	return mask == other.mask;
 }
 
-bool AnimeMask::operator!=(const AnimeMask& other) const
+bool Mask::operator!=(const Mask& other) const
 {
 	return mask != other.mask;
 }

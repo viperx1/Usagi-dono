@@ -697,9 +697,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				amaskString = amaskMatch.captured(1);
 				Logger::log("[AniDB Response] 230 ANIME extracted amask string: " + amaskString, __FILE__, __LINE__);
 			}
-			
-			// Also extract as uint for fallback/logging
-			if(!extractMasksFromCommand(animeCmd, fmask, amask))
+			else
 			{
 				LOG("Failed to extract amask from ANIME command for Tag: " + Tag);
 				// Fall back to default amask (all defined fields)
