@@ -35,6 +35,10 @@
 class AniDBApi : public ed2k
 {
 	Q_OBJECT
+	
+	// Allow test class to access private methods for testing
+	friend class TestableAniDBApi;
+	
 private:
 	/* === Settings Start */
     QByteArray aes_key;
