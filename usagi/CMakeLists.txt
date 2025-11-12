@@ -39,6 +39,7 @@ set(SOURCES
     src/main.cpp
     src/window.cpp
     src/hasherthread.cpp
+    src/hasherthreadpool.cpp
     src/hash/md4.cpp
     src/hash/ed2k.cpp
     src/anidbapi_settings.cpp
@@ -59,6 +60,7 @@ set(HEADERS
     src/main.h
     src/window.h
     src/hasherthread.h
+    src/hasherthreadpool.h
     src/hash/md4.h
     src/hash/ed2k.h
     src/Qt-AES-master/qaesencryption.h
