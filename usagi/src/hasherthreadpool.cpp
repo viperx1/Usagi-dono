@@ -34,6 +34,10 @@ HasherThreadPool::HasherThreadPool(int numThreads, QObject *parent)
                 this, &HasherThreadPool::onThreadFinished, Qt::QueuedConnection);
         connect(worker, &HasherThread::threadStarted,
                 this, &HasherThreadPool::onThreadStarted, Qt::QueuedConnection);
+        connect(worker, &HasherThread::notifyPartsDone,
+                this, &HasherThreadPool::onThreadPartsDone, Qt::QueuedConnection);
+        connect(worker, &HasherThread::notifyFileHashed,
+                this, &HasherThreadPool::onThreadFileHashed, Qt::QueuedConnection);
         
         workers.append(worker);
     }
@@ -130,6 +134,17 @@ void HasherThreadPool::stop()
     }
 }
 
+void HasherThreadPool::broadcastStopHasher()
+{
+    LOG("HasherThreadPool: Broadcasting stop hasher signal to all workers");
+    
+    // Signal all workers to stop their current hashing operations
+    for (HasherThread *worker : workers)
+    {
+        worker->stopHashing();
+    }
+}
+
 bool HasherThreadPool::wait(unsigned long msecs)
 {
     // Wait for all worker threads to finish
@@ -184,6 +199,18 @@ void HasherThreadPool::onThreadStarted(Qt::HANDLE threadId)
 {
     // Forward thread started signal for testing
     emit threadStarted(threadId);
+}
+
+void HasherThreadPool::onThreadPartsDone(int total, int done)
+{
+    // Forward parts done signal to UI
+    emit notifyPartsDone(total, done);
+}
+
+void HasherThreadPool::onThreadFileHashed(ed2k::ed2kfilestruct fileData)
+{
+    // Forward file hashed signal to UI
+    emit notifyFileHashed(fileData);
 }
 
 void HasherThreadPool::checkAllThreadsFinished()

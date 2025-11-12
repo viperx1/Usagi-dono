@@ -154,6 +154,10 @@ Window::Window()
     connect(&hasherThreadPool, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
     connect(&hasherThreadPool, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
     connect(&hasherThreadPool, SIGNAL(finished()), this, SLOT(hasherFinished()));
+    // Connect thread pool signals for hashing progress and completion
+    connect(&hasherThreadPool, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
+    connect(&hasherThreadPool, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(ed2k::ed2kfilestruct)));
+    // Also keep connection to main adbapi for non-threaded operations (like API calls)
     connect(adbapi, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
     connect(adbapi, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(ed2k::ed2kfilestruct)));
     connect(buttonstop, SIGNAL(clicked()), this, SLOT(ButtonHasherStopClick()));
@@ -952,9 +956,10 @@ void Window::ButtonHasherStopClick()
 	progressFile->setMaximum(1);
 	
 	// Notify all worker threads to stop hashing
-	// 1. First, notify ed2k to interrupt the current hashing operation
+	// 1. First, notify ed2k instances in all worker threads to interrupt current hashing
 	//    This sets a flag that ed2khash checks, causing it to return early
-	emit notifyStopHasher();
+	hasherThreadPool.broadcastStopHasher();
+	emit notifyStopHasher(); // Also notify main adbapi for consistency
 	
 	// 2. Then signal the thread pool to stop processing more files
 	hasherThreadPool.stop();

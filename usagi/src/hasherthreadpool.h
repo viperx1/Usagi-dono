@@ -42,6 +42,12 @@ public:
     void stop();
     
     /**
+     * Broadcasts stop signal to all worker API instances.
+     * This interrupts any ongoing hashing operations.
+     */
+    void broadcastStopHasher();
+    
+    /**
      * Waits for all threads to finish.
      * @param msecs Maximum time to wait in milliseconds
      * @return true if all threads finished, false if timeout
@@ -81,11 +87,23 @@ signals:
      */
     void threadStarted(Qt::HANDLE threadId);
     
+    /**
+     * Emitted when progress is made on hashing a file.
+     */
+    void notifyPartsDone(int total, int done);
+    
+    /**
+     * Emitted when a file has been completely hashed.
+     */
+    void notifyFileHashed(ed2k::ed2kfilestruct fileData);
+    
 private slots:
     void onThreadRequestNextFile();
     void onThreadSendHash(QString hash);
     void onThreadFinished();
     void onThreadStarted(Qt::HANDLE threadId);
+    void onThreadPartsDone(int total, int done);
+    void onThreadFileHashed(ed2k::ed2kfilestruct fileData);
     
 private:
     void checkAllThreadsFinished();

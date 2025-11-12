@@ -1,6 +1,7 @@
 #include "hasherthread.h"
 #include "main.h"
 #include "logger.h"
+#include <QMetaObject>
 
 extern myAniDBApi *adbapi;
 
@@ -13,6 +14,13 @@ HasherThread::HasherThread(myAniDBApi *api)
         apiInstance = new myAniDBApi("usagi", 1);
         ownsApiInstance = true;
     }
+    
+    // Connect API signals to relay them through this thread
+    // Using Qt::DirectConnection since we're in the same thread
+    connect(apiInstance, SIGNAL(notifyPartsDone(int,int)), 
+            this, SIGNAL(notifyPartsDone(int,int)), Qt::DirectConnection);
+    connect(apiInstance, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), 
+            this, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), Qt::DirectConnection);
 }
 
 void HasherThread::run()
@@ -105,4 +113,14 @@ void HasherThread::addFile(const QString &filePath)
     QMutexLocker locker(&mutex);
     fileQueue.enqueue(filePath);
     condition.wakeOne();
+}
+
+void HasherThread::stopHashing()
+{
+    // Signal the API instance to stop the current hashing operation
+    if (apiInstance != nullptr)
+    {
+        // Call the slot that sets the dohash flag to 0
+        QMetaObject::invokeMethod(apiInstance, "getNotifyStopHasher", Qt::QueuedConnection);
+    }
 }
