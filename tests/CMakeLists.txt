@@ -66,7 +66,43 @@ endif()
 
 add_test(NAME test_hash COMMAND test_hash -v2)
 
-# Test 2: Crash log encoding test
+# Test 2: Mask byte order test
+set(MASK_TEST_SOURCES
+    test_mask.cpp
+    ../usagi/src/mask.cpp
+)
+
+set(MASK_TEST_HEADERS
+    ../usagi/src/mask.h
+)
+
+add_executable(test_mask ${MASK_TEST_SOURCES} ${MASK_TEST_HEADERS})
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_mask PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_mask PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_mask PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_mask PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_mask COMMAND test_mask -v2)
+
+# Test 3: Crash log encoding test
 set(CRASHLOG_TEST_SOURCES
     test_crashlog.cpp
     ../usagi/src/crashlog.cpp

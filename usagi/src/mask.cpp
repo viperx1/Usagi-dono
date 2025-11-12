@@ -28,15 +28,24 @@ void Mask::setFromString(const QString& hexString)
 		return;
 	}
 	
-	// Parse hex string as 64-bit value
-	bool ok = false;
-	// Take first 14 characters (7 bytes), pad if shorter
-	QString padded = hexString.leftJustified(14, '0');
-	mask = padded.toULongLong(&ok, 16);
+	// Parse hex string byte by byte
+	// The hex string has Byte 1 first (leftmost), Byte 7 last (rightmost)
+	// We need to store Byte 1 in bits 7-0 (LSB), Byte 7 in bits 55-48
+	QString padded = hexString.leftJustified(14, '0').left(14); // Ensure exactly 14 chars
 	
-	if (!ok)
+	mask = 0;
+	for (int i = 0; i < 7; i++)
 	{
-		mask = 0;
+		bool ok = false;
+		QString byteStr = padded.mid(i * 2, 2);
+		uint8_t byte = byteStr.toUInt(&ok, 16);
+		if (!ok)
+		{
+			mask = 0;
+			return;
+		}
+		// Store this byte at position i (Byte 1 at i=0 goes to bits 7-0, etc.)
+		mask |= (static_cast<uint64_t>(byte) << (i * 8));
 	}
 	
 	// Ensure byte 8 is 0 (mask off upper 8 bits)
@@ -68,8 +77,17 @@ void Mask::setByte(int byteIndex, uint8_t value)
 
 QString Mask::toString() const
 {
-	// Format as 14 hex characters (7 bytes), always uppercase, zero-padded
-	return QString("%1").arg(mask, 14, 16, QChar('0')).toUpper();
+	// Extract each byte from LSB to MSB and format as hex string
+	// The enum values store Byte 1 in bits 7-0 (LSB), Byte 7 in bits 55-48 (MSB)
+	// But AniDB expects the hex string with Byte 1 first (leftmost), Byte 7 last (rightmost)
+	// So we need to extract bytes in reverse order compared to standard hex output
+	QString result;
+	for (int i = 0; i < 7; i++)
+	{
+		uint8_t byte = (mask >> (i * 8)) & 0xFF;
+		result += QString("%1").arg(byte, 2, 16, QChar('0')).toUpper();
+	}
+	return result;
 }
 
 uint64_t Mask::getValue() const
