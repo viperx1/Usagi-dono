@@ -1642,37 +1642,41 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	//   Byte 6: character ID list
 	//   Byte 7: episode type counts (specials, credits, other, trailer, parody)
 	// 
-	// Construct mask byte-by-byte to correctly cover all 7 bytes
 	// Note: Per API spec, selecting unused/retired bits returns error 505
-	AnimeMask mask;
+	// The enum values for bytes 1-4 are correct for OR operations
+	// Bytes 5-7 need to be shifted to their proper positions (32, 40, 48 bits)
 	
-	// Byte 1 (0xFC): AID, DATEFLAGS, YEAR, TYPE, RELATED_AID_LIST, RELATED_AID_TYPE
-	// Exclude bits 1-0 (retired)
-	mask.setByte(0, 0xFC);
+	// Construct bytes 1-4 using enum constants (these fit in 32 bits)
+	unsigned int amask_low = 
+		// Byte 1
+		ANIME_AID | ANIME_DATEFLAGS |
+		ANIME_YEAR | ANIME_TYPE |
+		ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
+		// Byte 2
+		ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
+		ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
+		// Byte 3
+		ANIME_EPISODES | ANIME_HIGHEST_EPISODE | ANIME_SPECIAL_EP_COUNT |
+		ANIME_AIR_DATE | ANIME_END_DATE | ANIME_URL | ANIME_PICNAME |
+		// Byte 4
+		ANIME_RATING | ANIME_VOTE_COUNT | ANIME_TEMP_RATING | ANIME_TEMP_VOTE_COUNT |
+		ANIME_AVG_REVIEW_RATING | ANIME_REVIEW_COUNT | ANIME_AWARD_LIST | ANIME_IS_18_RESTRICTED;
 	
-	// Byte 2 (0xFC): ROMAJI_NAME, KANJI_NAME, ENGLISH_NAME, OTHER_NAME, SHORT_NAME_LIST, SYNONYM_LIST
-	// Exclude bits 1-0 (retired)
-	mask.setByte(1, 0xFC);
+	// Construct bytes 5-7 by shifting enum values to their proper bit positions
+	// Note: Enum values are defined for bytes 1-4, so we shift them into bytes 5-7
+	uint64_t amask_high = 
+		// Byte 5 (shift byte 3 values by 16 bits) - exclude retired bit 7
+		((uint64_t)(ANIME_ANN_ID | ANIME_ALLCINEMA_ID | ANIME_ANIMENFO_ID |
+		            ANIME_TAG_NAME_LIST | ANIME_TAG_ID_LIST | 
+		            ANIME_TAG_WEIGHT_LIST | ANIME_DATE_RECORD_UPDATED) << 16) |
+		// Byte 6 (shift byte 2 value by 32 bits) - only CHARACTER_ID_LIST
+		((uint64_t)ANIME_CHARACTER_ID_LIST << 32) |
+		// Byte 7 (shift byte 1 values by 48 bits) - exclude unused bits 2-0
+		((uint64_t)(ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
+		            ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT) << 48);
 	
-	// Byte 3 (0xFE): EPISODES, HIGHEST_EPISODE, SPECIAL_EP_COUNT, AIR_DATE, END_DATE, URL, PICNAME
-	// Exclude bit 0 (retired)
-	mask.setByte(2, 0xFE);
-	
-	// Byte 4 (0xFF): RATING, VOTE_COUNT, TEMP_RATING, TEMP_VOTE_COUNT, AVG_REVIEW_RATING, REVIEW_COUNT, AWARD_LIST, IS_18_RESTRICTED
-	// All bits are valid
-	mask.setByte(3, 0xFF);
-	
-	// Byte 5 (0x7F): ANN_ID, ALLCINEMA_ID, ANIMENFO_ID, TAG_NAME_LIST, TAG_ID_LIST, TAG_WEIGHT_LIST, DATE_RECORD_UPDATED
-	// Exclude bit 7 (retired)
-	mask.setByte(4, 0x7F);
-	
-	// Byte 6 (0x80): CHARACTER_ID_LIST only
-	// Exclude bits 6-4 (retired) and bits 3-0 (unused)
-	mask.setByte(5, 0x80);
-	
-	// Byte 7 (0xF8): SPECIALS_COUNT, CREDITS_COUNT, OTHER_COUNT, TRAILER_COUNT, PARODY_COUNT
-	// Exclude bits 2-0 (unused)
-	mask.setByte(6, 0xF8);
+	// Combine into full 7-byte mask using AnimeMask class
+	AnimeMask mask(amask_low | amask_high);
 	
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
 }
