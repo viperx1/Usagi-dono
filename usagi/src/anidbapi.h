@@ -289,6 +289,9 @@ private:
 	void storeEpisodeData(const EpisodeData& data);
 	void storeGroupData(const GroupData& data);
 	
+	// Date format conversion helper - enforces YYYY-MM-DDZ format at fundamental level
+	QString convertToISODate(const QString& dateStr);
+	
 	bool extractMasksFromCommand(const QString& command, unsigned int& fmask, unsigned int& amask);
 
 	//wxDatagramSocket *Socket; // UDP socket

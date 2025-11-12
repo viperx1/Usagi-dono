@@ -6,6 +6,7 @@
 #include <QThread>
 #include <QElapsedTimer>
 #include <QRegularExpression>
+#include <QDateTime>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
@@ -75,7 +76,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 //		Debug("AniDBApi: Database opened");
 		query = QSqlQuery(db);
 		query.exec("CREATE TABLE IF NOT EXISTS `mylist`(`lid` INTEGER PRIMARY KEY, `fid` INTEGER, `eid` INTEGER, `aid` INTEGER, `gid` INTEGER, `date` INTEGER, `state` INTEGER, `viewed` INTEGER, `viewdate` INTEGER, `storage` TEXT, `source` TEXT, `other` TEXT, `filestate` INTEGER)");
-		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT, `enddate` TEXT);");
+		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT CHECK(startdate IS NULL OR startdate = '' OR startdate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `enddate` TEXT CHECK(enddate IS NULL OR enddate = '' OR enddate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'));");
         query.exec("CREATE TABLE IF NOT EXISTS `file`(`fid` INTEGER PRIMARY KEY, `aid` INTEGER, `eid` INTEGER, `gid` INTEGER, `lid` INTEGER, `othereps` TEXT, `isdepr` INTEGER, `state` INTEGER, `size` BIGINT, `ed2k` TEXT, `md5` TEXT, `sha1` TEXT, `crc` TEXT, `quality` TEXT, `source` TEXT, `codec_audio` TEXT, `bitrate_audio` INTEGER, `codec_video` TEXT, `bitrate_video` INTEGER, `resolution` TEXT, `filetype` TEXT, `lang_dub` TEXT, `lang_sub` TEXT, `length` INTEGER, `description` TEXT, `airdate` INTEGER, `filename` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT);");
 		// Add epno column if it doesn't exist (for existing databases)
@@ -872,25 +873,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				}
 			}
 			
-			// For ANIME command, we only update typename since other fields may not be returned
-			// The type field is returned as a string (e.g., "TV Series") by the API
-			if(!aid.isEmpty() && !animeData.type.isEmpty())
+			// Store all anime data to database
+			if(!aid.isEmpty())
 			{
-				QSqlQuery updateQuery(db);
-				updateQuery.prepare("UPDATE `anime` SET `typename` = ? WHERE `aid` = ?");
-				updateQuery.addBindValue(animeData.type);
-				updateQuery.addBindValue(aid.toInt());
-				
-				if(!updateQuery.exec())
-				{
-					LOG("Anime metadata update error: " + updateQuery.lastError().text());
-				}
-				else
-				{
-					Logger::log("[AniDB Response] 230 ANIME metadata updated - AID: " + aid + " Type: " + animeData.type, __FILE__, __LINE__);
-					// Emit signal to notify UI that anime data was updated
-					emit notifyAnimeUpdated(aid.toInt());
-				}
+				animeData.aid = aid;  // Ensure aid is set
+				storeAnimeData(animeData);
+				Logger::log("[AniDB Response] 230 ANIME metadata saved to database - AID: " + aid + " Type: " + animeData.type, __FILE__, __LINE__);
+				// Emit signal to notify UI that anime data was updated
+				emit notifyAnimeUpdated(aid.toInt());
 			}
 		}
 	}
@@ -3782,36 +3772,112 @@ void AniDBApi::storeFileData(const FileData& data)
 }
 
 /**
+ * Convert date string to ISO format (YYYY-MM-DDZ) for database storage.
+ * Enforces consistent date format at fundamental level.
+ * 
+ * Handles:
+ * - Unix timestamps (e.g., "1759449600") -> converts to ISO format
+ * - ISO dates (e.g., "2025-07-06Z") -> returns as-is
+ * - Empty strings -> returns empty
+ * 
+ * @param dateStr Input date string (Unix timestamp or ISO format)
+ * @return Date in YYYY-MM-DDZ format, or empty string if input is invalid/empty
+ */
+QString AniDBApi::convertToISODate(const QString& dateStr)
+{
+	if(dateStr.isEmpty())
+		return QString();
+	
+	// Check if it's already in ISO format (YYYY-MM-DD with optional Z)
+	QRegularExpression isoRegex("^\\d{4}-\\d{2}-\\d{2}Z?$");
+	if(isoRegex.match(dateStr).hasMatch())
+	{
+		// Ensure it ends with Z
+		if(dateStr.endsWith("Z"))
+			return dateStr;
+		else
+			return dateStr + "Z";
+	}
+	
+	// Check if it's a Unix timestamp (all digits)
+	QRegularExpression timestampRegex("^\\d+$");
+	if(timestampRegex.match(dateStr).hasMatch())
+	{
+		bool ok;
+		qint64 timestamp = dateStr.toLongLong(&ok);
+		if(ok && timestamp > 0)
+		{
+			QDateTime dt = QDateTime::fromSecsSinceEpoch(timestamp);
+			return dt.toString("yyyy-MM-dd") + "Z";
+		}
+	}
+	
+	// Invalid format - return empty
+	return QString();
+}
+
+/**
  * Store anime data in the database.
  */
 void AniDBApi::storeAnimeData(const AnimeData& data)
 {
 	if(data.aid.isEmpty())
 		return;
-		
-	QString q = QString("INSERT OR REPLACE INTO `anime` "
+	
+	// Convert Unix timestamps to YYYY-MM-DDZ format for consistency with mylist export
+	// This enforces the date format at the fundamental level before database storage
+	QString startdate = convertToISODate(data.air_date);
+	QString enddate = convertToISODate(data.end_date);
+	
+	// Use INSERT with ON CONFLICT DO UPDATE (UPSERT) to merge data from multiple responses
+	// COALESCE preserves existing non-empty values when new value is empty
+	QString q = QString("INSERT INTO `anime` "
 		"(`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, "
 		"`relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, "
-		"`nameother`, `nameshort`, `synonyms`) "
-		"VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7', '%8', "
-		"'%9', '%10', '%11', '%12', '%13', '%14')")
-		.arg(QString(data.aid).replace("'", "''"))
-		.arg(QString(data.eptotal).replace("'", "''"))
-		.arg(QString(data.eplast).replace("'", "''"))
-		.arg(QString(data.year).replace("'", "''"))
-		.arg(QString(data.type).replace("'", "''"))
-		.arg(QString(data.relaidlist).replace("'", "''"))
-		.arg(QString(data.relaidtype).replace("'", "''"))
-		.arg(QString(data.category).replace("'", "''"))
-		.arg(QString(data.nameromaji).replace("'", "''"))
-		.arg(QString(data.namekanji).replace("'", "''"))
-		.arg(QString(data.nameenglish).replace("'", "''"))
-		.arg(QString(data.nameother).replace("'", "''"))
-		.arg(QString(data.nameshort).replace("'", "''"))
-		.arg(QString(data.synonyms).replace("'", "''"));
-		
+		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`) "
+		"VALUES (:aid, :eptotal, :eplast, :year, :type, :relaidlist, "
+		":relaidtype, :category, :nameromaji, :namekanji, :nameenglish, "
+		":nameother, :nameshort, :synonyms, :typename, :startdate, :enddate) "
+		"ON CONFLICT(`aid`) DO UPDATE SET "
+		"`eptotal` = COALESCE(NULLIF(excluded.`eptotal`, ''), `anime`.`eptotal`), "
+		"`eplast` = COALESCE(NULLIF(excluded.`eplast`, ''), `anime`.`eplast`), "
+		"`year` = COALESCE(NULLIF(excluded.`year`, ''), `anime`.`year`), "
+		"`type` = COALESCE(NULLIF(excluded.`type`, ''), `anime`.`type`), "
+		"`relaidlist` = COALESCE(NULLIF(excluded.`relaidlist`, ''), `anime`.`relaidlist`), "
+		"`relaidtype` = COALESCE(NULLIF(excluded.`relaidtype`, ''), `anime`.`relaidtype`), "
+		"`category` = COALESCE(NULLIF(excluded.`category`, ''), `anime`.`category`), "
+		"`nameromaji` = COALESCE(NULLIF(excluded.`nameromaji`, ''), `anime`.`nameromaji`), "
+		"`namekanji` = COALESCE(NULLIF(excluded.`namekanji`, ''), `anime`.`namekanji`), "
+		"`nameenglish` = COALESCE(NULLIF(excluded.`nameenglish`, ''), `anime`.`nameenglish`), "
+		"`nameother` = COALESCE(NULLIF(excluded.`nameother`, ''), `anime`.`nameother`), "
+		"`nameshort` = COALESCE(NULLIF(excluded.`nameshort`, ''), `anime`.`nameshort`), "
+		"`synonyms` = COALESCE(NULLIF(excluded.`synonyms`, ''), `anime`.`synonyms`), "
+		"`typename` = COALESCE(NULLIF(excluded.`typename`, ''), `anime`.`typename`), "
+		"`startdate` = COALESCE(NULLIF(excluded.`startdate`, ''), `anime`.`startdate`), "
+		"`enddate` = COALESCE(NULLIF(excluded.`enddate`, ''), `anime`.`enddate`)");
+	
 	QSqlQuery query(db);
-	if(!query.exec(q))
+	query.prepare(q);
+	
+	query.bindValue(":aid", data.aid.toInt());
+	query.bindValue(":eptotal", data.eptotal);
+	query.bindValue(":eplast", data.eplast);
+	query.bindValue(":year", data.year);
+	query.bindValue(":type", data.type);
+	query.bindValue(":relaidlist", data.relaidlist);
+	query.bindValue(":relaidtype", data.relaidtype);
+	query.bindValue(":category", data.category);
+	query.bindValue(":nameromaji", data.nameromaji);
+	query.bindValue(":namekanji", data.namekanji);
+	query.bindValue(":nameenglish", data.nameenglish);
+	query.bindValue(":nameother", data.nameother);
+	query.bindValue(":nameshort", data.nameshort);
+	query.bindValue(":synonyms", data.synonyms);
+	query.bindValue(":typename", data.type);  // typename mirrors type
+	query.bindValue(":startdate", startdate);
+	query.bindValue(":enddate", enddate);
+	
+	if(!query.exec())
 	{
 		LOG("Anime database query error: " + query.lastError().text());
 	}
