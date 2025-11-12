@@ -3,6 +3,7 @@
 #include <QtGui>
 #include <QtAlgorithms>
 #include <QRegularExpression>
+#include <QMutex>
 #include <QProcess>
 #include <QDateTime>
 #include <QDir>
@@ -291,6 +292,9 @@ private:
     QElapsedTimer lastEtaUpdate;
     int totalHashParts;
     int completedHashParts;
+    
+    // Mutex to protect file assignment from concurrent thread requests
+    QMutex fileRequestMutex;
     
     // Constants for deferred processing
     static const int HASHED_FILES_BATCH_SIZE = 5; // Process 5 files per timer tick

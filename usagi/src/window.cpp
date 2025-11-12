@@ -992,6 +992,9 @@ void Window::ButtonHasherStopClick()
 
 void Window::provideNextFileToHash()
 {
+	// Thread-safe file assignment: only one thread can request a file at a time
+	QMutexLocker locker(&fileRequestMutex);
+	
 	// Look through the hashes widget for the next file that needs hashing (progress="0" and no hash)
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
@@ -1001,6 +1004,11 @@ void Window::provideNextFileToHash()
 		if(progress == "0" && existingHash.isEmpty())
 		{
 			QString filePath = hashes->item(i, 2)->text();
+			
+			// Immediately mark this file as assigned to prevent other threads from picking it up
+			QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
+			hashes->setItem(i, 1, itemProgressAssigned);
+			
 			hasherThreadPool->addFile(filePath);
 			return;
 		}
@@ -1102,10 +1110,10 @@ void Window::getNotifyFileHashed(int threadId, ed2k::ed2kfilestruct data)
 {
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
-		// Match by filename AND verify it's the file being hashed (progress="0" and either no hash or matching size)
+		// Match by filename AND verify it's the file being hashed (progress starts with "0" - either "0" or "0.1" for assigned)
 		// This prevents matching wrong file when there are multiple files with the same name
 		QString progress = hashes->item(i, 1)->text();
-		if(hashes->item(i, 0)->text() == data.filename && progress == "0")
+		if(hashes->item(i, 0)->text() == data.filename && progress.startsWith("0"))
 		{
 			// Additional check: verify file size matches to ensure we have the right file
 			QString filePath = hashes->item(i, 2)->text();
