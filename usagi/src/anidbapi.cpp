@@ -1643,11 +1643,9 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	//   Byte 7: episode type counts (specials, credits, other, trailer, parody)
 	// 
 	// Note: Per API spec, selecting unused/retired bits returns error 505
-	// The enum values for bytes 1-4 are correct for OR operations
-	// Bytes 5-7 need to be shifted to their proper positions (32, 40, 48 bits)
+	// All enum values are now properly defined in 64-bit notation
 	
-	// Construct bytes 1-4 using enum constants (these fit in 32 bits)
-	unsigned int amask_low = 
+	uint64_t amask = 
 		// Byte 1
 		ANIME_AID | ANIME_DATEFLAGS |
 		ANIME_YEAR | ANIME_TYPE |
@@ -1660,23 +1658,17 @@ QString AniDBApi::buildAnimeCommand(int aid)
 		ANIME_AIR_DATE | ANIME_END_DATE | ANIME_URL | ANIME_PICNAME |
 		// Byte 4
 		ANIME_RATING | ANIME_VOTE_COUNT | ANIME_TEMP_RATING | ANIME_TEMP_VOTE_COUNT |
-		ANIME_AVG_REVIEW_RATING | ANIME_REVIEW_COUNT | ANIME_AWARD_LIST | ANIME_IS_18_RESTRICTED;
+		ANIME_AVG_REVIEW_RATING | ANIME_REVIEW_COUNT | ANIME_AWARD_LIST | ANIME_IS_18_RESTRICTED |
+		// Byte 5
+		ANIME_ANN_ID | ANIME_ALLCINEMA_ID | ANIME_ANIMENFO_ID |
+		ANIME_TAG_NAME_LIST | ANIME_TAG_ID_LIST | ANIME_TAG_WEIGHT_LIST | ANIME_DATE_RECORD_UPDATED |
+		// Byte 6
+		ANIME_CHARACTER_ID_LIST |
+		// Byte 7
+		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
+		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
-	// Construct bytes 5-7 by shifting enum values to their proper bit positions
-	// Note: Enum values are defined for bytes 1-4, so we shift them into bytes 5-7
-	uint64_t amask_high = 
-		// Byte 5 (shift byte 3 values by 16 bits) - exclude retired bit 7
-		((uint64_t)(ANIME_ANN_ID | ANIME_ALLCINEMA_ID | ANIME_ANIMENFO_ID |
-		            ANIME_TAG_NAME_LIST | ANIME_TAG_ID_LIST | 
-		            ANIME_TAG_WEIGHT_LIST | ANIME_DATE_RECORD_UPDATED) << 16) |
-		// Byte 6 (shift byte 2 value by 32 bits) - only CHARACTER_ID_LIST
-		((uint64_t)ANIME_CHARACTER_ID_LIST << 32) |
-		// Byte 7 (shift byte 1 values by 48 bits) - exclude unused bits 2-0
-		((uint64_t)(ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
-		            ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT) << 48);
-	
-	// Combine into full 7-byte mask using AnimeMask class
-	AnimeMask mask(amask_low | amask_high);
+	AnimeMask mask(amask);
 	
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
 }
