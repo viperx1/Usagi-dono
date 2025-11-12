@@ -7,11 +7,13 @@
 #include <QString>
 #include <QQueue>
 
+class myAniDBApi;
+
 class HasherThread : public QThread
 {
     Q_OBJECT
 public:
-    HasherThread();
+    HasherThread(myAniDBApi *api = nullptr);
     void stop();
     void addFile(const QString &filePath);
     
@@ -28,6 +30,8 @@ private:
     QWaitCondition condition;
     QQueue<QString> fileQueue;
     bool shouldStop;
+    myAniDBApi *apiInstance;
+    bool ownsApiInstance;
 };
 
 #endif // HASHERTHREAD_H

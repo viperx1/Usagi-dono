@@ -4,9 +4,15 @@
 
 extern myAniDBApi *adbapi;
 
-HasherThread::HasherThread()
-    : shouldStop(false)
+HasherThread::HasherThread(myAniDBApi *api)
+    : shouldStop(false), apiInstance(api), ownsApiInstance(false)
 {
+    // If no API instance provided, create one for this thread
+    if (apiInstance == nullptr)
+    {
+        apiInstance = new myAniDBApi("usagi", 1);
+        ownsApiInstance = true;
+    }
 }
 
 void HasherThread::run()
@@ -55,10 +61,10 @@ void HasherThread::run()
         }
         
         // Perform the actual hashing in this worker thread
-        switch(adbapi->ed2khash(filePath))
+        switch(apiInstance->ed2khash(filePath))
         {
         case 1:
-            emit sendHash(adbapi->ed2khashstr);
+            emit sendHash(apiInstance->ed2khashstr);
             // Request the next file after successfully hashing this one
             emit requestNextFile();
             break;
@@ -78,6 +84,13 @@ void HasherThread::run()
     }
     
     LOG("HasherThread finished processing files [hasherthread.cpp]");
+    
+    // Clean up API instance if we own it
+    if (ownsApiInstance && apiInstance != nullptr)
+    {
+        delete apiInstance;
+        apiInstance = nullptr;
+    }
 }
 
 void HasherThread::stop()

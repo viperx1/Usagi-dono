@@ -1,12 +1,12 @@
 #include "main.h"
 #include "window.h"
-#include "hasherthread.h"
+#include "hasherthreadpool.h"
 #include "crashlog.h"
 #include "logger.h"
 #include "playbuttondelegate.h"
 #include <QElapsedTimer>
 
-HasherThread hasherThread;
+HasherThreadPool hasherThreadPool;
 myAniDBApi *adbapi;
 extern Window *window;
 settings_struct settings;
@@ -151,9 +151,9 @@ Window::Window()
 	connect(button3, SIGNAL(clicked()), this, SLOT(Button3Click()));
     connect(buttonstart, SIGNAL(clicked()), this, SLOT(ButtonHasherStartClick()));
     connect(buttonclear, SIGNAL(clicked()), this, SLOT(ButtonHasherClearClick()));
-    connect(&hasherThread, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
-    connect(&hasherThread, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
-    connect(&hasherThread, SIGNAL(finished()), this, SLOT(hasherFinished()));
+    connect(&hasherThreadPool, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
+    connect(&hasherThreadPool, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
+    connect(&hasherThreadPool, SIGNAL(finished()), this, SLOT(hasherFinished()));
     connect(adbapi, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
     connect(adbapi, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(ed2k::ed2kfilestruct)));
     connect(buttonstop, SIGNAL(clicked()), this, SLOT(ButtonHasherStopClick()));
@@ -926,7 +926,7 @@ void Window::ButtonHasherStartClick()
 		
 		buttonstart->setEnabled(0);
 		buttonclear->setEnabled(0);
-		hasherThread.start();
+		hasherThreadPool.start();
 	}
 	else if (rowsWithHashes.isEmpty())
 	{
@@ -951,18 +951,17 @@ void Window::ButtonHasherStopClick()
 	progressFile->setValue(0);
 	progressFile->setMaximum(1);
 	
-	if (hasherThread.isRunning()) {
-		// 1. First, notify ed2k to interrupt the current hashing operation
-		//    This sets a flag that ed2khash checks, causing it to return early
-		emit notifyStopHasher();
-		
-		// 2. Then signal the thread to stop processing more files
-		hasherThread.stop();
-		
-		// 3. Finally, wait for the thread to finish
-		//    The thread will finish quickly because ed2khash will exit early
-		hasherThread.wait();
-	}
+	// Notify all worker threads to stop hashing
+	// 1. First, notify ed2k to interrupt the current hashing operation
+	//    This sets a flag that ed2khash checks, causing it to return early
+	emit notifyStopHasher();
+	
+	// 2. Then signal the thread pool to stop processing more files
+	hasherThreadPool.stop();
+	
+	// 3. Finally, wait for all threads to finish
+	//    The threads will finish quickly because ed2khash will exit early
+	hasherThreadPool.wait();
 }
 
 void Window::provideNextFileToHash()
@@ -976,13 +975,13 @@ void Window::provideNextFileToHash()
 		if(progress == "0" && existingHash.isEmpty())
 		{
 			QString filePath = hashes->item(i, 2)->text();
-			hasherThread.addFile(filePath);
+			hasherThreadPool.addFile(filePath);
 			return;
 		}
 	}
 	
 	// No more files to hash, send empty string to signal completion
-	hasherThread.addFile(QString());
+	hasherThreadPool.addFile(QString());
 }
 
 void Window::ButtonHasherClearClick()
@@ -1351,7 +1350,7 @@ bool hashes_::event(QEvent *e)
 		QKeyEvent *keyEvent = static_cast<QKeyEvent*>(e);
 		if(keyEvent->key() == Qt::Key_Delete)
 		{
-			if(!hasherThread.isRunning())
+			if(!hasherThreadPool.isRunning())
 			{
 				this->setUpdatesEnabled(0);
 				QList<QTableWidgetItem *> selitems = this->selectedItems();
@@ -3241,7 +3240,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		.arg(filePaths.size()).arg(insertTime));
 	
 	// Directory watcher always auto-starts the hasher for detected files
-	if (!hasherThread.isRunning()) {
+	if (!hasherThreadPool.isRunning()) {
 		// Set settings for auto-hash if logged in
 		if (adbapi->LoggedIn()) {
 			addtomylist->setChecked(true);
@@ -3326,7 +3325,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			// Start hashing all detected files that need hashing
 			buttonstart->setEnabled(false);
 			buttonclear->setEnabled(false);
-			hasherThread.start();
+			hasherThreadPool.start();
 			
 			if (adbapi->LoggedIn()) {
 				LOG(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filesToHashCount));
