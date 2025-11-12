@@ -12,7 +12,8 @@ HasherThread::HasherThread(int threadId)
     hasher = new ed2k();
     
     // Connect hasher signals with thread ID parameter
-    connect(hasher, &ed2k::notifyPartsDone, this, [this](int total, int done) {
+    // Capture this and threadId explicitly for the lambda
+    connect(hasher, &ed2k::notifyPartsDone, this, [this, threadId](int total, int done) {
         // Throttle progress updates: emit only every 10 parts
         if (done - lastProgressUpdate >= 10 || done == total) {
             lastProgressUpdate = done;
@@ -20,7 +21,7 @@ HasherThread::HasherThread(int threadId)
         }
     });
     
-    connect(hasher, &ed2k::notifyFileHashed, this, [this](ed2k::ed2kfilestruct fileData) {
+    connect(hasher, &ed2k::notifyFileHashed, this, [this, threadId](ed2k::ed2kfilestruct fileData) {
         emit notifyFileHashed(threadId, fileData);
     });
 }
