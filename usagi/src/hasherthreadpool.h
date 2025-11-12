@@ -90,21 +90,26 @@ signals:
     
     /**
      * Emitted when progress is made on hashing a file.
+     * @param threadId Logical thread ID (0-based)
+     * @param total Total parts to hash
+     * @param done Parts completed
      */
-    void notifyPartsDone(int total, int done);
+    void notifyPartsDone(int threadId, int total, int done);
     
     /**
      * Emitted when a file has been completely hashed.
+     * @param threadId Logical thread ID (0-based)
+     * @param fileData Hashed file information
      */
-    void notifyFileHashed(ed2k::ed2kfilestruct fileData);
+    void notifyFileHashed(int threadId, ed2k::ed2kfilestruct fileData);
     
 private slots:
     void onThreadRequestNextFile();
     void onThreadSendHash(QString hash);
     void onThreadFinished();
     void onThreadStarted(Qt::HANDLE threadId);
-    void onThreadPartsDone(int total, int done);
-    void onThreadFileHashed(ed2k::ed2kfilestruct fileData);
+    void onThreadPartsDone(int threadId, int total, int done);
+    void onThreadFileHashed(int threadId, ed2k::ed2kfilestruct fileData);
     
 private:
     void checkAllThreadsFinished();

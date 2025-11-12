@@ -20,10 +20,10 @@ HasherThreadPool::HasherThreadPool(int numThreads, QObject *parent)
     
     LOG(QString("HasherThreadPool: Creating pool with %1 worker threads").arg(numThreads));
     
-    // Create worker threads
+    // Create worker threads with sequential thread IDs
     for (int i = 0; i < numThreads; ++i)
     {
-        HasherThread *worker = new HasherThread(nullptr); // nullptr = create own API instance
+        HasherThread *worker = new HasherThread(i); // Pass thread ID
         
         // Connect signals from worker to pool
         connect(worker, &HasherThread::requestNextFile, 
@@ -201,16 +201,16 @@ void HasherThreadPool::onThreadStarted(Qt::HANDLE threadId)
     emit threadStarted(threadId);
 }
 
-void HasherThreadPool::onThreadPartsDone(int total, int done)
+void HasherThreadPool::onThreadPartsDone(int threadId, int total, int done)
 {
-    // Forward parts done signal to UI
-    emit notifyPartsDone(total, done);
+    // Forward parts done signal to UI with thread ID
+    emit notifyPartsDone(threadId, total, done);
 }
 
-void HasherThreadPool::onThreadFileHashed(ed2k::ed2kfilestruct fileData)
+void HasherThreadPool::onThreadFileHashed(int threadId, ed2k::ed2kfilestruct fileData)
 {
-    // Forward file hashed signal to UI
-    emit notifyFileHashed(fileData);
+    // Forward file hashed signal to UI with thread ID
+    emit notifyFileHashed(threadId, fileData);
 }
 
 void HasherThreadPool::checkAllThreadsFinished()

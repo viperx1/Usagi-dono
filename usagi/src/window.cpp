@@ -108,7 +108,16 @@ Window::Window()
     QPushButton *movetodirbutton = new QPushButton("...");
     QPushButton *patternhelpbutton = new QPushButton("?");
     QBoxLayout *progress = new QBoxLayout(QBoxLayout::TopToBottom);
-    progressFile = new QProgressBar;
+    
+    // Create one progress bar per hasher thread
+    int numThreads = hasherThreadPool->threadCount();
+    for (int i = 0; i < numThreads; ++i) {
+        QProgressBar *threadProgress = new QProgressBar;
+        threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
+        threadProgressBars.append(threadProgress);
+        progress->addWidget(threadProgress);
+    }
+    
     progressTotal = new QProgressBar;
     progressTotalLabel = new QLabel;
     QBoxLayout *progressTotalLayout = new QBoxLayout(QBoxLayout::LeftToRight);
@@ -158,12 +167,9 @@ Window::Window()
     connect(hasherThreadPool, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
     connect(hasherThreadPool, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
     connect(hasherThreadPool, SIGNAL(finished()), this, SLOT(hasherFinished()));
-    // Connect thread pool signals for hashing progress and completion
-    connect(hasherThreadPool, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
-    connect(hasherThreadPool, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(ed2k::ed2kfilestruct)));
-    // Also keep connection to main adbapi for non-threaded operations (like API calls)
-    connect(adbapi, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
-    connect(adbapi, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(ed2k::ed2kfilestruct)));
+    // Connect thread pool signals for hashing progress and completion with thread ID
+    connect(hasherThreadPool, SIGNAL(notifyPartsDone(int,int,int)), this, SLOT(getNotifyPartsDone(int,int,int)));
+    connect(hasherThreadPool, SIGNAL(notifyFileHashed(int,ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(int,ed2k::ed2kfilestruct)));
     connect(buttonstop, SIGNAL(clicked()), this, SLOT(ButtonHasherStopClick()));
     connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
     connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
@@ -225,8 +231,7 @@ Window::Window()
 	layout2->addWidget(renametopattern);
 	layout2->addWidget(patternhelpbutton);
 
-	// page hasher - progress
-	progress->addWidget(progressFile);
+	// page hasher - progress (already added in loop above)
 	progress->addLayout(progressTotalLayout);
 
     // page settings
@@ -964,8 +969,12 @@ void Window::ButtonHasherStopClick()
 	progressTotal->setMaximum(1);
 	progressTotal->setFormat("");
 	progressTotalLabel->setText("");
-	progressFile->setValue(0);
-	progressFile->setMaximum(1);
+	
+	// Reset all thread progress bars
+	for (QProgressBar *bar : threadProgressBars) {
+		bar->setValue(0);
+		bar->setMaximum(1);
+	}
 	
 	// Notify all worker threads to stop hashing
 	// 1. First, notify ed2k instances in all worker threads to interrupt current hashing
@@ -1044,12 +1053,16 @@ void Window::markwatchedStateChanged(int state)
 	}
 }
 
-void Window::getNotifyPartsDone(int total, int done)
+void Window::getNotifyPartsDone(int threadId, int total, int done)
 {
 	completedHashParts++;
 	
-	progressFile->setMaximum(total);
-	progressFile->setValue(done);
+	// Update the specific thread's progress bar
+	if (threadId >= 0 && threadId < threadProgressBars.size()) {
+		threadProgressBars[threadId]->setMaximum(total);
+		threadProgressBars[threadId]->setValue(done);
+	}
+	
 	progressTotal->setValue(completedHashParts);
 	
 	// Update percentage label
@@ -1085,7 +1098,7 @@ void Window::getNotifyPartsDone(int total, int done)
 	}
 }
 
-void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
+void Window::getNotifyFileHashed(int threadId, ed2k::ed2kfilestruct data)
 {
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
