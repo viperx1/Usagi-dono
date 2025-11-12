@@ -682,11 +682,12 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		unsigned int fmask = 0;  // Not used for ANIME commands
 		uint64_t amask = 0;
 		QString amaskString;
+		QString animeCmd;  // Declare here so it's available throughout the entire block
 		Mask originalMask;  // Declare here so it's available throughout the entire block
 		
 		if(query.exec(q) && query.next())
 		{
-			QString animeCmd = query.value(0).toString();
+			animeCmd = query.value(0).toString();
 			Logger::log("[AniDB Response] 230 ANIME command: " + animeCmd, __FILE__, __LINE__);
 			
 			// Extract amask as string for proper 7-byte parsing
@@ -783,8 +784,40 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		
 		if(token2.size() >= 1)
 		{
-			QString aid = token2.at(0);  // AID is always first
-			int index = 1;  // Start parsing after AID
+			// Check if AID bit is set in the mask
+			// AID is Byte 1, bit 7 (0x80 in the first byte of the hex string)
+			bool hasAidBit = false;
+			if (amaskString.length() >= 2)
+			{
+				bool ok;
+				uint8_t byte1 = amaskString.left(2).toUInt(&ok, 16);
+				hasAidBit = ok && (byte1 & 0x80);
+			}
+			
+			QString aid;
+			int index;
+			
+			if (hasAidBit)
+			{
+				// AID is in the response at token[0]
+				aid = token2.at(0);
+				index = 1;  // Start parsing after AID
+				Logger::log("[AniDB Response] 230 ANIME - AID bit set, extracting AID from token[0]: " + aid, __FILE__, __LINE__);
+			}
+			else
+			{
+				// AID is NOT in the response, need to get it from the command
+				// Extract AID from the command string
+				QRegularExpression aidRegex("aid=(\\d+)");
+				QRegularExpressionMatch aidMatch = aidRegex.match(animeCmd);
+				if (aidMatch.hasMatch())
+				{
+					aid = aidMatch.captured(1);
+				}
+				index = 0;  // Start parsing from token[0]
+				Logger::log("[AniDB Response] 230 ANIME - AID bit NOT set, using AID from command: " + aid + ", starting parse at token[0]", __FILE__, __LINE__);
+			}
+			
 			int startIndex = index;
 			
 			// Check if response might be truncated (UDP 1400 byte limit)
