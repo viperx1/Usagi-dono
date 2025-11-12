@@ -102,7 +102,60 @@ endif()
 
 add_test(NAME test_mask COMMAND test_mask -v2)
 
-# Test 3: Crash log encoding test
+# Test 3: ANIME mask parsing test
+set(ANIME_MASK_PARSING_TEST_SOURCES
+    test_anime_mask_parsing.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(ANIME_MASK_PARSING_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/mask.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_anime_mask_parsing ${ANIME_MASK_PARSING_TEST_SOURCES} ${ANIME_MASK_PARSING_TEST_HEADERS})
+
+target_compile_definitions(test_anime_mask_parsing PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_anime_mask_parsing PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_anime_mask_parsing PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_anime_mask_parsing PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_anime_mask_parsing PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_anime_mask_parsing COMMAND test_anime_mask_parsing -v2)
+
+# Test 4: Crash log encoding test
 set(CRASHLOG_TEST_SOURCES
     test_crashlog.cpp
     ../usagi/src/crashlog.cpp
