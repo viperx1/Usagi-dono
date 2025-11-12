@@ -680,9 +680,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
 		QSqlQuery query(db);
 		unsigned int fmask = 0;  // Not used for ANIME commands
-		unsigned int amask = 0;
+		uint64_t amask = 0;
 		QString amaskString;
-		AnimeMask originalMask;  // Declare here so it's available throughout the entire block
+		Mask originalMask;  // Declare here so it's available throughout the entire block
 		
 		if(query.exec(q) && query.next())
 		{
@@ -697,9 +697,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				amaskString = amaskMatch.captured(1);
 				Logger::log("[AniDB Response] 230 ANIME extracted amask string: " + amaskString, __FILE__, __LINE__);
 			}
-			
-			// Also extract as uint for fallback/logging
-			if(!extractMasksFromCommand(animeCmd, fmask, amask))
+			else
 			{
 				LOG("Failed to extract amask from ANIME command for Tag: " + Tag);
 				// Fall back to default amask (all defined fields)
@@ -716,8 +714,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 						ANIME_CHARACTER_ID_LIST |
 						ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 						ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-				// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
-				amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
+				// Convert uint64 to hex string using Mask
+				amaskString = Mask(amask).toString();
 			}
 			// Ensure extracted amask string is 14 chars (7 bytes)
 			if (!amaskString.isEmpty())
@@ -725,7 +723,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				amaskString = amaskString.leftJustified(14, '0');
 			}
 			
-			// Set AnimeMask object for proper handling
+			// Set Mask object for proper handling
 			originalMask.setFromString(amaskString);
 			
 			Logger::log("[AniDB Response] 230 ANIME extracted amask: 0x" + amaskString, __FILE__, __LINE__);
@@ -747,11 +745,11 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					ANIME_CHARACTER_ID_LIST |
 					ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 					ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
-			// Convert uint to hex string (8 chars for 32-bit uint), then pad on RIGHT to 14 chars for 7-byte format
-			amaskString = QString("%1").arg(amask, 8, 16, QChar('0')).leftJustified(14, '0');
+			// Convert uint64 to hex string using Mask
+			amaskString = Mask(amask).toString();
 			Logger::log("[AniDB Response] 230 ANIME using default amask: 0x" + amaskString, __FILE__, __LINE__);
 			
-			// Set AnimeMask object from the default amask
+			// Set Mask object from the default amask
 			originalMask.setFromString(amaskString);
 		}
 		
@@ -799,7 +797,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Parse anime data using amask string for proper 7-byte handling
 			// Track which fields were successfully parsed for re-request logic
 			QByteArray parsedMaskBytes;
-			AnimeData animeData = parseAnimeMaskFromString(token2, amaskString, index, parsedMaskBytes);
+			AnimeData animeData = parseMaskFromString(token2, amaskString, index, parsedMaskBytes);
 			animeData.aid = aid;  // Ensure aid is set
 			
 			Logger::log("[AniDB Response] 230 ANIME parsed " + QString::number(index - startIndex) + " fields (index: " + QString::number(startIndex) + " -> " + QString::number(index) + ")", __FILE__, __LINE__);
@@ -812,7 +810,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
 				
 				// Calculate reduced mask with only missing fields
-				AnimeMask reducedMask = calculateReducedMask(originalMask, parsedMaskBytes);
+				Mask reducedMask = calculateReducedMask(originalMask, parsedMaskBytes);
 				
 				// Check if there are any missing fields
 				if (!reducedMask.isEmpty())
@@ -1631,7 +1629,7 @@ QString AniDBApi::buildAnimeCommand(int aid)
 {
 	// ANIME aid={int4 aid}&amask={hexstr amask}
 	// Request anime information for a specific anime ID
-	// Build amask using the anime_amask_codes enum and AnimeMask class (all 7 bytes)
+	// Build amask using 7-byte mask covering all available data fields
 	// 
 	// ANIME command uses byte-oriented mask (7 bytes):
 	//   Byte 1: aid, dateflags, year, type, related lists
@@ -1642,8 +1640,10 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	//   Byte 6: character ID list
 	//   Byte 7: episode type counts (specials, credits, other, trailer, parody)
 	// 
-	// We request all defined fields per API specification
-	unsigned int amask = 
+	// Note: Per API spec, selecting unused/retired bits returns error 505
+	// All enum values are now properly defined in 64-bit notation
+	
+	uint64_t amask = 
 		// Byte 1
 		ANIME_AID | ANIME_DATEFLAGS |
 		ANIME_YEAR | ANIME_TYPE |
@@ -1666,9 +1666,7 @@ QString AniDBApi::buildAnimeCommand(int aid)
 		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
-	// Create AnimeMask from the 32-bit enum (covers bytes 1-4, bytes 5-7 are zero)
-	// The AnimeMask class properly handles all 7 bytes using quint64
-	AnimeMask mask(amask);
+	Mask mask(amask);
 	
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
 }
@@ -3122,7 +3120,7 @@ AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens,
  * @param index Current index in tokens array (updated as fields are consumed)
  * @return AnimeData structure with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index)
+AniDBApi::AnimeData AniDBApi::parseMask(const QStringList& tokens, uint64_t amask, int& index)
 {
 	AnimeData data;
 	
@@ -3133,7 +3131,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 	
 	// Define all mask bits in MSB to LSB order (bit 7 of each byte first)
 	struct MaskBit {
-		unsigned int bit;
+		uint64_t bit;
 		QString* field;
 		const char* name;  // For debug logging
 	};
@@ -3239,7 +3237,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
 			if (currentBit == ANIME_AID)
 			{
-				Logger::log(QString("[AniDB parseAnimeMask] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
+				Logger::log(QString("[AniDB parseMask] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
 				continue;
 			}
 			
@@ -3250,7 +3248,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 				// This is a defined field
 				const MaskBit* maskBit = it->second;
 				QString value = tokens.value(index);
-				Logger::log(QString("[AniDB parseAnimeMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
+				Logger::log(QString("[AniDB parseMask] Bit match: %1 (bit 0x%2) -> token[%3] = '%4'")
 					.arg(maskBit->name)
 					.arg(currentBit, 0, 16)
 					.arg(index)
@@ -3265,7 +3263,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 			{
 				// This is a retired/unused bit - consume the token but don't store
 				QString value = tokens.value(index);
-				Logger::log(QString("[AniDB parseAnimeMask] Retired/unused bit 0x%1 -> token[%2] = '%3' (skipped)")
+				Logger::log(QString("[AniDB parseMask] Retired/unused bit 0x%1 -> token[%2] = '%3' (skipped)")
 					.arg(currentBit, 0, 16)
 					.arg(index)
 					.arg(value), __FILE__, __LINE__);
@@ -3288,7 +3286,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
 		if (amask & maskBits[i].bit)
 		{
 			QString value = tokens.value(index);
-			Logger::log(QString("[AniDB parseAnimeMask] Byte 5-7 field: %1 (bit 0x%2) -> token[%3] = '%4'")
+			Logger::log(QString("[AniDB parseMask] Byte 5-7 field: %1 (bit 0x%2) -> token[%3] = '%4'")
 				.arg(maskBits[i].name)
 				.arg(maskBits[i].bit, 0, 16)
 				.arg(index)
@@ -3320,7 +3318,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMask(const QStringList& tokens, unsigned
  * @param index Current index in tokens array (updated as fields are consumed)
  * @return AnimeData structure with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index)
+AniDBApi::AnimeData AniDBApi::parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index)
 {
 	AnimeData data;
 	
@@ -3340,7 +3338,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 	while (maskBytes.size() < 7)
 		maskBytes.append((char)0);
 	
-	Logger::log(QString("[AniDB parseAnimeMaskFromString] Mask string: %1 -> %2 bytes")
+	Logger::log(QString("[AniDB parseMaskFromString] Mask string: %1 -> %2 bytes")
 		.arg(amaskHexString)
 		.arg(maskBytes.size()), __FILE__, __LINE__);
 	
@@ -3439,7 +3437,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
 			if (byteIdx == 0 && maskBits[i].bitMask == 0x80)
 			{
-				Logger::log(QString("[AniDB parseAnimeMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
+				Logger::log(QString("[AniDB parseMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
 				continue;
 			}
 			
@@ -3448,7 +3446,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 			if (maskBits[i].field != nullptr)
 			{
 				// This is a defined field - store it
-				Logger::log(QString("[AniDB parseAnimeMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
+				Logger::log(QString("[AniDB parseMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
 					.arg(maskBits[i].name)
 					.arg(byteIdx + 1)
 					.arg(maskBits[i].bitMask, 0, 16)
@@ -3460,7 +3458,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 			else
 			{
 				// Retired/unused bit - consume the token but don't store
-				Logger::log(QString("[AniDB parseAnimeMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
+				Logger::log(QString("[AniDB parseMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
 					.arg(maskBits[i].name)
 					.arg(byteIdx + 1)
 					.arg(maskBits[i].bitMask, 0, 16)
@@ -3490,7 +3488,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
  * @param parsedMaskBytes Output: 7-byte array marking which bits were successfully parsed
  * @return AnimeData structure with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
+AniDBApi::AnimeData AniDBApi::parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
 {
 	AnimeData data;
 	
@@ -3514,7 +3512,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 	for (int i = 0; i < 7; i++)
 		parsedMaskBytes.append((char)0);
 	
-	Logger::log(QString("[AniDB parseAnimeMaskFromString] Mask string: %1 -> %2 bytes")
+	Logger::log(QString("[AniDB parseMaskFromString] Mask string: %1 -> %2 bytes")
 		.arg(amaskHexString)
 		.arg(maskBytes.size()), __FILE__, __LINE__);
 	
@@ -3613,7 +3611,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
 			if (byteIdx == 0 && maskBits[i].bitMask == 0x80)
 			{
-				Logger::log(QString("[AniDB parseAnimeMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
+				Logger::log(QString("[AniDB parseMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
 				// Mark as parsed since AID is always available
 				parsedMaskBytes[byteIdx] |= maskBits[i].bitMask;
 				continue;
@@ -3623,7 +3621,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 			if (index >= tokens.size())
 			{
 				// No more tokens available - this field was not received (truncation)
-				Logger::log(QString("[AniDB parseAnimeMaskFromString] MISSING: %1 (byte %2, bit 0x%3) -> no token at index %4")
+				Logger::log(QString("[AniDB parseMaskFromString] MISSING: %1 (byte %2, bit 0x%3) -> no token at index %4")
 					.arg(maskBits[i].name)
 					.arg(byteIdx + 1)
 					.arg(maskBits[i].bitMask, 0, 16)
@@ -3636,7 +3634,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 			if (maskBits[i].field != nullptr)
 			{
 				// This is a defined field - store it
-				Logger::log(QString("[AniDB parseAnimeMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
+				Logger::log(QString("[AniDB parseMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
 					.arg(maskBits[i].name)
 					.arg(byteIdx + 1)
 					.arg(maskBits[i].bitMask, 0, 16)
@@ -3648,7 +3646,7 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
 			else
 			{
 				// Retired/unused bit - consume the token but don't store
-				Logger::log(QString("[AniDB parseAnimeMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
+				Logger::log(QString("[AniDB parseMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
 					.arg(maskBits[i].name)
 					.arg(byteIdx + 1)
 					.arg(maskBits[i].bitMask, 0, 16)
@@ -3679,24 +3677,24 @@ AniDBApi::AnimeData AniDBApi::parseAnimeMaskFromString(const QStringList& tokens
  * @param parsedMaskBytes 7-byte array marking which bits were successfully parsed
  * @return Reduced mask hex string containing only unparsed fields
  */
-AnimeMask AniDBApi::calculateReducedMask(const AnimeMask& originalMask, const QByteArray& parsedMaskBytes)
+Mask AniDBApi::calculateReducedMask(const Mask& originalMask, const QByteArray& parsedMaskBytes)
 {
 	// Build parsed mask from byte array
-	AnimeMask parsedAnimeMask;
+	Mask parsedMask;
 	for (int i = 0; i < parsedMaskBytes.size() && i < 7; i++)
 	{
-		parsedAnimeMask.setByte(i, (quint8)parsedMaskBytes[i]);
+		parsedMask.setByte(i, (quint8)parsedMaskBytes[i]);
 	}
 	
 	// Calculate reduced mask: original AND NOT parsed
 	// This gives us the bits that were requested but not successfully parsed
-	AnimeMask reducedAnimeMask = originalMask & (~parsedAnimeMask);
+	Mask reducedMask = originalMask & (~parsedMask);
 	
 	Logger::log(QString("[AniDB calculateReducedMask] Original: %1 -> Reduced: %2")
 		.arg(originalMask.toString())
-		.arg(reducedAnimeMask.toString()), __FILE__, __LINE__);
+		.arg(reducedMask.toString()), __FILE__, __LINE__);
 	
-	return reducedAnimeMask;
+	return reducedMask;
 }
 
 /**

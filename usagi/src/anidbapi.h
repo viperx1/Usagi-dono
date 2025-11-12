@@ -16,7 +16,7 @@
 #include <zlib.h>
 #include "hash/ed2k.h"
 #include "Qt-AES-master/qaesencryption.h"
-#include "animemask.h"
+#include "mask.h"
 
 
 /*struct status_codes_
@@ -166,68 +166,68 @@ private:
 	// ANIME command amask (anime data fields)
 	// Based on AniDB UDP API definition - byte-oriented mask (7 bytes total)
 	// Mask bytes are sent as hex string, e.g., "80" for Byte 1 bit 7
-	enum anime_amask_codes
+	enum anime_amask_codes : uint64_t
 	{
-		// Byte 1 (first byte of mask) - bits 7-0 in dec: 128, 64, 32, 16, 8, 4, 2, 1
-		ANIME_AID =					0x00000080,  // Byte 1, bit 7 (dec 128)
-		ANIME_DATEFLAGS =			0x00000040,  // Byte 1, bit 6 (dec 64)
-		ANIME_YEAR =				0x00000020,  // Byte 1, bit 5 (dec 32)
-		ANIME_TYPE =				0x00000010,  // Byte 1, bit 4 (dec 16)
-		ANIME_RELATED_AID_LIST =	0x00000008,  // Byte 1, bit 3 (dec 8)
-		ANIME_RELATED_AID_TYPE =	0x00000004,  // Byte 1, bit 2 (dec 4)
+		// Byte 1 (first byte of mask) - bits 7-0 in 64-bit notation
+		ANIME_AID =					0x0000000000000080ULL,  // Byte 1, bit 7
+		ANIME_DATEFLAGS =			0x0000000000000040ULL,  // Byte 1, bit 6
+		ANIME_YEAR =				0x0000000000000020ULL,  // Byte 1, bit 5
+		ANIME_TYPE =				0x0000000000000010ULL,  // Byte 1, bit 4
+		ANIME_RELATED_AID_LIST =	0x0000000000000008ULL,  // Byte 1, bit 3
+		ANIME_RELATED_AID_TYPE =	0x0000000000000004ULL,  // Byte 1, bit 2
 		// Byte 1, bits 1-0 are retired
 		
-		// Byte 2 (second byte of mask) - bits 7-0 in dec: 128, 64, 32, 16, 8, 4, 2, 1
-		ANIME_ROMAJI_NAME =			0x00008000,  // Byte 2, bit 7 (dec 128)
-		ANIME_KANJI_NAME =			0x00004000,  // Byte 2, bit 6 (dec 64)
-		ANIME_ENGLISH_NAME =		0x00002000,  // Byte 2, bit 5 (dec 32)
-		ANIME_OTHER_NAME =			0x00001000,  // Byte 2, bit 4 (dec 16)
-		ANIME_SHORT_NAME_LIST =		0x00000800,  // Byte 2, bit 3 (dec 8)
-		ANIME_SYNONYM_LIST =		0x00000400,  // Byte 2, bit 2 (dec 4)
+		// Byte 2 (second byte of mask) - bits 15-8 in 64-bit notation
+		ANIME_ROMAJI_NAME =			0x0000000000008000ULL,  // Byte 2, bit 7
+		ANIME_KANJI_NAME =			0x0000000000004000ULL,  // Byte 2, bit 6
+		ANIME_ENGLISH_NAME =		0x0000000000002000ULL,  // Byte 2, bit 5
+		ANIME_OTHER_NAME =			0x0000000000001000ULL,  // Byte 2, bit 4
+		ANIME_SHORT_NAME_LIST =		0x0000000000000800ULL,  // Byte 2, bit 3
+		ANIME_SYNONYM_LIST =		0x0000000000000400ULL,  // Byte 2, bit 2
 		// Byte 2, bits 1-0 are retired
 		
-		// Byte 3 (third byte of mask) - bits 7-0 in dec: 128, 64, 32, 16, 8, 4, 2, 1
-		ANIME_EPISODES =			0x00800000,  // Byte 3, bit 7 (dec 128)
-		ANIME_HIGHEST_EPISODE =		0x00400000,  // Byte 3, bit 6 (dec 64)
-		ANIME_SPECIAL_EP_COUNT =	0x00200000,  // Byte 3, bit 5 (dec 32)
-		ANIME_AIR_DATE =			0x00100000,  // Byte 3, bit 4 (dec 16)
-		ANIME_END_DATE =			0x00080000,  // Byte 3, bit 3 (dec 8)
-		ANIME_URL =					0x00040000,  // Byte 3, bit 2 (dec 4)
-		ANIME_PICNAME =				0x00020000,  // Byte 3, bit 1 (dec 2)
+		// Byte 3 (third byte of mask) - bits 23-16 in 64-bit notation
+		ANIME_EPISODES =			0x0000000000800000ULL,  // Byte 3, bit 7
+		ANIME_HIGHEST_EPISODE =		0x0000000000400000ULL,  // Byte 3, bit 6
+		ANIME_SPECIAL_EP_COUNT =	0x0000000000200000ULL,  // Byte 3, bit 5
+		ANIME_AIR_DATE =			0x0000000000100000ULL,  // Byte 3, bit 4
+		ANIME_END_DATE =			0x0000000000080000ULL,  // Byte 3, bit 3
+		ANIME_URL =					0x0000000000040000ULL,  // Byte 3, bit 2
+		ANIME_PICNAME =				0x0000000000020000ULL,  // Byte 3, bit 1
 		// Byte 3, bit 0 is retired
 		
-		// Byte 4 (fourth byte of mask) - bits 7-0 in dec: 128, 64, 32, 16, 8, 4, 2, 1
-		ANIME_RATING =				0x80000000,  // Byte 4, bit 7 (dec 128)
-		ANIME_VOTE_COUNT =			0x40000000,  // Byte 4, bit 6 (dec 64)
-		ANIME_TEMP_RATING =			0x20000000,  // Byte 4, bit 5 (dec 32)
-		ANIME_TEMP_VOTE_COUNT =		0x10000000,  // Byte 4, bit 4 (dec 16)
-		ANIME_AVG_REVIEW_RATING =	0x08000000,  // Byte 4, bit 3 (dec 8)
-		ANIME_REVIEW_COUNT =		0x04000000,  // Byte 4, bit 2 (dec 4)
-		ANIME_AWARD_LIST =			0x02000000,  // Byte 4, bit 1 (dec 2)
-		ANIME_IS_18_RESTRICTED =	0x01000000,  // Byte 4, bit 0 (dec 1)
+		// Byte 4 (fourth byte of mask) - bits 31-24 in 64-bit notation
+		ANIME_RATING =				0x0000000080000000ULL,  // Byte 4, bit 7
+		ANIME_VOTE_COUNT =			0x0000000040000000ULL,  // Byte 4, bit 6
+		ANIME_TEMP_RATING =			0x0000000020000000ULL,  // Byte 4, bit 5
+		ANIME_TEMP_VOTE_COUNT =		0x0000000010000000ULL,  // Byte 4, bit 4
+		ANIME_AVG_REVIEW_RATING =	0x0000000008000000ULL,  // Byte 4, bit 3
+		ANIME_REVIEW_COUNT =		0x0000000004000000ULL,  // Byte 4, bit 2
+		ANIME_AWARD_LIST =			0x0000000002000000ULL,  // Byte 4, bit 1
+		ANIME_IS_18_RESTRICTED =	0x0000000001000000ULL,  // Byte 4, bit 0
 		
-		// Byte 5 (fifth byte of mask) - bits 7-0 in dec: 128, 64, 32, 16, 8, 4, 2, 1
-		// Byte 5, bit 7 is retired
-		ANIME_ANN_ID =				0x00400000,  // Byte 5, bit 6 (dec 64)
-		ANIME_ALLCINEMA_ID =		0x00200000,  // Byte 5, bit 5 (dec 32)
-		ANIME_ANIMENFO_ID =			0x00100000,  // Byte 5, bit 4 (dec 16)
-		ANIME_TAG_NAME_LIST =		0x00080000,  // Byte 5, bit 3 (dec 8)
-		ANIME_TAG_ID_LIST =			0x00040000,  // Byte 5, bit 2 (dec 4)
-		ANIME_TAG_WEIGHT_LIST =		0x00020000,  // Byte 5, bit 1 (dec 2)
-		ANIME_DATE_RECORD_UPDATED =	0x00010000,  // Byte 5, bit 0 (dec 1)
+		// Byte 5 (fifth byte of mask) - bits 39-32 in 64-bit notation
+		// Byte 5, bit 7 (0x0000008000000000ULL) is retired
+		ANIME_ANN_ID =				0x0000004000000000ULL,  // Byte 5, bit 6
+		ANIME_ALLCINEMA_ID =		0x0000002000000000ULL,  // Byte 5, bit 5
+		ANIME_ANIMENFO_ID =			0x0000001000000000ULL,  // Byte 5, bit 4
+		ANIME_TAG_NAME_LIST =		0x0000000800000000ULL,  // Byte 5, bit 3
+		ANIME_TAG_ID_LIST =			0x0000000400000000ULL,  // Byte 5, bit 2
+		ANIME_TAG_WEIGHT_LIST =		0x0000000200000000ULL,  // Byte 5, bit 1
+		ANIME_DATE_RECORD_UPDATED =	0x0000000100000000ULL,  // Byte 5, bit 0
 		
-		// Byte 6 (sixth byte of mask) - bits 7-0 in dec: 128, 64, 32, 16, 8, 4, 2, 1
-		ANIME_CHARACTER_ID_LIST =	0x00008000,  // Byte 6, bit 7 (dec 128)
-		// Byte 6, bits 6-4 are retired
-		// Byte 6, bits 3-0 are unused
+		// Byte 6 (sixth byte of mask) - bits 47-40 in 64-bit notation
+		ANIME_CHARACTER_ID_LIST =	0x0000800000000000ULL,  // Byte 6, bit 7
+		// Byte 6, bits 6-4 (0x0000400000000000ULL, 0x0000200000000000ULL, 0x0000100000000000ULL) are retired
+		// Byte 6, bits 3-0 (0x0000080000000000ULL, 0x0000040000000000ULL, 0x0000020000000000ULL, 0x0000010000000000ULL) are unused
 		
-		// Byte 7 (seventh byte of mask) - bits 7-0 in dec: 128, 64, 32, 16, 8, 4, 2, 1
-		ANIME_SPECIALS_COUNT =		0x00000080,  // Byte 7, bit 7 (dec 128)
-		ANIME_CREDITS_COUNT =		0x00000040,  // Byte 7, bit 6 (dec 64)
-		ANIME_OTHER_COUNT =			0x00000020,  // Byte 7, bit 5 (dec 32)
-		ANIME_TRAILER_COUNT =		0x00000010,  // Byte 7, bit 4 (dec 16)
-		ANIME_PARODY_COUNT =		0x00000008   // Byte 7, bit 3 (dec 8)
-		// Byte 7, bits 2-0 are unused
+		// Byte 7 (seventh byte of mask) - bits 55-48 in 64-bit notation
+		ANIME_SPECIALS_COUNT =		0x0080000000000000ULL,  // Byte 7, bit 7
+		ANIME_CREDITS_COUNT =		0x0040000000000000ULL,  // Byte 7, bit 6
+		ANIME_OTHER_COUNT =			0x0020000000000000ULL,  // Byte 7, bit 5
+		ANIME_TRAILER_COUNT =		0x0010000000000000ULL,  // Byte 7, bit 4
+		ANIME_PARODY_COUNT =		0x0008000000000000ULL   // Byte 7, bit 3
+		// Byte 7, bits 2-0 (0x0004000000000000ULL, 0x0002000000000000ULL, 0x0001000000000000ULL) are unused
 	};
 
 	// Data structures for parsed responses
@@ -275,10 +275,10 @@ private:
 	AnimeData parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index);
 	EpisodeData parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index);
 	GroupData parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
-	AnimeData parseAnimeMask(const QStringList& tokens, unsigned int amask, int& index);
-	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
-	AnimeData parseAnimeMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
-	AnimeMask calculateReducedMask(const AnimeMask& originalMask, const QByteArray& parsedMaskBytes);
+	AnimeData parseMask(const QStringList& tokens, uint64_t amask, int& index);
+	AnimeData parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
+	AnimeData parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
+	Mask calculateReducedMask(const Mask& originalMask, const QByteArray& parsedMaskBytes);
 	
 	void storeFileData(const FileData& data);
 	void storeAnimeData(const AnimeData& data);

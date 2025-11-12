@@ -111,7 +111,7 @@ add_test(NAME test_crashlog COMMAND test_crashlog -v2)
 set(ANIDBAPI_TEST_SOURCES
     test_anidbapi.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -163,7 +163,7 @@ add_test(NAME test_anidbapi COMMAND test_anidbapi -v2)
 set(TIMEOUT_RETRY_TEST_SOURCES
     test_anidb_timeout_retry.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -215,7 +215,7 @@ add_test(NAME test_anidb_timeout_retry COMMAND test_anidb_timeout_retry -v2)
 set(ANIME_TITLES_TEST_SOURCES
     test_anime_titles.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -576,7 +576,7 @@ add_test(NAME test_directorywatcher COMMAND test_directorywatcher -v2)
 set(HASH_STORAGE_TEST_SOURCES
     test_hash_storage.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -668,7 +668,7 @@ add_test(NAME test_logger COMMAND test_logger -v2)
 set(HASH_REUSE_TEST_SOURCES
     test_hash_reuse.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -720,7 +720,7 @@ add_test(NAME test_hash_reuse COMMAND test_hash_reuse -v2)
 set(BATCH_LOCALIDENTIFY_TEST_SOURCES
     test_batch_localidentify.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -772,7 +772,7 @@ add_test(NAME test_batch_localidentify COMMAND test_batch_localidentify -v2)
 set(HASH_DUPLICATE_REUSE_TEST_SOURCES
     test_hash_duplicate_reuse.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -847,7 +847,7 @@ add_test(NAME test_database_validation COMMAND test_database_validation -v2)
 set(THREAD_SAFETY_TEST_SOURCES
     test_thread_safety.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -899,7 +899,7 @@ add_test(NAME test_thread_safety COMMAND test_thread_safety -v2)
 set(IMMEDIATE_IDENTIFICATION_TEST_SOURCES
     test_immediate_identification.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -951,7 +951,7 @@ add_test(NAME test_immediate_identification COMMAND test_immediate_identificatio
 set(BATCH_HASH_RETRIEVAL_TEST_SOURCES
     test_batch_hash_retrieval.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -1003,7 +1003,7 @@ add_test(NAME test_batch_hash_retrieval COMMAND test_batch_hash_retrieval -v2)
 set(UI_FREEZE_FIX_TEST_SOURCES
     test_ui_freeze_fix.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
@@ -1058,7 +1058,7 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/myanidbapi.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
@@ -1115,7 +1115,7 @@ add_test(NAME test_hasher_thread COMMAND test_hasher_thread -v2)
 set(TRUNCATED_RESPONSE_TEST_SOURCES
     test_truncated_response.cpp
     ../usagi/src/anidbapi.cpp
-    ../usagi/src/animemask.cpp
+    ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
