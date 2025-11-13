@@ -116,7 +116,11 @@ void TestStopNonBlocking::testStopReturnsQuickly()
     
     // Now wait for threads to actually finish (this can take time, but we're not blocking the UI)
     // Wait up to 10 seconds for the finished signal
-    QVERIFY2(finishedSpy.wait(10000), "Threads should finish within 10 seconds after stop");
+    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
+    for (int i = 0; i < 1000 && finishedSpy.count() == 0; ++i) {
+        QTest::qWait(10);
+    }
+    QVERIFY2(finishedSpy.count() > 0, "Threads should finish within 10 seconds after stop");
     
     // Clean up temp files
     for (QTemporaryFile *tempFile : tempFiles)
@@ -186,9 +190,13 @@ void TestStopNonBlocking::testStopWithBroadcastReturnsQuickly()
     // With broadcastStopHasher and DirectConnection, threads should stop much faster
     // Previously threads would complete the entire file (50MB = ~500 parts = many seconds)
     // Now they should stop within the current 100KB chunk (< 1 second)
+    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
     QElapsedTimer finishTimer;
     finishTimer.start();
-    QVERIFY2(finishedSpy.wait(5000), "Threads should finish within 5 seconds after broadcast stop");
+    for (int i = 0; i < 500 && finishedSpy.count() == 0; ++i) {
+        QTest::qWait(10);
+    }
+    QVERIFY2(finishedSpy.count() > 0, "Threads should finish within 5 seconds after broadcast stop");
     qint64 finishTime = finishTimer.elapsed();
     
     // Verify threads stopped quickly (should be < 2 seconds for immediate stop)
@@ -240,8 +248,12 @@ void TestStopNonBlocking::testStopAndRestart()
     pool.stop();
     
     // Wait for threads to finish and the pool to update its state
+    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
     QSignalSpy firstFinishedSpy(&pool, &HasherThreadPool::finished);
-    QVERIFY2(firstFinishedSpy.wait(5000), "Threads should finish after stop");
+    for (int i = 0; i < 500 && firstFinishedSpy.count() == 0; ++i) {
+        QTest::qWait(10);
+    }
+    QVERIFY2(firstFinishedSpy.count() > 0, "Threads should finish after stop");
     
     // Process any pending events to ensure state is updated
     QTest::qWait(100);
@@ -263,7 +275,11 @@ void TestStopNonBlocking::testStopAndRestart()
     pool.addFile(QString());
     
     // Wait for completion
-    QVERIFY2(finishedSpy.wait(15000), "Threads should finish after restart");
+    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
+    for (int i = 0; i < 1500 && finishedSpy.count() == 0; ++i) {
+        QTest::qWait(10);
+    }
+    QVERIFY2(finishedSpy.count() > 0, "Threads should finish after restart");
     
     // Clean up temp files
     for (QTemporaryFile *tempFile : tempFiles)
