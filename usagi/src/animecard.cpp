@@ -1,7 +1,7 @@
 #include "animecard.h"
 #include <QPainter>
 #include <QMouseEvent>
-#include <QListWidgetItem>
+#include <QTreeWidgetItem>
 #include <QDateTime>
 
 AnimeCard::AnimeCard(QWidget *parent)
@@ -76,18 +76,23 @@ void AnimeCard::setupUI()
     
     m_mainLayout->addLayout(m_topLayout);
     
-    // Episode list (bottom section)
-    m_episodeList = new QListWidget(this);
-    m_episodeList->setStyleSheet("QListWidget { font-size: 8pt; }");
-    m_episodeList->setAlternatingRowColors(true);
-    m_episodeList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_mainLayout->addWidget(m_episodeList, 1);
+    // Episode tree (bottom section) - now supports episode->file hierarchy
+    m_episodeTree = new QTreeWidget(this);
+    m_episodeTree->setHeaderHidden(true);
+    m_episodeTree->setStyleSheet("QTreeWidget { font-size: 8pt; }");
+    m_episodeTree->setAlternatingRowColors(true);
+    m_episodeTree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_episodeTree->setIndentation(15);  // Indent for file children
+    m_mainLayout->addWidget(m_episodeTree, 1);
     
-    // Connect signals
-    connect(m_episodeList, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
+    // Connect signals for episode/file clicks
+    connect(m_episodeTree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem *item, int column) {
+        Q_UNUSED(column);
         if (item) {
-            int lid = item->data(Qt::UserRole).toInt();
-            emit episodeClicked(lid);
+            int lid = item->data(0, Qt::UserRole).toInt();
+            if (lid > 0) {  // Only emit if it's a file item (has lid)
+                emit episodeClicked(lid);
+            }
         }
     });
 }
@@ -152,62 +157,125 @@ void AnimeCard::setPoster(const QPixmap& pixmap)
 
 void AnimeCard::addEpisode(const EpisodeInfo& episode)
 {
-    QString itemText;
+    // Create episode parent item
+    QTreeWidgetItem *episodeItem = new QTreeWidgetItem(m_episodeTree);
     
-    // Format: "Episode X: Title [State] [Viewed]"
+    // Format episode text
+    QString episodeText;
     if (episode.episodeNumber.isValid()) {
-        itemText = QString("Ep %1: %2")
+        episodeText = QString("Ep %1: %2")
             .arg(episode.episodeNumber.toDisplayString())
             .arg(episode.episodeTitle);
     } else {
-        itemText = QString("Episode: %1").arg(episode.episodeTitle);
+        episodeText = QString("Episode: %1").arg(episode.episodeTitle);
     }
     
-    // Add state indicator
-    if (!episode.state.isEmpty()) {
-        itemText += QString(" [%1]").arg(episode.state);
+    // Show file count
+    if (episode.files.size() > 1) {
+        episodeText += QString(" (%1 files)").arg(episode.files.size());
     }
     
-    // Add viewed indicator
-    if (episode.viewed) {
-        itemText += " ✓";
-    }
+    episodeItem->setText(0, episodeText);
+    episodeItem->setData(0, Qt::UserRole, 0);  // 0 means it's an episode, not a file
+    episodeItem->setData(0, Qt::UserRole + 1, episode.eid);
     
-    QListWidgetItem *item = new QListWidgetItem(itemText, m_episodeList);
-    item->setData(Qt::UserRole, episode.lid);
-    item->setData(Qt::UserRole + 1, episode.eid);
-    
-    // Color code based on state
-    if (episode.viewed) {
-        item->setForeground(QBrush(QColor(0, 150, 0))); // Green for viewed
-    }
-    
-    // Add tooltip with file info
-    QString tooltip = QString("Episode: %1\nFile: %2\nStorage: %3\nState: %4\nViewed: %5")
-        .arg(episode.episodeTitle)
-        .arg(episode.fileName)
-        .arg(episode.storage)
-        .arg(episode.state)
-        .arg(episode.viewed ? "Yes" : "No");
-    
-    if (episode.lastPlayed > 0) {
-        QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(episode.lastPlayed);
-        tooltip += QString("\nLast Played: %1").arg(lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+    // Add file children
+    for (const FileInfo& file : episode.files) {
+        QTreeWidgetItem *fileItem = new QTreeWidgetItem(episodeItem);
         
-        // Track most recent last played time for this anime
-        if (episode.lastPlayed > m_lastPlayed) {
-            m_lastPlayed = episode.lastPlayed;
+        // Format file text with version indicator
+        QString fileText = QString("\\");
+        
+        // Add version if there are multiple files
+        if (episode.files.size() > 1 && file.version > 0) {
+            fileText += QString(" v%1").arg(file.version);
         }
+        
+        // Add file details
+        QStringList fileDetails;
+        if (!file.resolution.isEmpty()) {
+            fileDetails << file.resolution;
+        }
+        if (!file.quality.isEmpty()) {
+            fileDetails << file.quality;
+        }
+        if (!file.groupName.isEmpty()) {
+            fileDetails << QString("[%1]").arg(file.groupName);
+        }
+        
+        if (!fileDetails.isEmpty()) {
+            fileText += " " + fileDetails.join(" ");
+        } else if (!file.fileName.isEmpty()) {
+            fileText += " " + file.fileName;
+        } else {
+            fileText += QString(" FID:%1").arg(file.fid);
+        }
+        
+        // Add state indicator
+        if (!file.state.isEmpty()) {
+            fileText += QString(" [%1]").arg(file.state);
+        }
+        
+        // Add viewed indicator
+        if (file.viewed) {
+            fileText += " ✓";
+        }
+        
+        fileItem->setText(0, fileText);
+        fileItem->setData(0, Qt::UserRole, file.lid);
+        fileItem->setData(0, Qt::UserRole + 1, file.fid);
+        
+        // Color code based on state
+        if (file.viewed) {
+            fileItem->setForeground(0, QBrush(QColor(0, 150, 0))); // Green for viewed
+        }
+        
+        // Add tooltip with file info
+        QString tooltip = QString("File: %1\nStorage: %2\nState: %3\nViewed: %4")
+            .arg(file.fileName)
+            .arg(file.storage)
+            .arg(file.state)
+            .arg(file.viewed ? "Yes" : "No");
+        
+        if (!file.resolution.isEmpty()) {
+            tooltip += QString("\nResolution: %1").arg(file.resolution);
+        }
+        if (!file.quality.isEmpty()) {
+            tooltip += QString("\nQuality: %1").arg(file.quality);
+        }
+        if (!file.groupName.isEmpty()) {
+            tooltip += QString("\nGroup: %1").arg(file.groupName);
+        }
+        if (file.version > 0) {
+            tooltip += QString("\nVersion: v%1").arg(file.version);
+        }
+        
+        if (file.lastPlayed > 0) {
+            QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(file.lastPlayed);
+            tooltip += QString("\nLast Played: %1").arg(lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+            
+            // Track most recent last played time for this anime
+            if (file.lastPlayed > m_lastPlayed) {
+                m_lastPlayed = file.lastPlayed;
+            }
+        }
+        
+        fileItem->setToolTip(0, tooltip);
     }
     
-    item->setToolTip(tooltip);
+    // Expand episode by default if it has only one file, collapse if multiple
+    if (episode.files.size() == 1) {
+        episodeItem->setExpanded(true);
+    } else {
+        episodeItem->setExpanded(false);
+    }
     
-    m_episodeList->addItem(item);
+    m_episodeTree->addTopLevelItem(episodeItem);
 }
 
 void AnimeCard::clearEpisodes()
 {
-    m_episodeList->clear();
+    m_episodeTree->clear();
 }
 
 bool AnimeCard::operator<(const AnimeCard& other) const

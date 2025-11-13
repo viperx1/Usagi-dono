@@ -6,7 +6,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFrame>
-#include <QListWidget>
+#include <QTreeWidget>
 #include <QPushButton>
 #include <QPixmap>
 #include "epno.h"
@@ -44,17 +44,26 @@ public:
     void setStatistics(int episodesInList, int totalEpisodes, int viewedCount);
     void setPoster(const QPixmap& pixmap);
     
-    // Episode management
-    struct EpisodeInfo {
-        int eid;
+    // File and Episode management structures
+    struct FileInfo {
         int lid;
-        epno episodeNumber;
-        QString episodeTitle;
+        int fid;
         QString fileName;
         QString state;
         bool viewed;
         QString storage;
         qint64 lastPlayed;
+        QString resolution;
+        QString quality;
+        QString groupName;
+        int version;  // File version (1, 2, 3, etc.)
+    };
+    
+    struct EpisodeInfo {
+        int eid;
+        epno episodeNumber;
+        QString episodeTitle;
+        QList<FileInfo> files;  // Multiple files per episode
     };
     
     void addEpisode(const EpisodeInfo& episode);
@@ -107,7 +116,7 @@ private:
     QLabel *m_typeLabel;
     QLabel *m_airedLabel;
     QLabel *m_statsLabel;
-    QListWidget *m_episodeList;
+    QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy
     
     QVBoxLayout *m_mainLayout;
     QHBoxLayout *m_topLayout;

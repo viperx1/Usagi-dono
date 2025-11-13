@@ -4306,21 +4306,26 @@ void Window::loadMylistAsCards()
 			animeNeedingMetadata.insert(aid);
 		}
 		
-		// Query episodes for this anime
+		// Query episodes for this anime - need to get file details too
 		QSqlQuery episodeQuery(db);
 		episodeQuery.prepare("SELECT m.lid, m.eid, m.fid, m.state, m.viewed, m.storage, "
 							"e.name as episode_name, e.epno, "
 							"f.filename, m.last_played, "
-							"lf.path as local_file_path "
+							"lf.path as local_file_path, "
+							"f.resolution, f.quality, "
+							"(SELECT name FROM `group` WHERE gid = m.gid) as group_name "
 							"FROM mylist m "
 							"LEFT JOIN episode e ON m.eid = e.eid "
 							"LEFT JOIN file f ON m.fid = f.fid "
 							"LEFT JOIN local_files lf ON m.local_file = lf.id "
 							"WHERE m.aid = ? "
-							"ORDER BY e.epno");
+							"ORDER BY e.epno, m.lid");
 		episodeQuery.addBindValue(aid);
 		
-		int episodesInList = 0;
+		// Group files by episode
+		QMap<int, AnimeCard::EpisodeInfo> episodeMap;
+		QMap<int, int> episodeFileCount;  // Track file count per episode for versioning
+		int totalFiles = 0;
 		int viewedCount = 0;
 		
 		if (episodeQuery.exec())
@@ -4338,47 +4343,73 @@ void Window::loadMylistAsCards()
 				QString filename = episodeQuery.value(8).toString();
 				qint64 lastPlayed = episodeQuery.value(9).toLongLong();
 				QString localFilePath = episodeQuery.value(10).toString();
+				QString resolution = episodeQuery.value(11).toString();
+				QString quality = episodeQuery.value(12).toString();
+				QString groupName = episodeQuery.value(13).toString();
 				
-				episodesInList++;
+				totalFiles++;
 				if (viewed) {
 					viewedCount++;
 				}
 				
-				// Create episode info
-				AnimeCard::EpisodeInfo episodeInfo;
-				episodeInfo.eid = eid;
-				episodeInfo.lid = lid;
-				
-				if (!epno.isEmpty()) {
-					episodeInfo.episodeNumber = ::epno(epno);
+				// Get or create episode entry
+				if (!episodeMap.contains(eid)) {
+					AnimeCard::EpisodeInfo episodeInfo;
+					episodeInfo.eid = eid;
+					
+					if (!epno.isEmpty()) {
+						episodeInfo.episodeNumber = ::epno(epno);
+					}
+					
+					episodeInfo.episodeTitle = episodeName.isEmpty() ? "Episode" : episodeName;
+					
+					if (episodeName.isEmpty()) {
+						episodesNeedingData.insert(eid);
+					}
+					
+					episodeMap[eid] = episodeInfo;
+					episodeFileCount[eid] = 0;
 				}
 				
-				episodeInfo.episodeTitle = episodeName.isEmpty() ? "Episode" : episodeName;
-				episodeInfo.fileName = filename.isEmpty() ? QString("FID:%1").arg(fid) : filename;
+				// Create file info
+				AnimeCard::FileInfo fileInfo;
+				fileInfo.lid = lid;
+				fileInfo.fid = fid;
+				fileInfo.fileName = filename.isEmpty() ? QString("FID:%1").arg(fid) : filename;
 				
 				// State string
 				switch(state)
 				{
-					case 0: episodeInfo.state = "Unknown"; break;
-					case 1: episodeInfo.state = "HDD"; break;
-					case 2: episodeInfo.state = "CD/DVD"; break;
-					case 3: episodeInfo.state = "Deleted"; break;
-					default: episodeInfo.state = QString::number(state); break;
+					case 0: fileInfo.state = "Unknown"; break;
+					case 1: fileInfo.state = "HDD"; break;
+					case 2: fileInfo.state = "CD/DVD"; break;
+					case 3: fileInfo.state = "Deleted"; break;
+					default: fileInfo.state = QString::number(state); break;
 				}
 				
-				episodeInfo.viewed = (viewed != 0);
-				episodeInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
-				episodeInfo.lastPlayed = lastPlayed;
+				fileInfo.viewed = (viewed != 0);
+				fileInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
+				fileInfo.lastPlayed = lastPlayed;
+				fileInfo.resolution = resolution;
+				fileInfo.quality = quality;
+				fileInfo.groupName = groupName;
 				
-				if (episodeName.isEmpty()) {
-					episodesNeedingData.insert(eid);
-				}
+				// Assign version number (v1, v2, v3, etc.)
+				episodeFileCount[eid]++;
+				fileInfo.version = episodeFileCount[eid];
 				
-				card->addEpisode(episodeInfo);
+				// Add file to episode
+				episodeMap[eid].files.append(fileInfo);
 			}
 		}
 		
-		// Set statistics
+		// Add all episodes to card
+		for (const AnimeCard::EpisodeInfo& episodeInfo : episodeMap) {
+			card->addEpisode(episodeInfo);
+		}
+		
+		// Set statistics (count unique episodes, not files)
+		int episodesInList = episodeMap.size();
 		int totalEps = (epTotal > 0) ? epTotal : eps;
 		if (totalEps <= 0) totalEps = episodesInList; // Fallback
 		card->setStatistics(episodesInList, totalEps, viewedCount);
