@@ -1,6 +1,7 @@
 #include "main.h"
 #include "window.h"
 #include "hasherthreadpool.h"
+#include "hasherthread.h"
 #include "crashlog.h"
 #include "logger.h"
 #include "playbuttondelegate.h"
@@ -838,6 +839,7 @@ void Window::setupHashingProgress(const QStringList &files)
 	totalHashParts = calculateTotalHashParts(files);
 	completedHashParts = 0;
 	lastThreadProgress.clear(); // Reset per-thread progress tracking
+	progressHistory.clear(); // Reset progress history for ETA calculation
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
 	progressTotal->setFormat("ETA: calculating...");
@@ -1085,9 +1087,42 @@ void Window::getNotifyPartsDone(int threadId, int total, int done)
 	progressTotalLabel->setText(QString("%1%").arg(percentage));
 	
 	// Calculate and display ETA - throttled to once per second to prevent UI freeze
+	// Note: Progress updates from hasher are throttled by HASHER_PROGRESS_UPDATE_INTERVAL,
+	// but we track actual delta in completedHashParts, so rate calculation is accurate
 	if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
-		qint64 elapsedMs = hashingTimer.elapsed();
-		double partsPerMs = static_cast<double>(completedHashParts) / elapsedMs;
+		qint64 currentTime = hashingTimer.elapsed();
+		
+		// Add current progress snapshot to history
+		ProgressSnapshot snapshot;
+		snapshot.timestamp = currentTime;
+		snapshot.completedParts = completedHashParts;
+		progressHistory.append(snapshot);
+		
+		// Keep only snapshots from the last 30 seconds for moving average
+		const qint64 WINDOW_SIZE_MS = 30000;
+		while (!progressHistory.isEmpty() && (currentTime - progressHistory.first().timestamp) > WINDOW_SIZE_MS) {
+			progressHistory.removeFirst();
+		}
+		
+		// Calculate rate based on recent progress (moving average)
+		double partsPerMs = 0.0;
+		if (progressHistory.size() >= 2) {
+			// Use the earliest and latest snapshots in the window
+			const ProgressSnapshot &oldest = progressHistory.first();
+			const ProgressSnapshot &newest = progressHistory.last();
+			qint64 timeWindow = newest.timestamp - oldest.timestamp;
+			int partsInWindow = newest.completedParts - oldest.completedParts;
+			
+			if (timeWindow > 0 && partsInWindow > 0) {
+				partsPerMs = static_cast<double>(partsInWindow) / timeWindow;
+			}
+		}
+		
+		// If we don't have enough history yet, fall back to average from start
+		if (partsPerMs == 0.0 && currentTime > 0) {
+			partsPerMs = static_cast<double>(completedHashParts) / currentTime;
+		}
+		
 		int remainingParts = totalHashParts - completedHashParts;
 		
 		if (remainingParts > 0 && partsPerMs > 0) {

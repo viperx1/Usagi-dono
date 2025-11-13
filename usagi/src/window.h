@@ -296,6 +296,13 @@ private:
     // Track last progress per thread to calculate deltas with throttled updates
     QMap<int, int> lastThreadProgress;
     
+    // Track progress history for ETA calculation using moving average
+    struct ProgressSnapshot {
+        qint64 timestamp;  // Time in milliseconds
+        int completedParts;
+    };
+    QList<ProgressSnapshot> progressHistory;
+    
     // Mutex to protect file assignment from concurrent thread requests
     QMutex fileRequestMutex;
     
