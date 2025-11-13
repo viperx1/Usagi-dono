@@ -6,6 +6,7 @@
 #include "logger.h"
 #include "playbuttondelegate.h"
 #include <QElapsedTimer>
+#include <algorithm>
 
 HasherThreadPool *hasherThreadPool = nullptr;
 myAniDBApi *adbapi;

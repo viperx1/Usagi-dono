@@ -2,6 +2,7 @@
 #include <QPainter>
 #include <QMouseEvent>
 #include <QListWidgetItem>
+#include <QDateTime>
 
 AnimeCard::AnimeCard(QWidget *parent)
     : QFrame(parent)
