@@ -131,6 +131,32 @@ Window::Window()
     pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
 
     // page mylist
+    // Initialize card view flag (default to card view as per requirement)
+    mylistUseCardView = true;
+    
+    // Add toolbar for view toggle and sorting
+    QHBoxLayout *mylistToolbar = new QHBoxLayout();
+    
+    mylistViewToggleButton = new QPushButton("Switch to Tree View");
+    mylistViewToggleButton->setMaximumWidth(150);
+    connect(mylistViewToggleButton, SIGNAL(clicked()), this, SLOT(toggleMylistView()));
+    mylistToolbar->addWidget(mylistViewToggleButton);
+    
+    mylistToolbar->addWidget(new QLabel("Sort by:"));
+    mylistSortComboBox = new QComboBox();
+    mylistSortComboBox->addItem("Anime Title");
+    mylistSortComboBox->addItem("Type");
+    mylistSortComboBox->addItem("Aired Date");
+    mylistSortComboBox->addItem("Episodes (Count)");
+    mylistSortComboBox->addItem("Completion %");
+    mylistSortComboBox->setCurrentIndex(0);
+    connect(mylistSortComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(sortMylistCards(int)));
+    mylistToolbar->addWidget(mylistSortComboBox);
+    
+    mylistToolbar->addStretch();
+    pageMylist->addLayout(mylistToolbar);
+    
+    // Tree widget (for tree view mode)
     mylistTreeWidget = new QTreeWidget(this);
     mylistTreeWidget->setColumnCount(11);
     // New column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
@@ -151,13 +177,28 @@ Window::Window()
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pageMylist->addWidget(mylistTreeWidget);
     
+    // Card view (for card view mode)
+    mylistCardScrollArea = new QScrollArea(this);
+    mylistCardScrollArea->setWidgetResizable(true);
+    mylistCardScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    mylistCardScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    
+    mylistCardContainer = new QWidget();
+    mylistCardLayout = new FlowLayout(mylistCardContainer, 10, 10, 10);
+    mylistCardContainer->setLayout(mylistCardLayout);
+    mylistCardScrollArea->setWidget(mylistCardContainer);
+    
+    pageMylist->addWidget(mylistCardScrollArea);
+    
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
     mylistStatusLabel->setAlignment(Qt::AlignCenter);
     mylistStatusLabel->setStyleSheet("padding: 5px; background-color: #f0f0f0;");
     pageMylist->addWidget(mylistStatusLabel);
     
-    mylistTreeWidget->show();
+    // Initially show card view (hide tree view)
+    mylistTreeWidget->hide();
+    mylistCardScrollArea->show();
 
     // page hasher - signals
     connect(button1, SIGNAL(clicked()), this, SLOT(Button1Click()));
@@ -2373,6 +2414,12 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& 
 
 void Window::loadMylistFromDatabase()
 {
+	// If card view is active, use card loading instead
+	if (mylistUseCardView) {
+		loadMylistAsCards();
+		return;
+	}
+	
 	mylistTreeWidget->clear();
 	episodesNeedingData.clear();  // Clear tracking set
 	animeNeedingMetadata.clear();  // Clear tracking set
@@ -4014,4 +4061,292 @@ void Window::startPlaybackForFile(int lid)
 	} else {
 		LOG(QString("Cannot play: file path not found for LID %1").arg(lid));
 	}
+}
+
+// Toggle between card view and tree view
+void Window::toggleMylistView()
+{
+	mylistUseCardView = !mylistUseCardView;
+	
+	if (mylistUseCardView) {
+		mylistTreeWidget->hide();
+		mylistCardScrollArea->show();
+		mylistViewToggleButton->setText("Switch to Tree View");
+		mylistSortComboBox->setEnabled(true);
+		loadMylistAsCards();
+	} else {
+		mylistCardScrollArea->hide();
+		mylistTreeWidget->show();
+		mylistViewToggleButton->setText("Switch to Card View");
+		mylistSortComboBox->setEnabled(false);
+		loadMylistFromDatabase();
+	}
+}
+
+// Sort cards based on selected criterion
+void Window::sortMylistCards(int sortIndex)
+{
+	if (!mylistUseCardView || animeCards.isEmpty()) {
+		return;
+	}
+	
+	// Remove all cards from layout
+	for (AnimeCard *card : animeCards) {
+		mylistCardLayout->removeWidget(card);
+	}
+	
+	// Sort based on criterion
+	switch (sortIndex) {
+		case 0: // Anime Title
+			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+				return a->getAnimeTitle() < b->getAnimeTitle();
+			});
+			break;
+		case 1: // Type
+			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+				if (a->getAnimeType() == b->getAnimeType()) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				return a->getAnimeType() < b->getAnimeType();
+			});
+			break;
+		case 2: // Aired Date
+			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+				if (a->getAiredText() == b->getAiredText()) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				return a->getAiredText() < b->getAiredText();
+			});
+			break;
+		case 3: // Episodes (Count)
+			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+				if (a->getEpisodesInList() == b->getEpisodesInList()) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				return a->getEpisodesInList() < b->getEpisodesInList();
+			});
+			break;
+		case 4: // Completion %
+			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+				double completionA = (a->getEpisodesInList() > 0) ? 
+					(double)a->getViewedCount() / a->getEpisodesInList() : 0.0;
+				double completionB = (b->getEpisodesInList() > 0) ? 
+					(double)b->getViewedCount() / b->getEpisodesInList() : 0.0;
+				if (completionA == completionB) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				return completionA < completionB;
+			});
+			break;
+	}
+	
+	// Re-add cards to layout in sorted order
+	for (AnimeCard *card : animeCards) {
+		mylistCardLayout->addWidget(card);
+	}
+}
+
+// Load mylist data as cards
+void Window::loadMylistAsCards()
+{
+	// Clear existing cards
+	for (AnimeCard *card : animeCards) {
+		mylistCardLayout->removeWidget(card);
+		delete card;
+	}
+	animeCards.clear();
+	
+	episodesNeedingData.clear();
+	animeNeedingMetadata.clear();
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	
+	if(!validateDatabaseConnection(db, "loadMylistAsCards"))
+	{
+		mylistStatusLabel->setText("MyList Status: Database Error");
+		return;
+	}
+	
+	// Query all mylist entries grouped by anime
+	QString query = "SELECT m.aid, "
+					"a.nameromaji, a.nameenglish, a.eptotal, "
+					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
+					"a.eps, a.typename, a.startdate, a.enddate "
+					"FROM mylist m "
+					"LEFT JOIN anime a ON m.aid = a.aid "
+					"GROUP BY m.aid "
+					"ORDER BY a.nameromaji";
+	
+	QSqlQuery q(db);
+	
+	if(!q.exec(query))
+	{
+		LOG("Error loading mylist for cards: " + q.lastError().text());
+		return;
+	}
+	
+	// Create a card for each anime
+	while(q.next())
+	{
+		int aid = q.value(0).toInt();
+		QString animeName = q.value(1).toString();
+		QString animeNameEnglish = q.value(2).toString();
+		int epTotal = q.value(3).toInt();
+		QString animeTitle = q.value(4).toString();
+		int eps = q.value(5).toInt();
+		QString typeName = q.value(6).toString();
+		QString startDate = q.value(7).toString();
+		QString endDate = q.value(8).toString();
+		
+		// Use English name if romaji is empty
+		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
+		{
+			animeName = animeNameEnglish;
+		}
+		
+		// If anime name is still empty, try anime_titles table
+		if(animeName.isEmpty() && !animeTitle.isEmpty())
+		{
+			animeName = animeTitle;
+		}
+		
+		// If anime name is still empty, use aid
+		if(animeName.isEmpty())
+		{
+			animeName = QString("Anime #%1").arg(aid);
+		}
+		
+		// Create card
+		AnimeCard *card = new AnimeCard(mylistCardContainer);
+		card->setAnimeId(aid);
+		card->setAnimeTitle(animeName);
+		
+		// Set type
+		if (!typeName.isEmpty()) {
+			card->setAnimeType(typeName);
+		} else {
+			card->setAnimeType("Unknown");
+			animeNeedingMetadata.insert(aid);
+		}
+		
+		// Set aired dates
+		if (!startDate.isEmpty()) {
+			aired airedDates(startDate, endDate);
+			card->setAired(airedDates);
+		} else {
+			card->setAiredText("Unknown");
+			animeNeedingMetadata.insert(aid);
+		}
+		
+		// Query episodes for this anime
+		QSqlQuery episodeQuery(db);
+		episodeQuery.prepare("SELECT m.lid, m.eid, m.fid, m.state, m.viewed, m.storage, "
+							"e.name as episode_name, e.epno, "
+							"f.filename, m.last_played, "
+							"lf.path as local_file_path "
+							"FROM mylist m "
+							"LEFT JOIN episode e ON m.eid = e.eid "
+							"LEFT JOIN file f ON m.fid = f.fid "
+							"LEFT JOIN local_files lf ON m.local_file = lf.id "
+							"WHERE m.aid = ? "
+							"ORDER BY e.epno");
+		episodeQuery.addBindValue(aid);
+		
+		int episodesInList = 0;
+		int viewedCount = 0;
+		
+		if (episodeQuery.exec())
+		{
+			while (episodeQuery.next())
+			{
+				int lid = episodeQuery.value(0).toInt();
+				int eid = episodeQuery.value(1).toInt();
+				int fid = episodeQuery.value(2).toInt();
+				int state = episodeQuery.value(3).toInt();
+				int viewed = episodeQuery.value(4).toInt();
+				QString storage = episodeQuery.value(5).toString();
+				QString episodeName = episodeQuery.value(6).toString();
+				QString epno = episodeQuery.value(7).toString();
+				QString filename = episodeQuery.value(8).toString();
+				qint64 lastPlayed = episodeQuery.value(9).toLongLong();
+				QString localFilePath = episodeQuery.value(10).toString();
+				
+				episodesInList++;
+				if (viewed) {
+					viewedCount++;
+				}
+				
+				// Create episode info
+				AnimeCard::EpisodeInfo episodeInfo;
+				episodeInfo.eid = eid;
+				episodeInfo.lid = lid;
+				
+				if (!epno.isEmpty()) {
+					episodeInfo.episodeNumber = ::epno(epno);
+				}
+				
+				episodeInfo.episodeTitle = episodeName.isEmpty() ? "Episode" : episodeName;
+				episodeInfo.fileName = filename.isEmpty() ? QString("FID:%1").arg(fid) : filename;
+				
+				// State string
+				switch(state)
+				{
+					case 0: episodeInfo.state = "Unknown"; break;
+					case 1: episodeInfo.state = "HDD"; break;
+					case 2: episodeInfo.state = "CD/DVD"; break;
+					case 3: episodeInfo.state = "Deleted"; break;
+					default: episodeInfo.state = QString::number(state); break;
+				}
+				
+				episodeInfo.viewed = (viewed != 0);
+				episodeInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
+				episodeInfo.lastPlayed = lastPlayed;
+				
+				if (episodeName.isEmpty()) {
+					episodesNeedingData.insert(eid);
+				}
+				
+				card->addEpisode(episodeInfo);
+			}
+		}
+		
+		// Set statistics
+		int totalEps = (epTotal > 0) ? epTotal : eps;
+		if (totalEps <= 0) totalEps = episodesInList; // Fallback
+		card->setStatistics(episodesInList, totalEps, viewedCount);
+		
+		// Connect signals
+		connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
+		connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
+		
+		// Add to layout and track
+		mylistCardLayout->addWidget(card);
+		animeCards.append(card);
+	}
+	
+	// Apply current sort
+	sortMylistCards(mylistSortComboBox->currentIndex());
+	
+	mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
+	
+	// Request missing data if needed
+	if (!episodesNeedingData.isEmpty()) {
+		LOG(QString("Need episode data for %1 episodes").arg(episodesNeedingData.size()));
+	}
+	if (!animeNeedingMetadata.isEmpty()) {
+		LOG(QString("Need metadata for %1 anime").arg(animeNeedingMetadata.size()));
+	}
+}
+
+void Window::onCardClicked(int aid)
+{
+	LOG(QString("Card clicked for anime ID: %1").arg(aid));
+	// Could expand to show more details or navigate somewhere
+}
+
+void Window::onCardEpisodeClicked(int lid)
+{
+	LOG(QString("Episode clicked with LID: %1").arg(lid));
+	// Start playback for the episode
+	startPlaybackForFile(lid);
 }

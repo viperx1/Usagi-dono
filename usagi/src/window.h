@@ -23,6 +23,7 @@
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTreeWidget>
+#include <QtWidgets/QScrollArea>
 #include <QXmlStreamReader>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
@@ -30,6 +31,8 @@
 #include "aired.h"
 #include "directorywatcher.h"
 #include "playbackmanager.h"
+#include "animecard.h"
+#include "flowlayout.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -363,7 +366,14 @@ private:
 
     // page mylist
     QTreeWidget *mylistTreeWidget;
+    QScrollArea *mylistCardScrollArea;
+    QWidget *mylistCardContainer;
+    FlowLayout *mylistCardLayout;
+    QComboBox *mylistSortComboBox;
+    QPushButton *mylistViewToggleButton;
     QLabel *mylistStatusLabel;
+    bool mylistUseCardView;
+    QList<AnimeCard*> animeCards;
 	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
 	QSet<int> animeNeedingMetadata;  // Track AIDs that need metadata (typename, startdate, enddate)
 	// page settings
@@ -473,6 +483,13 @@ public slots:
     void saveMylistSorting();
     void restoreMylistSorting();
     void onMylistSortChanged(int column, Qt::SortOrder order);
+    
+    // MyList card view slots
+    void toggleMylistView();
+    void sortMylistCards(int sortIndex);
+    void loadMylistAsCards();
+    void onCardClicked(int aid);
+    void onCardEpisodeClicked(int lid);
     
     // Directory watcher slots
     void onWatcherEnabledChanged(int state);
