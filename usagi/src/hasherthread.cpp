@@ -127,6 +127,8 @@ void HasherThread::stopHashing()
     if (hasher != nullptr)
     {
         // Call the slot that sets the dohash flag to 0
-        QMetaObject::invokeMethod(hasher, "getNotifyStopHasher", Qt::QueuedConnection);
+        // Use DirectConnection to set the flag immediately, even if called from another thread
+        // This ensures the hashing loop stops as soon as possible
+        QMetaObject::invokeMethod(hasher, "getNotifyStopHasher", Qt::DirectConnection);
     }
 }

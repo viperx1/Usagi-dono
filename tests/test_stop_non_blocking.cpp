@@ -182,8 +182,18 @@ void TestStopNonBlocking::testStopWithBroadcastReturnsQuickly()
              QString("stop sequence took %1ms - should be nearly instantaneous").arg(stopTime).toUtf8());
     
     // Now wait for threads to actually finish
-    // With broadcastStopHasher, threads should finish faster (but still may take some time)
+    // With broadcastStopHasher and DirectConnection, threads should stop much faster
+    // Previously threads would complete the entire file (50MB = ~500 parts = many seconds)
+    // Now they should stop within the current 100KB chunk (< 1 second)
+    QElapsedTimer finishTimer;
+    finishTimer.start();
     QVERIFY2(finishedSpy.wait(5000), "Threads should finish within 5 seconds after broadcast stop");
+    qint64 finishTime = finishTimer.elapsed();
+    
+    // Verify threads stopped quickly (should be < 2 seconds for immediate stop)
+    // If threads were completing entire files, this would take 5+ seconds
+    QVERIFY2(finishTime < 2000,
+             QString("Threads took %1ms to finish - should stop immediately, not complete files").arg(finishTime).toUtf8());
     
     // Clean up temp files
     for (QTemporaryFile *tempFile : tempFiles)
