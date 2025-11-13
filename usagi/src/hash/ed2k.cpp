@@ -5,32 +5,9 @@
 #include <iomanip>
 #include <sstream>
 #include <cmath>
-#include <QMutexLocker>
-
-// Initialize static members
-QMutex ed2k::fileIOMutex;
-bool ed2k::useSerializedIO = false;
 
 ed2k::ed2k()
 {
-}
-
-void ed2k::setSerializedIO(bool enabled)
-{
-	useSerializedIO = enabled;
-	if (enabled)
-	{
-		LOG("ed2k: Serialized I/O enabled - optimized for HDD performance");
-	}
-	else
-	{
-		LOG("ed2k: Serialized I/O disabled - optimized for SSD/parallel I/O");
-	}
-}
-
-bool ed2k::getSerializedIO()
-{
-	return useSerializedIO;
 }
 
 qint64 ed2k::calculateHashParts(qint64 fileSize)
@@ -92,16 +69,7 @@ int ed2k::ed2khash(QString filepath)
 	ed2khashstr.clear();
 	Init();
 	
-	// Phase 1: File I/O (potentially serialized for HDD performance)
-	// Read entire file into memory in chunks, computing hash as we go
 	QFile file(fileinfo.absoluteFilePath());
-	
-	// Optional: Lock mutex for file I/O to prevent disk head thrashing on HDDs
-	QMutex *ioMutex = useSerializedIO ? &fileIOMutex : nullptr;
-	if (ioMutex)
-	{
-		ioMutex->lock();
-	}
 	
 	(void)file.open(QIODevice::ReadOnly);
 	
@@ -117,10 +85,6 @@ int ed2k::ed2khash(QString filepath)
 			if(dohash == 0)
 			{
 				file.close();
-				if (ioMutex)
-				{
-					ioMutex->unlock();
-				}
 				return 3; // hashing stopped by user
 			}
 			i = file.read(buffer, 102400);
@@ -133,15 +97,6 @@ int ed2k::ed2khash(QString filepath)
 		
 		file.close();
 		
-		// Unlock mutex after file I/O is complete
-		// This allows other threads to start reading their files
-		// while this thread completes the MD4 finalization (CPU work)
-		if (ioMutex)
-		{
-			ioMutex->unlock();
-		}
-		
-		// Phase 2: Finalization (parallel CPU work, not locked)
 		Final();
 		ed2kfilestruct hash;
 		hash.filename = fileinfo.fileName();
@@ -153,10 +108,6 @@ int ed2k::ed2khash(QString filepath)
 	}
 	else
 	{
-		if (ioMutex)
-		{
-			ioMutex->unlock();
-		}
 		ed2khashstr = QString("File %1 does not exist.").arg(fileinfo.absoluteFilePath());
 		return 2; // error opening file
 	}
