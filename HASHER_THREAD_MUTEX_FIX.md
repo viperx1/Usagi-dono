@@ -46,24 +46,61 @@ Track which thread is requesting a file and assign it directly to that thread:
 2. **In `addFile()`**: Check if we have a `requestingWorker` and assign the file directly to it
 3. **Fallback**: If no requesting worker (e.g., initial startup), use round-robin
 
+## Solution
+
+Track which thread is requesting a file and assign it directly to that thread:
+
+1. **In `onThreadRequestNextFile()`**: Use Qt's `sender()` to identify the requesting worker and enqueue it in a FIFO queue
+2. **In `addFile()`**: Dequeue from the request queue and assign the file to that worker
+3. **Fallback**: If queue is empty (e.g., initial startup), use round-robin
+
+### Important: Deadlock Fix
+
+The initial implementation had a critical bug that caused the app to freeze on startup:
+
+**Deadlock Scenario:**
+1. `onThreadRequestNextFile()` held `requestMutex` while emitting `requestNextFile()` signal
+2. Signal was processed **synchronously** (direct connection from HasherThreadPool to Window in same thread)
+3. `Window::provideNextFileToHash()` was called immediately (still holding `requestMutex`)
+4. `Window` called `HasherThreadPool::addFile()`
+5. `addFile()` tried to lock `requestMutex` → **DEADLOCK!**
+
+**Solution:** Release the mutex BEFORE emitting the signal.
+
+**Race Condition Fix:**
+
+Using a single `requestingWorker` variable had a race where multiple queued requests could overwrite each other:
+1. Thread A request → sets `requestingWorker = A`
+2. Thread B request → sets `requestingWorker = B` (overwrites!)
+3. Signal from step 1 processed → file assigned to B instead of A
+4. Thread A sits idle
+
+**Solution:** Use a FIFO queue (`requestQueue`) to preserve order of requests.
+
 ### Code Changes
 
 #### hasherthreadpool.h
 ```cpp
 private:
-    QMutex requestMutex;              // Protects requestingWorker
-    HasherThread* requestingWorker;   // Track which worker is requesting next file
+    QMutex requestMutex;              // Protects requestQueue
+    QQueue<HasherThread*> requestQueue;   // FIFO queue of workers requesting files
 ```
 
 #### hasherthreadpool.cpp
 ```cpp
 void HasherThreadPool::onThreadRequestNextFile()
 {
-    // Track which worker is requesting the next file
-    QMutexLocker locker(&requestMutex);
-    requestingWorker = qobject_cast<HasherThread*>(sender());
+    // Enqueue the requesting worker in FIFO order
+    {
+        QMutexLocker locker(&requestMutex);
+        HasherThread* requestingWorker = qobject_cast<HasherThread*>(sender());
+        if (requestingWorker != nullptr)
+        {
+            requestQueue.enqueue(requestingWorker);
+        }
+    }
     
-    // Forward the request to the Window class
+    // Release mutex BEFORE emitting to avoid deadlock
     emit requestNextFile();
 }
 
@@ -77,8 +114,10 @@ void HasherThreadPool::addFile(const QString &filePath)
         
         {
             QMutexLocker locker(&requestMutex);
-            targetWorker = requestingWorker;
-            requestingWorker = nullptr;  // Clear after assignment
+            if (!requestQueue.isEmpty())
+            {
+                targetWorker = requestQueue.dequeue();
+            }
         }
         
         if (targetWorker != nullptr)
@@ -88,7 +127,7 @@ void HasherThreadPool::addFile(const QString &filePath)
         }
         else
         {
-            // Fallback to round-robin
+            // Fallback to round-robin for initial distribution
             static int lastUsedWorker = 0;
             lastUsedWorker = (lastUsedWorker + 1) % workers.size();
             workers[lastUsedWorker]->addFile(filePath);
@@ -100,15 +139,18 @@ void HasherThreadPool::addFile(const QString &filePath)
 ## Benefits
 
 1. **No idle threads**: When a thread finishes and requests work, it gets work immediately
-2. **Better CPU utilization**: All threads stay busy when files are available
-3. **Faster overall hashing**: No threads waiting unnecessarily
-4. **Simpler logic**: Direct assignment is clearer than round-robin distribution
+2. **No deadlock**: Mutex released before signal emission prevents synchronous call deadlock
+3. **No race conditions**: FIFO queue preserves request order
+4. **Better CPU utilization**: All threads stay busy when files are available
+5. **Faster overall hashing**: No threads waiting unnecessarily
+6. **Simpler logic**: Direct assignment is clearer than round-robin distribution
 
 ## Thread Safety
 
-- `requestMutex` protects access to `requestingWorker`
+- `requestMutex` protects access to `requestQueue`
 - Each thread still has its own `mutex` and `condition` variable for queue operations
-- No race conditions: the requesting worker is captured before the signal chain completes
+- Mutex is released before emitting signal to prevent deadlock
+- FIFO queue ensures proper ordering even with concurrent requests
 
 ## Testing
 
