@@ -4239,7 +4239,7 @@ void Window::loadMylistAsCards()
 	QString query = "SELECT m.aid, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
 					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
-					"a.eps, a.typename, a.startdate, a.enddate "
+					"a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"GROUP BY m.aid "
@@ -4265,6 +4265,8 @@ void Window::loadMylistAsCards()
 		QString typeName = q.value(6).toString();
 		QString startDate = q.value(7).toString();
 		QString endDate = q.value(8).toString();
+		QString picname = q.value(9).toString();
+		QByteArray posterData = q.value(10).toByteArray();
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -4305,6 +4307,17 @@ void Window::loadMylistAsCards()
 			card->setAiredText("Unknown");
 			animeNeedingMetadata.insert(aid);
 		}
+		
+		// Load poster image if available
+		if (!posterData.isEmpty()) {
+			QPixmap poster;
+			if (poster.loadFromData(posterData)) {
+				card->setPoster(poster);
+			}
+		}
+		// Note: If no poster image in database but picname exists, 
+		// a background thread could download it from:
+		// http://img7.anidb.net/pics/anime/<picname>
 		
 		// Query episodes for this anime - need to get file details too
 		QSqlQuery episodeQuery(db);
