@@ -116,8 +116,8 @@ private:
     
     QVector<HasherThread*> workers;
     QMutex mutex;
-    QMutex requestMutex;  // Protects requestingWorker
-    HasherThread* requestingWorker;  // Track which worker is requesting next file
+    QMutex requestMutex;  // Protects requestQueue
+    QQueue<HasherThread*> requestQueue;  // FIFO queue of workers requesting files
     int activeThreads;
     int finishedThreads;
     bool isStarted;

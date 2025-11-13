@@ -5,7 +5,7 @@
 #include <algorithm>
 
 HasherThreadPool::HasherThreadPool(int numThreads, QObject *parent)
-    : QObject(parent), requestingWorker(nullptr), activeThreads(0), finishedThreads(0), isStarted(false), isStopping(false)
+    : QObject(parent), activeThreads(0), finishedThreads(0), isStarted(false), isStopping(false)
 {
     // Determine optimal number of threads
     if (numThreads <= 0)
@@ -72,14 +72,16 @@ void HasherThreadPool::addFile(const QString &filePath)
     
     if (isStarted && !workers.isEmpty())
     {
-        // Assign the file to the worker that requested it
+        // Assign the file to the worker that requested it from the queue
         // This ensures threads don't sit idle while other threads have queued work
         HasherThread* targetWorker = nullptr;
         
         {
             QMutexLocker locker(&requestMutex);
-            targetWorker = requestingWorker;
-            requestingWorker = nullptr;  // Clear after assignment
+            if (!requestQueue.isEmpty())
+            {
+                targetWorker = requestQueue.dequeue();
+            }
         }
         
         // If we have a specific requesting worker, assign to it
@@ -182,12 +184,20 @@ bool HasherThreadPool::isRunning() const
 
 void HasherThreadPool::onThreadRequestNextFile()
 {
-    // Track which worker is requesting the next file
+    // Track which worker is requesting the next file in a FIFO queue
     // Use sender() to identify the worker that sent the signal
-    QMutexLocker locker(&requestMutex);
-    requestingWorker = qobject_cast<HasherThread*>(sender());
+    {
+        QMutexLocker locker(&requestMutex);
+        HasherThread* requestingWorker = qobject_cast<HasherThread*>(sender());
+        if (requestingWorker != nullptr)
+        {
+            requestQueue.enqueue(requestingWorker);
+        }
+    }
     
     // Forward the request to the Window class to provide the next file
+    // IMPORTANT: Signal must be emitted AFTER releasing requestMutex to avoid deadlock
+    // because Window::provideNextFileToHash() will call addFile() which also locks requestMutex
     emit requestNextFile();
 }
 
