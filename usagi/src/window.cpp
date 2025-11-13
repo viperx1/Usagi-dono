@@ -979,6 +979,18 @@ void Window::ButtonHasherStopClick()
 		bar->setMaximum(1);
 	}
 	
+	// Reset progress of files that were assigned but not completed
+	// Files with progress "0.1" were assigned to threads but stopped before completion
+	// Reset them to "0" so they can be picked up again on next start
+	for (int i = 0; i < hashes->rowCount(); i++)
+	{
+		QString progress = hashes->item(i, 1)->text();
+		if (progress == "0.1")
+		{
+			hashes->item(i, 1)->setText("0");
+		}
+	}
+	
 	// Notify all worker threads to stop hashing
 	// 1. First, notify ed2k instances in all worker threads to interrupt current hashing
 	//    This sets a flag that ed2khash checks, causing it to return early
@@ -988,9 +1000,8 @@ void Window::ButtonHasherStopClick()
 	// 2. Then signal the thread pool to stop processing more files
 	hasherThreadPool->stop();
 	
-	// 3. Finally, wait for all threads to finish
-	//    The threads will finish quickly because ed2khash will exit early
-	hasherThreadPool->wait();
+	// 3. Don't wait here - let threads finish asynchronously to prevent UI freeze
+	//    The hasherFinished() slot will be called automatically when all threads complete
 }
 
 void Window::provideNextFileToHash()
