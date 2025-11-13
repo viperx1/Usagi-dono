@@ -25,6 +25,7 @@ private slots:
     void cleanupTestCase();
     void testStopReturnsQuickly();
     void testStopWithBroadcastReturnsQuickly();
+    void testStopAndRestart();
 };
 
 void TestStopNonBlocking::initTestCase()
@@ -194,6 +195,75 @@ void TestStopNonBlocking::testStopWithBroadcastReturnsQuickly()
     // If threads were completing entire files, this would take 5+ seconds
     QVERIFY2(finishTime < 2000,
              QString("Threads took %1ms to finish - should stop immediately, not complete files").arg(finishTime).toUtf8());
+    
+    // Clean up temp files
+    for (QTemporaryFile *tempFile : tempFiles)
+    {
+        delete tempFile;
+    }
+}
+
+void TestStopNonBlocking::testStopAndRestart()
+{
+    // Create temporary files to hash
+    QVector<QTemporaryFile*> tempFiles;
+    QVector<QString> filePaths;
+    
+    for (int i = 0; i < 2; ++i)
+    {
+        QTemporaryFile *tempFile = new QTemporaryFile();
+        QVERIFY(tempFile->open());
+        QByteArray data(10 * 1024 * 1024, 'C' + i); // 10MB each
+        tempFile->write(data);
+        tempFile->close();
+        filePaths.append(tempFile->fileName());
+        tempFiles.append(tempFile);
+    }
+    
+    // Create a thread pool with 2 threads
+    HasherThreadPool pool(2);
+    
+    // First run: Start, add files, and stop
+    pool.start();
+    QTest::qWait(500);
+    
+    for (const QString &filePath : filePaths)
+    {
+        pool.addFile(filePath);
+        QTest::qWait(50);
+    }
+    
+    QTest::qWait(200);
+    
+    // Stop the pool
+    pool.broadcastStopHasher();
+    pool.stop();
+    
+    // Wait for threads to finish and the pool to update its state
+    QSignalSpy firstFinishedSpy(&pool, &HasherThreadPool::finished);
+    QVERIFY2(firstFinishedSpy.wait(5000), "Threads should finish after stop");
+    
+    // Process any pending events to ensure state is updated
+    QTest::qWait(100);
+    
+    // Second run: Restart the pool (this should not crash)
+    QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
+    
+    pool.start();
+    QTest::qWait(500);
+    
+    // Add files again
+    for (const QString &filePath : filePaths)
+    {
+        pool.addFile(filePath);
+        QTest::qWait(50);
+    }
+    
+    // Signal completion
+    pool.addFile(QString());
+    
+    // Wait for completion
+    QVERIFY2(finishedSpy.wait(15000), "Threads should finish after restart");
     
     // Clean up temp files
     for (QTemporaryFile *tempFile : tempFiles)

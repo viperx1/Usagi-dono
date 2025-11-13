@@ -17,6 +17,7 @@ class HasherThread : public QThread
     Q_OBJECT
 public:
     HasherThread(int threadId = 0);
+    ~HasherThread();
     void stop();
     void addFile(const QString &filePath);
     void stopHashing(); // Interrupt any ongoing hash operation

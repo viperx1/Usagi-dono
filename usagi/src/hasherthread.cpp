@@ -8,22 +8,17 @@ extern myAniDBApi *adbapi;
 HasherThread::HasherThread(int threadId)
     : shouldStop(false), threadId(threadId), hasher(nullptr), lastProgressUpdate(0)
 {
-    // Create a lightweight ed2k hasher instance for this thread
-    hasher = new ed2k();
-    
-    // Connect hasher signals with thread ID parameter
-    // Capture this and threadId explicitly for the lambda
-    connect(hasher, &ed2k::notifyPartsDone, this, [this, threadId](int total, int done) {
-        // Throttle progress updates: emit only every HASHER_PROGRESS_UPDATE_INTERVAL parts
-        if (done - lastProgressUpdate >= HASHER_PROGRESS_UPDATE_INTERVAL || done == total) {
-            lastProgressUpdate = done;
-            emit notifyPartsDone(threadId, total, done);
-        }
-    });
-    
-    connect(hasher, &ed2k::notifyFileHashed, this, [this, threadId](ed2k::ed2kfilestruct fileData) {
-        emit notifyFileHashed(threadId, fileData);
-    });
+    // hasher will be created in run() to support thread restart
+}
+
+HasherThread::~HasherThread()
+{
+    // Clean up hasher instance if it exists
+    if (hasher != nullptr)
+    {
+        delete hasher;
+        hasher = nullptr;
+    }
 }
 
 void HasherThread::run()
@@ -34,6 +29,27 @@ void HasherThread::run()
         shouldStop = false;
         fileQueue.clear();
     }
+    
+    // Recreate hasher instance for this run (in case thread is being restarted)
+    if (hasher != nullptr)
+    {
+        delete hasher;
+    }
+    hasher = new ed2k();
+    
+    // Reconnect hasher signals with thread ID parameter
+    // Capture this and threadId explicitly for the lambda
+    connect(hasher, &ed2k::notifyPartsDone, this, [this](int total, int done) {
+        // Throttle progress updates: emit only every HASHER_PROGRESS_UPDATE_INTERVAL parts
+        if (done - lastProgressUpdate >= HASHER_PROGRESS_UPDATE_INTERVAL || done == total) {
+            lastProgressUpdate = done;
+            emit notifyPartsDone(threadId, total, done);
+        }
+    });
+    
+    connect(hasher, &ed2k::notifyFileHashed, this, [this](ed2k::ed2kfilestruct fileData) {
+        emit notifyFileHashed(threadId, fileData);
+    });
     
     LOG(QString("HasherThread %1 started processing files [hasherthread.cpp]").arg(threadId));
     
