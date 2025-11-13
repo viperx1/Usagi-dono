@@ -5,6 +5,7 @@
 #include <QString>
 #include <QFileInfo>
 #include <QFile>
+#include <QMutex>
 
 class ed2k:public QObject, private MD4
 {
@@ -20,9 +21,20 @@ private:
     qint64 fileSize;
 	QString fileName;
 	bool dohash;
+	
+	// Global mutex for serializing file I/O across all threads
+	// This improves performance on HDDs by preventing disk head thrashing
+	static QMutex fileIOMutex;
+	
+	// Flag to enable/disable serialized I/O (useful for HDD vs SSD)
+	static bool useSerializedIO;
+	
 protected:
 	static qint64 calculateHashParts(qint64 fileSize);
 public:
+	// Enable or disable serialized I/O (default: false for backward compatibility)
+	static void setSerializedIO(bool enabled);
+	static bool getSerializedIO();
 	QString ed2khashstr;
 	void Init();
 	void Update(unsigned char *input, unsigned int inputLen);

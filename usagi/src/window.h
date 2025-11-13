@@ -351,6 +351,7 @@ private:
 	QLabel *progressTotalLabel;
 	QCheckBox *addtomylist;
 	QCheckBox *markwatched;
+	QCheckBox *serializedIO; // Serialize file I/O for HDD performance
 	QLineEdit *storage;
 	QComboBox *hasherFileState;
 	QCheckBox *moveto;

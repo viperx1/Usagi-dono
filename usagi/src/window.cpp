@@ -95,6 +95,8 @@ Window::Window()
 	hasherFileState = new QComboBox;
 	addtomylist = new QCheckBox("Add file(s) to MyList");
 	markwatched = new QCheckBox("Mark watched (no change)");
+	serializedIO = new QCheckBox("Serialize I/O (for HDD)");
+	serializedIO->setToolTip("Enable for traditional hard drives to prevent disk head thrashing.\nDisable for SSDs to allow parallel I/O.");
     QLabel *label1 = new QLabel("Set state:");
     buttonstart = new QPushButton("Start");
     buttonstop = new QPushButton("Stop");
@@ -203,6 +205,7 @@ Window::Window()
 	pageHasherSettings->addWidget(storage, 1, 2, Qt::AlignLeft);
     pageHasherSettings->addWidget(addtomylist, 0, 1, Qt::AlignLeft);
     pageHasherSettings->addWidget(markwatched, 0, 2, Qt::AlignLeft);
+    pageHasherSettings->addWidget(serializedIO, 0, 3, Qt::AlignLeft);
     pageHasherSettings->addWidget(button1, 1, 4, Qt::AlignLeft);
     pageHasherSettings->addWidget(button2, 1, 5, Qt::AlignLeft);
 	pageHasherSettings->addWidget(button3, 1, 6, Qt::AlignLeft);
@@ -944,6 +947,9 @@ void Window::ButtonHasherStartClick()
 	// Start hashing for files without existing hashes
 	if (filesToHashCount > 0)
 	{
+		// Set serialized I/O based on checkbox state
+		ed2k::setSerializedIO(serializedIO->isChecked());
+		
 		// Calculate total hash parts for progress tracking
 		QStringList filesToHash = getFilesNeedingHash();
 		setupHashingProgress(filesToHash);
