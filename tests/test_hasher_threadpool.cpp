@@ -308,7 +308,11 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     pool.addFile(QString());
     
     // Wait for all hashing to complete
-    QVERIFY(finishedSpy.wait(15000)); // Up to 15 seconds for all files
+    // Use QTest::qWait() loop instead of QSignalSpy::wait() for better compatibility with static Qt builds
+    for (int i = 0; i < 150 && finishedSpy.count() == 0; ++i) {
+        QTest::qWait(100); // Wait up to 15 seconds total
+    }
+    QVERIFY(finishedSpy.count() >= 1);
     
     // Verify all files were hashed
     QCOMPARE(hashSpy.count(), numFiles);
