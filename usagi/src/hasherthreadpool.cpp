@@ -70,23 +70,33 @@ void HasherThreadPool::addFile(const QString &filePath)
         return;
     }
     
-    // Find the worker with the smallest queue (load balancing)
-    // For now, we'll use a simple round-robin approach by checking each thread
-    // In the current implementation, each thread processes one file at a time,
-    // so we just add to any available thread that's started
-    
-    // For simplicity, add to the first started thread's queue
-    // The threads will request next file when ready via requestNextFile signal
     if (isStarted && !workers.isEmpty())
     {
-        // We don't actually queue here - we'll provide files when threads request them
-        // This method is called in response to requestNextFile signal
-        // So we just need to forward it to a thread
+        // Assign the file to the worker that requested it from the queue
+        // This ensures threads don't sit idle while other threads have queued work
+        HasherThread* targetWorker = nullptr;
         
-        // Find a thread that's likely waiting for work
-        static int lastUsedWorker = 0;
-        lastUsedWorker = (lastUsedWorker + 1) % workers.size();
-        workers[lastUsedWorker]->addFile(filePath);
+        {
+            QMutexLocker locker(&requestMutex);
+            if (!requestQueue.isEmpty())
+            {
+                targetWorker = requestQueue.dequeue();
+            }
+        }
+        
+        // If we have a specific requesting worker, assign to it
+        // Otherwise fall back to round-robin (e.g., initial file distribution)
+        if (targetWorker != nullptr)
+        {
+            targetWorker->addFile(filePath);
+        }
+        else
+        {
+            // Fallback to round-robin for initial file distribution
+            static int lastUsedWorker = 0;
+            lastUsedWorker = (lastUsedWorker + 1) % workers.size();
+            workers[lastUsedWorker]->addFile(filePath);
+        }
     }
 }
 
@@ -174,7 +184,20 @@ bool HasherThreadPool::isRunning() const
 
 void HasherThreadPool::onThreadRequestNextFile()
 {
+    // Track which worker is requesting the next file in a FIFO queue
+    // Use sender() to identify the worker that sent the signal
+    {
+        QMutexLocker locker(&requestMutex);
+        HasherThread* requestingWorker = qobject_cast<HasherThread*>(sender());
+        if (requestingWorker != nullptr)
+        {
+            requestQueue.enqueue(requestingWorker);
+        }
+    }
+    
     // Forward the request to the Window class to provide the next file
+    // IMPORTANT: Signal must be emitted AFTER releasing requestMutex to avoid deadlock
+    // because Window::provideNextFileToHash() will call addFile() which also locks requestMutex
     emit requestNextFile();
 }
 

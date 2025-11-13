@@ -28,6 +28,7 @@ private slots:
     void testParallelHashing();
     void testStopAllThreads();
     void testMultipleThreadIdsUsed();
+    void testNoIdleThreadsWithWork();
 };
 
 void TestHasherThreadPool::initTestCase()
@@ -222,6 +223,107 @@ void TestHasherThreadPool::testMultipleThreadIdsUsed()
     // Stop the pool
     pool.addFile(QString());
     QVERIFY(pool.wait(2000));
+    
+    // Clean up temp files
+    for (QTemporaryFile *tempFile : tempFiles)
+    {
+        delete tempFile;
+    }
+}
+
+void TestHasherThreadPool::testNoIdleThreadsWithWork()
+{
+    // This test verifies the fix for the idle thread issue:
+    // When a thread finishes and requests more work, it should get that work
+    // immediately, not have it assigned to another thread's queue.
+    
+    // Create multiple temporary files to hash (more files than threads)
+    QVector<QTemporaryFile*> tempFiles;
+    QVector<QString> filePaths;
+    
+    const int numFiles = 6;  // More files than threads to ensure overlap
+    for (int i = 0; i < numFiles; ++i)
+    {
+        QTemporaryFile *tempFile = new QTemporaryFile();
+        QVERIFY(tempFile->open());
+        // Mix of file sizes to create timing differences
+        int sizeKB = (i % 2 == 0) ? 256 : 512;
+        QByteArray data(sizeKB * 1024, 'A' + i);
+        tempFile->write(data);
+        tempFile->close();
+        filePaths.append(tempFile->fileName());
+        tempFiles.append(tempFile);
+    }
+    
+    // Create a thread pool with 3 threads
+    HasherThreadPool pool(3);
+    
+    // Set up signal spies to track activity
+    QSignalSpy requestSpy(&pool, &HasherThreadPool::requestNextFile);
+    QSignalSpy hashSpy(&pool, &HasherThreadPool::sendHash);
+    QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
+    
+    // Track which thread IDs hash files to verify all threads are used
+    QSignalSpy fileHashedSpy(&pool, &HasherThreadPool::notifyFileHashed);
+    
+    // Start the pool
+    pool.start();
+    
+    // Wait for initial requests from all threads
+    QTest::qWait(1000);
+    int initialRequests = requestSpy.count();
+    QVERIFY(initialRequests >= 3); // Should have requests from all 3 threads
+    
+    // Feed files to the pool one by one as they're requested
+    int filesAdded = 0;
+    while (filesAdded < numFiles)
+    {
+        // Wait for a request
+        int currentRequests = requestSpy.count();
+        if (currentRequests > initialRequests + filesAdded)
+        {
+            pool.addFile(filePaths[filesAdded]);
+            filesAdded++;
+            QTest::qWait(50); // Small delay to simulate realistic timing
+        }
+        else
+        {
+            QTest::qWait(100); // Wait for more requests
+        }
+        
+        // Safety timeout to prevent infinite loop
+        if (filesAdded == 0 && requestSpy.count() == initialRequests)
+        {
+            // Add first batch of files to get things moving
+            for (int i = 0; i < 3 && i < numFiles; i++)
+            {
+                pool.addFile(filePaths[i]);
+                filesAdded++;
+            }
+            QTest::qWait(100);
+        }
+    }
+    
+    // Signal completion
+    pool.addFile(QString());
+    
+    // Wait for all hashing to complete
+    QVERIFY(finishedSpy.wait(15000)); // Up to 15 seconds for all files
+    
+    // Verify all files were hashed
+    QCOMPARE(hashSpy.count(), numFiles);
+    
+    // Verify that multiple threads participated (not all work on one thread)
+    QSet<int> activeThreadIds;
+    for (int i = 0; i < fileHashedSpy.count(); ++i)
+    {
+        int threadId = fileHashedSpy.at(i).at(0).toInt();
+        activeThreadIds.insert(threadId);
+    }
+    
+    // With the fix, all 3 threads should have processed files
+    // (Without the fix, some threads would sit idle)
+    QVERIFY(activeThreadIds.size() >= 2); // At least 2 threads should be used
     
     // Clean up temp files
     for (QTemporaryFile *tempFile : tempFiles)
