@@ -295,9 +295,9 @@ void AnimeCard::paintEvent(QPaintEvent *event)
 void AnimeCard::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        // Emit signal when card is clicked (but not when episode list is clicked)
+        // Emit signal when card is clicked (but not when episode tree is clicked)
         QPoint pos = event->pos();
-        if (!m_episodeList->geometry().contains(pos)) {
+        if (!m_episodeTree->geometry().contains(pos)) {
             emit cardClicked(m_animeId);
         }
     }
