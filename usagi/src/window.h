@@ -3,6 +3,7 @@
 #include <QtGui>
 #include <QtAlgorithms>
 #include <QRegularExpression>
+#include <QMutex>
 #include <QProcess>
 #include <QDateTime>
 #include <QDir>
@@ -292,6 +293,12 @@ private:
     int totalHashParts;
     int completedHashParts;
     
+    // Track last progress per thread to calculate deltas with throttled updates
+    QMap<int, int> lastThreadProgress;
+    
+    // Mutex to protect file assignment from concurrent thread requests
+    QMutex fileRequestMutex;
+    
     // Constants for deferred processing
     static const int HASHED_FILES_BATCH_SIZE = 5; // Process 5 files per timer tick
     static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
@@ -332,7 +339,7 @@ private:
     QPushButton *buttonstart;
     QPushButton *buttonstop;
 	QPushButton *buttonclear;
-	QProgressBar *progressFile;
+	QVector<QProgressBar*> threadProgressBars; // One progress bar per hasher thread
 	QProgressBar *progressTotal;
 	QLabel *progressTotalLabel;
 	QCheckBox *addtomylist;
@@ -425,8 +432,8 @@ public slots:
     void ButtonHasherStartClick();
     void ButtonHasherStopClick();
     void ButtonHasherClearClick();
-    void getNotifyPartsDone(int, int);
-    void getNotifyFileHashed(ed2k::ed2kfilestruct);
+    void getNotifyPartsDone(int threadId, int total, int done);
+    void getNotifyFileHashed(int threadId, ed2k::ed2kfilestruct fileData);
     void getNotifyLogAppend(QString);
     void getNotifyLoginChagned(QString);
     void getNotifyPasswordChagned(QString);

@@ -1200,6 +1200,66 @@ endif()
 add_test(NAME test_hasher_thread COMMAND test_hasher_thread -v2)
 
 
+# Test: HasherThreadPool multithreading
+set(HASHER_THREADPOOL_TEST_SOURCES
+    test_hasher_threadpool.cpp
+    ../usagi/src/hasherthread.cpp
+    ../usagi/src/hasherthreadpool.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/myanidbapi.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(HASHER_THREADPOOL_TEST_HEADERS
+    ../usagi/src/hasherthread.h
+    ../usagi/src/hasherthreadpool.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/anidbapi.h
+    ../usagi/src/main.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_hasher_threadpool ${HASHER_THREADPOOL_TEST_SOURCES} ${HASHER_THREADPOOL_TEST_HEADERS})
+
+target_compile_definitions(test_hasher_threadpool PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_hasher_threadpool PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+# Link Qt libraries
+target_link_libraries(test_hasher_threadpool PRIVATE
+    Qt6::Test
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Core
+    z
+)
+
+target_include_directories(test_hasher_threadpool PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_hasher_threadpool PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_hasher_threadpool COMMAND test_hasher_threadpool -v2)
+
+
 # Test: Truncated API response handling
 set(TRUNCATED_RESPONSE_TEST_SOURCES
     test_truncated_response.cpp

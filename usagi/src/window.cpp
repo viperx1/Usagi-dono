@@ -1,12 +1,12 @@
 #include "main.h"
 #include "window.h"
-#include "hasherthread.h"
+#include "hasherthreadpool.h"
 #include "crashlog.h"
 #include "logger.h"
 #include "playbuttondelegate.h"
 #include <QElapsedTimer>
 
-HasherThread hasherThread;
+HasherThreadPool *hasherThreadPool = nullptr;
 myAniDBApi *adbapi;
 extern Window *window;
 settings_struct settings;
@@ -15,6 +15,10 @@ settings_struct settings;
 Window::Window()
 {
 	qRegisterMetaType<ed2k::ed2kfilestruct>("ed2k::ed2kfilestruct");
+	
+	// Initialize global hasher thread pool
+	hasherThreadPool = new HasherThreadPool();
+	
 	adbapi = new myAniDBApi("usagi", 1);
 //	settings = new QSettings("settings.dat", QSettings::IniFormat);
 //	adbapi->SetUsername(settings->value("username").toString());
@@ -104,7 +108,16 @@ Window::Window()
     QPushButton *movetodirbutton = new QPushButton("...");
     QPushButton *patternhelpbutton = new QPushButton("?");
     QBoxLayout *progress = new QBoxLayout(QBoxLayout::TopToBottom);
-    progressFile = new QProgressBar;
+    
+    // Create one progress bar per hasher thread
+    int numThreads = hasherThreadPool->threadCount();
+    for (int i = 0; i < numThreads; ++i) {
+        QProgressBar *threadProgress = new QProgressBar;
+        threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
+        threadProgressBars.append(threadProgress);
+        progress->addWidget(threadProgress);
+    }
+    
     progressTotal = new QProgressBar;
     progressTotalLabel = new QLabel;
     QBoxLayout *progressTotalLayout = new QBoxLayout(QBoxLayout::LeftToRight);
@@ -151,11 +164,12 @@ Window::Window()
 	connect(button3, SIGNAL(clicked()), this, SLOT(Button3Click()));
     connect(buttonstart, SIGNAL(clicked()), this, SLOT(ButtonHasherStartClick()));
     connect(buttonclear, SIGNAL(clicked()), this, SLOT(ButtonHasherClearClick()));
-    connect(&hasherThread, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
-    connect(&hasherThread, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
-    connect(&hasherThread, SIGNAL(finished()), this, SLOT(hasherFinished()));
-    connect(adbapi, SIGNAL(notifyPartsDone(int,int)), this, SLOT(getNotifyPartsDone(int,int)));
-    connect(adbapi, SIGNAL(notifyFileHashed(ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(ed2k::ed2kfilestruct)));
+    connect(hasherThreadPool, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
+    connect(hasherThreadPool, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
+    connect(hasherThreadPool, SIGNAL(finished()), this, SLOT(hasherFinished()));
+    // Connect thread pool signals for hashing progress and completion with thread ID
+    connect(hasherThreadPool, SIGNAL(notifyPartsDone(int,int,int)), this, SLOT(getNotifyPartsDone(int,int,int)));
+    connect(hasherThreadPool, SIGNAL(notifyFileHashed(int,ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(int,ed2k::ed2kfilestruct)));
     connect(buttonstop, SIGNAL(clicked()), this, SLOT(ButtonHasherStopClick()));
     connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
     connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
@@ -217,8 +231,7 @@ Window::Window()
 	layout2->addWidget(renametopattern);
 	layout2->addWidget(patternhelpbutton);
 
-	// page hasher - progress
-	progress->addWidget(progressFile);
+	// page hasher - progress (already added in loop above)
 	progress->addLayout(progressTotalLayout);
 
     // page settings
@@ -393,6 +406,14 @@ Window::~Window()
     // Stop directory watcher on cleanup
     if (directoryWatcher) {
         directoryWatcher->stopWatching();
+    }
+    
+    // Clean up hasher thread pool
+    if (hasherThreadPool) {
+        hasherThreadPool->stop();
+        hasherThreadPool->wait();
+        delete hasherThreadPool;
+        hasherThreadPool = nullptr;
     }
 }
 
@@ -816,6 +837,7 @@ void Window::setupHashingProgress(const QStringList &files)
 {
 	totalHashParts = calculateTotalHashParts(files);
 	completedHashParts = 0;
+	lastThreadProgress.clear(); // Reset per-thread progress tracking
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
 	progressTotal->setFormat("ETA: calculating...");
@@ -926,7 +948,7 @@ void Window::ButtonHasherStartClick()
 		
 		buttonstart->setEnabled(0);
 		buttonclear->setEnabled(0);
-		hasherThread.start();
+		hasherThreadPool->start();
 	}
 	else if (rowsWithHashes.isEmpty())
 	{
@@ -948,25 +970,32 @@ void Window::ButtonHasherStopClick()
 	progressTotal->setMaximum(1);
 	progressTotal->setFormat("");
 	progressTotalLabel->setText("");
-	progressFile->setValue(0);
-	progressFile->setMaximum(1);
 	
-	if (hasherThread.isRunning()) {
-		// 1. First, notify ed2k to interrupt the current hashing operation
-		//    This sets a flag that ed2khash checks, causing it to return early
-		emit notifyStopHasher();
-		
-		// 2. Then signal the thread to stop processing more files
-		hasherThread.stop();
-		
-		// 3. Finally, wait for the thread to finish
-		//    The thread will finish quickly because ed2khash will exit early
-		hasherThread.wait();
+	// Reset all thread progress bars
+	for (QProgressBar *bar : threadProgressBars) {
+		bar->setValue(0);
+		bar->setMaximum(1);
 	}
+	
+	// Notify all worker threads to stop hashing
+	// 1. First, notify ed2k instances in all worker threads to interrupt current hashing
+	//    This sets a flag that ed2khash checks, causing it to return early
+	hasherThreadPool->broadcastStopHasher();
+	emit notifyStopHasher(); // Also notify main adbapi for consistency
+	
+	// 2. Then signal the thread pool to stop processing more files
+	hasherThreadPool->stop();
+	
+	// 3. Finally, wait for all threads to finish
+	//    The threads will finish quickly because ed2khash will exit early
+	hasherThreadPool->wait();
 }
 
 void Window::provideNextFileToHash()
 {
+	// Thread-safe file assignment: only one thread can request a file at a time
+	QMutexLocker locker(&fileRequestMutex);
+	
 	// Look through the hashes widget for the next file that needs hashing (progress="0" and no hash)
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
@@ -976,13 +1005,18 @@ void Window::provideNextFileToHash()
 		if(progress == "0" && existingHash.isEmpty())
 		{
 			QString filePath = hashes->item(i, 2)->text();
-			hasherThread.addFile(filePath);
+			
+			// Immediately mark this file as assigned to prevent other threads from picking it up
+			QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
+			hashes->setItem(i, 1, itemProgressAssigned);
+			
+			hasherThreadPool->addFile(filePath);
 			return;
 		}
 	}
 	
 	// No more files to hash, send empty string to signal completion
-	hasherThread.addFile(QString());
+	hasherThreadPool->addFile(QString());
 }
 
 void Window::ButtonHasherClearClick()
@@ -1028,12 +1062,22 @@ void Window::markwatchedStateChanged(int state)
 	}
 }
 
-void Window::getNotifyPartsDone(int total, int done)
+void Window::getNotifyPartsDone(int threadId, int total, int done)
 {
-	completedHashParts++;
+	// Calculate the delta from last update for this thread
+	int lastProgress = lastThreadProgress.value(threadId, 0);
+	int delta = done - lastProgress;
+	lastThreadProgress[threadId] = done;
 	
-	progressFile->setMaximum(total);
-	progressFile->setValue(done);
+	// Update completed parts by the actual delta (not just +1)
+	completedHashParts += delta;
+	
+	// Update the specific thread's progress bar
+	if (threadId >= 0 && threadId < threadProgressBars.size()) {
+		threadProgressBars[threadId]->setMaximum(total);
+		threadProgressBars[threadId]->setValue(done);
+	}
+	
 	progressTotal->setValue(completedHashParts);
 	
 	// Update percentage label
@@ -1069,14 +1113,14 @@ void Window::getNotifyPartsDone(int total, int done)
 	}
 }
 
-void Window::getNotifyFileHashed(ed2k::ed2kfilestruct data)
+void Window::getNotifyFileHashed(int threadId, ed2k::ed2kfilestruct data)
 {
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
-		// Match by filename AND verify it's the file being hashed (progress="0" and either no hash or matching size)
+		// Match by filename AND verify it's the file being hashed (progress starts with "0" - either "0" or "0.1" for assigned)
 		// This prevents matching wrong file when there are multiple files with the same name
 		QString progress = hashes->item(i, 1)->text();
-		if(hashes->item(i, 0)->text() == data.filename && progress == "0")
+		if(hashes->item(i, 0)->text() == data.filename && progress.startsWith("0"))
 		{
 			// Additional check: verify file size matches to ensure we have the right file
 			QString filePath = hashes->item(i, 2)->text();
@@ -1351,7 +1395,7 @@ bool hashes_::event(QEvent *e)
 		QKeyEvent *keyEvent = static_cast<QKeyEvent*>(e);
 		if(keyEvent->key() == Qt::Key_Delete)
 		{
-			if(!hasherThread.isRunning())
+			if(!hasherThreadPool->isRunning())
 			{
 				this->setUpdatesEnabled(0);
 				QList<QTableWidgetItem *> selitems = this->selectedItems();
@@ -3241,7 +3285,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		.arg(filePaths.size()).arg(insertTime));
 	
 	// Directory watcher always auto-starts the hasher for detected files
-	if (!hasherThread.isRunning()) {
+	if (!hasherThreadPool->isRunning()) {
 		// Set settings for auto-hash if logged in
 		if (adbapi->LoggedIn()) {
 			addtomylist->setChecked(true);
@@ -3326,7 +3370,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			// Start hashing all detected files that need hashing
 			buttonstart->setEnabled(false);
 			buttonclear->setEnabled(false);
-			hasherThread.start();
+			hasherThreadPool->start();
 			
 			if (adbapi->LoggedIn()) {
 				LOG(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filesToHashCount));

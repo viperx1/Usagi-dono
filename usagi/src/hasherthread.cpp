@@ -1,12 +1,29 @@
 #include "hasherthread.h"
 #include "main.h"
 #include "logger.h"
+#include <QMetaObject>
 
 extern myAniDBApi *adbapi;
 
-HasherThread::HasherThread()
-    : shouldStop(false)
+HasherThread::HasherThread(int threadId)
+    : shouldStop(false), threadId(threadId), hasher(nullptr), lastProgressUpdate(0)
 {
+    // Create a lightweight ed2k hasher instance for this thread
+    hasher = new ed2k();
+    
+    // Connect hasher signals with thread ID parameter
+    // Capture this and threadId explicitly for the lambda
+    connect(hasher, &ed2k::notifyPartsDone, this, [this, threadId](int total, int done) {
+        // Throttle progress updates: emit only every 10 parts
+        if (done - lastProgressUpdate >= 10 || done == total) {
+            lastProgressUpdate = done;
+            emit notifyPartsDone(threadId, total, done);
+        }
+    });
+    
+    connect(hasher, &ed2k::notifyFileHashed, this, [this, threadId](ed2k::ed2kfilestruct fileData) {
+        emit notifyFileHashed(threadId, fileData);
+    });
 }
 
 void HasherThread::run()
@@ -18,7 +35,7 @@ void HasherThread::run()
         fileQueue.clear();
     }
     
-    LOG("HasherThread started processing files [hasherthread.cpp]");
+    LOG(QString("HasherThread %1 started processing files [hasherthread.cpp]").arg(threadId));
     
     // Emit the thread ID so tests can verify we're running in a separate thread
     emit threadStarted(QThread::currentThreadId());
@@ -54,11 +71,14 @@ void HasherThread::run()
             break;
         }
         
-        // Perform the actual hashing in this worker thread
-        switch(adbapi->ed2khash(filePath))
+        // Reset progress tracking for new file
+        lastProgressUpdate = 0;
+        
+        // Perform the actual hashing in this worker thread using dedicated ed2k instance
+        switch(hasher->ed2khash(filePath))
         {
         case 1:
-            emit sendHash(adbapi->ed2khashstr);
+            emit sendHash(hasher->ed2khashstr);
             // Request the next file after successfully hashing this one
             emit requestNextFile();
             break;
@@ -77,7 +97,14 @@ void HasherThread::run()
         }
     }
     
-    LOG("HasherThread finished processing files [hasherthread.cpp]");
+    LOG(QString("HasherThread %1 finished processing files [hasherthread.cpp]").arg(threadId));
+    
+    // Clean up hasher instance
+    if (hasher != nullptr)
+    {
+        delete hasher;
+        hasher = nullptr;
+    }
 }
 
 void HasherThread::stop()
@@ -92,4 +119,14 @@ void HasherThread::addFile(const QString &filePath)
     QMutexLocker locker(&mutex);
     fileQueue.enqueue(filePath);
     condition.wakeOne();
+}
+
+void HasherThread::stopHashing()
+{
+    // Signal the hasher instance to stop the current hashing operation
+    if (hasher != nullptr)
+    {
+        // Call the slot that sets the dohash flag to 0
+        QMetaObject::invokeMethod(hasher, "getNotifyStopHasher", Qt::QueuedConnection);
+    }
 }
