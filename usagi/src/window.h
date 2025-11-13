@@ -371,8 +371,10 @@ private:
     FlowLayout *mylistCardLayout;
     QComboBox *mylistSortComboBox;
     QPushButton *mylistViewToggleButton;
+    QPushButton *mylistSortOrderButton;
     QLabel *mylistStatusLabel;
     bool mylistUseCardView;
+    bool mylistSortAscending;  // true for ascending, false for descending
     QList<AnimeCard*> animeCards;
 	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
 	QSet<int> animeNeedingMetadata;  // Track AIDs that need metadata (typename, startdate, enddate)
@@ -487,6 +489,7 @@ public slots:
     // MyList card view slots
     void toggleMylistView();
     void sortMylistCards(int sortIndex);
+    void toggleSortOrder();
     void loadMylistAsCards();
     void onCardClicked(int aid);
     void onCardEpisodeClicked(int lid);

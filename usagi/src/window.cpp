@@ -134,6 +134,7 @@ Window::Window()
     // page mylist
     // Initialize card view flag (default to card view as per requirement)
     mylistUseCardView = true;
+    mylistSortAscending = true;
     
     // Add toolbar for view toggle and sorting
     QHBoxLayout *mylistToolbar = new QHBoxLayout();
@@ -150,9 +151,16 @@ Window::Window()
     mylistSortComboBox->addItem("Aired Date");
     mylistSortComboBox->addItem("Episodes (Count)");
     mylistSortComboBox->addItem("Completion %");
+    mylistSortComboBox->addItem("Last Played");
     mylistSortComboBox->setCurrentIndex(0);
     connect(mylistSortComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(sortMylistCards(int)));
     mylistToolbar->addWidget(mylistSortComboBox);
+    
+    mylistSortOrderButton = new QPushButton("↑ Asc");
+    mylistSortOrderButton->setMaximumWidth(80);
+    mylistSortOrderButton->setToolTip("Toggle sort order (ascending/descending)");
+    connect(mylistSortOrderButton, SIGNAL(clicked()), this, SLOT(toggleSortOrder()));
+    mylistToolbar->addWidget(mylistSortOrderButton);
     
     mylistToolbar->addStretch();
     pageMylist->addLayout(mylistToolbar);
@@ -4099,36 +4107,52 @@ void Window::sortMylistCards(int sortIndex)
 	// Sort based on criterion
 	switch (sortIndex) {
 		case 0: // Anime Title
-			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
-				return a->getAnimeTitle() < b->getAnimeTitle();
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				if (mylistSortAscending) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				} else {
+					return a->getAnimeTitle() > b->getAnimeTitle();
+				}
 			});
 			break;
 		case 1: // Type
-			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
 				if (a->getAnimeType() == b->getAnimeType()) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				return a->getAnimeType() < b->getAnimeType();
+				if (mylistSortAscending) {
+					return a->getAnimeType() < b->getAnimeType();
+				} else {
+					return a->getAnimeType() > b->getAnimeType();
+				}
 			});
 			break;
 		case 2: // Aired Date
-			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
 				if (a->getAiredText() == b->getAiredText()) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				return a->getAiredText() < b->getAiredText();
+				if (mylistSortAscending) {
+					return a->getAiredText() < b->getAiredText();
+				} else {
+					return a->getAiredText() > b->getAiredText();
+				}
 			});
 			break;
 		case 3: // Episodes (Count)
-			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
 				if (a->getEpisodesInList() == b->getEpisodesInList()) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				return a->getEpisodesInList() < b->getEpisodesInList();
+				if (mylistSortAscending) {
+					return a->getEpisodesInList() < b->getEpisodesInList();
+				} else {
+					return a->getEpisodesInList() > b->getEpisodesInList();
+				}
 			});
 			break;
 		case 4: // Completion %
-			std::sort(animeCards.begin(), animeCards.end(), [](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
 				double completionA = (a->getEpisodesInList() > 0) ? 
 					(double)a->getViewedCount() / a->getEpisodesInList() : 0.0;
 				double completionB = (b->getEpisodesInList() > 0) ? 
@@ -4136,7 +4160,34 @@ void Window::sortMylistCards(int sortIndex)
 				if (completionA == completionB) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				return completionA < completionB;
+				if (mylistSortAscending) {
+					return completionA < completionB;
+				} else {
+					return completionA > completionB;
+				}
+			});
+			break;
+		case 5: // Last Played
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				qint64 lastPlayedA = a->getLastPlayed();
+				qint64 lastPlayedB = b->getLastPlayed();
+				
+				// Never played items (0) go to the end regardless of sort order
+				if (lastPlayedA == 0 && lastPlayedB == 0) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (lastPlayedA == 0) {
+					return false;  // a goes after b
+				}
+				if (lastPlayedB == 0) {
+					return true;   // a goes before b
+				}
+				
+				if (mylistSortAscending) {
+					return lastPlayedA < lastPlayedB;
+				} else {
+					return lastPlayedA > lastPlayedB;
+				}
 			});
 			break;
 	}
@@ -4145,6 +4196,22 @@ void Window::sortMylistCards(int sortIndex)
 	for (AnimeCard *card : animeCards) {
 		mylistCardLayout->addWidget(card);
 	}
+}
+
+// Toggle sort order between ascending and descending
+void Window::toggleSortOrder()
+{
+	mylistSortAscending = !mylistSortAscending;
+	
+	// Update button text
+	if (mylistSortAscending) {
+		mylistSortOrderButton->setText("↑ Asc");
+	} else {
+		mylistSortOrderButton->setText("↓ Desc");
+	}
+	
+	// Re-sort with current criterion
+	sortMylistCards(mylistSortComboBox->currentIndex());
 }
 
 // Load mylist data as cards

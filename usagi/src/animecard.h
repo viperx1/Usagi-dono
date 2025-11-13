@@ -68,6 +68,7 @@ public:
     int getEpisodesInList() const { return m_episodesInList; }
     int getTotalEpisodes() const { return m_totalEpisodes; }
     int getViewedCount() const { return m_viewedCount; }
+    qint64 getLastPlayed() const { return m_lastPlayed; }
     
     // Sorting support
     bool operator<(const AnimeCard& other) const;
@@ -98,6 +99,7 @@ private:
     int m_episodesInList;
     int m_totalEpisodes;
     int m_viewedCount;
+    qint64 m_lastPlayed;  // Most recent last_played timestamp from episodes
     
     // UI elements
     QLabel *m_posterLabel;

@@ -10,6 +10,7 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_episodesInList(0)
     , m_totalEpisodes(0)
     , m_viewedCount(0)
+    , m_lastPlayed(0)
 {
     setupUI();
     
@@ -192,6 +193,11 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     if (episode.lastPlayed > 0) {
         QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(episode.lastPlayed);
         tooltip += QString("\nLast Played: %1").arg(lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
+        
+        // Track most recent last played time for this anime
+        if (episode.lastPlayed > m_lastPlayed) {
+            m_lastPlayed = episode.lastPlayed;
+        }
     }
     
     item->setToolTip(tooltip);
