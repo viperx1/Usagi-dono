@@ -988,9 +988,8 @@ void Window::ButtonHasherStopClick()
 	// 2. Then signal the thread pool to stop processing more files
 	hasherThreadPool->stop();
 	
-	// 3. Finally, wait for all threads to finish
-	//    The threads will finish quickly because ed2khash will exit early
-	hasherThreadPool->wait();
+	// 3. Don't wait here - let threads finish asynchronously to prevent UI freeze
+	//    The hasherFinished() slot will be called automatically when all threads complete
 }
 
 void Window::provideNextFileToHash()
