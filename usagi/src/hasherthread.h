@@ -8,6 +8,10 @@
 #include <QQueue>
 #include "hash/ed2k.h"
 
+// Progress update throttle: emit progress signal every N parts to reduce UI overhead
+// This constant should be used by both hasher and UI for consistent progress tracking
+constexpr int HASHER_PROGRESS_UPDATE_INTERVAL = 10;
+
 class HasherThread : public QThread
 {
     Q_OBJECT

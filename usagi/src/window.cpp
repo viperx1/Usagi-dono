@@ -1,6 +1,7 @@
 #include "main.h"
 #include "window.h"
 #include "hasherthreadpool.h"
+#include "hasherthread.h"
 #include "crashlog.h"
 #include "logger.h"
 #include "playbuttondelegate.h"
@@ -1086,6 +1087,8 @@ void Window::getNotifyPartsDone(int threadId, int total, int done)
 	progressTotalLabel->setText(QString("%1%").arg(percentage));
 	
 	// Calculate and display ETA - throttled to once per second to prevent UI freeze
+	// Note: Progress updates from hasher are throttled by HASHER_PROGRESS_UPDATE_INTERVAL,
+	// but we track actual delta in completedHashParts, so rate calculation is accurate
 	if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
 		qint64 currentTime = hashingTimer.elapsed();
 		

@@ -14,8 +14,8 @@ HasherThread::HasherThread(int threadId)
     // Connect hasher signals with thread ID parameter
     // Capture this and threadId explicitly for the lambda
     connect(hasher, &ed2k::notifyPartsDone, this, [this, threadId](int total, int done) {
-        // Throttle progress updates: emit only every 10 parts
-        if (done - lastProgressUpdate >= 10 || done == total) {
+        // Throttle progress updates: emit only every HASHER_PROGRESS_UPDATE_INTERVAL parts
+        if (done - lastProgressUpdate >= HASHER_PROGRESS_UPDATE_INTERVAL || done == total) {
             lastProgressUpdate = done;
             emit notifyPartsDone(threadId, total, done);
         }
