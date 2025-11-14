@@ -140,12 +140,6 @@ Window::Window()
     posterNetworkManager = new QNetworkAccessManager(this);
     connect(posterNetworkManager, &QNetworkAccessManager::finished, this, &Window::onPosterDownloadFinished);
     
-    // Initialize timer for batching ANIME requests
-    animeRequestBatchTimer = new QTimer(this);
-    animeRequestBatchTimer->setSingleShot(false);
-    animeRequestBatchTimer->setInterval(100);  // Process batches every 100ms
-    connect(animeRequestBatchTimer, &QTimer::timeout, this, &Window::processAnimeRequestBatch);
-    
     // Add toolbar for view toggle and sorting
     QHBoxLayout *mylistToolbar = new QHBoxLayout();
     
@@ -2472,8 +2466,6 @@ void Window::loadMylistFromDatabase()
 	// If card view is active, use card loading instead
 	if (mylistUseCardView) {
 		animeMetadataRequested.clear();  // Clear request tracking for fresh load
-		animeMetadataPending.clear();  // Clear pending queue
-		animeRequestBatchTimer->stop();  // Stop batch timer
 		loadMylistAsCards();
 		return;
 	}
@@ -4132,8 +4124,6 @@ void Window::toggleMylistView()
 		mylistViewToggleButton->setText("Switch to Tree View");
 		mylistSortComboBox->setEnabled(true);
 		animeMetadataRequested.clear();  // Clear request tracking when switching to card view
-		animeMetadataPending.clear();  // Clear pending queue
-		animeRequestBatchTimer->stop();  // Stop batch timer
 		loadMylistAsCards();
 	} else {
 		mylistCardScrollArea->hide();
@@ -4544,47 +4534,29 @@ void Window::loadMylistAsCards()
 		// Filter out anime we've already requested to prevent spam
 		QSet<int> toRequest = animeNeedingMetadata - animeMetadataRequested;
 		if (!toRequest.isEmpty()) {
-			LOG(QString("Need metadata for %1 anime, queueing for batched requests...").arg(toRequest.size()));
-			// Add to pending queue for batched processing
-			animeMetadataPending.clear();
-			for (int aid : toRequest) {
-				animeMetadataPending.append(aid);
+			// Convert set to list for processing
+			QList<int> requestList = toRequest.values();
+			int total = requestList.size();
+			
+			LOG(QString("Queueing %1 ANIME metadata requests (batched)...").arg(total));
+			
+			// Batch insert all requests in a single transaction for speed
+			QSqlDatabase apiDb = QSqlDatabase::database();
+			apiDb.transaction();
+			
+			for (int aid : requestList) {
+				// Call adbapi->Anime() which will queue the request
+				adbapi->Anime(aid);
+				animeMetadataRequested.insert(aid);
 			}
-			// Start the batch timer if not already running
-			if (!animeRequestBatchTimer->isActive()) {
-				animeRequestBatchTimer->start();
-			}
+			
+			apiDb.commit();
+			
+			LOG(QString("Completed queueing %1 ANIME requests").arg(total));
 		}
 	}
 	if (!animeNeedingPoster.isEmpty()) {
 		LOG(QString("Need poster images for %1 anime").arg(animeNeedingPoster.size()));
-	}
-}
-
-// Process a batch of ANIME requests
-void Window::processAnimeRequestBatch()
-{
-	const int BATCH_SIZE = 5;  // Request 5 anime at a time
-	
-	if (animeMetadataPending.isEmpty()) {
-		animeRequestBatchTimer->stop();
-		return;
-	}
-	
-	// Process next batch
-	int processed = 0;
-	while (!animeMetadataPending.isEmpty() && processed < BATCH_SIZE) {
-		int aid = animeMetadataPending.takeFirst();
-		adbapi->Anime(aid);
-		animeMetadataRequested.insert(aid);
-		processed++;
-	}
-	
-	if (!animeMetadataPending.isEmpty()) {
-		LOG(QString("Batch processed %1 ANIME requests, %2 remaining in queue").arg(processed).arg(animeMetadataPending.size()));
-	} else {
-		LOG(QString("Final batch processed %1 ANIME requests, queue empty").arg(processed));
-		animeRequestBatchTimer->stop();
 	}
 }
 

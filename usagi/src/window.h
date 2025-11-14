@@ -379,8 +379,6 @@ private:
 	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
 	QSet<int> animeNeedingMetadata;  // Track AIDs that need metadata (typename, startdate, enddate)
 	QSet<int> animeMetadataRequested;  // Track AIDs for which we've already requested metadata (prevent spam)
-	QList<int> animeMetadataPending;  // Queue of AIDs waiting to be requested (for batching)
-	QTimer *animeRequestBatchTimer;  // Timer for batching ANIME requests
 	QSet<int> animeNeedingPoster;  // Track AIDs that need poster images
 	QMap<int, QString> animePicnames;  // aid -> picname mapping
 	QNetworkAccessManager *posterNetworkManager;  // For downloading poster images
@@ -504,7 +502,6 @@ public slots:
     // Poster download slots
     void onPosterDownloadFinished(QNetworkReply *reply);
     void downloadPosterForAnime(int aid, const QString &picname);
-    void processAnimeRequestBatch();  // Process next batch of ANIME requests
     
     // Directory watcher slots
     void onWatcherEnabledChanged(int state);
