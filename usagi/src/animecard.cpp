@@ -1,4 +1,5 @@
 #include "animecard.h"
+#include "playbuttondelegate.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QTreeWidgetItem>
@@ -76,20 +77,41 @@ void AnimeCard::setupUI()
     
     m_mainLayout->addLayout(m_topLayout);
     
-    // Episode tree (bottom section) - now supports episode->file hierarchy
+    // Episode tree (bottom section) - now supports episode->file hierarchy with play button
     m_episodeTree = new QTreeWidget(this);
+    m_episodeTree->setColumnCount(2);  // Column 0: Play button, Column 1: Episode/File info
     m_episodeTree->setHeaderHidden(true);
+    m_episodeTree->setColumnWidth(0, 30);  // Narrow column for play button
     m_episodeTree->setStyleSheet("QTreeWidget { font-size: 8pt; }");
     m_episodeTree->setAlternatingRowColors(true);
     m_episodeTree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_episodeTree->setIndentation(15);  // Indent for file children
     m_mainLayout->addWidget(m_episodeTree, 1);
     
-    // Connect signals for episode/file clicks
-    connect(m_episodeTree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem *item, int column) {
-        Q_UNUSED(column);
+    // Create play button delegate for column 0
+    m_playButtonDelegate = new PlayButtonDelegate(this);
+    m_episodeTree->setItemDelegateForColumn(0, m_playButtonDelegate);
+    
+    // Connect play button clicks to emit episodeClicked signal
+    connect(m_playButtonDelegate, &PlayButtonDelegate::playButtonClicked, this, [this](const QModelIndex &index) {
+        QTreeWidgetItem *item = m_episodeTree->topLevelItem(index.row());
+        if (!item) {
+            // Check if it's a child item
+            for (int i = 0; i < m_episodeTree->topLevelItemCount(); ++i) {
+                QTreeWidgetItem *parent = m_episodeTree->topLevelItem(i);
+                for (int j = 0; j < parent->childCount(); ++j) {
+                    QTreeWidgetItem *child = parent->child(j);
+                    if (m_episodeTree->indexFromItem(child, 0) == index) {
+                        item = child;
+                        break;
+                    }
+                }
+                if (item) break;
+            }
+        }
+        
         if (item) {
-            int lid = item->data(0, Qt::UserRole).toInt();
+            int lid = item->data(1, Qt::UserRole).toInt();
             if (lid > 0) {  // Only emit if it's a file item (has lid)
                 emit episodeClicked(lid);
             }
@@ -175,13 +197,28 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeText += QString(" (%1 files)").arg(episode.files.size());
     }
     
-    episodeItem->setText(0, episodeText);
-    episodeItem->setData(0, Qt::UserRole, 0);  // 0 means it's an episode, not a file
-    episodeItem->setData(0, Qt::UserRole + 1, episode.eid);
+    // Column 0: empty (no play button for episode parent)
+    episodeItem->setText(0, "");
+    episodeItem->setData(0, Qt::UserRole, 0);  // 0 means no button
+    
+    // Column 1: Episode info
+    episodeItem->setText(1, episodeText);
+    episodeItem->setData(1, Qt::UserRole, 0);  // 0 means it's an episode, not a file
+    episodeItem->setData(1, Qt::UserRole + 1, episode.eid);
     
     // Add file children
     for (const FileInfo& file : episode.files) {
         QTreeWidgetItem *fileItem = new QTreeWidgetItem(episodeItem);
+        
+        // Column 0: Play button text (same as tree view)
+        if (file.state == "Deleted") {
+            fileItem->setText(0, "✗"); // X for deleted
+            fileItem->setForeground(0, QBrush(QColor(Qt::red)));
+        } else if (file.viewed) {
+            fileItem->setText(0, "✓"); // Checkmark for watched
+        } else {
+            fileItem->setText(0, "▶"); // Play button
+        }
         
         // Format file text with version indicator
         QString fileText = QString("\\");
@@ -216,18 +253,14 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             fileText += QString(" [%1]").arg(file.state);
         }
         
-        // Add viewed indicator
-        if (file.viewed) {
-            fileText += " ✓";
-        }
+        // Column 1: File info (removed viewed indicator since it's in column 0 now)
+        fileItem->setText(1, fileText);
+        fileItem->setData(1, Qt::UserRole, file.lid);
+        fileItem->setData(1, Qt::UserRole + 1, file.fid);
         
-        fileItem->setText(0, fileText);
-        fileItem->setData(0, Qt::UserRole, file.lid);
-        fileItem->setData(0, Qt::UserRole + 1, file.fid);
-        
-        // Color code based on state
+        // Color code file text based on state
         if (file.viewed) {
-            fileItem->setForeground(0, QBrush(QColor(0, 150, 0))); // Green for viewed
+            fileItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for viewed
         }
         
         // Add tooltip with file info
@@ -260,15 +293,11 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             }
         }
         
-        fileItem->setToolTip(0, tooltip);
+        fileItem->setToolTip(1, tooltip);
     }
     
-    // Expand episode by default if it has only one file, collapse if multiple
-    if (episode.files.size() == 1) {
-        episodeItem->setExpanded(true);
-    } else {
-        episodeItem->setExpanded(false);
-    }
+    // Collapse all episodes by default
+    episodeItem->setExpanded(false);
     
     m_episodeTree->addTopLevelItem(episodeItem);
 }

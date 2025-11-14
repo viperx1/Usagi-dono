@@ -4129,13 +4129,28 @@ void Window::sortMylistCards(int sortIndex)
 			break;
 		case 2: // Aired Date
 			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
-				if (a->getAiredText() == b->getAiredText()) {
+				aired airedA = a->getAired();
+				aired airedB = b->getAired();
+				
+				// Handle invalid dates (put at end)
+				if (!airedA.isValid() && !airedB.isValid()) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (!airedA.isValid()) {
+					return false;  // a goes after b
+				}
+				if (!airedB.isValid()) {
+					return true;   // a goes before b
+				}
+				
+				// Use aired class comparison operators
+				if (airedA == airedB) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
 				if (mylistSortAscending) {
-					return a->getAiredText() < b->getAiredText();
+					return airedA < airedB;
 				} else {
-					return a->getAiredText() > b->getAiredText();
+					return airedA > airedB;
 				}
 			});
 			break;
@@ -4416,8 +4431,24 @@ void Window::loadMylistAsCards()
 			}
 		}
 		
-		// Add all episodes to card
-		for (const AnimeCard::EpisodeInfo& episodeInfo : episodeMap) {
+		// Add all episodes to card in sorted order by epno
+		QList<AnimeCard::EpisodeInfo> episodeList = episodeMap.values();
+		std::sort(episodeList.begin(), episodeList.end(), [](const AnimeCard::EpisodeInfo& a, const AnimeCard::EpisodeInfo& b) {
+			// Sort by episode number using epno comparison
+			if (a.episodeNumber.isValid() && b.episodeNumber.isValid()) {
+				return a.episodeNumber < b.episodeNumber;
+			}
+			// Put invalid epno at the end
+			if (!a.episodeNumber.isValid()) {
+				return false;
+			}
+			if (!b.episodeNumber.isValid()) {
+				return true;
+			}
+			return false;
+		});
+		
+		for (const AnimeCard::EpisodeInfo& episodeInfo : episodeList) {
 			card->addEpisode(episodeInfo);
 		}
 		

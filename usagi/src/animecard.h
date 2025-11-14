@@ -12,6 +12,8 @@
 #include "epno.h"
 #include "aired.h"
 
+// Forward declaration
+class PlayButtonDelegate;
 /**
  * AnimeCard - A card widget that displays anime information
  * 
@@ -74,6 +76,7 @@ public:
     QString getAnimeTitle() const { return m_animeTitle; }
     QString getAnimeType() const { return m_animeType; }
     QString getAiredText() const { return m_airedText; }
+    aired getAired() const { return m_aired; }  // For proper sorting
     int getEpisodesInList() const { return m_episodesInList; }
     int getTotalEpisodes() const { return m_totalEpisodes; }
     int getViewedCount() const { return m_viewedCount; }
@@ -117,6 +120,7 @@ private:
     QLabel *m_airedLabel;
     QLabel *m_statsLabel;
     QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy
+    PlayButtonDelegate *m_playButtonDelegate;  // Delegate for play button column
     
     QVBoxLayout *m_mainLayout;
     QHBoxLayout *m_topLayout;
