@@ -378,6 +378,10 @@ private:
     QList<AnimeCard*> animeCards;
 	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
 	QSet<int> animeNeedingMetadata;  // Track AIDs that need metadata (typename, startdate, enddate)
+	QSet<int> animeNeedingPoster;  // Track AIDs that need poster images
+	QMap<int, QString> animePicnames;  // aid -> picname mapping
+	QNetworkAccessManager *posterNetworkManager;  // For downloading poster images
+	QMap<QNetworkReply*, int> posterDownloadRequests;  // reply -> aid mapping
 	// page settings
 
     QLabel *labelLogin;
@@ -493,6 +497,10 @@ public slots:
     void loadMylistAsCards();
     void onCardClicked(int aid);
     void onCardEpisodeClicked(int lid);
+    
+    // Poster download slots
+    void onPosterDownloadFinished(QNetworkReply *reply);
+    void downloadPosterForAnime(int aid, const QString &picname);
     
     // Directory watcher slots
     void onWatcherEnabledChanged(int state);

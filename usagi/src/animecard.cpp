@@ -94,22 +94,12 @@ void AnimeCard::setupUI()
     
     // Connect play button clicks to emit episodeClicked signal
     connect(m_playButtonDelegate, &PlayButtonDelegate::playButtonClicked, this, [this](const QModelIndex &index) {
-        QTreeWidgetItem *item = m_episodeTree->topLevelItem(index.row());
-        if (!item) {
-            // Check if it's a child item
-            for (int i = 0; i < m_episodeTree->topLevelItemCount(); ++i) {
-                QTreeWidgetItem *parent = m_episodeTree->topLevelItem(i);
-                for (int j = 0; j < parent->childCount(); ++j) {
-                    QTreeWidgetItem *child = parent->child(j);
-                    if (m_episodeTree->indexFromItem(child, 0) == index) {
-                        item = child;
-                        break;
-                    }
-                }
-                if (item) break;
-            }
+        if (!index.isValid()) {
+            return;
         }
         
+        // Get the item from the model
+        QTreeWidgetItem *item = m_episodeTree->itemFromIndex(index);
         if (item) {
             int lid = item->data(1, Qt::UserRole).toInt();
             if (lid > 0) {  // Only emit if it's a file item (has lid)

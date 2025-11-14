@@ -136,6 +136,10 @@ Window::Window()
     mylistUseCardView = true;
     mylistSortAscending = true;
     
+    // Initialize network manager for poster downloads
+    posterNetworkManager = new QNetworkAccessManager(this);
+    connect(posterNetworkManager, &QNetworkAccessManager::finished, this, &Window::onPosterDownloadFinished);
+    
     // Add toolbar for view toggle and sorting
     QHBoxLayout *mylistToolbar = new QHBoxLayout();
     
@@ -1955,6 +1959,28 @@ void Window::getNotifyAnimeUpdated(int aid)
 {
 	// Anime metadata was updated in the database, reload the mylist to reflect changes
 	LOG(QString("Anime metadata received for AID %1, reloading mylist...").arg(aid));
+	
+	// Check if we got picname and need to download poster
+	if (animeNeedingPoster.contains(aid)) {
+		QSqlDatabase db = QSqlDatabase::database();
+		if (validateDatabaseConnection(db, "getNotifyAnimeUpdated")) {
+			QSqlQuery query(db);
+			query.prepare("SELECT picname, poster_image FROM anime WHERE aid = ?");
+			query.addBindValue(aid);
+			
+			if (query.exec() && query.next()) {
+				QString picname = query.value(0).toString();
+				QByteArray posterData = query.value(1).toByteArray();
+				
+				// If we got picname but no poster image, download it
+				if (!picname.isEmpty() && posterData.isEmpty()) {
+					animePicnames[aid] = picname;
+					downloadPosterForAnime(aid, picname);
+				}
+			}
+		}
+	}
+	
 	loadMylistFromDatabase();
 	animeNeedingMetadata.remove(aid);  // Remove from tracking set if present
 }
@@ -4241,6 +4267,8 @@ void Window::loadMylistAsCards()
 	
 	episodesNeedingData.clear();
 	animeNeedingMetadata.clear();
+	animeNeedingPoster.clear();
+	animePicnames.clear();
 	
 	QSqlDatabase db = QSqlDatabase::database();
 	
@@ -4329,10 +4357,18 @@ void Window::loadMylistAsCards()
 			if (poster.loadFromData(posterData)) {
 				card->setPoster(poster);
 			}
+		} else {
+			// Track anime needing poster download
+			if (!picname.isEmpty()) {
+				// Have picname but no image - download it
+				animeNeedingPoster.insert(aid);
+				animePicnames[aid] = picname;
+				downloadPosterForAnime(aid, picname);
+			} else if (typeName.isEmpty() || startDate.isEmpty()) {
+				// No picname - need to request anime metadata first
+				animeNeedingPoster.insert(aid);
+			}
 		}
-		// Note: If no poster image in database but picname exists, 
-		// a background thread could download it from:
-		// http://img7.anidb.net/pics/anime/<picname>
 		
 		// Query episodes for this anime - need to get file details too
 		QSqlQuery episodeQuery(db);
@@ -4478,6 +4514,86 @@ void Window::loadMylistAsCards()
 	}
 	if (!animeNeedingMetadata.isEmpty()) {
 		LOG(QString("Need metadata for %1 anime").arg(animeNeedingMetadata.size()));
+	}
+	if (!animeNeedingPoster.isEmpty()) {
+		LOG(QString("Need poster images for %1 anime").arg(animeNeedingPoster.size()));
+	}
+}
+
+// Download poster image for an anime
+void Window::downloadPosterForAnime(int aid, const QString &picname)
+{
+	if (picname.isEmpty()) {
+		return;
+	}
+	
+	// AniDB CDN URL for anime posters
+	QString url = QString("http://img7.anidb.net/pics/anime/%1").arg(picname);
+	
+	LOG(QString("Downloading poster for anime %1 from %2").arg(aid).arg(url));
+	
+	QNetworkRequest request(url);
+	request.setHeader(QNetworkRequest::UserAgentHeader, "Usagi/1");
+	
+	QNetworkReply *reply = posterNetworkManager->get(request);
+	posterDownloadRequests[reply] = aid;
+}
+
+// Handle poster download completion
+void Window::onPosterDownloadFinished(QNetworkReply *reply)
+{
+	// Clean up reply when done
+	reply->deleteLater();
+	
+	if (!posterDownloadRequests.contains(reply)) {
+		return;
+	}
+	
+	int aid = posterDownloadRequests.take(reply);
+	
+	if (reply->error() != QNetworkReply::NoError) {
+		LOG(QString("Error downloading poster for anime %1: %2").arg(aid).arg(reply->errorString()));
+		return;
+	}
+	
+	QByteArray imageData = reply->readAll();
+	if (imageData.isEmpty()) {
+		LOG(QString("Empty poster image data for anime %1").arg(aid));
+		return;
+	}
+	
+	// Verify it's a valid image
+	QPixmap poster;
+	if (!poster.loadFromData(imageData)) {
+		LOG(QString("Invalid poster image data for anime %1").arg(aid));
+		return;
+	}
+	
+	// Store in database
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!validateDatabaseConnection(db, "onPosterDownloadFinished")) {
+		return;
+	}
+	
+	QSqlQuery query(db);
+	query.prepare("UPDATE anime SET poster_image = :image WHERE aid = :aid");
+	query.bindValue(":image", imageData);
+	query.bindValue(":aid", aid);
+	
+	if (!query.exec()) {
+		LOG(QString("Error storing poster for anime %1: %2").arg(aid).arg(query.lastError().text()));
+		return;
+	}
+	
+	LOG(QString("Poster downloaded and stored for anime %1").arg(aid));
+	
+	// Update the card if it exists
+	for (AnimeCard *card : animeCards) {
+		if (card->getAnimeId() == aid) {
+			card->setPoster(poster);
+			animeNeedingPoster.remove(aid);
+			break;
+		}
 	}
 }
 
