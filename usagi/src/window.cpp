@@ -4451,22 +4451,6 @@ void Window::loadMylistAsCards()
 					
 					if (!epno.isEmpty()) {
 						episodeInfo.episodeNumber = ::epno(epno);
-						
-						// Track episode type
-						int epType = episodeInfo.episodeNumber.type();
-						if (epType == 1) {
-							// Normal episode
-							normalEpisodesSeen.insert(eid);
-							if (viewed) {
-								viewedNormalEpisodes.insert(eid);
-							}
-						} else {
-							// Special, credit, trailer, parody, or other
-							otherEpisodesSeen.insert(eid);
-							if (viewed) {
-								viewedOtherEpisodes.insert(eid);
-							}
-						}
 					}
 					
 					episodeInfo.episodeTitle = episodeName.isEmpty() ? "Episode" : episodeName;
@@ -4477,6 +4461,38 @@ void Window::loadMylistAsCards()
 					
 					episodeMap[eid] = episodeInfo;
 					episodeFileCount[eid] = 0;
+					
+					// Track episode type for statistics
+					if (!epno.isEmpty()) {
+						::epno episodeNumber(epno);
+						int epType = episodeNumber.type();
+						if (epType == 1) {
+							// Normal episode
+							normalEpisodesSeen.insert(eid);
+						} else if (epType > 1) {
+							// Special, credit, trailer, parody, or other
+							otherEpisodesSeen.insert(eid);
+						}
+					} else {
+						// If no episode number, treat as normal episode
+						normalEpisodesSeen.insert(eid);
+					}
+				}
+				
+				// Track viewed status for this file's episode
+				if (viewed) {
+					if (!epno.isEmpty()) {
+						::epno episodeNumber(epno);
+						int epType = episodeNumber.type();
+						if (epType == 1) {
+							viewedNormalEpisodes.insert(eid);
+						} else if (epType > 1) {
+							viewedOtherEpisodes.insert(eid);
+						}
+					} else {
+						// If no episode number, treat as normal episode
+						viewedNormalEpisodes.insert(eid);
+					}
 				}
 				
 				// Create file info
