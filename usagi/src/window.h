@@ -378,6 +378,7 @@ private:
     QList<AnimeCard*> animeCards;
 	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
 	QSet<int> animeNeedingMetadata;  // Track AIDs that need metadata (typename, startdate, enddate)
+	QSet<int> animeMetadataRequested;  // Track AIDs for which we've already requested metadata (prevent spam)
 	QSet<int> animeNeedingPoster;  // Track AIDs that need poster images
 	QMap<int, QString> animePicnames;  // aid -> picname mapping
 	QNetworkAccessManager *posterNetworkManager;  // For downloading poster images

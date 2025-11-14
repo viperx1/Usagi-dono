@@ -1957,10 +1957,15 @@ void Window::getNotifyEpisodeUpdated(int eid, int aid)
 
 void Window::getNotifyAnimeUpdated(int aid)
 {
-	// Anime metadata was updated in the database, reload the mylist to reflect changes
-	LOG(QString("Anime metadata received for AID %1, reloading mylist...").arg(aid));
+	// Anime metadata was updated in the database
+	LOG(QString("Anime metadata received for AID %1").arg(aid));
+	
+	// Remove from tracking to prevent re-requests
+	animeNeedingMetadata.remove(aid);
+	animeMetadataRequested.remove(aid);
 	
 	// Check if we got picname and need to download poster
+	bool needsPosterDownload = false;
 	if (animeNeedingPoster.contains(aid)) {
 		QSqlDatabase db = QSqlDatabase::database();
 		if (validateDatabaseConnection(db, "getNotifyAnimeUpdated")) {
@@ -1976,18 +1981,22 @@ void Window::getNotifyAnimeUpdated(int aid)
 				if (!picname.isEmpty() && posterData.isEmpty()) {
 					animePicnames[aid] = picname;
 					downloadPosterForAnime(aid, picname);
+					needsPosterDownload = true;
 				}
 			}
 		}
 	}
 	
-	// Reload appropriate view
-	if (mylistUseCardView) {
-		loadMylistAsCards();
-	} else {
-		loadMylistFromDatabase();
+	// Only reload view if we're not just triggering a poster download
+	// Poster download will update the card when it completes
+	if (!needsPosterDownload) {
+		// Reload appropriate view to show updated metadata
+		if (mylistUseCardView) {
+			loadMylistAsCards();
+		} else {
+			loadMylistFromDatabase();
+		}
 	}
-	animeNeedingMetadata.remove(aid);  // Remove from tracking set if present
 }
 
 void Window::updateEpisodeInTree(int eid, int aid)
@@ -2456,6 +2465,7 @@ void Window::loadMylistFromDatabase()
 {
 	// If card view is active, use card loading instead
 	if (mylistUseCardView) {
+		animeMetadataRequested.clear();  // Clear request tracking for fresh load
 		loadMylistAsCards();
 		return;
 	}
@@ -4113,6 +4123,7 @@ void Window::toggleMylistView()
 		mylistCardScrollArea->show();
 		mylistViewToggleButton->setText("Switch to Tree View");
 		mylistSortComboBox->setEnabled(true);
+		animeMetadataRequested.clear();  // Clear request tracking when switching to card view
 		loadMylistAsCards();
 	} else {
 		mylistCardScrollArea->hide();
@@ -4274,6 +4285,7 @@ void Window::loadMylistAsCards()
 	animeNeedingMetadata.clear();
 	animeNeedingPoster.clear();
 	animePicnames.clear();
+	// Note: NOT clearing animeMetadataRequested to prevent re-requesting same anime
 	
 	QSqlDatabase db = QSqlDatabase::database();
 	
@@ -4519,10 +4531,15 @@ void Window::loadMylistAsCards()
 		LOG(QString("Need episode data for %1 episodes").arg(episodesNeedingData.size()));
 	}
 	if (!animeNeedingMetadata.isEmpty()) {
-		LOG(QString("Need metadata for %1 anime, requesting via ANIME command...").arg(animeNeedingMetadata.size()));
-		// Request ANIME data for each anime that needs metadata (including picname)
-		for (int aid : animeNeedingMetadata) {
-			adbapi->Anime(aid);
+		// Filter out anime we've already requested to prevent spam
+		QSet<int> toRequest = animeNeedingMetadata - animeMetadataRequested;
+		if (!toRequest.isEmpty()) {
+			LOG(QString("Need metadata for %1 anime, requesting via ANIME command...").arg(toRequest.size()));
+			// Request ANIME data for each anime that needs metadata (including picname)
+			for (int aid : toRequest) {
+				adbapi->Anime(aid);
+				animeMetadataRequested.insert(aid);  // Mark as requested to prevent duplicates
+			}
 		}
 	}
 	if (!animeNeedingPoster.isEmpty()) {
