@@ -6,6 +6,7 @@
 #include "logger.h"
 #include "playbuttondelegate.h"
 #include <QElapsedTimer>
+#include <algorithm>
 
 HasherThreadPool *hasherThreadPool = nullptr;
 myAniDBApi *adbapi;
@@ -131,6 +132,44 @@ Window::Window()
     pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
 
     // page mylist
+    // Initialize card view flag (default to card view as per requirement)
+    mylistUseCardView = true;
+    mylistSortAscending = true;
+    
+    // Initialize network manager for poster downloads
+    posterNetworkManager = new QNetworkAccessManager(this);
+    connect(posterNetworkManager, &QNetworkAccessManager::finished, this, &Window::onPosterDownloadFinished);
+    
+    // Add toolbar for view toggle and sorting
+    QHBoxLayout *mylistToolbar = new QHBoxLayout();
+    
+    mylistViewToggleButton = new QPushButton("Switch to Tree View");
+    mylistViewToggleButton->setMaximumWidth(150);
+    connect(mylistViewToggleButton, SIGNAL(clicked()), this, SLOT(toggleMylistView()));
+    mylistToolbar->addWidget(mylistViewToggleButton);
+    
+    mylistToolbar->addWidget(new QLabel("Sort by:"));
+    mylistSortComboBox = new QComboBox();
+    mylistSortComboBox->addItem("Anime Title");
+    mylistSortComboBox->addItem("Type");
+    mylistSortComboBox->addItem("Aired Date");
+    mylistSortComboBox->addItem("Episodes (Count)");
+    mylistSortComboBox->addItem("Completion %");
+    mylistSortComboBox->addItem("Last Played");
+    mylistSortComboBox->setCurrentIndex(0);
+    connect(mylistSortComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(sortMylistCards(int)));
+    mylistToolbar->addWidget(mylistSortComboBox);
+    
+    mylistSortOrderButton = new QPushButton("↑ Asc");
+    mylistSortOrderButton->setMaximumWidth(80);
+    mylistSortOrderButton->setToolTip("Toggle sort order (ascending/descending)");
+    connect(mylistSortOrderButton, SIGNAL(clicked()), this, SLOT(toggleSortOrder()));
+    mylistToolbar->addWidget(mylistSortOrderButton);
+    
+    mylistToolbar->addStretch();
+    pageMylist->addLayout(mylistToolbar);
+    
+    // Tree widget (for tree view mode)
     mylistTreeWidget = new QTreeWidget(this);
     mylistTreeWidget->setColumnCount(11);
     // New column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
@@ -151,13 +190,28 @@ Window::Window()
     mylistTreeWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pageMylist->addWidget(mylistTreeWidget);
     
+    // Card view (for card view mode)
+    mylistCardScrollArea = new QScrollArea(this);
+    mylistCardScrollArea->setWidgetResizable(true);
+    mylistCardScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    mylistCardScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    
+    mylistCardContainer = new QWidget();
+    mylistCardLayout = new FlowLayout(mylistCardContainer, 10, 10, 10);
+    mylistCardContainer->setLayout(mylistCardLayout);
+    mylistCardScrollArea->setWidget(mylistCardContainer);
+    
+    pageMylist->addWidget(mylistCardScrollArea);
+    
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
     mylistStatusLabel->setAlignment(Qt::AlignCenter);
     mylistStatusLabel->setStyleSheet("padding: 5px; background-color: #f0f0f0;");
     pageMylist->addWidget(mylistStatusLabel);
     
-    mylistTreeWidget->show();
+    // Initially show card view (hide tree view)
+    mylistTreeWidget->hide();
+    mylistCardScrollArea->show();
 
     // page hasher - signals
     connect(button1, SIGNAL(clicked()), this, SLOT(Button1Click()));
@@ -1903,10 +1957,46 @@ void Window::getNotifyEpisodeUpdated(int eid, int aid)
 
 void Window::getNotifyAnimeUpdated(int aid)
 {
-	// Anime metadata was updated in the database, reload the mylist to reflect changes
-	LOG(QString("Anime metadata received for AID %1, reloading mylist...").arg(aid));
-	loadMylistFromDatabase();
-	animeNeedingMetadata.remove(aid);  // Remove from tracking set if present
+	// Anime metadata was updated in the database
+	LOG(QString("Anime metadata received for AID %1").arg(aid));
+	
+	// Remove from tracking to prevent re-requests
+	animeNeedingMetadata.remove(aid);
+	animeMetadataRequested.remove(aid);
+	
+	// Check if we got picname and need to download poster
+	bool needsPosterDownload = false;
+	if (animeNeedingPoster.contains(aid)) {
+		QSqlDatabase db = QSqlDatabase::database();
+		if (validateDatabaseConnection(db, "getNotifyAnimeUpdated")) {
+			QSqlQuery query(db);
+			query.prepare("SELECT picname, poster_image FROM anime WHERE aid = ?");
+			query.addBindValue(aid);
+			
+			if (query.exec() && query.next()) {
+				QString picname = query.value(0).toString();
+				QByteArray posterData = query.value(1).toByteArray();
+				
+				// If we got picname but no poster image, download it
+				if (!picname.isEmpty() && posterData.isEmpty()) {
+					animePicnames[aid] = picname;
+					downloadPosterForAnime(aid, picname);
+					needsPosterDownload = true;
+				}
+			}
+		}
+	}
+	
+	// Only reload view if we're not just triggering a poster download
+	// Poster download will update the card when it completes
+	if (!needsPosterDownload) {
+		// Reload appropriate view to show updated metadata
+		if (mylistUseCardView) {
+			loadMylistAsCards();
+		} else {
+			loadMylistFromDatabase();
+		}
+	}
 }
 
 void Window::updateEpisodeInTree(int eid, int aid)
@@ -2373,6 +2463,13 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& 
 
 void Window::loadMylistFromDatabase()
 {
+	// If card view is active, use card loading instead
+	if (mylistUseCardView) {
+		animeMetadataRequested.clear();  // Clear request tracking for fresh load
+		loadMylistAsCards();
+		return;
+	}
+	
 	mylistTreeWidget->clear();
 	episodesNeedingData.clear();  // Clear tracking set
 	animeNeedingMetadata.clear();  // Clear tracking set
@@ -4014,4 +4111,541 @@ void Window::startPlaybackForFile(int lid)
 	} else {
 		LOG(QString("Cannot play: file path not found for LID %1").arg(lid));
 	}
+}
+
+// Toggle between card view and tree view
+void Window::toggleMylistView()
+{
+	mylistUseCardView = !mylistUseCardView;
+	
+	if (mylistUseCardView) {
+		mylistTreeWidget->hide();
+		mylistCardScrollArea->show();
+		mylistViewToggleButton->setText("Switch to Tree View");
+		mylistSortComboBox->setEnabled(true);
+		animeMetadataRequested.clear();  // Clear request tracking when switching to card view
+		loadMylistAsCards();
+	} else {
+		mylistCardScrollArea->hide();
+		mylistTreeWidget->show();
+		mylistViewToggleButton->setText("Switch to Card View");
+		mylistSortComboBox->setEnabled(false);
+		loadMylistFromDatabase();
+	}
+}
+
+// Sort cards based on selected criterion
+void Window::sortMylistCards(int sortIndex)
+{
+	if (!mylistUseCardView || animeCards.isEmpty()) {
+		return;
+	}
+	
+	// Remove all cards from layout
+	for (AnimeCard *card : animeCards) {
+		mylistCardLayout->removeWidget(card);
+	}
+	
+	// Sort based on criterion
+	switch (sortIndex) {
+		case 0: // Anime Title
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				if (mylistSortAscending) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				} else {
+					return a->getAnimeTitle() > b->getAnimeTitle();
+				}
+			});
+			break;
+		case 1: // Type
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				if (a->getAnimeType() == b->getAnimeType()) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (mylistSortAscending) {
+					return a->getAnimeType() < b->getAnimeType();
+				} else {
+					return a->getAnimeType() > b->getAnimeType();
+				}
+			});
+			break;
+		case 2: // Aired Date
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				aired airedA = a->getAired();
+				aired airedB = b->getAired();
+				
+				// Handle invalid dates (put at end)
+				if (!airedA.isValid() && !airedB.isValid()) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (!airedA.isValid()) {
+					return false;  // a goes after b
+				}
+				if (!airedB.isValid()) {
+					return true;   // a goes before b
+				}
+				
+				// Use aired class comparison operators
+				if (airedA == airedB) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (mylistSortAscending) {
+					return airedA < airedB;
+				} else {
+					return airedA > airedB;
+				}
+			});
+			break;
+		case 3: // Episodes (Count)
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				if (a->getEpisodesInList() == b->getEpisodesInList()) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (mylistSortAscending) {
+					return a->getEpisodesInList() < b->getEpisodesInList();
+				} else {
+					return a->getEpisodesInList() > b->getEpisodesInList();
+				}
+			});
+			break;
+		case 4: // Completion %
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				double completionA = (a->getEpisodesInList() > 0) ? 
+					(double)a->getViewedCount() / a->getEpisodesInList() : 0.0;
+				double completionB = (b->getEpisodesInList() > 0) ? 
+					(double)b->getViewedCount() / b->getEpisodesInList() : 0.0;
+				if (completionA == completionB) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (mylistSortAscending) {
+					return completionA < completionB;
+				} else {
+					return completionA > completionB;
+				}
+			});
+			break;
+		case 5: // Last Played
+			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+				qint64 lastPlayedA = a->getLastPlayed();
+				qint64 lastPlayedB = b->getLastPlayed();
+				
+				// Never played items (0) go to the end regardless of sort order
+				if (lastPlayedA == 0 && lastPlayedB == 0) {
+					return a->getAnimeTitle() < b->getAnimeTitle();
+				}
+				if (lastPlayedA == 0) {
+					return false;  // a goes after b
+				}
+				if (lastPlayedB == 0) {
+					return true;   // a goes before b
+				}
+				
+				if (mylistSortAscending) {
+					return lastPlayedA < lastPlayedB;
+				} else {
+					return lastPlayedA > lastPlayedB;
+				}
+			});
+			break;
+	}
+	
+	// Re-add cards to layout in sorted order
+	for (AnimeCard *card : animeCards) {
+		mylistCardLayout->addWidget(card);
+	}
+}
+
+// Toggle sort order between ascending and descending
+void Window::toggleSortOrder()
+{
+	mylistSortAscending = !mylistSortAscending;
+	
+	// Update button text
+	if (mylistSortAscending) {
+		mylistSortOrderButton->setText("↑ Asc");
+	} else {
+		mylistSortOrderButton->setText("↓ Desc");
+	}
+	
+	// Re-sort with current criterion
+	sortMylistCards(mylistSortComboBox->currentIndex());
+}
+
+// Load mylist data as cards
+void Window::loadMylistAsCards()
+{
+	// Clear existing cards
+	for (AnimeCard *card : animeCards) {
+		mylistCardLayout->removeWidget(card);
+		delete card;
+	}
+	animeCards.clear();
+	
+	episodesNeedingData.clear();
+	animeNeedingMetadata.clear();
+	animeNeedingPoster.clear();
+	animePicnames.clear();
+	// Note: NOT clearing animeMetadataRequested to prevent re-requesting same anime
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	
+	if(!validateDatabaseConnection(db, "loadMylistAsCards"))
+	{
+		mylistStatusLabel->setText("MyList Status: Database Error");
+		return;
+	}
+	
+	// Query all mylist entries grouped by anime
+	QString query = "SELECT m.aid, "
+					"a.nameromaji, a.nameenglish, a.eptotal, "
+					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
+					"a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image "
+					"FROM mylist m "
+					"LEFT JOIN anime a ON m.aid = a.aid "
+					"GROUP BY m.aid "
+					"ORDER BY a.nameromaji";
+	
+	QSqlQuery q(db);
+	
+	if(!q.exec(query))
+	{
+		LOG("Error loading mylist for cards: " + q.lastError().text());
+		return;
+	}
+	
+	// Create a card for each anime
+	while(q.next())
+	{
+		int aid = q.value(0).toInt();
+		QString animeName = q.value(1).toString();
+		QString animeNameEnglish = q.value(2).toString();
+		int epTotal = q.value(3).toInt();
+		QString animeTitle = q.value(4).toString();
+		int eps = q.value(5).toInt();
+		QString typeName = q.value(6).toString();
+		QString startDate = q.value(7).toString();
+		QString endDate = q.value(8).toString();
+		QString picname = q.value(9).toString();
+		QByteArray posterData = q.value(10).toByteArray();
+		
+		// Use English name if romaji is empty
+		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
+		{
+			animeName = animeNameEnglish;
+		}
+		
+		// If anime name is still empty, try anime_titles table
+		if(animeName.isEmpty() && !animeTitle.isEmpty())
+		{
+			animeName = animeTitle;
+		}
+		
+		// If anime name is still empty, use aid
+		if(animeName.isEmpty())
+		{
+			animeName = QString("Anime #%1").arg(aid);
+		}
+		
+		// Create card
+		AnimeCard *card = new AnimeCard(mylistCardContainer);
+		card->setAnimeId(aid);
+		card->setAnimeTitle(animeName);
+		
+		// Set type
+		if (!typeName.isEmpty()) {
+			card->setAnimeType(typeName);
+		} else {
+			card->setAnimeType("Unknown");
+			animeNeedingMetadata.insert(aid);
+		}
+		
+		// Set aired dates
+		if (!startDate.isEmpty()) {
+			aired airedDates(startDate, endDate);
+			card->setAired(airedDates);
+		} else {
+			card->setAiredText("Unknown");
+			animeNeedingMetadata.insert(aid);
+		}
+		
+		// Load poster image if available
+		if (!posterData.isEmpty()) {
+			QPixmap poster;
+			if (poster.loadFromData(posterData)) {
+				card->setPoster(poster);
+			}
+		} else {
+			// Track anime needing poster download
+			if (!picname.isEmpty()) {
+				// Have picname but no image - download it
+				animeNeedingPoster.insert(aid);
+				animePicnames[aid] = picname;
+				downloadPosterForAnime(aid, picname);
+			} else {
+				// No picname - need to request anime metadata via ANIME command to get picname
+				animeNeedingPoster.insert(aid);
+				animeNeedingMetadata.insert(aid);  // Request ANIME data to get picname
+			}
+		}
+		
+		// Query episodes for this anime - need to get file details too
+		QSqlQuery episodeQuery(db);
+		episodeQuery.prepare("SELECT m.lid, m.eid, m.fid, m.state, m.viewed, m.storage, "
+							"e.name as episode_name, e.epno, "
+							"f.filename, m.last_played, "
+							"lf.path as local_file_path, "
+							"f.resolution, f.quality, "
+							"(SELECT name FROM `group` WHERE gid = m.gid) as group_name "
+							"FROM mylist m "
+							"LEFT JOIN episode e ON m.eid = e.eid "
+							"LEFT JOIN file f ON m.fid = f.fid "
+							"LEFT JOIN local_files lf ON m.local_file = lf.id "
+							"WHERE m.aid = ? "
+							"ORDER BY e.epno, m.lid");
+		episodeQuery.addBindValue(aid);
+		
+		// Group files by episode
+		QMap<int, AnimeCard::EpisodeInfo> episodeMap;
+		QMap<int, int> episodeFileCount;  // Track file count per episode for versioning
+		int totalFiles = 0;
+		int viewedCount = 0;
+		
+		if (episodeQuery.exec())
+		{
+			while (episodeQuery.next())
+			{
+				int lid = episodeQuery.value(0).toInt();
+				int eid = episodeQuery.value(1).toInt();
+				int fid = episodeQuery.value(2).toInt();
+				int state = episodeQuery.value(3).toInt();
+				int viewed = episodeQuery.value(4).toInt();
+				QString storage = episodeQuery.value(5).toString();
+				QString episodeName = episodeQuery.value(6).toString();
+				QString epno = episodeQuery.value(7).toString();
+				QString filename = episodeQuery.value(8).toString();
+				qint64 lastPlayed = episodeQuery.value(9).toLongLong();
+				QString localFilePath = episodeQuery.value(10).toString();
+				QString resolution = episodeQuery.value(11).toString();
+				QString quality = episodeQuery.value(12).toString();
+				QString groupName = episodeQuery.value(13).toString();
+				
+				totalFiles++;
+				if (viewed) {
+					viewedCount++;
+				}
+				
+				// Get or create episode entry
+				if (!episodeMap.contains(eid)) {
+					AnimeCard::EpisodeInfo episodeInfo;
+					episodeInfo.eid = eid;
+					
+					if (!epno.isEmpty()) {
+						episodeInfo.episodeNumber = ::epno(epno);
+					}
+					
+					episodeInfo.episodeTitle = episodeName.isEmpty() ? "Episode" : episodeName;
+					
+					if (episodeName.isEmpty()) {
+						episodesNeedingData.insert(eid);
+					}
+					
+					episodeMap[eid] = episodeInfo;
+					episodeFileCount[eid] = 0;
+				}
+				
+				// Create file info
+				AnimeCard::FileInfo fileInfo;
+				fileInfo.lid = lid;
+				fileInfo.fid = fid;
+				fileInfo.fileName = filename.isEmpty() ? QString("FID:%1").arg(fid) : filename;
+				
+				// State string
+				switch(state)
+				{
+					case 0: fileInfo.state = "Unknown"; break;
+					case 1: fileInfo.state = "HDD"; break;
+					case 2: fileInfo.state = "CD/DVD"; break;
+					case 3: fileInfo.state = "Deleted"; break;
+					default: fileInfo.state = QString::number(state); break;
+				}
+				
+				fileInfo.viewed = (viewed != 0);
+				fileInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
+				fileInfo.lastPlayed = lastPlayed;
+				fileInfo.resolution = resolution;
+				fileInfo.quality = quality;
+				fileInfo.groupName = groupName;
+				
+				// Assign version number (v1, v2, v3, etc.)
+				episodeFileCount[eid]++;
+				fileInfo.version = episodeFileCount[eid];
+				
+				// Add file to episode
+				episodeMap[eid].files.append(fileInfo);
+			}
+		}
+		
+		// Add all episodes to card in sorted order by epno
+		QList<AnimeCard::EpisodeInfo> episodeList = episodeMap.values();
+		std::sort(episodeList.begin(), episodeList.end(), [](const AnimeCard::EpisodeInfo& a, const AnimeCard::EpisodeInfo& b) {
+			// Sort by episode number using epno comparison
+			if (a.episodeNumber.isValid() && b.episodeNumber.isValid()) {
+				return a.episodeNumber < b.episodeNumber;
+			}
+			// Put invalid epno at the end
+			if (!a.episodeNumber.isValid()) {
+				return false;
+			}
+			if (!b.episodeNumber.isValid()) {
+				return true;
+			}
+			return false;
+		});
+		
+		for (const AnimeCard::EpisodeInfo& episodeInfo : episodeList) {
+			card->addEpisode(episodeInfo);
+		}
+		
+		// Set statistics (count unique episodes, not files)
+		int episodesInList = episodeMap.size();
+		int totalEps = (epTotal > 0) ? epTotal : eps;
+		if (totalEps <= 0) totalEps = episodesInList; // Fallback
+		card->setStatistics(episodesInList, totalEps, viewedCount);
+		
+		// Connect signals
+		connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
+		connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
+		
+		// Add to layout and track
+		mylistCardLayout->addWidget(card);
+		animeCards.append(card);
+	}
+	
+	// Apply current sort
+	sortMylistCards(mylistSortComboBox->currentIndex());
+	
+	mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
+	
+	// Request missing data if needed
+	if (!episodesNeedingData.isEmpty()) {
+		LOG(QString("Need episode data for %1 episodes").arg(episodesNeedingData.size()));
+	}
+	if (!animeNeedingMetadata.isEmpty()) {
+		// Filter out anime we've already requested to prevent spam
+		QSet<int> toRequest = animeNeedingMetadata - animeMetadataRequested;
+		if (!toRequest.isEmpty()) {
+			// Convert set to list for processing
+			QList<int> requestList = toRequest.values();
+			int total = requestList.size();
+			
+			LOG(QString("Queueing %1 ANIME metadata requests (batched)...").arg(total));
+			
+			// Batch insert all requests in a single transaction for speed
+			QSqlDatabase apiDb = QSqlDatabase::database();
+			apiDb.transaction();
+			
+			for (int aid : requestList) {
+				// Call adbapi->Anime() which will queue the request
+				adbapi->Anime(aid);
+				animeMetadataRequested.insert(aid);
+			}
+			
+			apiDb.commit();
+			
+			LOG(QString("Completed queueing %1 ANIME requests").arg(total));
+		}
+	}
+	if (!animeNeedingPoster.isEmpty()) {
+		LOG(QString("Need poster images for %1 anime").arg(animeNeedingPoster.size()));
+	}
+}
+
+// Download poster image for an anime
+void Window::downloadPosterForAnime(int aid, const QString &picname)
+{
+	if (picname.isEmpty()) {
+		return;
+	}
+	
+	// AniDB CDN URL for anime posters
+	QString url = QString("http://img7.anidb.net/pics/anime/%1").arg(picname);
+	
+	LOG(QString("Downloading poster for anime %1 from %2").arg(aid).arg(url));
+	
+	QNetworkRequest request(url);
+	request.setHeader(QNetworkRequest::UserAgentHeader, "Usagi/1");
+	
+	QNetworkReply *reply = posterNetworkManager->get(request);
+	posterDownloadRequests[reply] = aid;
+}
+
+// Handle poster download completion
+void Window::onPosterDownloadFinished(QNetworkReply *reply)
+{
+	// Clean up reply when done
+	reply->deleteLater();
+	
+	if (!posterDownloadRequests.contains(reply)) {
+		return;
+	}
+	
+	int aid = posterDownloadRequests.take(reply);
+	
+	if (reply->error() != QNetworkReply::NoError) {
+		LOG(QString("Error downloading poster for anime %1: %2").arg(aid).arg(reply->errorString()));
+		return;
+	}
+	
+	QByteArray imageData = reply->readAll();
+	if (imageData.isEmpty()) {
+		LOG(QString("Empty poster image data for anime %1").arg(aid));
+		return;
+	}
+	
+	// Verify it's a valid image
+	QPixmap poster;
+	if (!poster.loadFromData(imageData)) {
+		LOG(QString("Invalid poster image data for anime %1").arg(aid));
+		return;
+	}
+	
+	// Store in database
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!validateDatabaseConnection(db, "onPosterDownloadFinished")) {
+		return;
+	}
+	
+	QSqlQuery query(db);
+	query.prepare("UPDATE anime SET poster_image = :image WHERE aid = :aid");
+	query.bindValue(":image", imageData);
+	query.bindValue(":aid", aid);
+	
+	if (!query.exec()) {
+		LOG(QString("Error storing poster for anime %1: %2").arg(aid).arg(query.lastError().text()));
+		return;
+	}
+	
+	LOG(QString("Poster downloaded and stored for anime %1").arg(aid));
+	
+	// Update the card if it exists
+	for (AnimeCard *card : animeCards) {
+		if (card->getAnimeId() == aid) {
+			card->setPoster(poster);
+			animeNeedingPoster.remove(aid);
+			break;
+		}
+	}
+}
+
+void Window::onCardClicked(int aid)
+{
+	LOG(QString("Card clicked for anime ID: %1").arg(aid));
+	// Could expand to show more details or navigate somewhere
+}
+
+void Window::onCardEpisodeClicked(int lid)
+{
+	LOG(QString("Episode clicked with LID: %1").arg(lid));
+	// Start playback for the episode
+	startPlaybackForFile(lid);
 }

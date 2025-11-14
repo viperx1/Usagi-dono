@@ -51,6 +51,8 @@ set(SOURCES
     src/logger.cpp
     src/playbackmanager.cpp
     src/playbuttondelegate.cpp
+    src/animecard.cpp
+    src/flowlayout.cpp
 )
 
 # Header files
@@ -71,6 +73,8 @@ set(HEADERS
     src/logger.h
     src/playbackmanager.h
     src/playbuttondelegate.h
+    src/animecard.h
+    src/flowlayout.h
 )
 
 # Create executable

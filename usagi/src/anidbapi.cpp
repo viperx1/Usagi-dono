@@ -76,7 +76,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 //		Debug("AniDBApi: Database opened");
 		query = QSqlQuery(db);
 		query.exec("CREATE TABLE IF NOT EXISTS `mylist`(`lid` INTEGER PRIMARY KEY, `fid` INTEGER, `eid` INTEGER, `aid` INTEGER, `gid` INTEGER, `date` INTEGER, `state` INTEGER, `viewed` INTEGER, `viewdate` INTEGER, `storage` TEXT, `source` TEXT, `other` TEXT, `filestate` INTEGER)");
-		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT CHECK(startdate IS NULL OR startdate = '' OR startdate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `enddate` TEXT CHECK(enddate IS NULL OR enddate = '' OR enddate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'));");
+		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT CHECK(startdate IS NULL OR startdate = '' OR startdate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `enddate` TEXT CHECK(enddate IS NULL OR enddate = '' OR enddate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `picname` TEXT, `poster_image` BLOB);");
         query.exec("CREATE TABLE IF NOT EXISTS `file`(`fid` INTEGER PRIMARY KEY, `aid` INTEGER, `eid` INTEGER, `gid` INTEGER, `lid` INTEGER, `othereps` TEXT, `isdepr` INTEGER, `state` INTEGER, `size` BIGINT, `ed2k` TEXT, `md5` TEXT, `sha1` TEXT, `crc` TEXT, `quality` TEXT, `source` TEXT, `codec_audio` TEXT, `bitrate_audio` INTEGER, `codec_video` TEXT, `bitrate_video` INTEGER, `resolution` TEXT, `filetype` TEXT, `lang_dub` TEXT, `lang_sub` TEXT, `length` INTEGER, `description` TEXT, `airdate` INTEGER, `filename` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT);");
 		// Add epno column if it doesn't exist (for existing databases)
@@ -87,6 +87,9 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `typename` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `startdate` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `enddate` TEXT");
+		// Add picname and poster_image columns if they don't exist (for existing databases)
+		query.exec("ALTER TABLE `anime` ADD COLUMN `picname` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `poster_image` BLOB");
 		// Create local_files table for directory watcher feature
 		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT)");
@@ -3834,10 +3837,10 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 	QString q = QString("INSERT INTO `anime` "
 		"(`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, "
 		"`relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, "
-		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`) "
+		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`, `picname`) "
 		"VALUES (:aid, :eptotal, :eplast, :year, :type, :relaidlist, "
 		":relaidtype, :category, :nameromaji, :namekanji, :nameenglish, "
-		":nameother, :nameshort, :synonyms, :typename, :startdate, :enddate) "
+		":nameother, :nameshort, :synonyms, :typename, :startdate, :enddate, :picname) "
 		"ON CONFLICT(`aid`) DO UPDATE SET "
 		"`eptotal` = COALESCE(NULLIF(excluded.`eptotal`, ''), `anime`.`eptotal`), "
 		"`eplast` = COALESCE(NULLIF(excluded.`eplast`, ''), `anime`.`eplast`), "
@@ -3854,8 +3857,8 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 		"`synonyms` = COALESCE(NULLIF(excluded.`synonyms`, ''), `anime`.`synonyms`), "
 		"`typename` = COALESCE(NULLIF(excluded.`typename`, ''), `anime`.`typename`), "
 		"`startdate` = COALESCE(NULLIF(excluded.`startdate`, ''), `anime`.`startdate`), "
-		"`enddate` = COALESCE(NULLIF(excluded.`enddate`, ''), `anime`.`enddate`)");
-	
+		"`enddate` = COALESCE(NULLIF(excluded.`enddate`, ''), `anime`.`enddate`), "
+		"`picname` = COALESCE(NULLIF(excluded.`picname`, ''), `anime`.`picname`)");	
 	QSqlQuery query(db);
 	query.prepare(q);
 	
@@ -3876,6 +3879,7 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 	query.bindValue(":typename", data.type);  // typename mirrors type
 	query.bindValue(":startdate", startdate);
 	query.bindValue(":enddate", enddate);
+	query.bindValue(":picname", data.picname);
 	
 	if(!query.exec())
 	{
