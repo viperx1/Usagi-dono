@@ -81,7 +81,7 @@ void AnimeCard::setupUI()
     m_episodeTree = new QTreeWidget(this);
     m_episodeTree->setColumnCount(2);  // Column 0: Play button, Column 1: Episode/File info
     m_episodeTree->setHeaderHidden(true);
-    m_episodeTree->setColumnWidth(0, 30);  // Narrow column for play button
+    m_episodeTree->setColumnWidth(0, 35);  // Column for play button (increased from 30 to 35)
     m_episodeTree->setStyleSheet("QTreeWidget { font-size: 8pt; }");
     m_episodeTree->setAlternatingRowColors(true);
     m_episodeTree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);

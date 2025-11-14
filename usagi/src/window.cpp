@@ -1981,7 +1981,12 @@ void Window::getNotifyAnimeUpdated(int aid)
 		}
 	}
 	
-	loadMylistFromDatabase();
+	// Reload appropriate view
+	if (mylistUseCardView) {
+		loadMylistAsCards();
+	} else {
+		loadMylistFromDatabase();
+	}
 	animeNeedingMetadata.remove(aid);  // Remove from tracking set if present
 }
 
@@ -4364,9 +4369,10 @@ void Window::loadMylistAsCards()
 				animeNeedingPoster.insert(aid);
 				animePicnames[aid] = picname;
 				downloadPosterForAnime(aid, picname);
-			} else if (typeName.isEmpty() || startDate.isEmpty()) {
-				// No picname - need to request anime metadata first
+			} else {
+				// No picname - need to request anime metadata via ANIME command to get picname
 				animeNeedingPoster.insert(aid);
+				animeNeedingMetadata.insert(aid);  // Request ANIME data to get picname
 			}
 		}
 		
@@ -4513,7 +4519,11 @@ void Window::loadMylistAsCards()
 		LOG(QString("Need episode data for %1 episodes").arg(episodesNeedingData.size()));
 	}
 	if (!animeNeedingMetadata.isEmpty()) {
-		LOG(QString("Need metadata for %1 anime").arg(animeNeedingMetadata.size()));
+		LOG(QString("Need metadata for %1 anime, requesting via ANIME command...").arg(animeNeedingMetadata.size()));
+		// Request ANIME data for each anime that needs metadata (including picname)
+		for (int aid : animeNeedingMetadata) {
+			adbapi->Anime(aid);
+		}
 	}
 	if (!animeNeedingPoster.isEmpty()) {
 		LOG(QString("Need poster images for %1 anime").arg(animeNeedingPoster.size()));
