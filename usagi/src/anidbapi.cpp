@@ -41,6 +41,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	
 	anidbport = 9000;
 	loggedin = 0;
+	banned = false; // Initialize banned flag to false
 	Socket = nullptr;
 	currentTag = ""; // Initialize current tag tracker
 
@@ -1356,6 +1357,11 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	}
     else if(ReplyID == "555"){ // 555 BANNED - {str reason}
         banned = true;
+        QStringList token2 = Message.split("-");
+        token2.pop_front();
+        bannedfor = token2.join("-").trimmed();
+        Logger::log("[AniDB Error] 555 BANNED - Reason: " + bannedfor + " - All outgoing communication blocked until app restart", __FILE__, __LINE__);
+        LOG("AniDBApi: Recv: 555 BANNED - " + bannedfor);
     }
 	else if(ReplyID == "598"){ // 598 UNKNOWN COMMAND
 		// This typically means the command was malformed or not recognized
@@ -1434,16 +1440,87 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 
 QString AniDBApi::File(qint64 size, QString ed2k)
 {
-	unsigned int amask = aEPISODE_TOTAL | aEPISODE_LAST | aANIME_YEAR | aANIME_TYPE | aANIME_RELATED_LIST |
-				aANIME_RELATED_TYPE | aANIME_CATAGORY | aANIME_NAME_ROMAJI | aANIME_NAME_KANJI |
-				aANIME_NAME_ENGLISH | aANIME_NAME_OTHER | aANIME_NAME_SHORT | aANIME_SYNONYMS |
-				aEPISODE_NUMBER | aEPISODE_NAME | aEPISODE_NAME_ROMAJI | aEPISODE_NAME_KANJI |
-				aEPISODE_RATING | aEPISODE_VOTE_COUNT | aGROUP_NAME | aGROUP_NAME_SHORT |
-				aDATE_AID_RECORD_UPDATED;
+	// Check if file already exists in database
+	QSqlQuery checkQuery(db);
+	checkQuery.prepare("SELECT fid, aid, eid, gid FROM `file` WHERE size = ? AND ed2k = ?");
+	checkQuery.addBindValue(size);
+	checkQuery.addBindValue(ed2k);
+	
 	unsigned int fmask = fAID | fEID | fGID | fLID | fOTHEREPS | fISDEPR | fSTATE | fSIZE | fED2K | fMD5 | fSHA1 |
 				fCRC32 | fQUALITY | fSOURCE | fCODEC_AUDIO | fBITRATE_AUDIO | fCODEC_VIDEO | fBITRATE_VIDEO |
 				fRESOLUTION | fFILETYPE | fLANG_DUB | fLANG_SUB | fLENGTH | fDESCRIPTION | fAIRDATE |
 				fFILENAME;
+	
+	// Start with base amask - exclude anime name fields as they come from separate dump
+	unsigned int amask = aEPISODE_TOTAL | aEPISODE_LAST | aANIME_YEAR | aANIME_TYPE | aANIME_RELATED_LIST |
+				aANIME_RELATED_TYPE | aANIME_CATAGORY |
+				aEPISODE_NUMBER | aEPISODE_NAME | aEPISODE_NAME_ROMAJI | aEPISODE_NAME_KANJI |
+				aEPISODE_RATING | aEPISODE_VOTE_COUNT | aGROUP_NAME | aGROUP_NAME_SHORT |
+				aDATE_AID_RECORD_UPDATED;
+	
+	if(checkQuery.exec() && checkQuery.next())
+	{
+		// File exists - we already have fid, check if we need to reduce mask further
+		int fid = checkQuery.value(0).toInt();
+		int aid = checkQuery.value(1).toInt();
+		int eid = checkQuery.value(2).toInt();
+		int gid = checkQuery.value(3).toInt();
+		
+		Logger::log(QString("[AniDB File] File already in database (fid=%1) - checking for missing data").arg(fid), __FILE__, __LINE__);
+		
+		// Check if anime data exists in database
+		if(aid > 0)
+		{
+			QSqlQuery animeCheck(db);
+			animeCheck.prepare("SELECT aid FROM `anime` WHERE aid = ?");
+			animeCheck.addBindValue(aid);
+			if(animeCheck.exec() && animeCheck.next())
+			{
+				// Anime data exists, remove anime fields from amask
+				amask &= ~(aEPISODE_TOTAL | aEPISODE_LAST | aANIME_YEAR | aANIME_TYPE | 
+						   aANIME_RELATED_LIST | aANIME_RELATED_TYPE | aANIME_CATAGORY | 
+						   aDATE_AID_RECORD_UPDATED);
+				Logger::log("[AniDB File] Anime data already in database - excluding from request", __FILE__, __LINE__);
+			}
+		}
+		
+		// Check if episode data exists in database
+		if(eid > 0)
+		{
+			QSqlQuery episodeCheck(db);
+			episodeCheck.prepare("SELECT eid FROM `episode` WHERE eid = ?");
+			episodeCheck.addBindValue(eid);
+			if(episodeCheck.exec() && episodeCheck.next())
+			{
+				// Episode data exists, remove episode fields from amask
+				amask &= ~(aEPISODE_NUMBER | aEPISODE_NAME | aEPISODE_NAME_ROMAJI | 
+						   aEPISODE_NAME_KANJI | aEPISODE_RATING | aEPISODE_VOTE_COUNT);
+				Logger::log("[AniDB File] Episode data already in database - excluding from request", __FILE__, __LINE__);
+			}
+		}
+		
+		// Check if group data exists in database
+		if(gid > 0)
+		{
+			QSqlQuery groupCheck(db);
+			groupCheck.prepare("SELECT gid FROM `group` WHERE gid = ?");
+			groupCheck.addBindValue(gid);
+			if(groupCheck.exec() && groupCheck.next())
+			{
+				// Group data exists, remove group fields from amask
+				amask &= ~(aGROUP_NAME | aGROUP_NAME_SHORT);
+				Logger::log("[AniDB File] Group data already in database - excluding from request", __FILE__, __LINE__);
+			}
+		}
+		
+		// If all data exists, we don't need to request anything
+		if(amask == 0)
+		{
+			Logger::log("[AniDB File] All data already in database - skipping API request", __FILE__, __LINE__);
+			return GetTag(""); // Return empty tag to indicate no request was made
+		}
+	}
+	
 	QString msg = buildFileCommand(size, ed2k, fmask, amask);
 	LOG(msg);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
@@ -1543,6 +1620,18 @@ QString AniDBApi::MylistExport(QString template_name)
 
 QString AniDBApi::Episode(int eid)
 {
+	// Check if episode already exists in database
+	QSqlQuery checkQuery(db);
+	checkQuery.prepare("SELECT eid FROM `episode` WHERE eid = ?");
+	checkQuery.addBindValue(eid);
+	
+	if(checkQuery.exec() && checkQuery.next())
+	{
+		// Episode data already exists in database
+		Logger::log(QString("[AniDB API] Episode data already in database (EID=%1) - skipping API request").arg(eid), __FILE__, __LINE__);
+		return GetTag(""); // Return empty tag to indicate no request was made
+	}
+	
 	// Request episode information by episode ID
 	if(SID.length() == 0 || LoginStatus() == 0)
 	{
@@ -1558,6 +1647,18 @@ QString AniDBApi::Episode(int eid)
 
 QString AniDBApi::Anime(int aid)
 {
+	// Check if anime already exists in database
+	QSqlQuery checkQuery(db);
+	checkQuery.prepare("SELECT aid FROM `anime` WHERE aid = ?");
+	checkQuery.addBindValue(aid);
+	
+	if(checkQuery.exec() && checkQuery.next())
+	{
+		// Anime data already exists in database
+		Logger::log(QString("[AniDB API] Anime data already in database (AID=%1) - skipping API request").arg(aid), __FILE__, __LINE__);
+		return GetTag(""); // Return empty tag to indicate no request was made
+	}
+	
 	// Request anime information by anime ID
 	if(SID.length() == 0 || LoginStatus() == 0)
 	{
@@ -1659,7 +1760,7 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	// 
 	// ANIME command uses byte-oriented mask (7 bytes):
 	//   Byte 1: aid, dateflags, year, type, related lists
-	//   Byte 2: name variations (romaji, kanji, english, other, short, synonym)
+	//   Byte 2: name variations (romaji, kanji, english, other, short, synonym) - EXCLUDED (from separate dump)
 	//   Byte 3: episodes, highest episode, special ep count, dates, url, picname
 	//   Byte 4: ratings, reviews, awards, is 18+ restricted
 	//   Byte 5: external IDs (ANN, allcinema, animenfo), tags, date updated
@@ -1668,15 +1769,16 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	// 
 	// Note: Per API spec, selecting unused/retired bits returns error 505
 	// All enum values are now properly defined in 64-bit notation
+	// Note: Anime name fields are excluded as they come from separate dump
 	
 	uint64_t amask = 
 		// Byte 1
 		ANIME_AID | ANIME_DATEFLAGS |
 		ANIME_YEAR | ANIME_TYPE |
 		ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
-		// Byte 2
-		ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
-		ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
+		// Byte 2 - EXCLUDED: name fields come from separate dump
+		// ANIME_ROMAJI_NAME | ANIME_KANJI_NAME | ANIME_ENGLISH_NAME |
+		// ANIME_OTHER_NAME | ANIME_SHORT_NAME_LIST | ANIME_SYNONYM_LIST |
 		// Byte 3
 		ANIME_EPISODES | ANIME_HIGHEST_EPISODE | ANIME_SPECIAL_EP_COUNT |
 		ANIME_AIR_DATE | ANIME_END_DATE | ANIME_URL | ANIME_PICNAME |
@@ -1874,11 +1976,13 @@ int AniDBApi::SendPacket()
     
     if(!waitingForReply.isWaiting)
     {
-/*        if(banned == true)
+        // Check if banned - if so, stop all communication until app restart
+        if(banned == true)
         {
+            Logger::log("[AniDB Error] Client is BANNED - blocking all outgoing communication until app restart", __FILE__, __LINE__);
             packetsender->stop();
             return 0;
-        }*/
+        }
         QString q = "SELECT `tag`,`str` FROM `packets` WHERE `processed` = 0 AND `got_reply` = 0 ORDER BY `tag` ASC LIMIT 1";
         QString tag, str;
         QSqlQuery query(db);
