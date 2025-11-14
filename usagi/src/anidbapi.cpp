@@ -1620,16 +1620,33 @@ QString AniDBApi::MylistExport(QString template_name)
 
 QString AniDBApi::Episode(int eid)
 {
-	// Check if episode already exists in database
+	// Check which episode fields are already present in database FIRST
+	// to avoid unnecessary Auth() calls
 	QSqlQuery checkQuery(db);
-	checkQuery.prepare("SELECT eid FROM `episode` WHERE eid = ?");
+	checkQuery.prepare("SELECT name, nameromaji, namekanji, rating, votecount, epno FROM `episode` WHERE eid = ?");
 	checkQuery.addBindValue(eid);
 	
 	if(checkQuery.exec() && checkQuery.next())
 	{
-		// Episode data already exists in database
-		Logger::log(QString("[AniDB API] Episode data already in database (EID=%1) - skipping API request").arg(eid), __FILE__, __LINE__);
-		return GetTag(""); // Return empty tag to indicate no request was made
+		// Check if all important fields are populated
+		bool hasName = !checkQuery.value(0).isNull() && !checkQuery.value(0).toString().isEmpty();
+		bool hasNameRomaji = !checkQuery.value(1).isNull() && !checkQuery.value(1).toString().isEmpty();
+		bool hasNameKanji = !checkQuery.value(2).isNull() && !checkQuery.value(2).toString().isEmpty();
+		bool hasRating = !checkQuery.value(3).isNull();
+		bool hasVoteCount = !checkQuery.value(4).isNull();
+		bool hasEpno = !checkQuery.value(5).isNull() && !checkQuery.value(5).toString().isEmpty();
+		
+		// If all critical fields are present, skip the request
+		// Critical fields: at least one name field and epno
+		if((hasName || hasNameRomaji) && hasEpno)
+		{
+			Logger::log(QString("[AniDB API] Episode data already in database (EID=%1) - skipping API request").arg(eid), __FILE__, __LINE__);
+			return GetTag("");
+		}
+		else
+		{
+			Logger::log(QString("[AniDB API] Episode partially in database (EID=%1) - requesting missing data").arg(eid), __FILE__, __LINE__);
+		}
 	}
 	
 	// Request episode information by episode ID
@@ -1637,6 +1654,7 @@ QString AniDBApi::Episode(int eid)
 	{
 		Auth();
 	}
+	
 	Logger::log("[AniDB API] Requesting EPISODE data for EID: " + QString::number(eid), __FILE__, __LINE__);
 	QString msg = buildEpisodeCommand(eid);
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
@@ -1647,16 +1665,95 @@ QString AniDBApi::Episode(int eid)
 
 QString AniDBApi::Anime(int aid)
 {
-	// Check if anime already exists in database
+	// Check which anime fields are already present in database FIRST
+	// to avoid unnecessary Auth() calls
 	QSqlQuery checkQuery(db);
-	checkQuery.prepare("SELECT aid FROM `anime` WHERE aid = ?");
+	checkQuery.prepare("SELECT year, type, relaidlist, relaidtype, eps, startdate, enddate, picname FROM `anime` WHERE aid = ?");
 	checkQuery.addBindValue(aid);
+	
+	// Start with full mask (excluding name fields which come from separate dump)
+	uint64_t amask = 
+		// Byte 1
+		ANIME_AID | ANIME_DATEFLAGS |
+		ANIME_YEAR | ANIME_TYPE |
+		ANIME_RELATED_AID_LIST | ANIME_RELATED_AID_TYPE |
+		// Byte 2 - EXCLUDED: name fields come from separate dump
+		// Byte 3
+		ANIME_EPISODES | ANIME_HIGHEST_EPISODE | ANIME_SPECIAL_EP_COUNT |
+		ANIME_AIR_DATE | ANIME_END_DATE | ANIME_URL | ANIME_PICNAME |
+		// Byte 4
+		ANIME_RATING | ANIME_VOTE_COUNT | ANIME_TEMP_RATING | ANIME_TEMP_VOTE_COUNT |
+		ANIME_AVG_REVIEW_RATING | ANIME_REVIEW_COUNT | ANIME_AWARD_LIST | ANIME_IS_18_RESTRICTED |
+		// Byte 5
+		ANIME_ANN_ID | ANIME_ALLCINEMA_ID | ANIME_ANIMENFO_ID |
+		ANIME_TAG_NAME_LIST | ANIME_TAG_ID_LIST | ANIME_TAG_WEIGHT_LIST | ANIME_DATE_RECORD_UPDATED |
+		// Byte 6
+		ANIME_CHARACTER_ID_LIST |
+		// Byte 7
+		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
+		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
 	if(checkQuery.exec() && checkQuery.next())
 	{
-		// Anime data already exists in database
-		Logger::log(QString("[AniDB API] Anime data already in database (AID=%1) - skipping API request").arg(aid), __FILE__, __LINE__);
-		return GetTag(""); // Return empty tag to indicate no request was made
+		// Anime exists - check which fields are populated and reduce mask
+		Logger::log(QString("[AniDB API] Anime partially in database (AID=%1) - reducing mask for existing fields").arg(aid), __FILE__, __LINE__);
+		
+		// Check year field
+		if(!checkQuery.value(0).isNull() && !checkQuery.value(0).toString().isEmpty())
+		{
+			amask &= ~(ANIME_YEAR | ANIME_DATEFLAGS);
+		}
+		
+		// Check type field
+		if(!checkQuery.value(1).isNull() && !checkQuery.value(1).toString().isEmpty())
+		{
+			amask &= ~ANIME_TYPE;
+		}
+		
+		// Check related anime lists
+		if(!checkQuery.value(2).isNull() && !checkQuery.value(2).toString().isEmpty())
+		{
+			amask &= ~ANIME_RELATED_AID_LIST;
+		}
+		
+		// Check related anime types
+		if(!checkQuery.value(3).isNull() && !checkQuery.value(3).toString().isEmpty())
+		{
+			amask &= ~ANIME_RELATED_AID_TYPE;
+		}
+		
+		// Check episodes count
+		if(!checkQuery.value(4).isNull() && checkQuery.value(4).toInt() > 0)
+		{
+			amask &= ~(ANIME_EPISODES | ANIME_HIGHEST_EPISODE | ANIME_SPECIAL_EP_COUNT |
+					   ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
+					   ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT);
+		}
+		
+		// Check start date
+		if(!checkQuery.value(5).isNull() && !checkQuery.value(5).toString().isEmpty())
+		{
+			amask &= ~ANIME_AIR_DATE;
+		}
+		
+		// Check end date
+		if(!checkQuery.value(6).isNull() && !checkQuery.value(6).toString().isEmpty())
+		{
+			amask &= ~ANIME_END_DATE;
+		}
+		
+		// Check picname
+		if(!checkQuery.value(7).isNull() && !checkQuery.value(7).toString().isEmpty())
+		{
+			amask &= ~ANIME_PICNAME;
+		}
+		
+		// If all fields are present, skip the request
+		if(amask == 0)
+		{
+			Logger::log(QString("[AniDB API] All anime data present in database (AID=%1) - skipping API request").arg(aid), __FILE__, __LINE__);
+			return GetTag("");
+		}
 	}
 	
 	// Request anime information by anime ID
@@ -1664,8 +1761,13 @@ QString AniDBApi::Anime(int aid)
 	{
 		Auth();
 	}
+	
 	Logger::log("[AniDB API] Requesting ANIME data for AID: " + QString::number(aid), __FILE__, __LINE__);
-	QString msg = buildAnimeCommand(aid);
+	
+	// Build command with reduced mask
+	Mask mask(amask);
+	QString msg = QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
+	
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
 	query.exec(q);
