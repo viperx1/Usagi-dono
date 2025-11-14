@@ -23,9 +23,9 @@ void PlayButtonDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         return;
     }
 
-    // Draw button background
+    // Draw button background with less aggressive margins to make button more visible
     QStyleOptionButton buttonOption;
-    buttonOption.rect = option.rect.adjusted(2, 2, -2, -2);
+    buttonOption.rect = option.rect.adjusted(1, 1, -1, -1);  // Reduced from (2,2,-2,-2) to (1,1,-1,-1)
     buttonOption.state = QStyle::State_Enabled;
     
     // Add hover effect
@@ -109,7 +109,8 @@ QSize PlayButtonDelegate::sizeHint(const QStyleOptionViewItem &option,
                                    const QModelIndex &index) const
 {
     QSize size = QStyledItemDelegate::sizeHint(option, index);
-    // Make button slightly wider for better visibility
-    size.setWidth(qMax(40, size.width()));
+    // Make button wider and taller for better visibility
+    size.setWidth(qMax(48, size.width()));  // Increased from 40 to 48
+    size.setHeight(qMax(24, size.height())); // Ensure minimum height of 24 pixels
     return size;
 }

@@ -43,8 +43,9 @@ public:
     void setAnimeType(const QString& type);
     void setAired(const aired& airedDates);
     void setAiredText(const QString& airedText);
-    void setStatistics(int episodesInList, int totalEpisodes, int viewedCount);
+    void setStatistics(int normalEpisodes, int totalNormalEpisodes, int normalViewed, int otherEpisodes, int otherViewed);
     void setPoster(const QPixmap& pixmap);
+    void setTags(const QString& tags);
     
     // File and Episode management structures
     struct FileInfo {
@@ -77,16 +78,18 @@ public:
     QString getAnimeType() const { return m_animeType; }
     QString getAiredText() const { return m_airedText; }
     aired getAired() const { return m_aired; }  // For proper sorting
-    int getEpisodesInList() const { return m_episodesInList; }
-    int getTotalEpisodes() const { return m_totalEpisodes; }
-    int getViewedCount() const { return m_viewedCount; }
+    int getNormalEpisodes() const { return m_normalEpisodes; }
+    int getTotalNormalEpisodes() const { return m_totalNormalEpisodes; }
+    int getNormalViewed() const { return m_normalViewed; }
+    int getOtherEpisodes() const { return m_otherEpisodes; }
+    int getOtherViewed() const { return m_otherViewed; }
     qint64 getLastPlayed() const { return m_lastPlayed; }
     
     // Sorting support
     bool operator<(const AnimeCard& other) const;
     
     // Size management
-    static QSize getCardSize() { return QSize(400, 300); }
+    static QSize getCardSize() { return QSize(500, 350); }  // Increased from 400x300 to accommodate larger poster
     QSize sizeHint() const override { return getCardSize(); }
     QSize minimumSizeHint() const override { return getCardSize(); }
     
@@ -108,9 +111,11 @@ private:
     QString m_animeType;
     QString m_airedText;
     aired m_aired;
-    int m_episodesInList;
-    int m_totalEpisodes;
-    int m_viewedCount;
+    int m_normalEpisodes;
+    int m_totalNormalEpisodes;
+    int m_normalViewed;
+    int m_otherEpisodes;
+    int m_otherViewed;
     qint64 m_lastPlayed;  // Most recent last_played timestamp from episodes
     
     // UI elements
@@ -118,6 +123,7 @@ private:
     QLabel *m_titleLabel;
     QLabel *m_typeLabel;
     QLabel *m_airedLabel;
+    QLabel *m_tagsLabel;
     QLabel *m_statsLabel;
     QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy
     PlayButtonDelegate *m_playButtonDelegate;  // Delegate for play button column
