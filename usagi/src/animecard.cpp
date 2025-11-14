@@ -8,9 +8,11 @@
 AnimeCard::AnimeCard(QWidget *parent)
     : QFrame(parent)
     , m_animeId(0)
-    , m_episodesInList(0)
-    , m_totalEpisodes(0)
-    , m_viewedCount(0)
+    , m_normalEpisodes(0)
+    , m_totalNormalEpisodes(0)
+    , m_normalViewed(0)
+    , m_otherEpisodes(0)
+    , m_otherViewed(0)
     , m_lastPlayed(0)
 {
     setupUI();
@@ -39,9 +41,9 @@ void AnimeCard::setupUI()
     // Top section: poster + info
     m_topLayout = new QHBoxLayout();
     
-    // Poster (left side)
+    // Poster (left side) - doubled size
     m_posterLabel = new QLabel(this);
-    m_posterLabel->setFixedSize(80, 110);
+    m_posterLabel->setFixedSize(160, 220);  // Doubled from 80x110
     m_posterLabel->setScaledContents(true);
     m_posterLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);
     m_posterLabel->setAlignment(Qt::AlignCenter);
@@ -67,6 +69,12 @@ void AnimeCard::setupUI()
     m_airedLabel->setStyleSheet("font-size: 9pt; color: #666;");
     m_infoLayout->addWidget(m_airedLabel);
     
+    m_tagsLabel = new QLabel("", this);
+    m_tagsLabel->setWordWrap(true);
+    m_tagsLabel->setStyleSheet("font-size: 8pt; color: #888; font-style: italic;");
+    m_tagsLabel->setMaximumHeight(30);
+    m_infoLayout->addWidget(m_tagsLabel);
+    
     m_statsLabel = new QLabel("Episodes: 0/0 | Viewed: 0/0", this);
     m_statsLabel->setStyleSheet("font-size: 9pt; color: #333;");
     m_infoLayout->addWidget(m_statsLabel);
@@ -81,11 +89,12 @@ void AnimeCard::setupUI()
     m_episodeTree = new QTreeWidget(this);
     m_episodeTree->setColumnCount(2);  // Column 0: Play button, Column 1: Episode/File info
     m_episodeTree->setHeaderHidden(true);
-    m_episodeTree->setColumnWidth(0, 35);  // Column for play button (increased from 30 to 35)
+    m_episodeTree->setColumnWidth(0, 50);  // Column for play button (increased from 35 to 50 for better visibility)
     m_episodeTree->setStyleSheet("QTreeWidget { font-size: 8pt; }");
     m_episodeTree->setAlternatingRowColors(true);
     m_episodeTree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_episodeTree->setIndentation(15);  // Indent for file children
+    m_episodeTree->setUniformRowHeights(false);  // Allow rows to have different heights
     m_mainLayout->addWidget(m_episodeTree, 1);
     
     // Create play button delegate for column 0
@@ -140,21 +149,54 @@ void AnimeCard::setAiredText(const QString& airedText)
     m_airedLabel->setText("Aired: " + airedText);
 }
 
-void AnimeCard::setStatistics(int episodesInList, int totalEpisodes, int viewedCount)
+void AnimeCard::setStatistics(int normalEpisodes, int totalNormalEpisodes, int normalViewed, int otherEpisodes, int otherViewed)
 {
-    m_episodesInList = episodesInList;
-    m_totalEpisodes = totalEpisodes;
-    m_viewedCount = viewedCount;
+    m_normalEpisodes = normalEpisodes;
+    m_totalNormalEpisodes = totalNormalEpisodes;
+    m_normalViewed = normalViewed;
+    m_otherEpisodes = otherEpisodes;
+    m_otherViewed = otherViewed;
     updateStatisticsLabel();
+}
+
+void AnimeCard::setTags(const QString& tags)
+{
+    if (!tags.isEmpty()) {
+        m_tagsLabel->setText("Tags: " + tags);
+    } else {
+        m_tagsLabel->setText("");
+    }
 }
 
 void AnimeCard::updateStatisticsLabel()
 {
-    QString statsText = QString("Episodes: %1/%2 | Viewed: %3/%4")
-        .arg(m_episodesInList)
-        .arg(m_totalEpisodes)
-        .arg(m_viewedCount)
-        .arg(m_episodesInList);
+    // Format episode count like tree view: "A/B+C" where A=normalEpisodes, B=totalNormalEpisodes, C=otherEpisodes
+    QString episodeText;
+    if (m_totalNormalEpisodes > 0) {
+        if (m_otherEpisodes > 0) {
+            episodeText = QString("%1/%2+%3").arg(m_normalEpisodes).arg(m_totalNormalEpisodes).arg(m_otherEpisodes);
+        } else {
+            episodeText = QString("%1/%2").arg(m_normalEpisodes).arg(m_totalNormalEpisodes);
+        }
+    } else {
+        if (m_otherEpisodes > 0) {
+            episodeText = QString("%1/?+%2").arg(m_normalEpisodes).arg(m_otherEpisodes);
+        } else {
+            episodeText = QString("%1/?").arg(m_normalEpisodes);
+        }
+    }
+    
+    // Format viewed count like tree view: "A/B+C" where A=normalViewed, B=normalEpisodes, C=otherViewed
+    QString viewedText;
+    if (m_otherEpisodes > 0) {
+        viewedText = QString("%1/%2+%3").arg(m_normalViewed).arg(m_normalEpisodes).arg(m_otherViewed);
+    } else {
+        viewedText = QString("%1/%2").arg(m_normalViewed).arg(m_normalEpisodes);
+    }
+    
+    QString statsText = QString("Episodes: %1 | Viewed: %2")
+        .arg(episodeText)
+        .arg(viewedText);
     m_statsLabel->setText(statsText);
 }
 

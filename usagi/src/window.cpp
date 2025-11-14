@@ -4198,22 +4198,26 @@ void Window::sortMylistCards(int sortIndex)
 			break;
 		case 3: // Episodes (Count)
 			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
-				if (a->getEpisodesInList() == b->getEpisodesInList()) {
+				int episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+				int episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+				if (episodesA == episodesB) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
 				if (mylistSortAscending) {
-					return a->getEpisodesInList() < b->getEpisodesInList();
+					return episodesA < episodesB;
 				} else {
-					return a->getEpisodesInList() > b->getEpisodesInList();
+					return episodesA > episodesB;
 				}
 			});
 			break;
 		case 4: // Completion %
 			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
-				double completionA = (a->getEpisodesInList() > 0) ? 
-					(double)a->getViewedCount() / a->getEpisodesInList() : 0.0;
-				double completionB = (b->getEpisodesInList() > 0) ? 
-					(double)b->getViewedCount() / b->getEpisodesInList() : 0.0;
+				int totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+				int totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+				int viewedA = a->getNormalViewed() + a->getOtherViewed();
+				int viewedB = b->getNormalViewed() + b->getOtherViewed();
+				double completionA = (totalEpisodesA > 0) ? (double)viewedA / totalEpisodesA : 0.0;
+				double completionB = (totalEpisodesB > 0) ? (double)viewedB / totalEpisodesB : 0.0;
 				if (completionA == completionB) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
@@ -4299,7 +4303,7 @@ void Window::loadMylistAsCards()
 	QString query = "SELECT m.aid, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
 					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
-					"a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image "
+					"a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"GROUP BY m.aid "
@@ -4327,6 +4331,7 @@ void Window::loadMylistAsCards()
 		QString endDate = q.value(8).toString();
 		QString picname = q.value(9).toString();
 		QByteArray posterData = q.value(10).toByteArray();
+		QString category = q.value(11).toString();
 		
 		// Use English name if romaji is empty
 		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
@@ -4368,6 +4373,11 @@ void Window::loadMylistAsCards()
 			animeNeedingMetadata.insert(aid);
 		}
 		
+		// Set tags/categories
+		if (!category.isEmpty()) {
+			card->setTags(category);
+		}
+		
 		// Load poster image if available
 		if (!posterData.isEmpty()) {
 			QPixmap poster;
@@ -4407,8 +4417,11 @@ void Window::loadMylistAsCards()
 		// Group files by episode
 		QMap<int, AnimeCard::EpisodeInfo> episodeMap;
 		QMap<int, int> episodeFileCount;  // Track file count per episode for versioning
+		QSet<int> normalEpisodesSeen;  // Track unique normal episodes (type 1)
+		QSet<int> otherEpisodesSeen;   // Track unique other episodes (types 2-6)
+		QSet<int> viewedNormalEpisodes;  // Track viewed normal episodes
+		QSet<int> viewedOtherEpisodes;   // Track viewed other episodes
 		int totalFiles = 0;
-		int viewedCount = 0;
 		
 		if (episodeQuery.exec())
 		{
@@ -4430,9 +4443,6 @@ void Window::loadMylistAsCards()
 				QString groupName = episodeQuery.value(13).toString();
 				
 				totalFiles++;
-				if (viewed) {
-					viewedCount++;
-				}
 				
 				// Get or create episode entry
 				if (!episodeMap.contains(eid)) {
@@ -4441,6 +4451,22 @@ void Window::loadMylistAsCards()
 					
 					if (!epno.isEmpty()) {
 						episodeInfo.episodeNumber = ::epno(epno);
+						
+						// Track episode type
+						int epType = episodeInfo.episodeNumber.type();
+						if (epType == 1) {
+							// Normal episode
+							normalEpisodesSeen.insert(eid);
+							if (viewed) {
+								viewedNormalEpisodes.insert(eid);
+							}
+						} else {
+							// Special, credit, trailer, parody, or other
+							otherEpisodesSeen.insert(eid);
+							if (viewed) {
+								viewedOtherEpisodes.insert(eid);
+							}
+						}
 					}
 					
 					episodeInfo.episodeTitle = episodeName.isEmpty() ? "Episode" : episodeName;
@@ -4506,11 +4532,14 @@ void Window::loadMylistAsCards()
 			card->addEpisode(episodeInfo);
 		}
 		
-		// Set statistics (count unique episodes, not files)
-		int episodesInList = episodeMap.size();
-		int totalEps = (epTotal > 0) ? epTotal : eps;
-		if (totalEps <= 0) totalEps = episodesInList; // Fallback
-		card->setStatistics(episodesInList, totalEps, viewedCount);
+		// Set statistics - count normal and other episodes separately
+		int normalEpisodes = normalEpisodesSeen.size();
+		int otherEpisodes = otherEpisodesSeen.size();
+		int normalViewed = viewedNormalEpisodes.size();
+		int otherViewed = viewedOtherEpisodes.size();
+		int totalNormalEpisodes = (eps > 0) ? eps : normalEpisodes;  // eps is the total normal episode count
+		
+		card->setStatistics(normalEpisodes, totalNormalEpisodes, normalViewed, otherEpisodes, otherViewed);
 		
 		// Connect signals
 		connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
