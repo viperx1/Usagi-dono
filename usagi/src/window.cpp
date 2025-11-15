@@ -322,22 +322,29 @@ Window::Window()
     pageSettings->addWidget(watcherAutoStart, 5, 0, 1, 2);
     pageSettings->addWidget(watcherStatusLabel, 6, 0, 1, 2);
     
-    // Add playback settings after directory watcher
+    // Add auto-fetch settings after directory watcher
+    QLabel *autoFetchLabel = new QLabel("Auto-fetch:");
+    autoFetchEnabled = new QCheckBox("Automatically download anime titles and other data on startup");
+    
+    pageSettings->addWidget(autoFetchLabel, 7, 0, 1, 2);
+    pageSettings->addWidget(autoFetchEnabled, 8, 0, 1, 2);
+    
+    // Add playback settings after auto-fetch
     QLabel *playbackLabel = new QLabel("Playback:");
     mediaPlayerPath = new QLineEdit;
     mediaPlayerBrowseButton = new QPushButton("Browse...");
     
-    pageSettings->addWidget(playbackLabel, 7, 0, 1, 2);
-    pageSettings->addWidget(new QLabel("Media Player:"), 8, 0);
-    pageSettings->addWidget(mediaPlayerPath, 8, 1);
-    pageSettings->addWidget(mediaPlayerBrowseButton, 8, 2);
+    pageSettings->addWidget(playbackLabel, 9, 0, 1, 2);
+    pageSettings->addWidget(new QLabel("Media Player:"), 10, 0);
+    pageSettings->addWidget(mediaPlayerPath, 10, 1);
+    pageSettings->addWidget(mediaPlayerBrowseButton, 10, 2);
     
-    pageSettings->setRowStretch(9, 1000);
-    pageSettings->addWidget(buttonSaveSettings, 10, 0);
-    pageSettings->addWidget(buttonRequestMylistExport, 11, 0);
+    pageSettings->setRowStretch(11, 1000);
+    pageSettings->addWidget(buttonSaveSettings, 12, 0);
+    pageSettings->addWidget(buttonRequestMylistExport, 13, 0);
 
     pageSettings->setColumnStretch(1, 100);
-    pageSettings->setRowStretch(12, 100);
+    pageSettings->setRowStretch(14, 100);
 
 	// page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
@@ -415,19 +422,25 @@ Window::Window()
     QString watcherDir = adbapi->getWatcherDirectory();
     bool watcherAutoStartSetting = adbapi->getWatcherAutoStart();
     
+    // Load auto-fetch settings from database
+    bool autoFetchEnabledSetting = adbapi->getAutoFetchEnabled();
+    
     // Block signals while setting UI values to prevent premature slot activation
     watcherEnabled->blockSignals(true);
     watcherDirectory->blockSignals(true);
     watcherAutoStart->blockSignals(true);
+    autoFetchEnabled->blockSignals(true);
     
     watcherEnabled->setChecked(watcherEnabledSetting);
     watcherDirectory->setText(watcherDir);
     watcherAutoStart->setChecked(watcherAutoStartSetting);
+    autoFetchEnabled->setChecked(autoFetchEnabledSetting);
     
     // Restore signal connections
     watcherEnabled->blockSignals(false);
     watcherDirectory->blockSignals(false);
     watcherAutoStart->blockSignals(false);
+    autoFetchEnabled->blockSignals(false);
     
     // Load media player path from settings
     QString playerPath = PlaybackManager::getMediaPlayerPath();
@@ -1587,6 +1600,9 @@ void Window::saveSettings()
 	adbapi->setWatcherEnabled(watcherEnabled->isChecked());
 	adbapi->setWatcherDirectory(watcherDirectory->text());
 	adbapi->setWatcherAutoStart(watcherAutoStart->isChecked());
+	
+	// Save auto-fetch settings to database
+	adbapi->setAutoFetchEnabled(autoFetchEnabled->isChecked());
 	
 	// Save media player path
 	PlaybackManager::setMediaPlayerPath(mediaPlayerPath->text());

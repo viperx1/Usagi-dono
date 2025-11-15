@@ -51,6 +51,9 @@ private:
 	bool watcherEnabled;
 	QString watcherDirectory;
 	bool watcherAutoStart;
+	
+	// Auto-fetch settings
+	bool autoFetchEnabled;
     /* Settings End === */
 
 	int protover; // AniDB API version = 3
@@ -400,6 +403,10 @@ public:
 	void setWatcherEnabled(bool enabled);
 	void setWatcherDirectory(QString directory);
 	void setWatcherAutoStart(bool autoStart);
+	
+	// Auto-fetch settings
+	bool getAutoFetchEnabled();
+	void setAutoFetchEnabled(bool enabled);
     /* Settings End === */
 	
 	/* === Anime Titles Start */

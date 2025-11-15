@@ -127,6 +127,9 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	watcherDirectory = QString();
 	watcherAutoStart = false;
 	
+	// Initialize auto-fetch settings with defaults (disabled by default)
+	autoFetchEnabled = false;
+	
 	while(query.next())
 	{
 		if(query.value(0).toString() == "username")
@@ -157,6 +160,10 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		{
 			watcherAutoStart = (query.value(1).toString() == "1");
 		}
+		if(query.value(0).toString() == "autoFetchEnabled")
+		{
+			autoFetchEnabled = (query.value(1).toString() == "1");
+		}
 	}
 
 	// Initialize network manager for anime titles download
@@ -184,12 +191,16 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	// Load any persisted export queue state from previous session
 	loadExportQueueState();
 
-	// Check and download anime titles if needed (automatically on startup)
+	// Check and download anime titles if needed (automatically on startup if auto-fetch is enabled)
 	Logger::log("[AniDB Init] Checking if anime titles need update", __FILE__, __LINE__);
-	if(shouldUpdateAnimeTitles())
+	if(autoFetchEnabled && shouldUpdateAnimeTitles())
 	{
-		Logger::log("[AniDB Init] Starting anime titles download", __FILE__, __LINE__);
+		Logger::log("[AniDB Init] Auto-fetch enabled - starting anime titles download", __FILE__, __LINE__);
 		downloadAnimeTitles();
+	}
+	else if(!autoFetchEnabled)
+	{
+		Logger::log("[AniDB Init] Auto-fetch disabled - skipping anime titles download", __FILE__, __LINE__);
 	}
 	else
 	{

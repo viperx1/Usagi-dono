@@ -99,3 +99,17 @@ void AniDBApi::setWatcherAutoStart(bool autoStart)
 	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'watcherAutoStart', '%1');").arg(autoStart ? "1" : "0");
 	query.exec(q);
 }
+
+// Auto-fetch settings
+bool AniDBApi::getAutoFetchEnabled()
+{
+	return AniDBApi::autoFetchEnabled;
+}
+
+void AniDBApi::setAutoFetchEnabled(bool enabled)
+{
+	AniDBApi::autoFetchEnabled = enabled;
+	QSqlQuery query;
+	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'autoFetchEnabled', '%1');").arg(enabled ? "1" : "0");
+	query.exec(q);
+}
