@@ -77,7 +77,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 //		Debug("AniDBApi: Database opened");
 		query = QSqlQuery(db);
 		query.exec("CREATE TABLE IF NOT EXISTS `mylist`(`lid` INTEGER PRIMARY KEY, `fid` INTEGER, `eid` INTEGER, `aid` INTEGER, `gid` INTEGER, `date` INTEGER, `state` INTEGER, `viewed` INTEGER, `viewdate` INTEGER, `storage` TEXT, `source` TEXT, `other` TEXT, `filestate` INTEGER)");
-		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT CHECK(startdate IS NULL OR startdate = '' OR startdate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `enddate` TEXT CHECK(enddate IS NULL OR enddate = '' OR enddate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `picname` TEXT, `poster_image` BLOB);");
+		query.exec("CREATE TABLE IF NOT EXISTS `anime`(`aid` INTEGER PRIMARY KEY, `eptotal` INTEGER, `eps` INTEGER, `eplast` INTEGER, `year` TEXT, `type` TEXT, `relaidlist` TEXT, `relaidtype` TEXT, `category` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `nameenglish` TEXT, `nameother` TEXT, `nameshort` TEXT, `synonyms` TEXT, `typename` TEXT, `startdate` TEXT CHECK(startdate IS NULL OR startdate = '' OR startdate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `enddate` TEXT CHECK(enddate IS NULL OR enddate = '' OR enddate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z'), `picname` TEXT, `poster_image` BLOB, `dateflags` TEXT, `episodes` INTEGER, `highest_episode` TEXT, `special_ep_count` INTEGER, `url` TEXT, `rating` TEXT, `vote_count` INTEGER, `temp_rating` TEXT, `temp_vote_count` INTEGER, `avg_review_rating` TEXT, `review_count` INTEGER, `award_list` TEXT, `is_18_restricted` INTEGER, `ann_id` INTEGER, `allcinema_id` INTEGER, `animenfo_id` TEXT, `tag_name_list` TEXT, `tag_id_list` TEXT, `tag_weight_list` TEXT, `date_record_updated` INTEGER, `character_id_list` TEXT, `specials_count` INTEGER, `credits_count` INTEGER, `other_count` INTEGER, `trailer_count` INTEGER, `parody_count` INTEGER);");
         query.exec("CREATE TABLE IF NOT EXISTS `file`(`fid` INTEGER PRIMARY KEY, `aid` INTEGER, `eid` INTEGER, `gid` INTEGER, `lid` INTEGER, `othereps` TEXT, `isdepr` INTEGER, `state` INTEGER, `size` BIGINT, `ed2k` TEXT, `md5` TEXT, `sha1` TEXT, `crc` TEXT, `quality` TEXT, `source` TEXT, `codec_audio` TEXT, `bitrate_audio` INTEGER, `codec_video` TEXT, `bitrate_video` INTEGER, `resolution` TEXT, `filetype` TEXT, `lang_dub` TEXT, `lang_sub` TEXT, `length` INTEGER, `description` TEXT, `airdate` INTEGER, `filename` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT);");
 		// Add epno column if it doesn't exist (for existing databases)
@@ -91,6 +91,33 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// Add picname and poster_image columns if they don't exist (for existing databases)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `picname` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `poster_image` BLOB");
+		// Add new ANIME command fields to anime table if they don't exist (for existing databases)
+		query.exec("ALTER TABLE `anime` ADD COLUMN `dateflags` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `episodes` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `highest_episode` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `special_ep_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `url` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `rating` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `vote_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `temp_rating` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `temp_vote_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `avg_review_rating` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `review_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `award_list` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `is_18_restricted` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `ann_id` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `allcinema_id` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `animenfo_id` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `tag_name_list` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `tag_id_list` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `tag_weight_list` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `date_record_updated` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `character_id_list` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `specials_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `credits_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `other_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `trailer_count` INTEGER");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `parody_count` INTEGER");
 		// Create local_files table for directory watcher feature
 		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT)");
@@ -2005,9 +2032,9 @@ int AniDBApi::Recv()
 			.arg(data.size()).arg(bytesRead).arg(decompressedData.size()).arg(result.length()), __FILE__, __LINE__);
 		
 		// Detect truncation: UDP MTU limit is typically 1400 bytes
-		// If datagram size is exactly 1400 bytes, the response is likely truncated
-		// Note: With compression enabled, we should check the decompressed size
-		if(decompressedData.size() >= 1400 || bytesRead >= 1400)
+		// Check ONLY the raw datagram size (before decompression), not the decompressed data
+		// If raw datagram size is at/near 1400 bytes, the response is likely truncated
+		if(bytesRead >= 1400 || data.size() >= 1400)
 		{
 			isTruncated = true;
 			Logger::log(QString("[AniDB Recv] TRUNCATION DETECTED: Datagram at MTU limit (%1 bytes raw, %2 bytes decompressed), response is truncated")
@@ -4264,10 +4291,20 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 	QString q = QString("INSERT INTO `anime` "
 		"(`aid`, `eptotal`, `eplast`, `year`, `type`, `relaidlist`, "
 		"`relaidtype`, `category`, `nameromaji`, `namekanji`, `nameenglish`, "
-		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`, `picname`) "
+		"`nameother`, `nameshort`, `synonyms`, `typename`, `startdate`, `enddate`, `picname`, "
+		"`dateflags`, `episodes`, `highest_episode`, `special_ep_count`, `url`, "
+		"`rating`, `vote_count`, `temp_rating`, `temp_vote_count`, `avg_review_rating`, `review_count`, "
+		"`award_list`, `is_18_restricted`, `ann_id`, `allcinema_id`, `animenfo_id`, "
+		"`tag_name_list`, `tag_id_list`, `tag_weight_list`, `date_record_updated`, "
+		"`character_id_list`, `specials_count`, `credits_count`, `other_count`, `trailer_count`, `parody_count`) "
 		"VALUES (:aid, :eptotal, :eplast, :year, :type, :relaidlist, "
 		":relaidtype, :category, :nameromaji, :namekanji, :nameenglish, "
-		":nameother, :nameshort, :synonyms, :typename, :startdate, :enddate, :picname) "
+		":nameother, :nameshort, :synonyms, :typename, :startdate, :enddate, :picname, "
+		":dateflags, :episodes, :highest_episode, :special_ep_count, :url, "
+		":rating, :vote_count, :temp_rating, :temp_vote_count, :avg_review_rating, :review_count, "
+		":award_list, :is_18_restricted, :ann_id, :allcinema_id, :animenfo_id, "
+		":tag_name_list, :tag_id_list, :tag_weight_list, :date_record_updated, "
+		":character_id_list, :specials_count, :credits_count, :other_count, :trailer_count, :parody_count) "
 		"ON CONFLICT(`aid`) DO UPDATE SET "
 		"`eptotal` = COALESCE(NULLIF(excluded.`eptotal`, ''), `anime`.`eptotal`), "
 		"`eplast` = COALESCE(NULLIF(excluded.`eplast`, ''), `anime`.`eplast`), "
@@ -4285,7 +4322,33 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 		"`typename` = COALESCE(NULLIF(excluded.`typename`, ''), `anime`.`typename`), "
 		"`startdate` = COALESCE(NULLIF(excluded.`startdate`, ''), `anime`.`startdate`), "
 		"`enddate` = COALESCE(NULLIF(excluded.`enddate`, ''), `anime`.`enddate`), "
-		"`picname` = COALESCE(NULLIF(excluded.`picname`, ''), `anime`.`picname`)");	
+		"`picname` = COALESCE(NULLIF(excluded.`picname`, ''), `anime`.`picname`), "
+		"`dateflags` = COALESCE(NULLIF(excluded.`dateflags`, ''), `anime`.`dateflags`), "
+		"`episodes` = COALESCE(NULLIF(excluded.`episodes`, ''), `anime`.`episodes`), "
+		"`highest_episode` = COALESCE(NULLIF(excluded.`highest_episode`, ''), `anime`.`highest_episode`), "
+		"`special_ep_count` = COALESCE(NULLIF(excluded.`special_ep_count`, ''), `anime`.`special_ep_count`), "
+		"`url` = COALESCE(NULLIF(excluded.`url`, ''), `anime`.`url`), "
+		"`rating` = COALESCE(NULLIF(excluded.`rating`, ''), `anime`.`rating`), "
+		"`vote_count` = COALESCE(NULLIF(excluded.`vote_count`, ''), `anime`.`vote_count`), "
+		"`temp_rating` = COALESCE(NULLIF(excluded.`temp_rating`, ''), `anime`.`temp_rating`), "
+		"`temp_vote_count` = COALESCE(NULLIF(excluded.`temp_vote_count`, ''), `anime`.`temp_vote_count`), "
+		"`avg_review_rating` = COALESCE(NULLIF(excluded.`avg_review_rating`, ''), `anime`.`avg_review_rating`), "
+		"`review_count` = COALESCE(NULLIF(excluded.`review_count`, ''), `anime`.`review_count`), "
+		"`award_list` = COALESCE(NULLIF(excluded.`award_list`, ''), `anime`.`award_list`), "
+		"`is_18_restricted` = COALESCE(NULLIF(excluded.`is_18_restricted`, ''), `anime`.`is_18_restricted`), "
+		"`ann_id` = COALESCE(NULLIF(excluded.`ann_id`, ''), `anime`.`ann_id`), "
+		"`allcinema_id` = COALESCE(NULLIF(excluded.`allcinema_id`, ''), `anime`.`allcinema_id`), "
+		"`animenfo_id` = COALESCE(NULLIF(excluded.`animenfo_id`, ''), `anime`.`animenfo_id`), "
+		"`tag_name_list` = COALESCE(NULLIF(excluded.`tag_name_list`, ''), `anime`.`tag_name_list`), "
+		"`tag_id_list` = COALESCE(NULLIF(excluded.`tag_id_list`, ''), `anime`.`tag_id_list`), "
+		"`tag_weight_list` = COALESCE(NULLIF(excluded.`tag_weight_list`, ''), `anime`.`tag_weight_list`), "
+		"`date_record_updated` = COALESCE(NULLIF(excluded.`date_record_updated`, ''), `anime`.`date_record_updated`), "
+		"`character_id_list` = COALESCE(NULLIF(excluded.`character_id_list`, ''), `anime`.`character_id_list`), "
+		"`specials_count` = COALESCE(NULLIF(excluded.`specials_count`, ''), `anime`.`specials_count`), "
+		"`credits_count` = COALESCE(NULLIF(excluded.`credits_count`, ''), `anime`.`credits_count`), "
+		"`other_count` = COALESCE(NULLIF(excluded.`other_count`, ''), `anime`.`other_count`), "
+		"`trailer_count` = COALESCE(NULLIF(excluded.`trailer_count`, ''), `anime`.`trailer_count`), "
+		"`parody_count` = COALESCE(NULLIF(excluded.`parody_count`, ''), `anime`.`parody_count`)");	
 	QSqlQuery query(db);
 	query.prepare(q);
 	
@@ -4307,6 +4370,34 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 	query.bindValue(":startdate", startdate);
 	query.bindValue(":enddate", enddate);
 	query.bindValue(":picname", data.picname);
+	
+	// Bind new fields from Byte 1-7
+	query.bindValue(":dateflags", data.dateflags);
+	query.bindValue(":episodes", data.episodes.isEmpty() ? QVariant() : data.episodes.toInt());
+	query.bindValue(":highest_episode", data.highest_episode);
+	query.bindValue(":special_ep_count", data.special_ep_count.isEmpty() ? QVariant() : data.special_ep_count.toInt());
+	query.bindValue(":url", data.url);
+	query.bindValue(":rating", data.rating);
+	query.bindValue(":vote_count", data.vote_count.isEmpty() ? QVariant() : data.vote_count.toInt());
+	query.bindValue(":temp_rating", data.temp_rating);
+	query.bindValue(":temp_vote_count", data.temp_vote_count.isEmpty() ? QVariant() : data.temp_vote_count.toInt());
+	query.bindValue(":avg_review_rating", data.avg_review_rating);
+	query.bindValue(":review_count", data.review_count.isEmpty() ? QVariant() : data.review_count.toInt());
+	query.bindValue(":award_list", data.award_list);
+	query.bindValue(":is_18_restricted", data.is_18_restricted.isEmpty() ? QVariant() : data.is_18_restricted.toInt());
+	query.bindValue(":ann_id", data.ann_id.isEmpty() ? QVariant() : data.ann_id.toInt());
+	query.bindValue(":allcinema_id", data.allcinema_id.isEmpty() ? QVariant() : data.allcinema_id.toInt());
+	query.bindValue(":animenfo_id", data.animenfo_id);
+	query.bindValue(":tag_name_list", data.tag_name_list);
+	query.bindValue(":tag_id_list", data.tag_id_list);
+	query.bindValue(":tag_weight_list", data.tag_weight_list);
+	query.bindValue(":date_record_updated", data.date_record_updated.isEmpty() ? QVariant() : data.date_record_updated.toLongLong());
+	query.bindValue(":character_id_list", data.character_id_list);
+	query.bindValue(":specials_count", data.specials_count.isEmpty() ? QVariant() : data.specials_count.toInt());
+	query.bindValue(":credits_count", data.credits_count.isEmpty() ? QVariant() : data.credits_count.toInt());
+	query.bindValue(":other_count", data.other_count.isEmpty() ? QVariant() : data.other_count.toInt());
+	query.bindValue(":trailer_count", data.trailer_count.isEmpty() ? QVariant() : data.trailer_count.toInt());
+	query.bindValue(":parody_count", data.parody_count.isEmpty() ? QVariant() : data.parody_count.toInt());
 	
 	if(!query.exec())
 	{
