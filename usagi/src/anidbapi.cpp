@@ -4129,8 +4129,18 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 			int have = CHUNK_SIZE - stream.avail_out;
 			decompressed.append((char*)outBuffer, have);
 			
+			// Z_BUF_ERROR (-5) with no input remaining means decompression is complete
+			// This can happen when compressed data doesn't have an explicit end marker
+			if(ret == Z_BUF_ERROR && stream.avail_in == 0)
+			{
+				Logger::log(QString("[AniDB Decompress] inflate returned Z_BUF_ERROR with input exhausted - treating as completion"), __FILE__, __LINE__);
+				ret = Z_STREAM_END;  // Treat as successful completion
+				break;
+			}
+			
 			// Safety check: if no output was produced and no more input, break to avoid infinite loop
-			if(have == 0 && stream.avail_in == 0)
+			// But only if it's not Z_BUF_ERROR (which we handle above)
+			if(have == 0 && stream.avail_in == 0 && ret != Z_BUF_ERROR)
 			{
 				Logger::log(QString("[AniDB Decompress] inflate (zlib format) stalled: no output, no input remaining (ret=%1)").arg(ret), __FILE__, __LINE__);
 				break;
@@ -4194,8 +4204,18 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 			int have = CHUNK_SIZE - stream.avail_out;
 			decompressed.append((char*)outBuffer, have);
 			
+			// Z_BUF_ERROR (-5) with no input remaining means decompression is complete
+			// This can happen when compressed data doesn't have an explicit end marker
+			if(ret == Z_BUF_ERROR && stream.avail_in == 0)
+			{
+				Logger::log(QString("[AniDB Decompress] inflate returned Z_BUF_ERROR with input exhausted - treating as completion"), __FILE__, __LINE__);
+				ret = Z_STREAM_END;  // Treat as successful completion
+				break;
+			}
+			
 			// Safety check: if no output was produced and no more input, break to avoid infinite loop
-			if(have == 0 && stream.avail_in == 0)
+			// But only if it's not Z_BUF_ERROR (which we handle above)
+			if(have == 0 && stream.avail_in == 0 && ret != Z_BUF_ERROR)
 			{
 				Logger::log(QString("[AniDB Decompress] inflate (raw DEFLATE) stalled: no output, no input remaining (ret=%1)").arg(ret), __FILE__, __LINE__);
 				break;
@@ -4205,12 +4225,20 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 		
 		inflateEnd(&stream);
 		
-		Logger::log(QString("[AniDB Decompress] Successfully decompressed %1 bytes -> %2 bytes (ratio: %3x) using raw DEFLATE")
-			.arg(compressedData.size())
-			.arg(decompressed.size())
-			.arg(QString::number((double)decompressed.size() / compressedData.size(), 'f', 2)), __FILE__, __LINE__);
-		
-		return decompressed;
+		if(ret == Z_STREAM_END)
+		{
+			Logger::log(QString("[AniDB Decompress] Successfully decompressed %1 bytes -> %2 bytes (ratio: %3x) using raw DEFLATE")
+				.arg(compressedData.size())
+				.arg(decompressed.size())
+				.arg(QString::number((double)decompressed.size() / compressedData.size(), 'f', 2)), __FILE__, __LINE__);
+			
+			return decompressed;
+		}
+		else
+		{
+			Logger::log(QString("[AniDB Decompress] ERROR: raw DEFLATE decompression incomplete (ret=%1)").arg(ret), __FILE__, __LINE__);
+			return data;  // Return original data on error
+		}
 	}
 	
 	// Should not reach here
