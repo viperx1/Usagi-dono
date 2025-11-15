@@ -186,6 +186,7 @@ void TestAniDBApiCommands::testAuthCommandFormat()
     QVERIFY(authCommand.contains("client="));
     QVERIFY(authCommand.contains("clientver="));
     QVERIFY(authCommand.contains("enc="));
+    QVERIFY(authCommand.contains("comp="));
     
     // Verify parameter values
     QVERIFY(authCommand.contains("user=testuser"));
@@ -194,10 +195,11 @@ void TestAniDBApiCommands::testAuthCommandFormat()
     QVERIFY(authCommand.contains("client=usagitest"));
     QVERIFY(authCommand.contains("clientver=1"));
     QVERIFY(authCommand.contains("enc=utf8"));
+    QVERIFY(authCommand.contains("comp=1"));
     
     // Verify parameters are separated by '&'
     int ampCount = authCommand.count('&');
-    QVERIFY(ampCount >= 5); // At least 5 '&' separators for 6 parameters
+    QVERIFY(ampCount >= 6); // At least 6 '&' separators for 7 parameters (including comp=1)
 }
 
 // ===== LOGOUT Command Tests =====

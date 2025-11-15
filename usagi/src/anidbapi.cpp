@@ -1790,7 +1790,7 @@ QString AniDBApi::Anime(int aid)
 
 QString AniDBApi::buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc)
 {
-	return QString("AUTH user=%1&pass=%2&protover=%3&client=%4&clientver=%5&enc=%6")
+	return QString("AUTH user=%1&pass=%2&protover=%3&client=%4&clientver=%5&enc=%6&comp=1")
 		.arg(username).arg(password).arg(protover).arg(client).arg(clientver).arg(enc);
 }
 
@@ -1993,18 +1993,25 @@ int AniDBApi::Recv()
 	{
 		data.resize(Socket->pendingDatagramSize());
 		qint64 bytesRead = Socket->readDatagram(data.data(), data.size());
+		
+		// Decompress if needed (comp=1 feature)
+		QByteArray decompressedData = decompressIfNeeded(data);
+		
 //		result = codec->toUnicode(data);
 //		result.toUtf8();
-        result = QString::fromUtf8(data.data());
+        result = QString::fromUtf8(decompressedData.data());
 		LOG("AniDBApi: Recv: " + result);
-		Logger::log(QString("[AniDB Recv] Datagram size: %1 bytes, Read: %2 bytes, Result length: %3 chars").arg(data.size()).arg(bytesRead).arg(result.length()), __FILE__, __LINE__);
+		Logger::log(QString("[AniDB Recv] Datagram size: %1 bytes, Read: %2 bytes, Decompressed: %3 bytes, Result length: %4 chars")
+			.arg(data.size()).arg(bytesRead).arg(decompressedData.size()).arg(result.length()), __FILE__, __LINE__);
 		
 		// Detect truncation: UDP MTU limit is typically 1400 bytes
 		// If datagram size is exactly 1400 bytes, the response is likely truncated
-		if(data.size() >= 1400 || bytesRead >= 1400)
+		// Note: With compression enabled, we should check the decompressed size
+		if(decompressedData.size() >= 1400 || bytesRead >= 1400)
 		{
 			isTruncated = true;
-			Logger::log(QString("[AniDB Recv] TRUNCATION DETECTED: Datagram at MTU limit (%1 bytes), response is truncated").arg(data.size()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Recv] TRUNCATION DETECTED: Datagram at MTU limit (%1 bytes raw, %2 bytes decompressed), response is truncated")
+				.arg(data.size()).arg(decompressedData.size()), __FILE__, __LINE__);
 		}
     }
 	if(result.length() > 0)
@@ -4034,6 +4041,87 @@ QString AniDBApi::convertToISODate(const QString& dateStr)
 	
 	// Invalid format - return empty
 	return QString();
+}
+
+/**
+ * Decompress datagram if it's DEFLATE-compressed (comp=1 feature).
+ * 
+ * According to AniDB UDP API specification:
+ * - If comp=1 is enabled in AUTH, server may send compressed datagrams
+ * - Compressed datagrams always start with two zero bytes (0x00 0x00)
+ * - Tags should never start with zero, so this is a reliable indicator
+ * - Compression algorithm is DEFLATE (RFC 1951)
+ * 
+ * @param data Raw datagram data
+ * @return Decompressed data if compressed, or original data if not compressed
+ */
+QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
+{
+	// Check if data is compressed: first two bytes must be 0x00 0x00
+	if(data.size() < 2)
+		return data;  // Too small to be compressed
+	
+	if((unsigned char)data[0] != 0x00 || (unsigned char)data[1] != 0x00)
+		return data;  // Not compressed - return as-is
+	
+	// Data is compressed - decompress using zlib DEFLATE
+	Logger::log("[AniDB Decompress] Detected compressed datagram (starts with 0x00 0x00)", __FILE__, __LINE__);
+	
+	// Skip the two leading zero bytes - actual compressed data starts at byte 2
+	QByteArray compressedData = data.mid(2);
+	
+	// Initialize zlib stream for DEFLATE decompression
+	z_stream stream;
+	stream.zalloc = Z_NULL;
+	stream.zfree = Z_NULL;
+	stream.opaque = Z_NULL;
+	stream.avail_in = compressedData.size();
+	stream.next_in = (Bytef*)compressedData.data();
+	
+	// Initialize inflator with raw DEFLATE format (no zlib or gzip headers)
+	// windowBits = -15 means raw DEFLATE (negative value removes zlib wrapper)
+	int ret = inflateInit2(&stream, -15);
+	if(ret != Z_OK)
+	{
+		Logger::log(QString("[AniDB Decompress] ERROR: inflateInit2 failed with code %1").arg(ret), __FILE__, __LINE__);
+		return data;  // Return original data on error
+	}
+	
+	// Decompress in chunks - allocate buffer for decompressed data
+	// Start with 4x the compressed size as estimate (typical compression ratio)
+	QByteArray decompressed;
+	decompressed.reserve(compressedData.size() * 4);
+	
+	const int CHUNK_SIZE = 4096;
+	unsigned char outBuffer[CHUNK_SIZE];
+	
+	do
+	{
+		stream.avail_out = CHUNK_SIZE;
+		stream.next_out = outBuffer;
+		
+		ret = inflate(&stream, Z_NO_FLUSH);
+		
+		if(ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
+		{
+			Logger::log(QString("[AniDB Decompress] ERROR: inflate failed with code %1").arg(ret), __FILE__, __LINE__);
+			inflateEnd(&stream);
+			return data;  // Return original data on error
+		}
+		
+		int have = CHUNK_SIZE - stream.avail_out;
+		decompressed.append((char*)outBuffer, have);
+		
+	} while(ret != Z_STREAM_END);
+	
+	inflateEnd(&stream);
+	
+	Logger::log(QString("[AniDB Decompress] Successfully decompressed %1 bytes -> %2 bytes (ratio: %3x)")
+		.arg(compressedData.size())
+		.arg(decompressed.size())
+		.arg(QString::number((double)decompressed.size() / compressedData.size(), 'f', 2)), __FILE__, __LINE__);
+	
+	return decompressed;
 }
 
 /**
