@@ -3174,6 +3174,25 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				QString allCinemaId = attributes.value("AllCinemaId").toString();
 				QString animeNfoId = attributes.value("AnimeNfoId").toString();
 				
+				// Extract year, name, and other metadata fields
+				QString yearStart = attributes.value("YearStart").toString();
+				QString yearEnd = attributes.value("YearEnd").toString();
+				QString name = attributes.value("Name").toString();
+				QString titleJapKanji = attributes.value("TitleJapKanji").toString();
+				QString titleEng = attributes.value("TitleEng").toString();
+				QString updateTimestamp = attributes.value("Update").toString();
+				QString awardIcons = attributes.value("AwardIcons").toString();
+				
+				// Build year string (format: "YYYY" or "YYYY-YYYY" if different)
+				QString year;
+				if(!yearStart.isEmpty())
+				{
+					if(!yearEnd.isEmpty() && yearStart != yearEnd)
+						year = yearStart + "-" + yearEnd;
+					else
+						year = yearStart;
+				}
+				
 				// Ensure anime record exists in database
 				// This runs for all anime, regardless of whether we have eptotal or typename data
 				if(!currentAid.isEmpty())
@@ -3221,7 +3240,10 @@ int Window::parseMylistExport(const QString &tarGzPath)
 						"`rating` = :rating, `vote_count` = :vote_count, "
 						"`temp_rating` = :temp_rating, `temp_vote_count` = :temp_vote_count, "
 						"`avg_review_rating` = :avg_review_rating, `review_count` = :review_count, "
-						"`ann_id` = :ann_id, `allcinema_id` = :allcinema_id, `animenfo_id` = :animenfo_id "
+						"`ann_id` = :ann_id, `allcinema_id` = :allcinema_id, `animenfo_id` = :animenfo_id, "
+						"`year` = :year, `nameromaji` = :nameromaji, `namekanji` = :namekanji, "
+						"`nameenglish` = :nameenglish, `date_record_updated` = :date_record_updated, "
+						"`award_list` = :award_list "
 						"WHERE `aid` = :aid");
 					animeQueryExec.bindValue(":typename", typeName.isEmpty() ? QVariant() : typeName);
 					animeQueryExec.bindValue(":startdate", startDate.isEmpty() ? QVariant() : startDate);
@@ -3237,6 +3259,12 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					animeQueryExec.bindValue(":ann_id", annId.isEmpty() ? QVariant() : annId.toInt());
 					animeQueryExec.bindValue(":allcinema_id", allCinemaId.isEmpty() ? QVariant() : allCinemaId.toInt());
 					animeQueryExec.bindValue(":animenfo_id", animeNfoId.isEmpty() ? QVariant() : animeNfoId);
+					animeQueryExec.bindValue(":year", year.isEmpty() ? QVariant() : year);
+					animeQueryExec.bindValue(":nameromaji", name.isEmpty() ? QVariant() : name);
+					animeQueryExec.bindValue(":namekanji", titleJapKanji.isEmpty() ? QVariant() : titleJapKanji);
+					animeQueryExec.bindValue(":nameenglish", titleEng.isEmpty() ? QVariant() : titleEng);
+					animeQueryExec.bindValue(":date_record_updated", updateTimestamp.isEmpty() ? QVariant() : updateTimestamp.toLongLong());
+					animeQueryExec.bindValue(":award_list", awardIcons.isEmpty() ? QVariant() : awardIcons);
 					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
 					if(!animeQueryExec.exec())
