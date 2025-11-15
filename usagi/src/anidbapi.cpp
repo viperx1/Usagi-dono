@@ -4129,6 +4129,13 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 			int have = CHUNK_SIZE - stream.avail_out;
 			decompressed.append((char*)outBuffer, have);
 			
+			// Safety check: if no output was produced and no more input, break to avoid infinite loop
+			if(have == 0 && stream.avail_in == 0)
+			{
+				Logger::log(QString("[AniDB Decompress] inflate (zlib format) stalled: no output, no input remaining (ret=%1)").arg(ret), __FILE__, __LINE__);
+				break;
+			}
+			
 		} while(ret != Z_STREAM_END);
 		
 		if(ret == Z_STREAM_END)
@@ -4186,6 +4193,13 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 			
 			int have = CHUNK_SIZE - stream.avail_out;
 			decompressed.append((char*)outBuffer, have);
+			
+			// Safety check: if no output was produced and no more input, break to avoid infinite loop
+			if(have == 0 && stream.avail_in == 0)
+			{
+				Logger::log(QString("[AniDB Decompress] inflate (raw DEFLATE) stalled: no output, no input remaining (ret=%1)").arg(ret), __FILE__, __LINE__);
+				break;
+			}
 			
 		} while(ret != Z_STREAM_END);
 		
