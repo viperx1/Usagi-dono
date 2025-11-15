@@ -3161,6 +3161,19 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				QString startDate = attributes.value("StartDate").toString();
 				QString endDate = attributes.value("EndDate").toString();
 				
+				// Extract additional fields from mylist export
+				QString epsSpecial = attributes.value("EpsSpecial").toString();
+				QString url = attributes.value("Url").toString();
+				QString rating = attributes.value("Rating").toString();
+				QString votes = attributes.value("Votes").toString();
+				QString tmpRating = attributes.value("TmpRating").toString();
+				QString tmpVotes = attributes.value("TmpVotes").toString();
+				QString reviewRating = attributes.value("ReviewRating").toString();
+				QString reviews = attributes.value("Reviews").toString();
+				QString annId = attributes.value("AnnId").toString();
+				QString allCinemaId = attributes.value("AllCinemaId").toString();
+				QString animeNfoId = attributes.value("AnimeNfoId").toString();
+				
 				// Ensure anime record exists in database
 				// This runs for all anime, regardless of whether we have eptotal or typename data
 				if(!currentAid.isEmpty())
@@ -3196,17 +3209,34 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					}
 				}
 				
-				// Always update typename, startdate, enddate from mylist export
+				// Always update metadata fields from mylist export (including new fields)
 				// This runs independently of the eptotal/eps check above
 				if(!currentAid.isEmpty())
 				{
 					QSqlQuery animeQueryExec(db);
-					// Always update typename, startdate, enddate (even if already set)
+					// Update typename, startdate, enddate and new fields from mylist export
 					animeQueryExec.prepare("UPDATE `anime` SET `typename` = :typename, "
-						"`startdate` = :startdate, `enddate` = :enddate WHERE `aid` = :aid");
+						"`startdate` = :startdate, `enddate` = :enddate, "
+						"`special_ep_count` = :special_ep_count, `url` = :url, "
+						"`rating` = :rating, `vote_count` = :vote_count, "
+						"`temp_rating` = :temp_rating, `temp_vote_count` = :temp_vote_count, "
+						"`avg_review_rating` = :avg_review_rating, `review_count` = :review_count, "
+						"`ann_id` = :ann_id, `allcinema_id` = :allcinema_id, `animenfo_id` = :animenfo_id "
+						"WHERE `aid` = :aid");
 					animeQueryExec.bindValue(":typename", typeName.isEmpty() ? QVariant() : typeName);
 					animeQueryExec.bindValue(":startdate", startDate.isEmpty() ? QVariant() : startDate);
 					animeQueryExec.bindValue(":enddate", endDate.isEmpty() ? QVariant() : endDate);
+					animeQueryExec.bindValue(":special_ep_count", epsSpecial.isEmpty() ? QVariant() : epsSpecial.toInt());
+					animeQueryExec.bindValue(":url", url.isEmpty() ? QVariant() : url);
+					animeQueryExec.bindValue(":rating", rating.isEmpty() ? QVariant() : rating);
+					animeQueryExec.bindValue(":vote_count", votes.isEmpty() ? QVariant() : votes.toInt());
+					animeQueryExec.bindValue(":temp_rating", tmpRating.isEmpty() ? QVariant() : tmpRating);
+					animeQueryExec.bindValue(":temp_vote_count", tmpVotes.isEmpty() ? QVariant() : tmpVotes.toInt());
+					animeQueryExec.bindValue(":avg_review_rating", reviewRating.isEmpty() ? QVariant() : reviewRating);
+					animeQueryExec.bindValue(":review_count", reviews.isEmpty() ? QVariant() : reviews.toInt());
+					animeQueryExec.bindValue(":ann_id", annId.isEmpty() ? QVariant() : annId.toInt());
+					animeQueryExec.bindValue(":allcinema_id", allCinemaId.isEmpty() ? QVariant() : allCinemaId.toInt());
+					animeQueryExec.bindValue(":animenfo_id", animeNfoId.isEmpty() ? QVariant() : animeNfoId);
 					animeQueryExec.bindValue(":aid", currentAid.toInt());
 					
 					if(!animeQueryExec.exec())
