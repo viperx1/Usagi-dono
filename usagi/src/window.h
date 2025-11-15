@@ -399,6 +399,9 @@ private:
     QCheckBox *watcherAutoStart;
     QLabel *watcherStatusLabel;
     
+    // Auto-fetch settings
+    QCheckBox *autoFetchEnabled;
+    
     // Playback settings
     QLineEdit *mediaPlayerPath;
     QPushButton *mediaPlayerBrowseButton;

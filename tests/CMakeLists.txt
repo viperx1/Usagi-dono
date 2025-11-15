@@ -1371,3 +1371,56 @@ if(WIN32)
 endif()
 
 add_test(NAME test_truncated_response COMMAND test_truncated_response -v2)
+
+
+# Test: API optimization (ban handling and database checks)
+set(API_OPTIMIZATION_TEST_SOURCES
+    test_api_optimization.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(API_OPTIMIZATION_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_api_optimization ${API_OPTIMIZATION_TEST_SOURCES} ${API_OPTIMIZATION_TEST_HEADERS})
+
+target_compile_definitions(test_api_optimization PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_api_optimization PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_api_optimization PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_api_optimization PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_api_optimization PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_api_optimization COMMAND test_api_optimization -v2)
