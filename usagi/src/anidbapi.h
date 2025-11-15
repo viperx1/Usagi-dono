@@ -38,6 +38,7 @@ class AniDBApi : public ed2k
 	
 	// Allow test class to access private methods for testing
 	friend class TestableAniDBApi;
+	friend class TestCompression;  // Allow compression test to access decompressIfNeeded
 	
 private:
 	/* === Settings Start */
@@ -296,6 +297,9 @@ private:
 	QString convertToISODate(const QString& dateStr);
 	
 	bool extractMasksFromCommand(const QString& command, unsigned int& fmask, unsigned int& amask);
+	
+	// Compression helper - decompress DEFLATE-compressed datagram if needed
+	QByteArray decompressIfNeeded(const QByteArray& data);
 
 	//wxDatagramSocket *Socket; // UDP socket
 	//wxIPV4address addrLocal; // local address/port
