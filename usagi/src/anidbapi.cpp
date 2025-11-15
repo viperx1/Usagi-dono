@@ -4052,6 +4052,9 @@ QString AniDBApi::convertToISODate(const QString& dateStr)
  * - Tags should never start with zero, so this is a reliable indicator
  * - Compression algorithm is DEFLATE (RFC 1951)
  * 
+ * Implementation tries both zlib format (with header) and raw DEFLATE format
+ * to handle potential variations in server compression implementation.
+ * 
  * @param data Raw datagram data
  * @return Decompressed data if compressed, or original data if not compressed
  */
@@ -4065,10 +4068,19 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 		return data;  // Not compressed - return as-is
 	
 	// Data is compressed - decompress using zlib DEFLATE
-	Logger::log("[AniDB Decompress] Detected compressed datagram (starts with 0x00 0x00)", __FILE__, __LINE__);
+	Logger::log(QString("[AniDB Decompress] Detected compressed datagram (starts with 0x00 0x00), total size: %1 bytes")
+		.arg(data.size()), __FILE__, __LINE__);
 	
 	// Skip the two leading zero bytes - actual compressed data starts at byte 2
 	QByteArray compressedData = data.mid(2);
+	
+	// Log first few bytes of compressed data for debugging
+	QString hexDump;
+	for(int i = 0; i < qMin(16, compressedData.size()); i++)
+	{
+		hexDump += QString("%1 ").arg((unsigned char)compressedData[i], 2, 16, QChar('0'));
+	}
+	Logger::log(QString("[AniDB Decompress] First bytes of compressed data: %1").arg(hexDump), __FILE__, __LINE__);
 	
 	// Initialize zlib stream for DEFLATE decompression
 	z_stream stream;
@@ -4078,50 +4090,118 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 	stream.avail_in = compressedData.size();
 	stream.next_in = (Bytef*)compressedData.data();
 	
-	// Initialize inflator with raw DEFLATE format (no zlib or gzip headers)
-	// windowBits = -15 means raw DEFLATE (negative value removes zlib wrapper)
-	int ret = inflateInit2(&stream, -15);
+	// Try with zlib format first (windowBits = 15 for zlib wrapper)
+	// AniDB documentation says DEFLATE, but implementation might vary
+	int ret = inflateInit2(&stream, 15);
+	bool tryAlternateFormat = false;
+	
 	if(ret != Z_OK)
 	{
-		Logger::log(QString("[AniDB Decompress] ERROR: inflateInit2 failed with code %1").arg(ret), __FILE__, __LINE__);
-		return data;  // Return original data on error
+		Logger::log(QString("[AniDB Decompress] inflateInit2 (zlib format) failed with code %1, will try raw DEFLATE").arg(ret), __FILE__, __LINE__);
+		tryAlternateFormat = true;
+	}
+	else
+	{
+		// Decompress in chunks
+		QByteArray decompressed;
+		decompressed.reserve(compressedData.size() * 4);
+		
+		const int CHUNK_SIZE = 4096;
+		unsigned char outBuffer[CHUNK_SIZE];
+		
+		do
+		{
+			stream.avail_out = CHUNK_SIZE;
+			stream.next_out = outBuffer;
+			
+			ret = inflate(&stream, Z_NO_FLUSH);
+			
+			if(ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
+			{
+				Logger::log(QString("[AniDB Decompress] inflate (zlib format) failed with code %1 after %2 bytes, will try raw DEFLATE")
+					.arg(ret)
+					.arg(stream.total_out), __FILE__, __LINE__);
+				inflateEnd(&stream);
+				tryAlternateFormat = true;
+				break;
+			}
+			
+			int have = CHUNK_SIZE - stream.avail_out;
+			decompressed.append((char*)outBuffer, have);
+			
+		} while(ret != Z_STREAM_END);
+		
+		if(ret == Z_STREAM_END)
+		{
+			inflateEnd(&stream);
+			Logger::log(QString("[AniDB Decompress] Successfully decompressed %1 bytes -> %2 bytes (ratio: %3x) using zlib format")
+				.arg(compressedData.size())
+				.arg(decompressed.size())
+				.arg(QString::number((double)decompressed.size() / compressedData.size(), 'f', 2)), __FILE__, __LINE__);
+			return decompressed;
+		}
 	}
 	
-	// Decompress in chunks - allocate buffer for decompressed data
-	// Start with 4x the compressed size as estimate (typical compression ratio)
-	QByteArray decompressed;
-	decompressed.reserve(compressedData.size() * 4);
-	
-	const int CHUNK_SIZE = 4096;
-	unsigned char outBuffer[CHUNK_SIZE];
-	
-	do
+	// Try raw DEFLATE format if zlib format failed
+	if(tryAlternateFormat)
 	{
-		stream.avail_out = CHUNK_SIZE;
-		stream.next_out = outBuffer;
+		stream.zalloc = Z_NULL;
+		stream.zfree = Z_NULL;
+		stream.opaque = Z_NULL;
+		stream.avail_in = compressedData.size();
+		stream.next_in = (Bytef*)compressedData.data();
 		
-		ret = inflate(&stream, Z_NO_FLUSH);
-		
-		if(ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
+		ret = inflateInit2(&stream, -15);
+		if(ret != Z_OK)
 		{
-			Logger::log(QString("[AniDB Decompress] ERROR: inflate failed with code %1").arg(ret), __FILE__, __LINE__);
-			inflateEnd(&stream);
+			Logger::log(QString("[AniDB Decompress] ERROR: inflateInit2 (raw DEFLATE) also failed with code %1").arg(ret), __FILE__, __LINE__);
 			return data;  // Return original data on error
 		}
 		
-		int have = CHUNK_SIZE - stream.avail_out;
-		decompressed.append((char*)outBuffer, have);
+		// Decompress in chunks
+		QByteArray decompressed;
+		decompressed.reserve(compressedData.size() * 4);
 		
-	} while(ret != Z_STREAM_END);
+		const int CHUNK_SIZE = 4096;
+		unsigned char outBuffer[CHUNK_SIZE];
+		
+		do
+		{
+			stream.avail_out = CHUNK_SIZE;
+			stream.next_out = outBuffer;
+			
+			ret = inflate(&stream, Z_NO_FLUSH);
+			
+			if(ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
+			{
+				Logger::log(QString("[AniDB Decompress] ERROR: inflate (raw DEFLATE) failed with code %1, bytes in: %2, bytes out: %3, total in: %4, total out: %5")
+					.arg(ret)
+					.arg(stream.avail_in)
+					.arg(stream.avail_out)
+					.arg(stream.total_in)
+					.arg(stream.total_out), __FILE__, __LINE__);
+				inflateEnd(&stream);
+				return data;  // Return original data on error
+			}
+			
+			int have = CHUNK_SIZE - stream.avail_out;
+			decompressed.append((char*)outBuffer, have);
+			
+		} while(ret != Z_STREAM_END);
+		
+		inflateEnd(&stream);
+		
+		Logger::log(QString("[AniDB Decompress] Successfully decompressed %1 bytes -> %2 bytes (ratio: %3x) using raw DEFLATE")
+			.arg(compressedData.size())
+			.arg(decompressed.size())
+			.arg(QString::number((double)decompressed.size() / compressedData.size(), 'f', 2)), __FILE__, __LINE__);
+		
+		return decompressed;
+	}
 	
-	inflateEnd(&stream);
-	
-	Logger::log(QString("[AniDB Decompress] Successfully decompressed %1 bytes -> %2 bytes (ratio: %3x)")
-		.arg(compressedData.size())
-		.arg(decompressed.size())
-		.arg(QString::number((double)decompressed.size() / compressedData.size(), 'f', 2)), __FILE__, __LINE__);
-	
-	return decompressed;
+	// Should not reach here
+	Logger::log("[AniDB Decompress] ERROR: Unexpected code path reached", __FILE__, __LINE__);
+	return data;
 }
 
 /**
