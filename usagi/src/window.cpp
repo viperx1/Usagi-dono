@@ -4713,8 +4713,8 @@ void Window::loadMylistAsCards()
 	
 	// Load posters asynchronously in batches to keep UI responsive
 	// Process posters in small batches with delays between to avoid blocking the UI thread
-	QTimer::singleShot(10, this, [this, timer]() {
-		qint64 startAsyncPosters = timer.elapsed();
+	QTimer::singleShot(10, this, [this]() {
+		qint64 startAsyncPosters = QDateTime::currentMSecsSinceEpoch();
 		LOG(QString("[Timing] Starting async poster loading"));
 		
 		// Collect all cards with pending poster data
@@ -4723,6 +4723,10 @@ void Window::loadMylistAsCards()
 			if (!card->property("deferredPosterData").toByteArray().isEmpty()) {
 				cardsWithPosters.append(card);
 			}
+		}
+		
+		if (cardsWithPosters.isEmpty()) {
+			return;  // Nothing to do
 		}
 		
 		const int totalPosters = cardsWithPosters.size();
@@ -4735,7 +4739,7 @@ void Window::loadMylistAsCards()
 		// Lambda for processing a batch of posters - must be defined as std::function to allow recursion
 		auto processBatch = std::make_shared<std::function<void(int)>>();
 		*processBatch = [this, cardsWithPosters, postersLoaded, totalPosters, 
-		                 timer, startAsyncPosters, BATCH_SIZE, BATCH_DELAY, processBatch](int startIdx) {
+		                 startAsyncPosters, BATCH_SIZE, BATCH_DELAY, processBatch](int startIdx) {
 			int endIdx = std::min(startIdx + BATCH_SIZE, static_cast<int>(cardsWithPosters.size()));
 			
 			// Process this batch
@@ -4760,7 +4764,7 @@ void Window::loadMylistAsCards()
 				});
 			} else {
 				// All posters loaded
-				qint64 asyncPostersElapsed = timer.elapsed() - startAsyncPosters;
+				qint64 asyncPostersElapsed = QDateTime::currentMSecsSinceEpoch() - startAsyncPosters;
 				LOG(QString("[Timing] Async poster loading completed: %1 ms for %2 posters (avg %3 ms)")
 					.arg(asyncPostersElapsed)
 					.arg(*postersLoaded)
