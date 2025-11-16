@@ -62,7 +62,8 @@ void MyListCardManager::loadAllCards()
     QString query = "SELECT m.aid, "
                     "a.nameromaji, a.nameenglish, a.eptotal, "
                     "at.title as anime_title, "
-                    "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
+                    "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+                    "a.rating, a.tag_name_list "
                     "FROM mylist m "
                     "LEFT JOIN anime a ON m.aid = a.aid "
                     "LEFT JOIN anime_titles at ON m.aid = at.aid AND at.type = 1 "
@@ -337,7 +338,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QSqlQuery q(db);
     q.prepare("SELECT a.nameromaji, a.nameenglish, a.eptotal, "
               "at.title as anime_title, "
-              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
+              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+              "a.rating, a.tag_name_list "
               "FROM anime a "
               "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
               "WHERE a.aid = ?");
@@ -358,6 +360,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QString picname = q.value(8).toString();
     QByteArray posterData = q.value(9).toByteArray();
     QString category = q.value(10).toString();
+    QString rating = q.value(11).toString();
+    QString tagNameList = q.value(12).toString();
     
     // Determine anime name
     if (animeName.isEmpty() && !animeNameEnglish.isEmpty()) {
@@ -392,9 +396,16 @@ AnimeCard* MyListCardManager::createCard(int aid)
         m_animeNeedingMetadata.insert(aid);
     }
     
-    // Set tags/categories
-    if (!category.isEmpty()) {
+    // Set tags from tag_name_list (prefer this over category)
+    if (!tagNameList.isEmpty()) {
+        card->setTags(tagNameList);
+    } else if (!category.isEmpty()) {
         card->setTags(category);
+    }
+    
+    // Set rating
+    if (!rating.isEmpty()) {
+        card->setRating(rating);
     }
     
     // Load poster asynchronously
@@ -467,7 +478,8 @@ void MyListCardManager::updateCardFromDatabase(int aid)
     QSqlQuery q(db);
     q.prepare("SELECT a.nameromaji, a.nameenglish, "
               "at.title as anime_title, "
-              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
+              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+              "a.rating, a.tag_name_list "
               "FROM anime a "
               "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
               "WHERE a.aid = ?");
@@ -489,6 +501,8 @@ void MyListCardManager::updateCardFromDatabase(int aid)
     QString picname = q.value(7).toString();
     QByteArray posterData = q.value(8).toByteArray();
     QString category = q.value(9).toString();
+    QString rating = q.value(10).toString();
+    QString tagNameList = q.value(11).toString();
     
     // Update anime name
     if (animeName.isEmpty() && !animeNameEnglish.isEmpty()) {
@@ -512,9 +526,16 @@ void MyListCardManager::updateCardFromDatabase(int aid)
         card->setAired(airedDates);
     }
     
-    // Update tags/categories
-    if (!category.isEmpty()) {
+    // Update tags from tag_name_list (prefer this over category)
+    if (!tagNameList.isEmpty()) {
+        card->setTags(tagNameList);
+    } else if (!category.isEmpty()) {
         card->setTags(category);
+    }
+    
+    // Update rating
+    if (!rating.isEmpty()) {
+        card->setRating(rating);
     }
     
     // Update poster if available
@@ -623,6 +644,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
             
             fileInfo.viewed = (viewed != 0);
             fileInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
+            fileInfo.localFilePath = localFilePath;  // Store local file path for existence check
             fileInfo.lastPlayed = lastPlayed;
             fileInfo.resolution = resolution;
             fileInfo.quality = quality;
