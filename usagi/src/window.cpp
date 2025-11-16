@@ -7,6 +7,8 @@
 #include "playbuttondelegate.h"
 #include <QElapsedTimer>
 #include <algorithm>
+#include <functional>
+#include <memory>
 
 HasherThreadPool *hasherThreadPool = nullptr;
 myAniDBApi *adbapi;
@@ -4709,31 +4711,67 @@ void Window::loadMylistAsCards()
 	
 	mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
 	
-	// Load posters asynchronously after a short delay to let UI become responsive
-	// This prevents blocking the main thread with image decoding
+	// Load posters asynchronously in batches to keep UI responsive
+	// Process posters in small batches with delays between to avoid blocking the UI thread
 	QTimer::singleShot(10, this, [this, timer]() {
 		qint64 startAsyncPosters = timer.elapsed();
-		int postersLoaded = 0;
 		LOG(QString("[Timing] Starting async poster loading"));
 		
+		// Collect all cards with pending poster data
+		QList<AnimeCard*> cardsWithPosters;
 		for (AnimeCard *card : animeCards) {
-			QByteArray posterData = card->property("deferredPosterData").toByteArray();
-			if (!posterData.isEmpty()) {
-				QPixmap poster;
-				if (poster.loadFromData(posterData)) {
-					card->setPoster(poster);
-					postersLoaded++;
-				}
-				// Clear stored data to free memory
-				card->setProperty("deferredPosterData", QVariant());
+			if (!card->property("deferredPosterData").toByteArray().isEmpty()) {
+				cardsWithPosters.append(card);
 			}
 		}
 		
-		qint64 asyncPostersElapsed = timer.elapsed() - startAsyncPosters;
-		LOG(QString("[Timing] Async poster loading completed: %1 ms for %2 posters (avg %3 ms)")
-			.arg(asyncPostersElapsed)
-			.arg(postersLoaded)
-			.arg(postersLoaded > 0 ? asyncPostersElapsed / postersLoaded : 0));
+		const int totalPosters = cardsWithPosters.size();
+		const int BATCH_SIZE = 10; // Process 10 posters per batch
+		const int BATCH_DELAY = 5; // 5ms delay between batches
+		
+		// Create a shared counter for tracking loaded posters
+		auto postersLoaded = std::make_shared<int>(0);
+		
+		// Lambda for processing a batch of posters - must be defined as std::function to allow recursion
+		auto processBatch = std::make_shared<std::function<void(int)>>();
+		*processBatch = [this, cardsWithPosters, postersLoaded, totalPosters, 
+		                 timer, startAsyncPosters, BATCH_SIZE, BATCH_DELAY, processBatch](int startIdx) {
+			int endIdx = std::min(startIdx + BATCH_SIZE, cardsWithPosters.size());
+			
+			// Process this batch
+			for (int i = startIdx; i < endIdx; i++) {
+				AnimeCard *card = cardsWithPosters[i];
+				QByteArray posterData = card->property("deferredPosterData").toByteArray();
+				if (!posterData.isEmpty()) {
+					QPixmap poster;
+					if (poster.loadFromData(posterData)) {
+						card->setPoster(poster);
+						(*postersLoaded)++;
+					}
+					// Clear stored data to free memory
+					card->setProperty("deferredPosterData", QVariant());
+				}
+			}
+			
+			// If there are more posters, schedule next batch
+			if (endIdx < cardsWithPosters.size()) {
+				QTimer::singleShot(BATCH_DELAY, this, [processBatch, endIdx]() {
+					(*processBatch)(endIdx);
+				});
+			} else {
+				// All posters loaded
+				qint64 asyncPostersElapsed = timer.elapsed() - startAsyncPosters;
+				LOG(QString("[Timing] Async poster loading completed: %1 ms for %2 posters (avg %3 ms)")
+					.arg(asyncPostersElapsed)
+					.arg(*postersLoaded)
+					.arg(*postersLoaded > 0 ? asyncPostersElapsed / (*postersLoaded) : 0));
+			}
+		};
+		
+		// Start processing first batch
+		if (!cardsWithPosters.isEmpty()) {
+			(*processBatch)(0);
+		}
 	});
 	
 	// Request missing data if needed
