@@ -4403,6 +4403,7 @@ void Window::loadMylistAsCards()
 	}
 	
 	// Query all mylist entries grouped by anime
+	// Note: Including poster_image in query but will load asynchronously to avoid blocking
 	qint64 startQuery = timer.elapsed();
 	QString query = "SELECT m.aid, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
@@ -4494,13 +4495,12 @@ void Window::loadMylistAsCards()
 			card->setTags(category);
 		}
 		
-		// Load poster image if available
+		// Skip synchronous poster decoding during initial card creation for better performance
+		// Store poster data for async loading after UI is responsive
 		qint64 startPoster = timer.elapsed();
 		if (!posterData.isEmpty()) {
-			QPixmap poster;
-			if (poster.loadFromData(posterData)) {
-				card->setPoster(poster);
-			}
+			// Store poster data with the card for deferred decoding
+			card->setProperty("deferredPosterData", posterData);
 		} else {
 			// Track anime needing poster download
 			if (!picname.isEmpty()) {
@@ -4708,6 +4708,33 @@ void Window::loadMylistAsCards()
 	LOG(QString("[Timing] Sorting cards took %1 ms").arg(sortElapsed));
 	
 	mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
+	
+	// Load posters asynchronously after a short delay to let UI become responsive
+	// This prevents blocking the main thread with image decoding
+	QTimer::singleShot(10, this, [this, timer]() {
+		qint64 startAsyncPosters = timer.elapsed();
+		int postersLoaded = 0;
+		LOG(QString("[Timing] Starting async poster loading"));
+		
+		for (AnimeCard *card : animeCards) {
+			QByteArray posterData = card->property("deferredPosterData").toByteArray();
+			if (!posterData.isEmpty()) {
+				QPixmap poster;
+				if (poster.loadFromData(posterData)) {
+					card->setPoster(poster);
+					postersLoaded++;
+				}
+				// Clear stored data to free memory
+				card->setProperty("deferredPosterData", QVariant());
+			}
+		}
+		
+		qint64 asyncPostersElapsed = timer.elapsed() - startAsyncPosters;
+		LOG(QString("[Timing] Async poster loading completed: %1 ms for %2 posters (avg %3 ms)")
+			.arg(asyncPostersElapsed)
+			.arg(postersLoaded)
+			.arg(postersLoaded > 0 ? asyncPostersElapsed / postersLoaded : 0));
+	});
 	
 	// Request missing data if needed
 	qint64 startRequests = timer.elapsed();
