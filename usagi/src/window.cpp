@@ -4406,10 +4406,11 @@ void Window::loadMylistAsCards()
 	qint64 startQuery = timer.elapsed();
 	QString query = "SELECT m.aid, "
 					"a.nameromaji, a.nameenglish, a.eptotal, "
-					"(SELECT title FROM anime_titles WHERE aid = m.aid AND type = 1 LIMIT 1) as anime_title, "
+					"at.title as anime_title, "
 					"a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
+					"LEFT JOIN anime_titles at ON m.aid = at.aid AND at.type = 1 "
 					"GROUP BY m.aid "
 					"ORDER BY a.nameromaji";
 	
@@ -4523,11 +4524,12 @@ void Window::loadMylistAsCards()
 							"f.filename, m.last_played, "
 							"lf.path as local_file_path, "
 							"f.resolution, f.quality, "
-							"(SELECT name FROM `group` WHERE gid = m.gid) as group_name "
+							"g.name as group_name "
 							"FROM mylist m "
 							"LEFT JOIN episode e ON m.eid = e.eid "
 							"LEFT JOIN file f ON m.fid = f.fid "
 							"LEFT JOIN local_files lf ON m.local_file = lf.id "
+							"LEFT JOIN `group` g ON m.gid = g.gid "
 							"WHERE m.aid = ? "
 							"ORDER BY e.epno, m.lid");
 		episodeQuery.addBindValue(aid);
