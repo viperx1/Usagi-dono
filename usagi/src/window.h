@@ -33,10 +33,12 @@
 #include "playbackmanager.h"
 #include "animecard.h"
 #include "flowlayout.h"
+#include "mylistcardmanager.h"
 //#include "hasherthread.h"
 
 // Forward declarations
 class PlayButtonDelegate;
+class MyListCardManager;
 
 // MyList tree widget column indices (using enum for type safety and maintainability)
 // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
@@ -375,14 +377,15 @@ private:
     QLabel *mylistStatusLabel;
     bool mylistUseCardView;
     bool mylistSortAscending;  // true for ascending, false for descending
-    QList<AnimeCard*> animeCards;
-	QSet<int> episodesNeedingData;  // Track EIDs that need EPISODE API call
-	QSet<int> animeNeedingMetadata;  // Track AIDs that need metadata (typename, startdate, enddate)
-	QSet<int> animeMetadataRequested;  // Track AIDs for which we've already requested metadata (prevent spam)
-	QSet<int> animeNeedingPoster;  // Track AIDs that need poster images
-	QMap<int, QString> animePicnames;  // aid -> picname mapping
-	QNetworkAccessManager *posterNetworkManager;  // For downloading poster images
-	QMap<QNetworkReply*, int> posterDownloadRequests;  // reply -> aid mapping
+    MyListCardManager *cardManager;  // Manages card lifecycle and updates
+    QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead
+	QSet<int> episodesNeedingData;  // Deprecated: moved to MyListCardManager
+	QSet<int> animeNeedingMetadata;  // Deprecated: moved to MyListCardManager
+	QSet<int> animeMetadataRequested;  // Deprecated: moved to MyListCardManager
+	QSet<int> animeNeedingPoster;  // Deprecated: moved to MyListCardManager
+	QMap<int, QString> animePicnames;  // Deprecated: moved to MyListCardManager
+	QNetworkAccessManager *posterNetworkManager;  // Deprecated: moved to MyListCardManager
+	QMap<QNetworkReply*, int> posterDownloadRequests;  // Deprecated: moved to MyListCardManager
 	// page settings
 
     QLabel *labelLogin;
