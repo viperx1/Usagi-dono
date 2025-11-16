@@ -127,12 +127,22 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
+		// Create index on anime_titles for faster lookups by aid and type
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_anime_titles_aid_type` ON `anime_titles`(`aid`, `type`);");
 		query.exec("CREATE TABLE IF NOT EXISTS `packets`(`tag` INTEGER PRIMARY KEY, `str` TEXT, `processed` BOOL DEFAULT 0, `sendtime` INTEGER, `got_reply` BOOL DEFAULT 0, `reply` TEXT, `retry_count` INTEGER DEFAULT 0);");
 		// Add retry_count column to packets if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `packets` ADD COLUMN `retry_count` INTEGER DEFAULT 0");
 		query.exec("CREATE TABLE IF NOT EXISTS `settings`(`id` INTEGER PRIMARY KEY, `name` TEXT UNIQUE, `value` TEXT);");
 		query.exec("CREATE TABLE IF NOT EXISTS `notifications`(`nid` INTEGER PRIMARY KEY, `type` TEXT, `from_user_id` INTEGER, `from_user_name` TEXT, `date` INTEGER, `message_type` INTEGER, `title` TEXT, `body` TEXT, `received_at` INTEGER, `acknowledged` BOOL DEFAULT 0);");
 		query.exec("UPDATE `packets` SET `processed` = 1 WHERE `processed` = 0;");
+		
+		// Create indexes for JOIN performance optimization
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_mylist_aid` ON `mylist`(`aid`);");
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_mylist_eid` ON `mylist`(`eid`);");
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_mylist_fid` ON `mylist`(`fid`);");
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_mylist_gid` ON `mylist`(`gid`);");
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_episode_eid` ON `episode`(`eid`);");
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_file_fid` ON `file`(`fid`);");
 		
 		// Add playback tracking columns to mylist if they don't exist
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `playback_position` INTEGER DEFAULT 0");
