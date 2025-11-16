@@ -45,8 +45,21 @@ public:
     void setAiredText(const QString& airedText);
     void setStatistics(int normalEpisodes, int totalNormalEpisodes, int normalViewed, int otherEpisodes, int otherViewed);
     void setPoster(const QPixmap& pixmap);
-    void setTags(const QString& tags);
     void setRating(const QString& rating);
+    
+    // Tag structure for storing tag data
+    struct TagInfo {
+        QString name;
+        int id;
+        int weight;
+        
+        // For sorting by weight (highest first)
+        bool operator<(const TagInfo& other) const {
+            return weight > other.weight;
+        }
+    };
+    
+    void setTags(const QList<TagInfo>& tags);
     
     // File and Episode management structures
     struct FileInfo {

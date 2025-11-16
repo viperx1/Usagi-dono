@@ -77,7 +77,7 @@ void AnimeCard::setupUI()
     m_tagsLabel = new QLabel("", this);
     m_tagsLabel->setWordWrap(true);
     m_tagsLabel->setStyleSheet("font-size: 8pt; color: #888; font-style: italic;");
-    m_tagsLabel->setMaximumHeight(30);
+    // Remove maximum height to allow vertical expansion
     m_infoLayout->addWidget(m_tagsLabel);
     
     m_statsLabel = new QLabel("Episodes: 0/0 | Viewed: 0/0", this);
@@ -164,13 +164,20 @@ void AnimeCard::setStatistics(int normalEpisodes, int totalNormalEpisodes, int n
     updateStatisticsLabel();
 }
 
-void AnimeCard::setTags(const QString& tags)
+void AnimeCard::setTags(const QList<TagInfo>& tags)
 {
-    if (!tags.isEmpty()) {
-        m_tagsLabel->setText("Tags: " + tags);
-    } else {
+    if (tags.isEmpty()) {
         m_tagsLabel->setText("");
+        return;
     }
+    
+    // Tags are already sorted by weight (highest first)
+    QStringList tagNames;
+    for (const TagInfo& tag : tags) {
+        tagNames << tag.name;
+    }
+    
+    m_tagsLabel->setText("Tags: " + tagNames.join(", "));
 }
 
 void AnimeCard::setRating(const QString& rating)
@@ -257,6 +264,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     
     if (anyFileExists) {
         episodeItem->setText(0, "▶"); // Play button if any file exists
+        episodeItem->setTextAlignment(0, Qt::AlignCenter);  // Center the play button
         episodeItem->setData(0, Qt::UserRole, 1);  // 1 means show button
         episodeItem->setForeground(0, QBrush(QColor(0, 150, 0))); // Green for available
         // Store the lid of the first available file for playback
