@@ -4736,7 +4736,7 @@ void Window::loadMylistAsCards()
 		auto processBatch = std::make_shared<std::function<void(int)>>();
 		*processBatch = [this, cardsWithPosters, postersLoaded, totalPosters, 
 		                 timer, startAsyncPosters, BATCH_SIZE, BATCH_DELAY, processBatch](int startIdx) {
-			int endIdx = std::min(startIdx + BATCH_SIZE, cardsWithPosters.size());
+			int endIdx = std::min(startIdx + BATCH_SIZE, static_cast<int>(cardsWithPosters.size()));
 			
 			// Process this batch
 			for (int i = startIdx; i < endIdx; i++) {
