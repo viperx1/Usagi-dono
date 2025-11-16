@@ -4379,9 +4379,11 @@ void Window::loadMylistAsCards()
 	
 	LOG(QString("[Timing] Starting loadMylistAsCards"));
 	
-	// Clear existing cards
+	// Clear existing cards and cancel any pending async poster operations
 	qint64 startClear = timer.elapsed();
 	for (AnimeCard *card : animeCards) {
+		// Clear any pending deferred poster data to prevent async operations on deleted cards
+		card->setProperty("deferredPosterData", QVariant());
 		mylistCardLayout->removeWidget(card);
 		delete card;
 	}
@@ -4745,6 +4747,13 @@ void Window::loadMylistAsCards()
 			// Process this batch
 			for (int i = startIdx; i < endIdx; i++) {
 				AnimeCard *card = cardsWithPosters[i];
+				
+				// Safety check: verify card still exists in animeCards list
+				// (it may have been deleted if loadMylistAsCards was called again)
+				if (!animeCards.contains(card)) {
+					continue;  // Card was deleted, skip it
+				}
+				
 				QByteArray posterData = card->property("deferredPosterData").toByteArray();
 				if (!posterData.isEmpty()) {
 					QPixmap poster;
