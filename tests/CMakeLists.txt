@@ -1477,3 +1477,57 @@ if(WIN32)
 endif()
 
 add_test(NAME test_api_optimization COMMAND test_api_optimization -v2)
+
+# Test: MyListCardManager test
+set(MYLISTCARDMANAGER_TEST_SOURCES
+    test_mylistcardmanager.cpp
+    ../usagi/src/mylistcardmanager.cpp
+    ../usagi/src/animecard.cpp
+    ../usagi/src/flowlayout.cpp
+    ../usagi/src/playbuttondelegate.cpp
+    ../usagi/src/epno.cpp
+    ../usagi/src/aired.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(MYLISTCARDMANAGER_TEST_HEADERS
+    ../usagi/src/mylistcardmanager.h
+    ../usagi/src/animecard.h
+    ../usagi/src/flowlayout.h
+    ../usagi/src/playbuttondelegate.h
+    ../usagi/src/epno.h
+    ../usagi/src/aired.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_mylistcardmanager ${MYLISTCARDMANAGER_TEST_SOURCES} ${MYLISTCARDMANAGER_TEST_HEADERS})
+
+target_compile_definitions(test_mylistcardmanager PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds, ensure QT_STATIC is defined
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_mylistcardmanager PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_mylistcardmanager PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_mylistcardmanager PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_mylistcardmanager PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_mylistcardmanager COMMAND test_mylistcardmanager -v2)
