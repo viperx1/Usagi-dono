@@ -138,9 +138,31 @@ Window::Window()
     mylistUseCardView = true;
     mylistSortAscending = true;
     
-    // Initialize network manager for poster downloads
+    // Initialize network manager for poster downloads (deprecated, kept for backward compatibility)
     posterNetworkManager = new QNetworkAccessManager(this);
     connect(posterNetworkManager, &QNetworkAccessManager::finished, this, &Window::onPosterDownloadFinished);
+    
+    // Initialize card manager for efficient card lifecycle management
+    cardManager = new MyListCardManager(this);
+    
+    // Connect card manager signals to window slots
+    connect(cardManager, &MyListCardManager::allCardsLoaded, this, [this](int count) {
+        mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(count));
+        animeCards = cardManager->getAllCards();  // Update legacy list for backward compatibility
+    });
+    
+    connect(cardManager, &MyListCardManager::cardCreated, this, [this](int aid, AnimeCard *card) {
+        // Connect individual card signals
+        connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
+        connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
+    });
+    
+    connect(cardManager, &MyListCardManager::cardUpdated, this, [this](int aid) {
+        // Card was updated, may need to resort
+        if (mylistUseCardView) {
+            sortMylistCards(mylistSortComboBox->currentIndex());
+        }
+    });
     
     // Add toolbar for view toggle and sorting
     QHBoxLayout *mylistToolbar = new QHBoxLayout();
@@ -1970,7 +1992,18 @@ void Window::getNotifyEpisodeUpdated(int eid, int aid)
 {
 	// Episode data was updated in the database, update only the specific episode item
 	LOG(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
-	updateEpisodeInTree(eid, aid);
+	
+	// Update tree view if active
+	if (!mylistUseCardView) {
+		updateEpisodeInTree(eid, aid);
+	}
+	
+	// Update card manager if in card view
+	if (mylistUseCardView && cardManager) {
+		cardManager->onEpisodeUpdated(eid, aid);
+		// Backward compatibility: update animeCards list
+		animeCards = cardManager->getAllCards();
+	}
 }
 
 void Window::getNotifyAnimeUpdated(int aid)
@@ -2008,7 +2041,14 @@ void Window::getNotifyAnimeUpdated(int aid)
 				// If we got picname but no poster image, download it
 				if (!picname.isEmpty() && posterData.isEmpty()) {
 					animePicnames[aid] = picname;
-					downloadPosterForAnime(aid, picname);
+					
+					// Use card manager to download poster if in card view
+					if (mylistUseCardView && cardManager) {
+						cardManager->updateCardPoster(aid, picname);
+					} else {
+						downloadPosterForAnime(aid, picname);
+					}
+					
 					needsPosterDownload = true;
 					LOG(QString("[Timing] Triggered poster download for AID %1").arg(aid));
 				}
@@ -2016,18 +2056,23 @@ void Window::getNotifyAnimeUpdated(int aid)
 		}
 	}
 	
-	// Only reload view if we're not just triggering a poster download
-	// Poster download will update the card when it completes
-	if (!needsPosterDownload) {
+	// Update views
+	if (mylistUseCardView && cardManager) {
+		// Use card manager for efficient update
+		cardManager->onAnimeUpdated(aid);
+		// Backward compatibility: update animeCards list
+		animeCards = cardManager->getAllCards();
+		
+		// If not just triggering poster download, may need to resort
+		if (!needsPosterDownload) {
+			sortMylistCards(mylistSortComboBox->currentIndex());
+		}
+	} else if (!needsPosterDownload) {
+		// Tree view: reload entire view (old behavior)
 		qint64 startReload = timer.elapsed();
 		LOG(QString("[Timing] Starting view reload for AID %1").arg(aid));
 		
-		// Reload appropriate view to show updated metadata
-		if (mylistUseCardView) {
-			loadMylistAsCards();
-		} else {
-			loadMylistFromDatabase();
-		}
+		loadMylistFromDatabase();
 		
 		qint64 reloadElapsed = timer.elapsed() - startReload;
 		LOG(QString("[Timing] View reload took %1 ms").arg(reloadElapsed));
@@ -2135,6 +2180,14 @@ void Window::updateOrAddMylistEntry(int lid)
 {
 	// Update or add a single mylist entry without clearing the entire tree
 	// This preserves selection, sorting, focus, and expanded state
+	
+	// If in card view, use card manager for efficient updates
+	if (mylistUseCardView && cardManager) {
+		cardManager->updateOrAddMylistEntry(lid);
+		// Backward compatibility: update animeCards list
+		animeCards = cardManager->getAllCards();
+		return;
+	}
 	
 	QSqlDatabase db = QSqlDatabase::database();
 	
@@ -4377,452 +4430,28 @@ void Window::loadMylistAsCards()
 	QElapsedTimer timer;
 	timer.start();
 	
-	LOG(QString("[Timing] Starting loadMylistAsCards"));
+	LOG(QString("[Timing] Starting loadMylistAsCards with MyListCardManager"));
 	
-	// Clear existing cards and cancel any pending async poster operations
-	qint64 startClear = timer.elapsed();
-	for (AnimeCard *card : animeCards) {
-		// Clear any pending deferred poster data to prevent async operations on deleted cards
-		card->setProperty("deferredPosterData", QVariant());
-		mylistCardLayout->removeWidget(card);
-		delete card;
-	}
-	animeCards.clear();
+	// Set the layout for the card manager
+	cardManager->setCardLayout(mylistCardLayout);
 	
-	qint64 clearElapsed = timer.elapsed() - startClear;
-	LOG(QString("[Timing] Clearing existing cards took %1 ms").arg(clearElapsed));
+	// Connect card manager to API update signals
+	connect(adbapi, &myAniDBApi::notifyEpisodeUpdated, 
+	        cardManager, &MyListCardManager::onEpisodeUpdated, Qt::UniqueConnection);
+	connect(adbapi, &myAniDBApi::notifyAnimeUpdated,
+	        cardManager, &MyListCardManager::onAnimeUpdated, Qt::UniqueConnection);
 	
-	episodesNeedingData.clear();
-	animeNeedingMetadata.clear();
-	animeNeedingPoster.clear();
-	animePicnames.clear();
-	// Note: NOT clearing animeMetadataRequested to prevent re-requesting same anime
+	// Load all cards through the manager
+	cardManager->loadAllCards();
 	
-	QSqlDatabase db = QSqlDatabase::database();
-	
-	if(!validateDatabaseConnection(db, "loadMylistAsCards"))
-	{
-		mylistStatusLabel->setText("MyList Status: Database Error");
-		return;
-	}
-	
-	// Query all mylist entries grouped by anime
-	// Note: Including poster_image in query but will load asynchronously to avoid blocking
-	qint64 startQuery = timer.elapsed();
-	QString query = "SELECT m.aid, "
-					"a.nameromaji, a.nameenglish, a.eptotal, "
-					"at.title as anime_title, "
-					"a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
-					"FROM mylist m "
-					"LEFT JOIN anime a ON m.aid = a.aid "
-					"LEFT JOIN anime_titles at ON m.aid = at.aid AND at.type = 1 "
-					"GROUP BY m.aid "
-					"ORDER BY a.nameromaji";
-	
-	QSqlQuery q(db);
-	
-	if(!q.exec(query))
-	{
-		LOG("Error loading mylist for cards: " + q.lastError().text());
-		return;
-	}
-	
-	qint64 queryElapsed = timer.elapsed() - startQuery;
-	LOG(QString("[Timing] Main mylist query took %1 ms").arg(queryElapsed));
-	
-	int cardCount = 0;
-	qint64 totalCardCreationTime = 0;
-	qint64 totalEpisodeQueryTime = 0;
-	qint64 totalPosterTime = 0;
-	
-	// Create a card for each anime
-	while(q.next())
-	{
-		qint64 startCard = timer.elapsed();
-		cardCount++;
-		
-		int aid = q.value(0).toInt();
-		QString animeName = q.value(1).toString();
-		QString animeNameEnglish = q.value(2).toString();
-		int epTotal = q.value(3).toInt();
-		QString animeTitle = q.value(4).toString();
-		int eps = q.value(5).toInt();
-		QString typeName = q.value(6).toString();
-		QString startDate = q.value(7).toString();
-		QString endDate = q.value(8).toString();
-		QString picname = q.value(9).toString();
-		QByteArray posterData = q.value(10).toByteArray();
-		QString category = q.value(11).toString();
-		
-		// Use English name if romaji is empty
-		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
-		{
-			animeName = animeNameEnglish;
-		}
-		
-		// If anime name is still empty, try anime_titles table
-		if(animeName.isEmpty() && !animeTitle.isEmpty())
-		{
-			animeName = animeTitle;
-		}
-		
-		// If anime name is still empty, use aid
-		if(animeName.isEmpty())
-		{
-			animeName = QString("Anime #%1").arg(aid);
-		}
-		
-		// Create card
-		AnimeCard *card = new AnimeCard(mylistCardContainer);
-		card->setAnimeId(aid);
-		card->setAnimeTitle(animeName);
-		
-		// Set type
-		if (!typeName.isEmpty()) {
-			card->setAnimeType(typeName);
-		} else {
-			card->setAnimeType("Unknown");
-			animeNeedingMetadata.insert(aid);
-		}
-		
-		// Set aired dates
-		if (!startDate.isEmpty()) {
-			aired airedDates(startDate, endDate);
-			card->setAired(airedDates);
-		} else {
-			card->setAiredText("Unknown");
-			animeNeedingMetadata.insert(aid);
-		}
-		
-		// Set tags/categories
-		if (!category.isEmpty()) {
-			card->setTags(category);
-		}
-		
-		// Skip synchronous poster decoding during initial card creation for better performance
-		// Store poster data for async loading after UI is responsive
-		qint64 startPoster = timer.elapsed();
-		if (!posterData.isEmpty()) {
-			// Store poster data with the card for deferred decoding
-			card->setProperty("deferredPosterData", posterData);
-		} else {
-			// Track anime needing poster download
-			if (!picname.isEmpty()) {
-				// Have picname but no image - download it
-				animeNeedingPoster.insert(aid);
-				animePicnames[aid] = picname;
-				downloadPosterForAnime(aid, picname);
-			} else {
-				// No picname - need to request anime metadata via ANIME command to get picname
-				animeNeedingPoster.insert(aid);
-				animeNeedingMetadata.insert(aid);  // Request ANIME data to get picname
-			}
-		}
-		totalPosterTime += (timer.elapsed() - startPoster);
-		
-		// Query episodes for this anime - need to get file details too
-		qint64 startEpisodeQuery = timer.elapsed();
-		QSqlQuery episodeQuery(db);
-		episodeQuery.prepare("SELECT m.lid, m.eid, m.fid, m.state, m.viewed, m.storage, "
-							"e.name as episode_name, e.epno, "
-							"f.filename, m.last_played, "
-							"lf.path as local_file_path, "
-							"f.resolution, f.quality, "
-							"g.name as group_name "
-							"FROM mylist m "
-							"LEFT JOIN episode e ON m.eid = e.eid "
-							"LEFT JOIN file f ON m.fid = f.fid "
-							"LEFT JOIN local_files lf ON m.local_file = lf.id "
-							"LEFT JOIN `group` g ON m.gid = g.gid "
-							"WHERE m.aid = ? "
-							"ORDER BY e.epno, m.lid");
-		episodeQuery.addBindValue(aid);
-		
-		// Group files by episode
-		QMap<int, AnimeCard::EpisodeInfo> episodeMap;
-		QMap<int, int> episodeFileCount;  // Track file count per episode for versioning
-		QSet<int> normalEpisodesSeen;  // Track unique normal episodes (type 1)
-		QSet<int> otherEpisodesSeen;   // Track unique other episodes (types 2-6)
-		QSet<int> viewedNormalEpisodes;  // Track viewed normal episodes
-		QSet<int> viewedOtherEpisodes;   // Track viewed other episodes
-		int totalFiles = 0;
-		
-		if (episodeQuery.exec())
-		{
-			while (episodeQuery.next())
-			{
-				int lid = episodeQuery.value(0).toInt();
-				int eid = episodeQuery.value(1).toInt();
-				int fid = episodeQuery.value(2).toInt();
-				int state = episodeQuery.value(3).toInt();
-				int viewed = episodeQuery.value(4).toInt();
-				QString storage = episodeQuery.value(5).toString();
-				QString episodeName = episodeQuery.value(6).toString();
-				QString epno = episodeQuery.value(7).toString();
-				QString filename = episodeQuery.value(8).toString();
-				qint64 lastPlayed = episodeQuery.value(9).toLongLong();
-				QString localFilePath = episodeQuery.value(10).toString();
-				QString resolution = episodeQuery.value(11).toString();
-				QString quality = episodeQuery.value(12).toString();
-				QString groupName = episodeQuery.value(13).toString();
-				
-				totalFiles++;
-				
-				// Get or create episode entry
-				if (!episodeMap.contains(eid)) {
-					AnimeCard::EpisodeInfo episodeInfo;
-					episodeInfo.eid = eid;
-					
-					if (!epno.isEmpty()) {
-						episodeInfo.episodeNumber = ::epno(epno);
-					}
-					
-					episodeInfo.episodeTitle = episodeName.isEmpty() ? "Episode" : episodeName;
-					
-					if (episodeName.isEmpty()) {
-						episodesNeedingData.insert(eid);
-					}
-					
-					episodeMap[eid] = episodeInfo;
-					episodeFileCount[eid] = 0;
-					
-					// Track episode type for statistics
-					if (!epno.isEmpty()) {
-						::epno episodeNumber(epno);
-						int epType = episodeNumber.type();
-						if (epType == 1) {
-							// Normal episode
-							normalEpisodesSeen.insert(eid);
-						} else if (epType > 1) {
-							// Special, credit, trailer, parody, or other
-							otherEpisodesSeen.insert(eid);
-						}
-					} else {
-						// If no episode number, treat as normal episode
-						normalEpisodesSeen.insert(eid);
-					}
-				}
-				
-				// Track viewed status for this file's episode
-				if (viewed) {
-					if (!epno.isEmpty()) {
-						::epno episodeNumber(epno);
-						int epType = episodeNumber.type();
-						if (epType == 1) {
-							viewedNormalEpisodes.insert(eid);
-						} else if (epType > 1) {
-							viewedOtherEpisodes.insert(eid);
-						}
-					} else {
-						// If no episode number, treat as normal episode
-						viewedNormalEpisodes.insert(eid);
-					}
-				}
-				
-				// Create file info
-				AnimeCard::FileInfo fileInfo;
-				fileInfo.lid = lid;
-				fileInfo.fid = fid;
-				fileInfo.fileName = filename.isEmpty() ? QString("FID:%1").arg(fid) : filename;
-				
-				// State string
-				switch(state)
-				{
-					case 0: fileInfo.state = "Unknown"; break;
-					case 1: fileInfo.state = "HDD"; break;
-					case 2: fileInfo.state = "CD/DVD"; break;
-					case 3: fileInfo.state = "Deleted"; break;
-					default: fileInfo.state = QString::number(state); break;
-				}
-				
-				fileInfo.viewed = (viewed != 0);
-				fileInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
-				fileInfo.lastPlayed = lastPlayed;
-				fileInfo.resolution = resolution;
-				fileInfo.quality = quality;
-				fileInfo.groupName = groupName;
-				
-				// Assign version number (v1, v2, v3, etc.)
-				episodeFileCount[eid]++;
-				fileInfo.version = episodeFileCount[eid];
-				
-				// Add file to episode
-				episodeMap[eid].files.append(fileInfo);
-			}
-		}
-		
-		totalEpisodeQueryTime += (timer.elapsed() - startEpisodeQuery);
-		
-		// Add all episodes to card in sorted order by epno
-		QList<AnimeCard::EpisodeInfo> episodeList = episodeMap.values();
-		std::sort(episodeList.begin(), episodeList.end(), [](const AnimeCard::EpisodeInfo& a, const AnimeCard::EpisodeInfo& b) {
-			// Sort by episode number using epno comparison
-			if (a.episodeNumber.isValid() && b.episodeNumber.isValid()) {
-				return a.episodeNumber < b.episodeNumber;
-			}
-			// Put invalid epno at the end
-			if (!a.episodeNumber.isValid()) {
-				return false;
-			}
-			if (!b.episodeNumber.isValid()) {
-				return true;
-			}
-			return false;
-		});
-		
-		for (const AnimeCard::EpisodeInfo& episodeInfo : episodeList) {
-			card->addEpisode(episodeInfo);
-		}
-		
-		// Set statistics - count normal and other episodes separately
-		int normalEpisodes = normalEpisodesSeen.size();
-		int otherEpisodes = otherEpisodesSeen.size();
-		int normalViewed = viewedNormalEpisodes.size();
-		int otherViewed = viewedOtherEpisodes.size();
-		int totalNormalEpisodes = (eps > 0) ? eps : normalEpisodes;  // eps is the total normal episode count
-		
-		card->setStatistics(normalEpisodes, totalNormalEpisodes, normalViewed, otherEpisodes, otherViewed);
-		
-		// Connect signals
-		connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
-		connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
-		
-		// Add to layout and track
-		mylistCardLayout->addWidget(card);
-		animeCards.append(card);
-		
-		totalCardCreationTime += (timer.elapsed() - startCard);
-	}
-	
-	LOG(QString("[Timing] Created %1 cards - Total time: %2 ms (avg %3 ms per card)")
-		.arg(cardCount)
-		.arg(totalCardCreationTime)
-		.arg(cardCount > 0 ? totalCardCreationTime / cardCount : 0));
-	LOG(QString("[Timing] Episode queries took %1 ms total (avg %2 ms per card)")
-		.arg(totalEpisodeQueryTime)
-		.arg(cardCount > 0 ? totalEpisodeQueryTime / cardCount : 0));
-	LOG(QString("[Timing] Poster operations took %1 ms total (avg %2 ms per card)")
-		.arg(totalPosterTime)
-		.arg(cardCount > 0 ? totalPosterTime / cardCount : 0));
+	// Get cards for backward compatibility with sorting code
+	animeCards = cardManager->getAllCards();
 	
 	// Apply current sort
 	qint64 startSort = timer.elapsed();
 	sortMylistCards(mylistSortComboBox->currentIndex());
 	qint64 sortElapsed = timer.elapsed() - startSort;
 	LOG(QString("[Timing] Sorting cards took %1 ms").arg(sortElapsed));
-	
-	mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
-	
-	// Load posters asynchronously in batches to keep UI responsive
-	// Process posters in small batches with delays between to avoid blocking the UI thread
-	QTimer::singleShot(10, this, [this]() {
-		qint64 startAsyncPosters = QDateTime::currentMSecsSinceEpoch();
-		LOG(QString("[Timing] Starting async poster loading"));
-		
-		// Collect all cards with pending poster data
-		QList<AnimeCard*> cardsWithPosters;
-		for (AnimeCard *card : animeCards) {
-			if (!card->property("deferredPosterData").toByteArray().isEmpty()) {
-				cardsWithPosters.append(card);
-			}
-		}
-		
-		if (cardsWithPosters.isEmpty()) {
-			return;  // Nothing to do
-		}
-		
-		const int totalPosters = cardsWithPosters.size();
-		const int BATCH_SIZE = 10; // Process 10 posters per batch
-		const int BATCH_DELAY = 5; // 5ms delay between batches
-		
-		// Create a shared counter for tracking loaded posters
-		auto postersLoaded = std::make_shared<int>(0);
-		
-		// Lambda for processing a batch of posters - must be defined as std::function to allow recursion
-		auto processBatch = std::make_shared<std::function<void(int)>>();
-		*processBatch = [this, cardsWithPosters, postersLoaded, totalPosters, 
-		                 startAsyncPosters, BATCH_SIZE, BATCH_DELAY, processBatch](int startIdx) {
-			int endIdx = std::min(startIdx + BATCH_SIZE, static_cast<int>(cardsWithPosters.size()));
-			
-			// Process this batch
-			for (int i = startIdx; i < endIdx; i++) {
-				AnimeCard *card = cardsWithPosters[i];
-				
-				// Safety check: verify card still exists in animeCards list
-				// (it may have been deleted if loadMylistAsCards was called again)
-				if (!animeCards.contains(card)) {
-					continue;  // Card was deleted, skip it
-				}
-				
-				QByteArray posterData = card->property("deferredPosterData").toByteArray();
-				if (!posterData.isEmpty()) {
-					QPixmap poster;
-					if (poster.loadFromData(posterData)) {
-						card->setPoster(poster);
-						(*postersLoaded)++;
-					}
-					// Clear stored data to free memory
-					card->setProperty("deferredPosterData", QVariant());
-				}
-			}
-			
-			// If there are more posters, schedule next batch
-			if (endIdx < cardsWithPosters.size()) {
-				QTimer::singleShot(BATCH_DELAY, this, [processBatch, endIdx]() {
-					(*processBatch)(endIdx);
-				});
-			} else {
-				// All posters loaded
-				qint64 asyncPostersElapsed = QDateTime::currentMSecsSinceEpoch() - startAsyncPosters;
-				LOG(QString("[Timing] Async poster loading completed: %1 ms for %2 posters (avg %3 ms)")
-					.arg(asyncPostersElapsed)
-					.arg(*postersLoaded)
-					.arg(*postersLoaded > 0 ? asyncPostersElapsed / (*postersLoaded) : 0));
-			}
-		};
-		
-		// Start processing first batch
-		if (!cardsWithPosters.isEmpty()) {
-			(*processBatch)(0);
-		}
-	});
-	
-	// Request missing data if needed
-	qint64 startRequests = timer.elapsed();
-	if (!episodesNeedingData.isEmpty()) {
-		LOG(QString("Need episode data for %1 episodes").arg(episodesNeedingData.size()));
-	}
-	if (!animeNeedingMetadata.isEmpty()) {
-		// Filter out anime we've already requested to prevent spam
-		QSet<int> toRequest = animeNeedingMetadata - animeMetadataRequested;
-		if (!toRequest.isEmpty()) {
-			// Convert set to list for processing
-			QList<int> requestList = toRequest.values();
-			int total = requestList.size();
-			
-			LOG(QString("Queueing %1 ANIME metadata requests (batched)...").arg(total));
-			
-			// Batch insert all requests in a single transaction for speed
-			QSqlDatabase apiDb = QSqlDatabase::database();
-			apiDb.transaction();
-			
-			for (int aid : requestList) {
-				// Call adbapi->Anime() which will queue the request
-				adbapi->Anime(aid);
-				animeMetadataRequested.insert(aid);
-			}
-			
-			apiDb.commit();
-			
-			LOG(QString("Completed queueing %1 ANIME requests").arg(total));
-		}
-	}
-	if (!animeNeedingPoster.isEmpty()) {
-		LOG(QString("Need poster images for %1 anime").arg(animeNeedingPoster.size()));
-	}
-	
-	qint64 requestsElapsed = timer.elapsed() - startRequests;
-	LOG(QString("[Timing] Queueing metadata requests took %1 ms").arg(requestsElapsed));
 	
 	qint64 totalElapsed = timer.elapsed();
 	LOG(QString("[Timing] Total loadMylistAsCards took %1 ms").arg(totalElapsed));

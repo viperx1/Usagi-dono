@@ -1,0 +1,148 @@
+#ifndef MYLISTCARDMANAGER_H
+#define MYLISTCARDMANAGER_H
+
+#include <QObject>
+#include <QMap>
+#include <QSet>
+#include <QMutex>
+#include <QTimer>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkReply>
+#include "animecard.h"
+#include "flowlayout.h"
+
+/**
+ * MyListCardManager - Manages the lifecycle and updates of anime cards
+ * 
+ * This class provides:
+ * - Card caching and lookup by anime ID
+ * - Individual card updates without full reload
+ * - Asynchronous data loading and updates
+ * - Decoupled card management from main Window class
+ * 
+ * Design principles:
+ * - Cards are created once and updated individually
+ * - All updates are asynchronous using Qt signals/slots
+ * - Thread-safe operations with mutex protection
+ * - Efficient batch processing for multiple updates
+ */
+class MyListCardManager : public QObject
+{
+    Q_OBJECT
+    
+public:
+    explicit MyListCardManager(QObject *parent = nullptr);
+    virtual ~MyListCardManager();
+    
+    // Set the layout where cards will be displayed
+    void setCardLayout(FlowLayout *layout);
+    
+    // Initialize cards from database (call once on startup or view switch)
+    void loadAllCards();
+    
+    // Clear all cards (when switching views or shutting down)
+    void clearAllCards();
+    
+    // Get card by anime ID (returns nullptr if not found)
+    AnimeCard* getCard(int aid);
+    
+    // Check if a card exists for given anime ID
+    bool hasCard(int aid) const;
+    
+    // Get all cards (for sorting operations)
+    QList<AnimeCard*> getAllCards() const;
+    
+    // Individual update methods (asynchronous)
+    void updateCardAnimeInfo(int aid);
+    void updateCardEpisode(int aid, int eid);
+    void updateCardStatistics(int aid);
+    void updateCardPoster(int aid, const QString &picname);
+    
+    // Batch update methods for efficiency
+    void updateMultipleCards(const QSet<int> &aids);
+    
+    // Add or update a single mylist entry (creates card if needed)
+    void updateOrAddMylistEntry(int lid);
+    
+signals:
+    // Emitted when a card is created
+    void cardCreated(int aid, AnimeCard *card);
+    
+    // Emitted when a card is updated
+    void cardUpdated(int aid);
+    
+    // Emitted when all cards are loaded
+    void allCardsLoaded(int count);
+    
+    // Emitted when a card needs to be sorted
+    void cardNeedsSorting(int aid);
+    
+public slots:
+    // Slot to handle episode updates from API
+    void onEpisodeUpdated(int eid, int aid);
+    
+    // Slot to handle anime updates from API
+    void onAnimeUpdated(int aid);
+    
+    // Slot to handle poster download completion
+    void onPosterDownloadFinished(QNetworkReply *reply);
+    
+private slots:
+    // Timer slot for batched updates
+    void processBatchedUpdates();
+    
+private:
+    // Create a single card for an anime
+    AnimeCard* createCard(int aid);
+    
+    // Update card data from database
+    void updateCardFromDatabase(int aid);
+    
+    // Load episode data for a card
+    void loadEpisodesForCard(AnimeCard *card, int aid);
+    
+    // Request missing anime metadata
+    void requestAnimeMetadata(int aid);
+    
+    // Download poster for anime
+    void downloadPoster(int aid, const QString &picname);
+    
+    // Helper to calculate statistics for an anime
+    struct AnimeStats {
+        int normalEpisodes;
+        int totalNormalEpisodes;
+        int normalViewed;
+        int otherEpisodes;
+        int otherViewed;
+    };
+    AnimeStats calculateStatistics(int aid);
+    
+    // Card cache indexed by anime ID
+    QMap<int, AnimeCard*> m_cards;
+    
+    // Layout where cards are displayed
+    FlowLayout *m_layout;
+    
+    // Network manager for poster downloads
+    QNetworkAccessManager *m_networkManager;
+    
+    // Tracking for pending operations
+    QSet<int> m_episodesNeedingData;
+    QSet<int> m_animeNeedingMetadata;
+    QSet<int> m_animeMetadataRequested;
+    QSet<int> m_animeNeedingPoster;
+    QMap<int, QString> m_animePicnames;
+    QMap<QNetworkReply*, int> m_posterDownloadRequests;
+    
+    // Batched updates for efficiency
+    QSet<int> m_pendingCardUpdates;
+    QTimer *m_batchUpdateTimer;
+    
+    // Thread safety
+    mutable QMutex m_mutex;
+    
+    // Constants
+    static const int BATCH_UPDATE_DELAY = 50; // ms
+};
+
+#endif // MYLISTCARDMANAGER_H

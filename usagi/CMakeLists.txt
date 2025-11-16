@@ -53,6 +53,7 @@ set(SOURCES
     src/playbuttondelegate.cpp
     src/animecard.cpp
     src/flowlayout.cpp
+    src/mylistcardmanager.cpp
 )
 
 # Header files
@@ -75,6 +76,7 @@ set(HEADERS
     src/playbuttondelegate.h
     src/animecard.h
     src/flowlayout.h
+    src/mylistcardmanager.h
 )
 
 # Create executable
