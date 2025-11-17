@@ -4968,6 +4968,16 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
         // Mark the file in local_files as bound to anime (binding_status 1)
         adbapi->UpdateLocalFileBindingStatus(fileData.filepath, 1);
         
+        // Reload mylist to show the newly bound file
+        // Note: This happens immediately, before the API response. 
+        // The actual entry will appear after the API confirms (210 response)
+        // but we refresh the display to pick up the binding_status change
+        if(mylistUseCardView) {
+            loadMylistAsCards();
+        } else {
+            loadMylistFromDatabase();
+        }
+        
         // Remove from unknown files widget after successful binding
         unknownFiles->removeRow(row);
         unknownFilesData.remove(row);

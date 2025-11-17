@@ -2209,14 +2209,14 @@ QString AniDBApi::buildMylistAddGenericCommand(int aid, QString epno, int viewed
 	}
 	if(storage.length() > 0)
 	{
-		msg += QString("&storage=%1").arg(storage);
+		msg += QString("&storage=%1").arg(QString(QUrl::toPercentEncoding(storage)));
 	}
 	if(other.length() > 0)
 	{
-		// Replace newlines with <br> as per API specification
+		// Replace newlines with <br> as per API specification, then URL-encode
 		QString escapedOther = other;
 		escapedOther.replace("\n", "<br>");
-		msg += QString("&other=%1").arg(escapedOther);
+		msg += QString("&other=%1").arg(QString(QUrl::toPercentEncoding(escapedOther)));
 	}
 	msg += QString("&state=%1").arg(state);
 	return msg;
