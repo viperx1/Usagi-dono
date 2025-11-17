@@ -94,6 +94,7 @@ Window::Window()
     button2 = new QPushButton("Add directories...");
 	button3 = new QPushButton("Last directory");
     hashes = new hashes_; // QTableWidget
+    unknownFiles = new unknown_files_(this); // Unknown files widget
     hasherOutput = new QTextEdit;
 	hasherFileState = new QComboBox;
 	addtomylist = new QCheckBox("Add file(s) to MyList");
@@ -129,6 +130,17 @@ Window::Window()
     progressTotalLayout->addWidget(progressTotalLabel);
 
     pageHasher->addWidget(hashes, 1);
+    
+    // Add unknown files widget with a label (initially hidden)
+    QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
+    unknownFilesLabel->setObjectName("unknownFilesLabel");
+    pageHasher->addWidget(unknownFilesLabel);
+    pageHasher->addWidget(unknownFiles, 0, Qt::AlignTop);
+    
+    // Hide unknown files section initially
+    unknownFilesLabel->hide();
+    unknownFiles->hide();
+    
     pageHasher->addLayout(pageHasherSettings);
     pageHasher->addLayout(progress);
     pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
@@ -1572,6 +1584,69 @@ bool hashes_::event(QEvent *e)
 	}
 }
 
+// unknown_files_ implementation
+unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
+{
+    setColumnCount(4);
+    setRowCount(0);
+    setRowHeight(0, 20);
+    verticalHeader()->setDefaultSectionSize(20);
+    setSelectionBehavior(QAbstractItemView::SelectRows);
+    setEditTriggers(QAbstractItemView::NoEditTriggers);
+    verticalHeader()->hide();
+    setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    setHorizontalHeaderLabels(QStringList() << "Filename" << "Anime" << "Episode" << "Action");
+    setColumnWidth(0, 400);
+    setColumnWidth(1, 300);
+    setColumnWidth(2, 200);
+    setColumnWidth(3, 100);
+    setMaximumHeight(200); // Limit height so it doesn't dominate the UI
+}
+
+bool unknown_files_::event(QEvent *e)
+{
+    if(e->type() == QEvent::KeyPress)
+    {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(e);
+        if(keyEvent->key() == Qt::Key_Delete)
+        {
+            setUpdatesEnabled(0);
+            QList<QTableWidgetItem *> selitems = selectedItems();
+            QList<int> selrows;
+            while(!selitems.isEmpty())
+            {
+                if(!selrows.contains(selitems.first()->row()))
+                {
+                    selrows.append(selitems.first()->row());
+                    selitems.pop_front();
+                }
+                else
+                {
+                    selitems.pop_front();
+                }
+            }
+            std::sort(selrows.begin(), selrows.end());
+            while(!selrows.isEmpty())
+            {
+                int item = selrows.last();
+                selrows.pop_back();
+                removeRow(item);
+            }
+            setUpdatesEnabled(1);
+            return true;
+        }
+        else
+        {
+            return QTableWidget::event(e);
+        }
+    }
+    else
+    {
+        return QTableWidget::event(e);
+    }
+}
+
 void Window::getNotifyLogAppend(QString str)
 {
 	QTime t;
@@ -1685,6 +1760,18 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 // Update status in local_files to 3 (not in anidb)
                 QString localPath = hashes->item(i, 2)->text();
                 adbapi->UpdateLocalFileStatus(localPath, 3);
+                
+                // Add to unknown files widget for manual binding
+                QString filename = hashes->item(i, 0)->text();
+                QString filepath = hashes->item(i, 2)->text();
+                QString hash = hashes->item(i, 9)->text();
+                
+                // Get file size
+                QFileInfo fileInfo(filepath);
+                qint64 fileSize = fileInfo.size();
+                
+                unknownFilesInsertRow(filename, filepath, hash, fileSize);
+                LOG(QString("Added unknown file to manual binding widget: %1").arg(filename));
                 
                 return;
             }
@@ -2550,6 +2637,156 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& 
 	hashes->setItem(hashes->rowCount()-1, 7, item8);
 	hashes->setItem(hashes->rowCount()-1, 8, item9);
 	hashes->setItem(hashes->rowCount()-1, 9, item10);
+}
+
+void Window::unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
+{
+    // Show the unknown files widget if it's hidden
+    QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
+    if(unknownFilesLabel && unknownFilesLabel->isHidden())
+    {
+        unknownFilesLabel->show();
+    }
+    if(unknownFiles->isHidden())
+    {
+        unknownFiles->show();
+    }
+    
+    int row = unknownFiles->rowCount();
+    unknownFiles->insertRow(row);
+    
+    // Column 0: Filename
+    QTableWidgetItem *filenameItem = new QTableWidgetItem(filename);
+    filenameItem->setToolTip(filepath);
+    unknownFiles->setItem(row, 0, filenameItem);
+    
+    // Column 1: Anime search field (using QLineEdit with autocomplete)
+    QLineEdit *animeSearch = new QLineEdit();
+    animeSearch->setPlaceholderText("Search anime title...");
+    
+    // Set up autocomplete using anime_titles database
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
+    query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
+    
+    QStringList animeTitles;
+    QMap<QString, int> titleToAid;
+    
+    while(query.next())
+    {
+        int aid = query.value(0).toInt();
+        QString title = query.value(1).toString();
+        QString displayText = QString("%1: %2").arg(aid).arg(title);
+        animeTitles << displayText;
+        titleToAid[displayText] = aid;
+    }
+    
+    QCompleter *completer = new QCompleter(animeTitles, animeSearch);
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    completer->setFilterMode(Qt::MatchContains);
+    animeSearch->setCompleter(completer);
+    
+    unknownFiles->setCellWidget(row, 1, animeSearch);
+    
+    // Column 2: Episode selector (QComboBox, initially empty)
+    QComboBox *episodeCombo = new QComboBox();
+    episodeCombo->addItem("Select anime first", -1);
+    episodeCombo->setEnabled(false);
+    unknownFiles->setCellWidget(row, 2, episodeCombo);
+    
+    // Column 3: Bind button
+    QPushButton *bindButton = new QPushButton("Bind");
+    bindButton->setEnabled(false);
+    unknownFiles->setCellWidget(row, 3, bindButton);
+    
+    // Store file data
+    UnknownFileData fileData;
+    fileData.filename = filename;
+    fileData.filepath = filepath;
+    fileData.hash = hash;
+    fileData.size = size;
+    fileData.selectedAid = -1;
+    fileData.selectedEid = -1;
+    unknownFilesData[row] = fileData;
+    
+    // Connect anime search to populate episodes
+    connect(animeSearch, &QLineEdit::textChanged, [this, row, animeSearch, episodeCombo, bindButton, titleToAid]() {
+        QString searchText = animeSearch->text();
+        
+        // Check if the text matches a valid anime from autocomplete
+        if(titleToAid.contains(searchText))
+        {
+            int aid = titleToAid[searchText];
+            unknownFilesData[row].selectedAid = aid;
+            
+            // Populate episodes for this anime
+            QSqlDatabase db = QSqlDatabase::database();
+            QSqlQuery query(db);
+            query.prepare("SELECT eid, epno, name FROM episode WHERE eid IN (SELECT DISTINCT eid FROM file WHERE aid = ?) ORDER BY epno");
+            query.addBindValue(aid);
+            
+            episodeCombo->clear();
+            episodeCombo->setEnabled(true);
+            
+            if(query.exec())
+            {
+                int count = 0;
+                while(query.next())
+                {
+                    int eid = query.value(0).toInt();
+                    QString epno = query.value(1).toString();
+                    QString name = query.value(2).toString();
+                    QString displayText = QString("%1: %2").arg(epno).arg(name);
+                    episodeCombo->addItem(displayText, eid);
+                    count++;
+                }
+                
+                if(count == 0)
+                {
+                    episodeCombo->addItem("No episodes found", -1);
+                    episodeCombo->setEnabled(false);
+                }
+            }
+            else
+            {
+                episodeCombo->addItem("Error loading episodes", -1);
+                episodeCombo->setEnabled(false);
+            }
+        }
+        else
+        {
+            // Clear episode selection if anime is not valid
+            episodeCombo->clear();
+            episodeCombo->addItem("Select anime first", -1);
+            episodeCombo->setEnabled(false);
+            bindButton->setEnabled(false);
+            unknownFilesData[row].selectedAid = -1;
+            unknownFilesData[row].selectedEid = -1;
+        }
+    });
+    
+    // Connect episode selection
+    connect(episodeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this, row, episodeCombo, bindButton](int index) {
+        if(index >= 0)
+        {
+            int eid = episodeCombo->itemData(index).toInt();
+            if(eid > 0)
+            {
+                unknownFilesData[row].selectedEid = eid;
+                bindButton->setEnabled(true);
+            }
+            else
+            {
+                unknownFilesData[row].selectedEid = -1;
+                bindButton->setEnabled(false);
+            }
+        }
+    });
+    
+    // Connect bind button
+    connect(bindButton, &QPushButton::clicked, [this, row]() {
+        onUnknownFileBindClicked(row);
+    });
 }
 
 void Window::loadMylistFromDatabase()
@@ -4549,4 +4786,113 @@ void Window::onCardEpisodeClicked(int lid)
 	LOG(QString("Episode clicked with LID: %1").arg(lid));
 	// Start playback for the episode
 	startPlaybackForFile(lid);
+}
+
+// Unknown files handling slots
+void Window::onUnknownFileAnimeSearchChanged(int row)
+{
+    // This is handled by the lambda in unknownFilesInsertRow
+    // Placeholder for future enhancements
+}
+
+void Window::onUnknownFileEpisodeSelected(int row)
+{
+    // This is handled by the lambda in unknownFilesInsertRow
+    // Placeholder for future enhancements
+}
+
+void Window::onUnknownFileBindClicked(int row)
+{
+    if(!unknownFilesData.contains(row))
+    {
+        LOG(QString("Error: Unknown file data not found for row %1").arg(row));
+        return;
+    }
+    
+    UnknownFileData &fileData = unknownFilesData[row];
+    
+    if(fileData.selectedAid <= 0 || fileData.selectedEid <= 0)
+    {
+        LOG(QString("Error: Invalid anime or episode selection for row %1").arg(row));
+        QMessageBox::warning(this, "Invalid Selection", "Please select both an anime and an episode before binding.");
+        return;
+    }
+    
+    LOG(QString("Binding unknown file: %1 to anime %2, episode %3")
+        .arg(fileData.filename)
+        .arg(fileData.selectedAid)
+        .arg(fileData.selectedEid));
+    
+    // Get file details from episode to populate mylist entry
+    QSqlDatabase db = QSqlDatabase::database();
+    if(!validateDatabaseConnection(db, "onUnknownFileBindClicked"))
+    {
+        return;
+    }
+    
+    QSqlQuery query(db);
+    query.prepare("SELECT fid, gid FROM file WHERE eid = :eid LIMIT 1");
+    query.bindValue(":eid", fileData.selectedEid);
+    
+    int fid = -1;
+    int gid = -1;
+    
+    if(query.exec() && query.next())
+    {
+        fid = query.value(0).toInt();
+        gid = query.value(1).toInt();
+    }
+    
+    // Create a manual mylist entry using MYLISTADD with fid/size/ed2k
+    // Use the settings from the UI
+    int viewed = 0;
+    if(markwatched->checkState() == Qt::Checked) {
+        viewed = 1;
+    } else if(markwatched->checkState() == Qt::PartiallyChecked) {
+        viewed = 0;
+    } else {
+        viewed = -1; // no change
+    }
+    
+    int state = hasherFileState->currentIndex();
+    QString storageStr = storage->text();
+    
+    // Add to mylist via API
+    if(addtomylist->isChecked() && adbapi->LoggedIn())
+    {
+        LOG(QString("Adding unknown file to mylist: size=%1, hash=%2")
+            .arg(fileData.size)
+            .arg(fileData.hash));
+        
+        adbapi->MylistAdd(fileData.size, fileData.hash, viewed, state, storageStr, false);
+        
+        // Mark the file in local_files as bound (status 2 = identified and in mylist)
+        adbapi->UpdateLocalFileStatus(fileData.filepath, 2);
+        
+        // Remove from unknown files widget after successful binding
+        unknownFiles->removeRow(row);
+        unknownFilesData.remove(row);
+        
+        // Update row indices in unknownFilesData map
+        QMap<int, UnknownFileData> newMap;
+        for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
+        {
+            int oldRow = it.key();
+            if(oldRow > row) {
+                newMap[oldRow - 1] = it.value();
+            } else {
+                newMap[oldRow] = it.value();
+            }
+        }
+        unknownFilesData = newMap;
+        
+        LOG(QString("Successfully bound unknown file to anime %1, episode %2")
+            .arg(fileData.selectedAid)
+            .arg(fileData.selectedEid));
+    }
+    else
+    {
+        QMessageBox::warning(this, "Cannot Add", 
+            "Please enable 'Add file(s) to MyList' and ensure you are logged in.");
+    }
 }

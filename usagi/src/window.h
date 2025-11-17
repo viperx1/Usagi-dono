@@ -62,6 +62,15 @@ public:
 	bool event(QEvent *e);
 };
 
+// Custom table widget for unknown files (files not in AniDB database)
+class unknown_files_ : public QTableWidget
+{
+    Q_OBJECT
+public:
+    unknown_files_(QWidget *parent = nullptr);
+    bool event(QEvent *e) override;
+};
+
 // Custom tree widget item that can sort episodes using epno type
 class EpisodeTreeWidgetItem : public QTreeWidgetItem
 {
@@ -525,17 +534,35 @@ public slots:
     
     // Hasher slots
     void provideNextFileToHash();
+    
+    // Unknown files slots
+    void onUnknownFileAnimeSearchChanged(int row);
+    void onUnknownFileEpisodeSelected(int row);
+    void onUnknownFileBindClicked(int row);
 
 signals:
 	void notifyStopHasher();
 public:
 	// page hasher
     hashes_ *hashes;
+    unknown_files_ *unknownFiles;
 	void hashesinsertrow(QFileInfo, Qt::CheckState, const QString& preloadedHash = QString());
+    void unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size);
 	int parseMylistExport(const QString &tarGzPath);
     Window();
 	~Window();
 private:
+    // Unknown files data structure
+    struct UnknownFileData {
+        QString filename;
+        QString filepath;
+        QString hash;
+        qint64 size;
+        int selectedAid;
+        int selectedEid;
+    };
+    QMap<int, UnknownFileData> unknownFilesData; // row index -> file data
+    
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
     void insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeItem, const QMap<QPair<int, int>, QTreeWidgetItem*>& episodeItems);
