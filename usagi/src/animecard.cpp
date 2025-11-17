@@ -1,5 +1,6 @@
 #include "animecard.h"
 #include "playbuttondelegate.h"
+#include "logger.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
@@ -115,9 +116,16 @@ void AnimeCard::setupUI()
     m_episodeTree->setUniformRowHeights(false);  // Allow rows to have different heights
     m_mainLayout->addWidget(m_episodeTree, 1);
     
+    // Debug: Log tree widget configuration
+    LOG(QString("AnimeCard: Tree widget configured with %1 columns, widths: [0]=%2px, [1]=%3px")
+        .arg(m_episodeTree->columnCount())
+        .arg(m_episodeTree->columnWidth(0))
+        .arg(m_episodeTree->columnWidth(1)));
+    
     // Create play button delegate for column 1
     m_playButtonDelegate = new PlayButtonDelegate(this);
     m_episodeTree->setItemDelegateForColumn(1, m_playButtonDelegate);
+    LOG(QString("AnimeCard: PlayButtonDelegate attached to column 1"));
     
     // Connect play button clicks to emit episodeClicked signal
     connect(m_playButtonDelegate, &PlayButtonDelegate::playButtonClicked, this, [this](const QModelIndex &index) {
@@ -145,7 +153,6 @@ void AnimeCard::setAnimeTitle(const QString& title)
 {
     m_animeTitle = title;
     m_titleLabel->setText(title);
-    m_titleLabel->setToolTip(title);
 }
 
 void AnimeCard::setAnimeType(const QString& type)
@@ -278,6 +285,14 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         }
     }
     
+    // Debug logging for play button visibility
+    LOG(QString("AnimeCard: Episode %1 (%2) - files: %3, anyFileExists: %4, existingFileLid: %5")
+        .arg(episode.eid)
+        .arg(episodeText)
+        .arg(episode.files.size())
+        .arg(anyFileExists ? "YES" : "NO")
+        .arg(existingFileLid));
+    
     if (anyFileExists) {
         episodeItem->setText(1, "▶"); // Play button if any file exists
         episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the play button
@@ -285,10 +300,12 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
         // Store the lid of the first available file for playback
         episodeItem->setData(2, Qt::UserRole, existingFileLid);
+        LOG(QString("AnimeCard: Play button SET for episode %1 in column 1").arg(episode.eid));
     } else {
         episodeItem->setText(1, "");
         episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no button
         episodeItem->setData(2, Qt::UserRole, 0);  // 0 means it's an episode with no files
+        LOG(QString("AnimeCard: Play button NOT set for episode %1 (no existing files)").arg(episode.eid));
     }
     
     // Column 2: Episode info
@@ -309,12 +326,20 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             fileExists = QFile::exists(file.localFilePath);
         }
         
+        // Debug logging for file play button
+        LOG(QString("AnimeCard: File lid=%1, localPath='%2', exists=%3")
+            .arg(file.lid)
+            .arg(file.localFilePath)
+            .arg(fileExists ? "YES" : "NO"));
+        
         if (fileExists) {
             fileItem->setText(1, "▶"); // Play button for existing files
             fileItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
+            LOG(QString("AnimeCard: Play button SET for file lid=%1 in column 1").arg(file.lid));
         } else {
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(QColor(Qt::red)));
+            LOG(QString("AnimeCard: X marker SET for file lid=%1 in column 1 (file missing)").arg(file.lid));
         }
         
         // Format file text with version indicator
