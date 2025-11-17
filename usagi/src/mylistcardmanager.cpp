@@ -242,6 +242,50 @@ void MyListCardManager::onAnimeUpdated(int aid)
     // Remove from tracking
     QMutexLocker locker(&m_mutex);
     m_animeNeedingMetadata.remove(aid);
+    AnimeCard *card = m_cards.value(aid, nullptr);
+    
+    // Hide warning only if both metadata and poster are no longer needed
+    bool stillNeedsData = m_animeNeedingPoster.contains(aid);
+    locker.unlock();
+    
+    if (card && !stillNeedsData) {
+        card->setNeedsFetch(false);
+    }
+}
+
+void MyListCardManager::onFetchDataRequested(int aid)
+{
+    LOG(QString("[MyListCardManager] Manual fetch requested for anime %1").arg(aid));
+    
+    QMutexLocker locker(&m_mutex);
+    
+    bool needsMetadata = false;
+    bool needsPoster = false;
+    
+    // Request metadata if not already requested
+    if (!m_animeMetadataRequested.contains(aid)) {
+        m_animeMetadataRequested.insert(aid);
+        needsMetadata = true;
+    }
+    
+    // Request poster if needed and not already downloaded
+    if (m_animeNeedingPoster.contains(aid) && m_animePicnames.contains(aid)) {
+        QString picname = m_animePicnames[aid];
+        needsPoster = true;
+        locker.unlock();
+        
+        if (needsMetadata) {
+            requestAnimeMetadata(aid);
+        }
+        if (needsPoster) {
+            downloadPoster(aid, picname);
+        }
+    } else {
+        locker.unlock();
+        if (needsMetadata) {
+            requestAnimeMetadata(aid);
+        }
+    }
 }
 
 void MyListCardManager::onPosterDownloadFinished(QNetworkReply *reply)
@@ -284,6 +328,18 @@ void MyListCardManager::onPosterDownloadFinished(QNetworkReply *reply)
     QPixmap poster;
     if (poster.loadFromData(imageData)) {
         card->setPoster(poster);
+        
+        // Remove from tracking
+        QMutexLocker locker(&m_mutex);
+        m_animeNeedingPoster.remove(aid);
+        
+        // Hide warning if metadata is also no longer needed
+        bool stillNeedsData = m_animeNeedingMetadata.contains(aid);
+        locker.unlock();
+        
+        if (!stillNeedsData) {
+            card->setNeedsFetch(false);
+        }
         
         // Store in database for future use
         QSqlDatabase db = QSqlDatabase::database();
@@ -464,7 +520,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     } else if (!picname.isEmpty()) {
         m_animePicnames[aid] = picname;
         m_animeNeedingPoster.insert(aid);
-        downloadPoster(aid, picname);
+        // Disabled auto-download - user can request via context menu
+        // downloadPoster(aid, picname);
     } else {
         m_animeNeedingPoster.insert(aid);
         m_animeNeedingMetadata.insert(aid);
@@ -490,10 +547,12 @@ AnimeCard* MyListCardManager::createCard(int aid)
     m_cards[aid] = card;
     locker.unlock();
     
-    // Request missing metadata if needed
-    if (m_animeNeedingMetadata.contains(aid) && !m_animeMetadataRequested.contains(aid)) {
-        requestAnimeMetadata(aid);
-        m_animeMetadataRequested.insert(aid);
+    // Connect fetch data request signal from card
+    connect(card, &AnimeCard::fetchDataRequested, this, &MyListCardManager::onFetchDataRequested);
+    
+    // Show warning indicator if metadata or poster is missing (instead of auto-fetching)
+    if (m_animeNeedingMetadata.contains(aid) || m_animeNeedingPoster.contains(aid)) {
+        card->setNeedsFetch(true);
     }
     
     emit cardCreated(aid, card);
