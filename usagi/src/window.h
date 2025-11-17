@@ -540,7 +540,8 @@ public slots:
     // Unknown files slots
     void onUnknownFileAnimeSearchChanged(int row);
     void onUnknownFileEpisodeSelected(int row);
-    void onUnknownFileBindClicked(int row);
+    void onUnknownFileBindClicked(int row, const QString& epno);
+    void onUnknownFileNotAnimeClicked(int row);
 
 signals:
 	void notifyStopHasher();
@@ -550,6 +551,7 @@ public:
     unknown_files_ *unknownFiles;
 	void hashesinsertrow(QFileInfo, Qt::CheckState, const QString& preloadedHash = QString());
     void unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size);
+    void loadUnboundFiles();
 	int parseMylistExport(const QString &tarGzPath);
     Window();
 	~Window();

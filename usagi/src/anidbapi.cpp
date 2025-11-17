@@ -123,9 +123,12 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `last_checked` INTEGER");
 		// Create local_files table for directory watcher feature
 		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
-		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT)");
+		// binding_status: 0=not_bound, 1=bound_to_anime, 2=not_anime
+		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT, `binding_status` INTEGER DEFAULT 0)");
 		// Add ed2k_hash column to local_files if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `local_files` ADD COLUMN `ed2k_hash` TEXT");
+		// Add binding_status column to local_files if it doesn't exist (for existing databases)
+		query.exec("ALTER TABLE `local_files` ADD COLUMN `binding_status` INTEGER DEFAULT 0");
 		// Add local_file column to mylist if it doesn't exist (references local_files.id)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
@@ -1489,6 +1492,24 @@ QString AniDBApi::MylistAdd(qint64 size, QString ed2khash, int viewed, int state
 	return GetTag(msg);
 }
 
+QString AniDBApi::MylistAddGeneric(int aid, QString epno, int viewed, int state, QString storage, QString other)
+{
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	QString msg = buildMylistAddGenericCommand(aid, epno, viewed, state, storage, other);
+	QString q;
+	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		Logger::log("[AniDB MylistAddGeneric] Database insert error: " + query.lastError().text(), __FILE__, __LINE__);
+		return "0";
+	}
+	return GetTag(msg);
+}
+
 QString AniDBApi::File(qint64 size, QString ed2k)
 {
 	// Check if file already exists in database
@@ -2179,6 +2200,28 @@ QString AniDBApi::buildMylistAddCommand(qint64 size, QString ed2khash, int viewe
 	return msg;
 }
 
+QString AniDBApi::buildMylistAddGenericCommand(int aid, QString epno, int viewed, int state, QString storage, QString other)
+{
+	QString msg = QString("MYLISTADD aid=%1&generic=1&epno=%2").arg(aid).arg(epno);
+	if(viewed > 0 && viewed < 3)
+	{
+		msg += QString("&viewed=%1").arg(viewed-1);
+	}
+	if(storage.length() > 0)
+	{
+		msg += QString("&storage=%1").arg(storage);
+	}
+	if(other.length() > 0)
+	{
+		// Replace newlines with <br> as per API specification
+		QString escapedOther = other;
+		escapedOther.replace("\n", "<br>");
+		msg += QString("&other=%1").arg(escapedOther);
+	}
+	msg += QString("&state=%1").arg(state);
+	return msg;
+}
+
 QString AniDBApi::buildMylistCommand(int lid)
 {
 	return QString("MYLIST lid=%1").arg(lid);
@@ -2859,6 +2902,32 @@ void AniDBApi::UpdateLocalFileStatus(QString localPath, int status)
 	}
 }
 
+void AniDBApi::UpdateLocalFileBindingStatus(QString localPath, int bindingStatus)
+{
+	// Check if database is valid and open before using it
+	if (!db.isValid() || !db.isOpen())
+	{
+		LOG("Database not available, cannot update local file binding status");
+		return;
+	}
+	
+	// Update the binding_status in local_files table
+	// binding_status: 0=not_bound, 1=bound_to_anime, 2=not_anime
+	QSqlQuery query(db);
+	query.prepare("UPDATE `local_files` SET `binding_status` = ? WHERE `path` = ?");
+	query.addBindValue(bindingStatus);
+	query.addBindValue(localPath);
+	
+	if(query.exec())
+	{
+		LOG(QString("Updated local_files binding_status for path=%1 to binding_status=%2").arg(localPath).arg(bindingStatus));
+	}
+	else
+	{
+		LOG("Failed to update local_files binding_status: " + query.lastError().text());
+	}
+}
+
 void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int status)
 {
 	// Check if database is valid and open before using it
@@ -3048,7 +3117,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 		placeholders.append("?");
 	}
 	
-	QString queryStr = QString("SELECT `path`, `ed2k_hash`, `status` FROM `local_files` WHERE `path` IN (%1)")
+	QString queryStr = QString("SELECT `path`, `ed2k_hash`, `status`, `binding_status` FROM `local_files` WHERE `path` IN (%1)")
 	                   .arg(placeholders.join(","));
 	
 	qint64 buildQueryTime = buildQueryTimer.elapsed();
@@ -3089,6 +3158,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 		info.path = query.value(0).toString();
 		info.hash = query.value(1).toString();
 		info.status = query.value(2).toInt();
+		info.bindingStatus = query.value(3).toInt();
 		
 		results[info.path] = info;
 	}
@@ -3099,6 +3169,48 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	Logger::log(QString("[TIMING] batchGetLocalFileHashes TOTAL for %1 paths (found %2): %3 ms [anidbapi.cpp]")
 	            .arg(filePaths.size()).arg(results.size()).arg(totalTime), __FILE__, __LINE__);
 	
+	return results;
+}
+
+QList<AniDBApi::FileHashInfo> AniDBApi::getUnboundFiles()
+{
+	QList<FileHashInfo> results;
+	
+	// Check if database is valid and open
+	if (!db.isValid() || !db.isOpen())
+	{
+		LOG("Database not available, cannot get unbound files");
+		return results;
+	}
+	
+	// Get files where binding_status is 0 (not_bound) and status is 3 (not in anidb)
+	QSqlQuery query(db);
+	query.prepare("SELECT `path`, `filename`, `ed2k_hash`, `status`, `binding_status` FROM `local_files` WHERE `binding_status` = 0 AND `status` = 3 AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
+	
+	if (!query.exec())
+	{
+		LOG(QString("Failed to get unbound files: %1").arg(query.lastError().text()));
+		return results;
+	}
+	
+	while (query.next())
+	{
+		FileHashInfo info;
+		info.path = query.value(0).toString();
+		// Use filename field if available, otherwise extract from path
+		QString filename = query.value(1).toString();
+		if (filename.isEmpty()) {
+			QFileInfo fileInfo(info.path);
+			filename = fileInfo.fileName();
+		}
+		info.hash = query.value(2).toString();
+		info.status = query.value(3).toInt();
+		info.bindingStatus = query.value(4).toInt();
+		
+		results.append(info);
+	}
+	
+	LOG(QString("Found %1 unbound files").arg(results.size()));
 	return results;
 }
 

@@ -330,6 +330,7 @@ public:
 	QString Auth();
 	QString Logout();
     QString MylistAdd(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit = 0);
+    QString MylistAddGeneric(int aid, QString epno, int viewed, int state, QString storage, QString other);
     QString Mylist(int lid = -1);
     QString File(qint64, QString);
 	QString PushAck(int nid);
@@ -343,6 +344,7 @@ public:
 	QString buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc);
 	QString buildLogoutCommand();
 	QString buildMylistAddCommand(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit);
+	QString buildMylistAddGenericCommand(int aid, QString epno, int viewed, int state, QString storage, QString other);
 	QString buildMylistCommand(int lid);
 	QString buildMylistStatsCommand();
 	QString buildFileCommand(qint64 size, QString ed2k, unsigned int fmask, unsigned int amask);
@@ -369,6 +371,7 @@ public:
 	int UpdateLocalPath(QString tag, QString localPath);
 	int LinkLocalFileToMylist(qint64 size, QString ed2kHash, QString localPath);
 	void UpdateLocalFileStatus(QString localPath, int status);
+	void UpdateLocalFileBindingStatus(QString localPath, int bindingStatus);
 	void updateLocalFileHash(QString localPath, QString ed2kHash, int status);
 	void batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& pathHashPairs, int status);
 	QString getLocalFileHash(QString localPath);
@@ -377,8 +380,10 @@ public:
 		QString path;
 		QString hash;
 		int status;
+		int bindingStatus;
 	};
 	QMap<QString, FileHashInfo> batchGetLocalFileHashes(const QStringList& filePaths);
+	QList<FileHashInfo> getUnboundFiles();
 
 	/* === Socket Start */
 	int CreateSocket();
