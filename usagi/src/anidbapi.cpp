@@ -1716,7 +1716,13 @@ QString AniDBApi::Anime(int aid)
 	// Check which anime fields are already present in database FIRST
 	// to avoid unnecessary Auth() calls
 	QSqlQuery checkQuery(db);
-	checkQuery.prepare("SELECT year, type, relaidlist, relaidtype, eps, startdate, enddate, picname FROM `anime` WHERE aid = ?");
+	checkQuery.prepare("SELECT year, type, relaidlist, relaidtype, eps, startdate, enddate, picname, "
+					   "url, rating, vote_count, temp_rating, temp_vote_count, avg_review_rating, "
+					   "review_count, award_list, is_18_restricted, ann_id, allcinema_id, animenfo_id, "
+					   "tag_name_list, tag_id_list, tag_weight_list, date_record_updated, character_id_list, "
+					   "episodes, highest_episode, special_ep_count, specials_count, credits_count, "
+					   "other_count, trailer_count, parody_count, dateflags "
+					   "FROM `anime` WHERE aid = ?");
 	checkQuery.addBindValue(aid);
 	
 	// Start with full mask (excluding name fields which come from separate dump)
@@ -1741,60 +1747,257 @@ QString AniDBApi::Anime(int aid)
 		ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
 		ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT;
 	
+	// Log initial mask
+	Mask initialMask(amask);
+	Logger::log(QString("[AniDB Mask] Initial mask for AID %1: 0x%2").arg(aid).arg(initialMask.toString()), __FILE__, __LINE__);
+	
 	if(checkQuery.exec() && checkQuery.next())
 	{
 		// Anime exists - check which fields are populated and reduce mask
-		Logger::log(QString("[AniDB API] Anime partially in database (AID=%1) - reducing mask for existing fields").arg(aid), __FILE__, __LINE__);
+		Logger::log(QString("[AniDB Mask] Anime exists in database (AID=%1) - checking fields for mask reduction").arg(aid), __FILE__, __LINE__);
 		
-		// Check year field
+		// Check year field (index 0)
 		if(!checkQuery.value(0).isNull() && !checkQuery.value(0).toString().isEmpty())
 		{
-			amask &= ~(ANIME_YEAR | ANIME_DATEFLAGS);
+			Logger::log(QString("[AniDB Mask] Removing YEAR from mask (value: %1)").arg(checkQuery.value(0).toString()), __FILE__, __LINE__);
+			amask &= ~ANIME_YEAR;
 		}
 		
-		// Check type field
+		// Check type field (index 1)
 		if(!checkQuery.value(1).isNull() && !checkQuery.value(1).toString().isEmpty())
 		{
+			Logger::log(QString("[AniDB Mask] Removing TYPE from mask (value: %1)").arg(checkQuery.value(1).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_TYPE;
 		}
 		
-		// Check related anime lists
+		// Check related anime lists (index 2)
 		if(!checkQuery.value(2).isNull() && !checkQuery.value(2).toString().isEmpty())
 		{
+			Logger::log(QString("[AniDB Mask] Removing RELATED_AID_LIST from mask"), __FILE__, __LINE__);
 			amask &= ~ANIME_RELATED_AID_LIST;
 		}
 		
-		// Check related anime types
+		// Check related anime types (index 3)
 		if(!checkQuery.value(3).isNull() && !checkQuery.value(3).toString().isEmpty())
 		{
+			Logger::log(QString("[AniDB Mask] Removing RELATED_AID_TYPE from mask"), __FILE__, __LINE__);
 			amask &= ~ANIME_RELATED_AID_TYPE;
 		}
 		
-		// Check episodes count
+		// Check eps count (index 4) - legacy field, kept for compatibility
+		// Note: Individual episode fields are checked separately below
 		if(!checkQuery.value(4).isNull() && checkQuery.value(4).toInt() > 0)
 		{
-			amask &= ~(ANIME_EPISODES | ANIME_HIGHEST_EPISODE | ANIME_SPECIAL_EP_COUNT |
-					   ANIME_SPECIALS_COUNT | ANIME_CREDITS_COUNT | ANIME_OTHER_COUNT |
-					   ANIME_TRAILER_COUNT | ANIME_PARODY_COUNT);
+			Logger::log(QString("[AniDB Mask] Found eps field (legacy, value: %1)").arg(checkQuery.value(4).toInt()), __FILE__, __LINE__);
+			// Don't remove mask bits here - check actual fields below
 		}
 		
-		// Check start date
+		// Check start date (index 5)
 		if(!checkQuery.value(5).isNull() && !checkQuery.value(5).toString().isEmpty())
 		{
+			Logger::log(QString("[AniDB Mask] Removing AIR_DATE from mask (value: %1)").arg(checkQuery.value(5).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_AIR_DATE;
 		}
 		
-		// Check end date
+		// Check end date (index 6)
 		if(!checkQuery.value(6).isNull() && !checkQuery.value(6).toString().isEmpty())
 		{
+			Logger::log(QString("[AniDB Mask] Removing END_DATE from mask (value: %1)").arg(checkQuery.value(6).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_END_DATE;
 		}
 		
-		// Check picname
+		// Check picname (index 7)
 		if(!checkQuery.value(7).isNull() && !checkQuery.value(7).toString().isEmpty())
 		{
+			Logger::log(QString("[AniDB Mask] Removing PICNAME from mask"), __FILE__, __LINE__);
 			amask &= ~ANIME_PICNAME;
 		}
+		
+		// Check url (index 8)
+		if(!checkQuery.value(8).isNull() && !checkQuery.value(8).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing URL from mask"), __FILE__, __LINE__);
+			amask &= ~ANIME_URL;
+		}
+		
+		// Check rating (index 9)
+		if(!checkQuery.value(9).isNull() && !checkQuery.value(9).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing RATING from mask (value: %1)").arg(checkQuery.value(9).toString()), __FILE__, __LINE__);
+			amask &= ~ANIME_RATING;
+		}
+		
+		// Check vote_count (index 10)
+		if(!checkQuery.value(10).isNull() && checkQuery.value(10).toInt() > 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing VOTE_COUNT from mask (value: %1)").arg(checkQuery.value(10).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_VOTE_COUNT;
+		}
+		
+		// Check temp_rating (index 11)
+		if(!checkQuery.value(11).isNull() && !checkQuery.value(11).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing TEMP_RATING from mask (value: %1)").arg(checkQuery.value(11).toString()), __FILE__, __LINE__);
+			amask &= ~ANIME_TEMP_RATING;
+		}
+		
+		// Check temp_vote_count (index 12)
+		if(!checkQuery.value(12).isNull() && checkQuery.value(12).toInt() > 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing TEMP_VOTE_COUNT from mask (value: %1)").arg(checkQuery.value(12).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_TEMP_VOTE_COUNT;
+		}
+		
+		// Check avg_review_rating (index 13)
+		if(!checkQuery.value(13).isNull() && !checkQuery.value(13).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing AVG_REVIEW_RATING from mask (value: %1)").arg(checkQuery.value(13).toString()), __FILE__, __LINE__);
+			amask &= ~ANIME_AVG_REVIEW_RATING;
+		}
+		
+		// Check review_count (index 14)
+		if(!checkQuery.value(14).isNull() && checkQuery.value(14).toInt() > 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing REVIEW_COUNT from mask (value: %1)").arg(checkQuery.value(14).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_REVIEW_COUNT;
+		}
+		
+		// Check award_list (index 15)
+		if(!checkQuery.value(15).isNull() && !checkQuery.value(15).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing AWARD_LIST from mask"), __FILE__, __LINE__);
+			amask &= ~ANIME_AWARD_LIST;
+		}
+		
+		// Check is_18_restricted (index 16)
+		if(!checkQuery.value(16).isNull())
+		{
+			Logger::log(QString("[AniDB Mask] Removing IS_18_RESTRICTED from mask (value: %1)").arg(checkQuery.value(16).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_IS_18_RESTRICTED;
+		}
+		
+		// Check ann_id (index 17)
+		if(!checkQuery.value(17).isNull() && checkQuery.value(17).toInt() > 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing ANN_ID from mask (value: %1)").arg(checkQuery.value(17).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_ANN_ID;
+		}
+		
+		// Check allcinema_id (index 18)
+		if(!checkQuery.value(18).isNull() && checkQuery.value(18).toInt() > 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing ALLCINEMA_ID from mask (value: %1)").arg(checkQuery.value(18).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_ALLCINEMA_ID;
+		}
+		
+		// Check animenfo_id (index 19)
+		if(!checkQuery.value(19).isNull() && !checkQuery.value(19).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing ANIMENFO_ID from mask"), __FILE__, __LINE__);
+			amask &= ~ANIME_ANIMENFO_ID;
+		}
+		
+		// Check tag_name_list (index 20)
+		if(!checkQuery.value(20).isNull() && !checkQuery.value(20).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing TAG_NAME_LIST from mask"), __FILE__, __LINE__);
+			amask &= ~ANIME_TAG_NAME_LIST;
+		}
+		
+		// Check tag_id_list (index 21)
+		if(!checkQuery.value(21).isNull() && !checkQuery.value(21).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing TAG_ID_LIST from mask"), __FILE__, __LINE__);
+			amask &= ~ANIME_TAG_ID_LIST;
+		}
+		
+		// Check tag_weight_list (index 22)
+		if(!checkQuery.value(22).isNull() && !checkQuery.value(22).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing TAG_WEIGHT_LIST from mask"), __FILE__, __LINE__);
+			amask &= ~ANIME_TAG_WEIGHT_LIST;
+		}
+		
+		// Check date_record_updated (index 23)
+		if(!checkQuery.value(23).isNull() && checkQuery.value(23).toInt() > 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing DATE_RECORD_UPDATED from mask (value: %1)").arg(checkQuery.value(23).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_DATE_RECORD_UPDATED;
+		}
+		
+		// Check character_id_list (index 24)
+		if(!checkQuery.value(24).isNull() && !checkQuery.value(24).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing CHARACTER_ID_LIST from mask"), __FILE__, __LINE__);
+			amask &= ~ANIME_CHARACTER_ID_LIST;
+		}
+		
+		// Check episodes (index 25)
+		if(!checkQuery.value(25).isNull() && checkQuery.value(25).toInt() >= 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing EPISODES from mask (value: %1)").arg(checkQuery.value(25).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_EPISODES;
+		}
+		
+		// Check highest_episode (index 26)
+		if(!checkQuery.value(26).isNull() && !checkQuery.value(26).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing HIGHEST_EPISODE from mask (value: %1)").arg(checkQuery.value(26).toString()), __FILE__, __LINE__);
+			amask &= ~ANIME_HIGHEST_EPISODE;
+		}
+		
+		// Check special_ep_count (index 27)
+		if(!checkQuery.value(27).isNull() && checkQuery.value(27).toInt() >= 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing SPECIAL_EP_COUNT from mask (value: %1)").arg(checkQuery.value(27).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_SPECIAL_EP_COUNT;
+		}
+		
+		// Check specials_count (index 28)
+		if(!checkQuery.value(28).isNull() && checkQuery.value(28).toInt() >= 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing SPECIALS_COUNT from mask (value: %1)").arg(checkQuery.value(28).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_SPECIALS_COUNT;
+		}
+		
+		// Check credits_count (index 29)
+		if(!checkQuery.value(29).isNull() && checkQuery.value(29).toInt() >= 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing CREDITS_COUNT from mask (value: %1)").arg(checkQuery.value(29).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_CREDITS_COUNT;
+		}
+		
+		// Check other_count (index 30)
+		if(!checkQuery.value(30).isNull() && checkQuery.value(30).toInt() >= 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing OTHER_COUNT from mask (value: %1)").arg(checkQuery.value(30).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_OTHER_COUNT;
+		}
+		
+		// Check trailer_count (index 31)
+		if(!checkQuery.value(31).isNull() && checkQuery.value(31).toInt() >= 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing TRAILER_COUNT from mask (value: %1)").arg(checkQuery.value(31).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_TRAILER_COUNT;
+		}
+		
+		// Check parody_count (index 32)
+		if(!checkQuery.value(32).isNull() && checkQuery.value(32).toInt() >= 0)
+		{
+			Logger::log(QString("[AniDB Mask] Removing PARODY_COUNT from mask (value: %1)").arg(checkQuery.value(32).toInt()), __FILE__, __LINE__);
+			amask &= ~ANIME_PARODY_COUNT;
+		}
+		
+		// Check dateflags (index 33)
+		if(!checkQuery.value(33).isNull() && !checkQuery.value(33).toString().isEmpty())
+		{
+			Logger::log(QString("[AniDB Mask] Removing DATEFLAGS from mask (value: %1)").arg(checkQuery.value(33).toString()), __FILE__, __LINE__);
+			amask &= ~ANIME_DATEFLAGS;
+		}
+		
+		// Log final mask after reduction
+		Mask finalMask(amask);
+		Logger::log(QString("[AniDB Mask] Final mask after reduction for AID %1: 0x%2").arg(aid).arg(finalMask.toString()), __FILE__, __LINE__);
 		
 		// If all fields are present, skip the request
 		if(amask == 0)
@@ -1802,6 +2005,11 @@ QString AniDBApi::Anime(int aid)
 			Logger::log(QString("[AniDB API] All anime data present in database (AID=%1) - skipping API request").arg(aid), __FILE__, __LINE__);
 			return GetTag("");
 		}
+	}
+	else
+	{
+		// Anime doesn't exist in database yet
+		Logger::log(QString("[AniDB Mask] Anime not found in database (AID=%1) - using full mask").arg(aid), __FILE__, __LINE__);
 	}
 	
 	// Request anime information by anime ID
@@ -1814,6 +2022,7 @@ QString AniDBApi::Anime(int aid)
 	
 	// Build command with reduced mask
 	Mask mask(amask);
+	Logger::log(QString("[AniDB Mask] Sending ANIME request for AID %1 with mask: 0x%2").arg(aid).arg(mask.toString()), __FILE__, __LINE__);
 	QString msg = QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
 	
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
