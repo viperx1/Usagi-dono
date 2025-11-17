@@ -1819,17 +1819,36 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString localPath = hashes->item(i, 2)->text();
                 adbapi->UpdateLocalFileStatus(localPath, 3);
                 
-                // Add to unknown files widget for manual binding
+                // Add to unknown files widget for manual binding (only if not already there)
                 QString filename = hashes->item(i, 0)->text();
                 QString filepath = hashes->item(i, 2)->text();
                 QString hash = hashes->item(i, 9)->text();
                 
-                // Get file size
-                QFileInfo fileInfo(filepath);
-                qint64 fileSize = fileInfo.size();
+                // Check if file is already in unknown files widget (avoid duplicates)
+                bool alreadyExists = false;
+                for(int row = 0; row < unknownFiles->rowCount(); ++row)
+                {
+                    QTableWidgetItem *item = unknownFiles->item(row, 0);
+                    if(item && item->toolTip() == filepath)
+                    {
+                        alreadyExists = true;
+                        break;
+                    }
+                }
                 
-                unknownFilesInsertRow(filename, filepath, hash, fileSize);
-                LOG(QString("Added unknown file to manual binding widget: %1").arg(filename));
+                if(!alreadyExists)
+                {
+                    // Get file size
+                    QFileInfo fileInfo(filepath);
+                    qint64 fileSize = fileInfo.size();
+                    
+                    unknownFilesInsertRow(filename, filepath, hash, fileSize);
+                    LOG(QString("Added unknown file to manual binding widget: %1").arg(filename));
+                }
+                else
+                {
+                    LOG(QString("File already in unknown files widget, skipping: %1").arg(filename));
+                }
                 
                 return;
             }
