@@ -2836,12 +2836,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     });
     
     // Connect bind button - use filepath to find current row dynamically
-    connect(bindButton, &QPushButton::clicked, [this, episodeInput]() {
-        QPushButton *btn = qobject_cast<QPushButton*>(sender());
-        if(!btn) return;
-        
-        QString filepath = btn->property("filepath").toString();
-        
+    connect(bindButton, &QPushButton::clicked, [this, bindButton, episodeInput, filepath]() {
         // Find current row by filepath
         int currentRow = -1;
         for(int i = 0; i < unknownFiles->rowCount(); ++i) {
@@ -2858,15 +2853,8 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     });
     
     // Connect "Not Anime" button - use filepath to find current row dynamically
-    connect(notAnimeButton, &QPushButton::clicked, [this]() {
+    connect(notAnimeButton, &QPushButton::clicked, [this, notAnimeButton, filepath]() {
         LOG("Not Anime button clicked");
-        QPushButton *btn = qobject_cast<QPushButton*>(sender());
-        if(!btn) {
-            LOG("ERROR: sender() is not a QPushButton");
-            return;
-        }
-        
-        QString filepath = btn->property("filepath").toString();
         LOG(QString("Not Anime button filepath: %1").arg(filepath));
         
         // Find current row by filepath
