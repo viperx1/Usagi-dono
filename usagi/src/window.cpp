@@ -1678,7 +1678,7 @@ unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
     setColumnWidth(0, 400);
     setColumnWidth(1, 300);
     setColumnWidth(2, 200);
-    setColumnWidth(3, 100);
+    setColumnWidth(3, 150);  // 50% wider than original 100
     setMaximumHeight(200); // Limit height so it doesn't dominate the UI
 }
 
@@ -2859,10 +2859,15 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     
     // Connect "Not Anime" button - use filepath to find current row dynamically
     connect(notAnimeButton, &QPushButton::clicked, [this]() {
+        LOG("Not Anime button clicked");
         QPushButton *btn = qobject_cast<QPushButton*>(sender());
-        if(!btn) return;
+        if(!btn) {
+            LOG("ERROR: sender() is not a QPushButton");
+            return;
+        }
         
         QString filepath = btn->property("filepath").toString();
+        LOG(QString("Not Anime button filepath: %1").arg(filepath));
         
         // Find current row by filepath
         int currentRow = -1;
@@ -2874,8 +2879,12 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
             }
         }
         
+        LOG(QString("Not Anime button found row: %1").arg(currentRow));
+        
         if(currentRow >= 0) {
             onUnknownFileNotAnimeClicked(currentRow);
+        } else {
+            LOG("ERROR: Could not find row for filepath");
         }
     });
 }
