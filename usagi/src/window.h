@@ -567,6 +567,12 @@ private:
     };
     QMap<int, UnknownFileData> unknownFilesData; // row index -> file data
     
+    // Cached anime titles for unknown files widget (to avoid repeated DB queries)
+    QStringList cachedAnimeTitles;
+    QMap<QString, int> cachedTitleToAid;
+    bool animeTitlesCacheLoaded;
+    void loadAnimeTitlesCache();
+    
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
     void insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeItem, const QMap<QPair<int, int>, QTreeWidgetItem*>& episodeItems);

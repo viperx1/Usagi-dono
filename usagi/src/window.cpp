@@ -43,6 +43,9 @@ Window::Window()
 	// Initialize UI color constants (use Qt's predefined yellow color)
 	m_hashedFileColor = QColor(Qt::yellow);
 	
+	// Initialize anime titles cache flag
+	animeTitlesCacheLoaded = false;
+	
     safeclose = new QTimer;
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
@@ -1396,6 +1399,12 @@ void Window::loadUnboundFiles()
     
     LOG(QString("Found %1 unbound files, adding to unknown files widget").arg(unboundFiles.size()));
     
+    // Load anime titles cache once before processing files
+    loadAnimeTitlesCache();
+    
+    // Disable updates during bulk insertion for performance
+    unknownFiles->setUpdatesEnabled(false);
+    
     // Add each unbound file to the unknown files widget
     for(const AniDBApi::FileHashInfo& fileInfo : unboundFiles)
     {
@@ -1412,7 +1421,39 @@ void Window::loadUnboundFiles()
         unknownFilesInsertRow(filename, fileInfo.path, fileInfo.hash, fileSize);
     }
     
+    // Re-enable updates after bulk insertion
+    unknownFiles->setUpdatesEnabled(true);
+    
     LOG(QString("Successfully loaded %1 unbound files").arg(unboundFiles.size()));
+}
+
+void Window::loadAnimeTitlesCache()
+{
+    if(animeTitlesCacheLoaded)
+    {
+        return; // Already loaded
+    }
+    
+    LOG("Loading anime titles cache for unknown files widget...");
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
+    query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
+    
+    cachedAnimeTitles.clear();
+    cachedTitleToAid.clear();
+    
+    while(query.next())
+    {
+        int aid = query.value(0).toInt();
+        QString title = query.value(1).toString();
+        QString displayText = QString("%1: %2").arg(aid).arg(title);
+        cachedAnimeTitles << displayText;
+        cachedTitleToAid[displayText] = aid;
+    }
+    
+    animeTitlesCacheLoaded = true;
+    LOG(QString("Loaded %1 anime titles into cache").arg(cachedAnimeTitles.size()));
 }
 
 void Window::saveMylistSorting()
@@ -2681,24 +2722,11 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     QLineEdit *animeSearch = new QLineEdit();
     animeSearch->setPlaceholderText("Search anime title...");
     
-    // Set up autocomplete using anime_titles database
-    QSqlDatabase db = QSqlDatabase::database();
-    QSqlQuery query(db);
-    query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
+    // Load anime titles cache if not already loaded
+    loadAnimeTitlesCache();
     
-    QStringList animeTitles;
-    QMap<QString, int> titleToAid;
-    
-    while(query.next())
-    {
-        int aid = query.value(0).toInt();
-        QString title = query.value(1).toString();
-        QString displayText = QString("%1: %2").arg(aid).arg(title);
-        animeTitles << displayText;
-        titleToAid[displayText] = aid;
-    }
-    
-    QCompleter *completer = new QCompleter(animeTitles, animeSearch);
+    // Use cached anime titles for completer (avoid repeated DB queries)
+    QCompleter *completer = new QCompleter(cachedAnimeTitles, animeSearch);
     completer->setCaseSensitivity(Qt::CaseInsensitive);
     completer->setFilterMode(Qt::MatchContains);
     animeSearch->setCompleter(completer);
@@ -2738,13 +2766,13 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     unknownFilesData[row] = fileData;
     
     // Connect anime search to populate episode suggestions
-    connect(animeSearch, &QLineEdit::textChanged, [this, row, animeSearch, episodeInput, bindButton, titleToAid]() {
+    connect(animeSearch, &QLineEdit::textChanged, [this, row, animeSearch, episodeInput, bindButton]() {
         QString searchText = animeSearch->text();
         
-        // Check if the text matches a valid anime from autocomplete
-        if(titleToAid.contains(searchText))
+        // Check if the text matches a valid anime from autocomplete (use cached data)
+        if(cachedTitleToAid.contains(searchText))
         {
-            int aid = titleToAid[searchText];
+            int aid = cachedTitleToAid[searchText];
             unknownFilesData[row].selectedAid = aid;
             
             // Enable episode input
