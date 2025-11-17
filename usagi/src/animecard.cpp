@@ -116,16 +116,9 @@ void AnimeCard::setupUI()
     m_episodeTree->setUniformRowHeights(false);  // Allow rows to have different heights
     m_mainLayout->addWidget(m_episodeTree, 1);
     
-    // Debug: Log tree widget configuration
-    LOG(QString("AnimeCard: Tree widget configured with %1 columns, widths: [0]=%2px, [1]=%3px")
-        .arg(m_episodeTree->columnCount())
-        .arg(m_episodeTree->columnWidth(0))
-        .arg(m_episodeTree->columnWidth(1)));
-    
     // Create play button delegate for column 1
     m_playButtonDelegate = new PlayButtonDelegate(this);
     m_episodeTree->setItemDelegateForColumn(1, m_playButtonDelegate);
-    LOG(QString("AnimeCard: PlayButtonDelegate attached to column 1"));
     
     // Connect play button clicks to emit episodeClicked signal
     connect(m_playButtonDelegate, &PlayButtonDelegate::playButtonClicked, this, [this](const QModelIndex &index) {
@@ -277,37 +270,18 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     // Check if any file in this episode exists locally
     bool anyFileExists = false;
     int existingFileLid = 0;
-    LOG(QString("AnimeCard: Checking %1 files for episode %2").arg(episode.files.size()).arg(episode.eid));
-    for (const FileInfo& file : episode.files) {
-        LOG(QString("AnimeCard: File lid=%1, localFilePath='%2', isEmpty=%3")
-            .arg(file.lid)
-            .arg(file.localFilePath)
-            .arg(file.localFilePath.isEmpty() ? "YES" : "NO"));
-        
+    for (const FileInfo& file : episode.files) {      
         if (!file.localFilePath.isEmpty()) {
             bool exists = QFile::exists(file.localFilePath);
-            LOG(QString("AnimeCard: File path not empty, QFile::exists('%1') = %2")
-                .arg(file.localFilePath)
-                .arg(exists ? "YES" : "NO"));
-            
             if (exists) {
                 anyFileExists = true;
                 existingFileLid = file.lid;
                 break;  // Found at least one file that exists
             }
-        } else {
-            LOG(QString("AnimeCard: File lid=%1 has empty localFilePath, skipping existence check").arg(file.lid));
-        }
+        } 
     }
     
     // Debug logging for play button visibility
-    LOG(QString("AnimeCard: Episode %1 (%2) - files: %3, anyFileExists: %4, existingFileLid: %5")
-        .arg(episode.eid)
-        .arg(episodeText)
-        .arg(episode.files.size())
-        .arg(anyFileExists ? "YES" : "NO")
-        .arg(existingFileLid));
-    
     if (anyFileExists) {
         episodeItem->setText(1, "▶"); // Play button if any file exists
         episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the play button
@@ -315,7 +289,6 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
         // Store the lid of the first available file for playback
         episodeItem->setData(2, Qt::UserRole, existingFileLid);
-        LOG(QString("AnimeCard: Play button SET for episode %1 in column 1").arg(episode.eid));
     } else {
         // Show X marker for episodes with missing files (consistent with file rows)
         episodeItem->setText(1, "✗"); // X for missing files
@@ -323,7 +296,6 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
         episodeItem->setForeground(1, QBrush(QColor(Qt::red))); // Red for missing
         episodeItem->setData(2, Qt::UserRole, 0);  // 0 means it's an episode with no files
-        LOG(QString("AnimeCard: X marker SET for episode %1 in column 1 (no existing files)").arg(episode.eid));
     }
     
     // Column 2: Episode info
@@ -344,20 +316,12 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             fileExists = QFile::exists(file.localFilePath);
         }
         
-        // Debug logging for file play button
-        LOG(QString("AnimeCard: File lid=%1, localPath='%2', exists=%3")
-            .arg(file.lid)
-            .arg(file.localFilePath)
-            .arg(fileExists ? "YES" : "NO"));
-        
         if (fileExists) {
             fileItem->setText(1, "▶"); // Play button for existing files
             fileItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
-            LOG(QString("AnimeCard: Play button SET for file lid=%1 in column 1").arg(file.lid));
         } else {
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(QColor(Qt::red)));
-            LOG(QString("AnimeCard: X marker SET for file lid=%1 in column 1 (file missing)").arg(file.lid));
         }
         
         // Format file text with version indicator
