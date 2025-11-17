@@ -4951,10 +4951,19 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     QString storageStr = storage->text();
     
     // Prepare the "other" field with file details
+    // Note: The AniDB API has an undocumented length limit for the 'other' field
+    // Testing shows ~100 chars works reliably, so we truncate to stay safe
     QString otherField = QString("File: %1\nHash: %2\nSize: %3")
         .arg(fileData.filename)
         .arg(fileData.hash)
         .arg(fileData.size);
+    
+    // Truncate if too long (limit to 100 chars to stay within API limits)
+    if(otherField.length() > 100)
+    {
+        otherField = otherField.left(97) + "...";
+        LOG(QString("Truncated 'other' field to 100 chars for API compatibility"));
+    }
     
     // Add to mylist via API using generic parameter
     if(addtomylist->isChecked() && adbapi->LoggedIn())
