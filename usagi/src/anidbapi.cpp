@@ -118,6 +118,9 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `other_count` INTEGER");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `trailer_count` INTEGER");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `parody_count` INTEGER");
+		// Add cache tracking columns for anime data requests
+		query.exec("ALTER TABLE `anime` ADD COLUMN `last_mask` TEXT");
+		query.exec("ALTER TABLE `anime` ADD COLUMN `last_checked` INTEGER");
 		// Create local_files table for directory watcher feature
 		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT)");
@@ -1721,7 +1724,7 @@ QString AniDBApi::Anime(int aid)
 					   "review_count, award_list, is_18_restricted, ann_id, allcinema_id, animenfo_id, "
 					   "tag_name_list, tag_id_list, tag_weight_list, date_record_updated, character_id_list, "
 					   "episodes, highest_episode, special_ep_count, specials_count, credits_count, "
-					   "other_count, trailer_count, parody_count, dateflags "
+					   "other_count, trailer_count, parody_count, dateflags, last_mask, last_checked "
 					   "FROM `anime` WHERE aid = ?");
 	checkQuery.addBindValue(aid);
 	
@@ -1756,11 +1759,35 @@ QString AniDBApi::Anime(int aid)
 		// Anime exists - check which fields are populated and reduce mask
 		Logger::log(QString("[AniDB Mask] Anime exists in database (AID=%1) - checking fields for mask reduction").arg(aid), __FILE__, __LINE__);
 		
+		// Check if we should skip this request based on last_checked timestamp
+		// Index 34 = last_mask, Index 35 = last_checked
+		QString lastMaskStr = checkQuery.value(34).toString();
+		qint64 lastChecked = checkQuery.value(35).toLongLong();
+		qint64 currentTime = QDateTime::currentSecsSinceEpoch();
+		qint64 oneWeekInSeconds = 7 * 24 * 60 * 60;
+		
+		if(!lastMaskStr.isEmpty() && lastChecked > 0 && (currentTime - lastChecked) < oneWeekInSeconds)
+		{
+			// Data was checked less than a week ago
+			Mask lastMask(lastMaskStr);
+			Logger::log(QString("[AniDB Cache] Anime data was checked %1 seconds ago (last mask: 0x%2)")
+						.arg(currentTime - lastChecked).arg(lastMask.toString()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Cache] Skipping request - data is less than 7 days old (AID=%1)").arg(aid), __FILE__, __LINE__);
+			return GetTag("");
+		}
+		
+		// Track which fields are missing for debug output
+		QStringList missingFields;
+		
 		// Check year field (index 0)
 		if(!checkQuery.value(0).isNull() && !checkQuery.value(0).toString().isEmpty())
 		{
 			Logger::log(QString("[AniDB Mask] Removing YEAR from mask (value: %1)").arg(checkQuery.value(0).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_YEAR;
+		}
+		else
+		{
+			missingFields << "year";
 		}
 		
 		// Check type field (index 1)
@@ -1769,6 +1796,10 @@ QString AniDBApi::Anime(int aid)
 			Logger::log(QString("[AniDB Mask] Removing TYPE from mask (value: %1)").arg(checkQuery.value(1).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_TYPE;
 		}
+		else
+		{
+			missingFields << "type";
+		}
 		
 		// Check related anime lists (index 2)
 		if(!checkQuery.value(2).isNull() && !checkQuery.value(2).toString().isEmpty())
@@ -1776,12 +1807,20 @@ QString AniDBApi::Anime(int aid)
 			Logger::log(QString("[AniDB Mask] Removing RELATED_AID_LIST from mask"), __FILE__, __LINE__);
 			amask &= ~ANIME_RELATED_AID_LIST;
 		}
+		else
+		{
+			missingFields << "related_aid_list";
+		}
 		
 		// Check related anime types (index 3)
 		if(!checkQuery.value(3).isNull() && !checkQuery.value(3).toString().isEmpty())
 		{
 			Logger::log(QString("[AniDB Mask] Removing RELATED_AID_TYPE from mask"), __FILE__, __LINE__);
 			amask &= ~ANIME_RELATED_AID_TYPE;
+		}
+		else
+		{
+			missingFields << "related_aid_type";
 		}
 		
 		// Check eps count (index 4) - legacy field, kept for compatibility
@@ -1798,12 +1837,20 @@ QString AniDBApi::Anime(int aid)
 			Logger::log(QString("[AniDB Mask] Removing AIR_DATE from mask (value: %1)").arg(checkQuery.value(5).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_AIR_DATE;
 		}
+		else
+		{
+			missingFields << "startdate";
+		}
 		
 		// Check end date (index 6)
 		if(!checkQuery.value(6).isNull() && !checkQuery.value(6).toString().isEmpty())
 		{
 			Logger::log(QString("[AniDB Mask] Removing END_DATE from mask (value: %1)").arg(checkQuery.value(6).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_END_DATE;
+		}
+		else
+		{
+			missingFields << "enddate";
 		}
 		
 		// Check picname (index 7)
@@ -1812,12 +1859,20 @@ QString AniDBApi::Anime(int aid)
 			Logger::log(QString("[AniDB Mask] Removing PICNAME from mask"), __FILE__, __LINE__);
 			amask &= ~ANIME_PICNAME;
 		}
+		else
+		{
+			missingFields << "picname";
+		}
 		
 		// Check url (index 8)
 		if(!checkQuery.value(8).isNull() && !checkQuery.value(8).toString().isEmpty())
 		{
 			Logger::log(QString("[AniDB Mask] Removing URL from mask"), __FILE__, __LINE__);
 			amask &= ~ANIME_URL;
+		}
+		else
+		{
+			missingFields << "url";
 		}
 		
 		// Check rating (index 9)
@@ -1826,6 +1881,10 @@ QString AniDBApi::Anime(int aid)
 			Logger::log(QString("[AniDB Mask] Removing RATING from mask (value: %1)").arg(checkQuery.value(9).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_RATING;
 		}
+		else
+		{
+			missingFields << "rating";
+		}
 		
 		// Check vote_count (index 10)
 		if(!checkQuery.value(10).isNull() && checkQuery.value(10).toInt() > 0)
@@ -1833,12 +1892,20 @@ QString AniDBApi::Anime(int aid)
 			Logger::log(QString("[AniDB Mask] Removing VOTE_COUNT from mask (value: %1)").arg(checkQuery.value(10).toInt()), __FILE__, __LINE__);
 			amask &= ~ANIME_VOTE_COUNT;
 		}
+		else
+		{
+			missingFields << "vote_count";
+		}
 		
 		// Check temp_rating (index 11)
 		if(!checkQuery.value(11).isNull() && !checkQuery.value(11).toString().isEmpty())
 		{
 			Logger::log(QString("[AniDB Mask] Removing TEMP_RATING from mask (value: %1)").arg(checkQuery.value(11).toString()), __FILE__, __LINE__);
 			amask &= ~ANIME_TEMP_RATING;
+		}
+		else
+		{
+			missingFields << "temp_rating";
 		}
 		
 		// Check temp_vote_count (index 12)
@@ -1999,6 +2066,13 @@ QString AniDBApi::Anime(int aid)
 		Mask finalMask(amask);
 		Logger::log(QString("[AniDB Mask] Final mask after reduction for AID %1: 0x%2").arg(aid).arg(finalMask.toString()), __FILE__, __LINE__);
 		
+		// Log missing fields that will be requested
+		if(!missingFields.isEmpty())
+		{
+			Logger::log(QString("[AniDB Missing Data] Requesting missing fields for AID %1: %2")
+						.arg(aid).arg(missingFields.join(", ")), __FILE__, __LINE__);
+		}
+		
 		// If all fields are present, skip the request
 		if(amask == 0)
 		{
@@ -2024,6 +2098,47 @@ QString AniDBApi::Anime(int aid)
 	Mask mask(amask);
 	Logger::log(QString("[AniDB Mask] Sending ANIME request for AID %1 with mask: 0x%2").arg(aid).arg(mask.toString()), __FILE__, __LINE__);
 	QString msg = QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
+	
+	// Read existing last_mask from database to combine with new request
+	QSqlQuery readMaskQuery(db);
+	readMaskQuery.prepare("SELECT `last_mask` FROM `anime` WHERE `aid` = ?");
+	readMaskQuery.addBindValue(aid);
+	uint64_t combinedMask = amask;
+	if(readMaskQuery.exec() && readMaskQuery.next())
+	{
+		QString existingMaskStr = readMaskQuery.value(0).toString();
+		if(!existingMaskStr.isEmpty())
+		{
+			Mask existingMask(existingMaskStr);
+			// Combine masks using OR operation to track all data ever requested
+			combinedMask = existingMask.getValue() | amask;
+			Mask combined(combinedMask);
+			Logger::log(QString("[AniDB Cache] Combining masks - existing: 0x%1, new: 0x%2, combined: 0x%3")
+						.arg(existingMask.toString()).arg(mask.toString()).arg(combined.toString()), __FILE__, __LINE__);
+		}
+	}
+	
+	// Update last_mask and last_checked timestamp in database
+	// Use INSERT OR IGNORE to create the row if it doesn't exist yet
+	QSqlQuery insertQuery(db);
+	insertQuery.prepare("INSERT OR IGNORE INTO `anime` (`aid`) VALUES (?)");
+	insertQuery.addBindValue(aid);
+	insertQuery.exec();
+	
+	QSqlQuery updateQuery(db);
+	updateQuery.prepare("UPDATE `anime` SET `last_mask` = ?, `last_checked` = ? WHERE `aid` = ?");
+	Mask combinedMaskObj(combinedMask);
+	updateQuery.addBindValue(combinedMaskObj.toString());
+	updateQuery.addBindValue(QDateTime::currentSecsSinceEpoch());
+	updateQuery.addBindValue(aid);
+	if(!updateQuery.exec())
+	{
+		Logger::log(QString("[AniDB Cache] Failed to update last_mask and last_checked for AID %1").arg(aid), __FILE__, __LINE__);
+	}
+	else
+	{
+		Logger::log(QString("[AniDB Cache] Updated last_mask (0x%1) and last_checked for AID %1").arg(combinedMaskObj.toString()).arg(aid), __FILE__, __LINE__);
+	}
 	
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
