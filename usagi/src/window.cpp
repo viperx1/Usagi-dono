@@ -3406,10 +3406,14 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				// Escape single quotes in storage
 				QString storage_escaped = QString(storage).replace("'", "''");
 				
-				// Insert into database with proper lid value
+				// Insert into database with proper lid value, preserving local_file if it exists
 				QString q = QString("INSERT OR REPLACE INTO `mylist` "
-					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`) "
-					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8')")
+					"(`lid`, `fid`, `eid`, `aid`, `gid`, `state`, `viewed`, `storage`, `local_file`, `playback_position`, `playback_duration`, `last_played`) "
+					"VALUES (%1, %2, %3, %4, %5, %6, %7, '%8', "
+					"(SELECT `local_file` FROM `mylist` WHERE `lid` = %1), "
+					"COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = %1), 0), "
+					"COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = %1), 0))")
 					.arg(lid)  // LId from File element
 					.arg(fid.isEmpty() ? "0" : fid)  // Id from File element
 					.arg(currentEid.isEmpty() ? "0" : currentEid)  // Id from Ep element

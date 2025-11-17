@@ -1,5 +1,6 @@
 #include "animecard.h"
 #include "playbuttondelegate.h"
+#include "logger.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
@@ -44,9 +45,9 @@ void AnimeCard::setupUI()
     // Top section: poster + info
     m_topLayout = new QHBoxLayout();
     
-    // Poster (left side) - doubled size
+    // Poster (left side) - increased by 50%
     m_posterLabel = new QLabel(this);
-    m_posterLabel->setFixedSize(160, 220);  // Doubled from 80x110
+    m_posterLabel->setFixedSize(240, 330);  // Increased by 50% from 160x220
     m_posterLabel->setScaledContents(true);
     m_posterLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);
     m_posterLabel->setAlignment(Qt::AlignCenter);
@@ -104,9 +105,10 @@ void AnimeCard::setupUI()
     
     // Episode tree (bottom section) - now supports episode->file hierarchy with play button
     m_episodeTree = new QTreeWidget(this);
-    m_episodeTree->setColumnCount(2);  // Column 0: Play button, Column 1: Episode/File info
+    m_episodeTree->setColumnCount(3);  // Column 0: Expand button, Column 1: Play button, Column 2: Episode/File info
     m_episodeTree->setHeaderHidden(true);
-    m_episodeTree->setColumnWidth(0, 50);  // Column for play button (increased from 35 to 50 for better visibility)
+    m_episodeTree->setColumnWidth(0, 30);  // Column for expand button (narrow)
+    m_episodeTree->setColumnWidth(1, 50);  // Column for play button
     m_episodeTree->setStyleSheet("QTreeWidget { font-size: 8pt; }");
     m_episodeTree->setAlternatingRowColors(true);
     m_episodeTree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -114,9 +116,16 @@ void AnimeCard::setupUI()
     m_episodeTree->setUniformRowHeights(false);  // Allow rows to have different heights
     m_mainLayout->addWidget(m_episodeTree, 1);
     
-    // Create play button delegate for column 0
+    // Debug: Log tree widget configuration
+    LOG(QString("AnimeCard: Tree widget configured with %1 columns, widths: [0]=%2px, [1]=%3px")
+        .arg(m_episodeTree->columnCount())
+        .arg(m_episodeTree->columnWidth(0))
+        .arg(m_episodeTree->columnWidth(1)));
+    
+    // Create play button delegate for column 1
     m_playButtonDelegate = new PlayButtonDelegate(this);
-    m_episodeTree->setItemDelegateForColumn(0, m_playButtonDelegate);
+    m_episodeTree->setItemDelegateForColumn(1, m_playButtonDelegate);
+    LOG(QString("AnimeCard: PlayButtonDelegate attached to column 1"));
     
     // Connect play button clicks to emit episodeClicked signal
     connect(m_playButtonDelegate, &PlayButtonDelegate::playButtonClicked, this, [this](const QModelIndex &index) {
@@ -127,7 +136,7 @@ void AnimeCard::setupUI()
         // Get the item from the model
         QTreeWidgetItem *item = m_episodeTree->itemFromIndex(index);
         if (item) {
-            int lid = item->data(1, Qt::UserRole).toInt();
+            int lid = item->data(2, Qt::UserRole).toInt();  // Changed from column 1 to column 2
             if (lid > 0) {  // Only emit if it's a file item (has lid)
                 emit episodeClicked(lid);
             }
@@ -144,7 +153,6 @@ void AnimeCard::setAnimeTitle(const QString& title)
 {
     m_animeTitle = title;
     m_titleLabel->setText(title);
-    m_titleLabel->setToolTip(title);
 }
 
 void AnimeCard::setAnimeType(const QString& type)
@@ -262,52 +270,94 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeText += QString(" (%1 files)").arg(episode.files.size());
     }
     
-    // Column 0: Play button if any file exists
+    // Column 0: Empty - expand button only (Qt handles this automatically)
+    episodeItem->setText(0, "");
+    
+    // Column 1: Play button if any file exists
     // Check if any file in this episode exists locally
     bool anyFileExists = false;
     int existingFileLid = 0;
+    LOG(QString("AnimeCard: Checking %1 files for episode %2").arg(episode.files.size()).arg(episode.eid));
     for (const FileInfo& file : episode.files) {
-        if (!file.localFilePath.isEmpty() && QFile::exists(file.localFilePath)) {
-            anyFileExists = true;
-            existingFileLid = file.lid;
-            break;  // Found at least one file that exists
+        LOG(QString("AnimeCard: File lid=%1, localFilePath='%2', isEmpty=%3")
+            .arg(file.lid)
+            .arg(file.localFilePath)
+            .arg(file.localFilePath.isEmpty() ? "YES" : "NO"));
+        
+        if (!file.localFilePath.isEmpty()) {
+            bool exists = QFile::exists(file.localFilePath);
+            LOG(QString("AnimeCard: File path not empty, QFile::exists('%1') = %2")
+                .arg(file.localFilePath)
+                .arg(exists ? "YES" : "NO"));
+            
+            if (exists) {
+                anyFileExists = true;
+                existingFileLid = file.lid;
+                break;  // Found at least one file that exists
+            }
+        } else {
+            LOG(QString("AnimeCard: File lid=%1 has empty localFilePath, skipping existence check").arg(file.lid));
         }
     }
     
+    // Debug logging for play button visibility
+    LOG(QString("AnimeCard: Episode %1 (%2) - files: %3, anyFileExists: %4, existingFileLid: %5")
+        .arg(episode.eid)
+        .arg(episodeText)
+        .arg(episode.files.size())
+        .arg(anyFileExists ? "YES" : "NO")
+        .arg(existingFileLid));
+    
     if (anyFileExists) {
-        episodeItem->setText(0, "▶"); // Play button if any file exists
-        episodeItem->setTextAlignment(0, Qt::AlignCenter);  // Center the play button
-        episodeItem->setData(0, Qt::UserRole, 1);  // 1 means show button
-        episodeItem->setForeground(0, QBrush(QColor(0, 150, 0))); // Green for available
+        episodeItem->setText(1, "▶"); // Play button if any file exists
+        episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the play button
+        episodeItem->setData(1, Qt::UserRole, 1);  // 1 means show button
+        episodeItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
         // Store the lid of the first available file for playback
-        episodeItem->setData(1, Qt::UserRole, existingFileLid);
+        episodeItem->setData(2, Qt::UserRole, existingFileLid);
+        LOG(QString("AnimeCard: Play button SET for episode %1 in column 1").arg(episode.eid));
     } else {
-        episodeItem->setText(0, "");
-        episodeItem->setData(0, Qt::UserRole, 0);  // 0 means no button
-        episodeItem->setData(1, Qt::UserRole, 0);  // 0 means it's an episode with no files
+        // Show X marker for episodes with missing files (consistent with file rows)
+        episodeItem->setText(1, "✗"); // X for missing files
+        episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the marker
+        episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
+        episodeItem->setForeground(1, QBrush(QColor(Qt::red))); // Red for missing
+        episodeItem->setData(2, Qt::UserRole, 0);  // 0 means it's an episode with no files
+        LOG(QString("AnimeCard: X marker SET for episode %1 in column 1 (no existing files)").arg(episode.eid));
     }
     
-    // Column 1: Episode info
-    episodeItem->setText(1, episodeText);
-    episodeItem->setData(1, Qt::UserRole + 1, episode.eid);
+    // Column 2: Episode info
+    episodeItem->setText(2, episodeText);
+    episodeItem->setData(2, Qt::UserRole + 1, episode.eid);
     
     // Add file children
     for (const FileInfo& file : episode.files) {
         QTreeWidgetItem *fileItem = new QTreeWidgetItem(episodeItem);
         
-        // Column 0: Play button - reflects file existence, not watch state
+        // Column 0: Empty - no expand button for files
+        fileItem->setText(0, "");
+        
+        // Column 1: Play button - reflects file existence, not watch state
         // Check if local file exists
         bool fileExists = false;
         if (!file.localFilePath.isEmpty()) {
             fileExists = QFile::exists(file.localFilePath);
         }
         
+        // Debug logging for file play button
+        LOG(QString("AnimeCard: File lid=%1, localPath='%2', exists=%3")
+            .arg(file.lid)
+            .arg(file.localFilePath)
+            .arg(fileExists ? "YES" : "NO"));
+        
         if (fileExists) {
-            fileItem->setText(0, "▶"); // Play button for existing files
-            fileItem->setForeground(0, QBrush(QColor(0, 150, 0))); // Green for available
+            fileItem->setText(1, "▶"); // Play button for existing files
+            fileItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
+            LOG(QString("AnimeCard: Play button SET for file lid=%1 in column 1").arg(file.lid));
         } else {
-            fileItem->setText(0, "✗"); // X for missing files
-            fileItem->setForeground(0, QBrush(QColor(Qt::red)));
+            fileItem->setText(1, "✗"); // X for missing files
+            fileItem->setForeground(1, QBrush(QColor(Qt::red)));
+            LOG(QString("AnimeCard: X marker SET for file lid=%1 in column 1 (file missing)").arg(file.lid));
         }
         
         // Format file text with version indicator
@@ -343,14 +393,14 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             fileText += QString(" [%1]").arg(file.state);
         }
         
-        // Column 1: File info (removed viewed indicator since it's in column 0 now)
-        fileItem->setText(1, fileText);
-        fileItem->setData(1, Qt::UserRole, file.lid);
-        fileItem->setData(1, Qt::UserRole + 1, file.fid);
+        // Column 2: File info
+        fileItem->setText(2, fileText);
+        fileItem->setData(2, Qt::UserRole, file.lid);
+        fileItem->setData(2, Qt::UserRole + 1, file.fid);
         
         // Color code file text based on state
         if (file.viewed) {
-            fileItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for viewed
+            fileItem->setForeground(2, QBrush(QColor(0, 150, 0))); // Green for viewed
         }
         
         // Add tooltip with file info
@@ -383,7 +433,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             }
         }
         
-        fileItem->setToolTip(1, tooltip);
+        fileItem->setToolTip(2, tooltip);
     }
     
     // Collapse all episodes by default
