@@ -1759,23 +1759,6 @@ QString AniDBApi::Anime(int aid)
 		// Anime exists - check which fields are populated and reduce mask
 		Logger::log(QString("[AniDB Mask] Anime exists in database (AID=%1) - checking fields for mask reduction").arg(aid), __FILE__, __LINE__);
 		
-		// Check if we should skip this request based on last_checked timestamp
-		// Index 34 = last_mask, Index 35 = last_checked
-		QString lastMaskStr = checkQuery.value(34).toString();
-		qint64 lastChecked = checkQuery.value(35).toLongLong();
-		qint64 currentTime = QDateTime::currentSecsSinceEpoch();
-		qint64 oneWeekInSeconds = 7 * 24 * 60 * 60;
-		
-		if(!lastMaskStr.isEmpty() && lastChecked > 0 && (currentTime - lastChecked) < oneWeekInSeconds)
-		{
-			// Data was checked less than a week ago
-			Mask lastMask(lastMaskStr);
-			Logger::log(QString("[AniDB Cache] Anime data was checked %1 seconds ago (last mask: 0x%2)")
-						.arg(currentTime - lastChecked).arg(lastMask.toString()), __FILE__, __LINE__);
-			Logger::log(QString("[AniDB Cache] Skipping request - data is less than 7 days old (AID=%1)").arg(aid), __FILE__, __LINE__);
-			return GetTag("");
-		}
-		
 		// Track which fields are missing for debug output
 		QStringList missingFields;
 		
@@ -2071,6 +2054,23 @@ QString AniDBApi::Anime(int aid)
 		{
 			Logger::log(QString("[AniDB Missing Data] Requesting missing fields for AID %1: %2")
 						.arg(aid).arg(missingFields.join(", ")), __FILE__, __LINE__);
+		}
+		
+		// Check if we should skip this request based on last_checked timestamp
+		// Index 34 = last_mask, Index 35 = last_checked
+		QString lastMaskStr = checkQuery.value(34).toString();
+		qint64 lastChecked = checkQuery.value(35).toLongLong();
+		qint64 currentTime = QDateTime::currentSecsSinceEpoch();
+		qint64 oneWeekInSeconds = 7 * 24 * 60 * 60;
+		
+		if(!lastMaskStr.isEmpty() && lastChecked > 0 && (currentTime - lastChecked) < oneWeekInSeconds)
+		{
+			// Data was checked less than a week ago - skip request even though fields are missing
+			Mask lastMask(lastMaskStr);
+			Logger::log(QString("[AniDB Cache] Anime data was checked %1 seconds ago (last mask: 0x%2)")
+						.arg(currentTime - lastChecked).arg(lastMask.toString()), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Cache] Skipping request - data is less than 7 days old (AID=%1)").arg(aid), __FILE__, __LINE__);
+			return GetTag("");
 		}
 		
 		// If all fields are present, skip the request
