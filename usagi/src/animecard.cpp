@@ -277,11 +277,26 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     // Check if any file in this episode exists locally
     bool anyFileExists = false;
     int existingFileLid = 0;
+    LOG(QString("AnimeCard: Checking %1 files for episode %2").arg(episode.files.size()).arg(episode.eid));
     for (const FileInfo& file : episode.files) {
-        if (!file.localFilePath.isEmpty() && QFile::exists(file.localFilePath)) {
-            anyFileExists = true;
-            existingFileLid = file.lid;
-            break;  // Found at least one file that exists
+        LOG(QString("AnimeCard: File lid=%1, localFilePath='%2', isEmpty=%3")
+            .arg(file.lid)
+            .arg(file.localFilePath)
+            .arg(file.localFilePath.isEmpty() ? "YES" : "NO"));
+        
+        if (!file.localFilePath.isEmpty()) {
+            bool exists = QFile::exists(file.localFilePath);
+            LOG(QString("AnimeCard: File path not empty, QFile::exists('%1') = %2")
+                .arg(file.localFilePath)
+                .arg(exists ? "YES" : "NO"));
+            
+            if (exists) {
+                anyFileExists = true;
+                existingFileLid = file.lid;
+                break;  // Found at least one file that exists
+            }
+        } else {
+            LOG(QString("AnimeCard: File lid=%1 has empty localFilePath, skipping existence check").arg(file.lid));
         }
     }
     
