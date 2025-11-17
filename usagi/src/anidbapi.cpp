@@ -2213,12 +2213,14 @@ QString AniDBApi::buildMylistAddGenericCommand(int aid, QString epno, int viewed
 	}
 	if(other.length() > 0)
 	{
-		// Replace newlines with a placeholder, URL-encode, then replace placeholder with <br>
-		// This ensures <br> remains literal in the URL (not encoded)
+		// Replace newlines with <br />
 		QString escapedOther = other;
-		escapedOther.replace("\n", "___NEWLINE___");
-		escapedOther = QString(QUrl::toPercentEncoding(escapedOther));
-		escapedOther.replace("___NEWLINE___", "<br>");
+        escapedOther.replace("\n", "<br />");
+        escapedOther = QString(escapedOther);
+        // limit escapedOther to 90 characters to comply with AniDB limits
+        if (escapedOther.length() > 90) {
+            escapedOther = escapedOther.left(90);
+        }
 		msg += QString("&other=%1").arg(escapedOther);
 	}
 	msg += QString("&state=%1").arg(state);
