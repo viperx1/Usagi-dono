@@ -107,7 +107,7 @@ public:
     bool operator<(const AnimeCard& other) const;
     
     // Size management
-    static QSize getCardSize() { return QSize(500, 350); }  // Increased from 400x300 to accommodate larger poster
+    static QSize getCardSize() { return QSize(600, 450); }  // Increased from 500x350 to accommodate 50% larger poster
     QSize sizeHint() const override { return getCardSize(); }
     QSize minimumSizeHint() const override { return getCardSize(); }
     
