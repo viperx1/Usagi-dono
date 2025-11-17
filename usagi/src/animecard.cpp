@@ -116,16 +116,9 @@ void AnimeCard::setupUI()
     m_episodeTree->setUniformRowHeights(false);  // Allow rows to have different heights
     m_mainLayout->addWidget(m_episodeTree, 1);
     
-    // Debug: Log tree widget configuration
-    LOG(QString("AnimeCard: Tree widget configured with %1 columns, widths: [0]=%2px, [1]=%3px")
-        .arg(m_episodeTree->columnCount())
-        .arg(m_episodeTree->columnWidth(0))
-        .arg(m_episodeTree->columnWidth(1)));
-    
     // Create play button delegate for column 1
     m_playButtonDelegate = new PlayButtonDelegate(this);
     m_episodeTree->setItemDelegateForColumn(1, m_playButtonDelegate);
-    LOG(QString("AnimeCard: PlayButtonDelegate attached to column 1"));
     
     // Connect play button clicks to emit episodeClicked signal
     connect(m_playButtonDelegate, &PlayButtonDelegate::playButtonClicked, this, [this](const QModelIndex &index) {
@@ -285,9 +278,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
                 existingFileLid = file.lid;
                 break;  // Found at least one file that exists
             }
-        } else {
-            LOG(QString("AnimeCard: File lid=%1 has empty localFilePath, skipping existence check").arg(file.lid));
-        }
+        } 
     }
     
     // Debug logging for play button visibility
