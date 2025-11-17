@@ -302,10 +302,13 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setData(2, Qt::UserRole, existingFileLid);
         LOG(QString("AnimeCard: Play button SET for episode %1 in column 1").arg(episode.eid));
     } else {
-        episodeItem->setText(1, "");
-        episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no button
+        // Show X marker for episodes with missing files (consistent with file rows)
+        episodeItem->setText(1, "✗"); // X for missing files
+        episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the marker
+        episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
+        episodeItem->setForeground(1, QBrush(QColor(Qt::red))); // Red for missing
         episodeItem->setData(2, Qt::UserRole, 0);  // 0 means it's an episode with no files
-        LOG(QString("AnimeCard: Play button NOT set for episode %1 (no existing files)").arg(episode.eid));
+        LOG(QString("AnimeCard: X marker SET for episode %1 in column 1 (no existing files)").arg(episode.eid));
     }
     
     // Column 2: Episode info
