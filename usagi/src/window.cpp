@@ -1606,34 +1606,14 @@ unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
 
 bool unknown_files_::event(QEvent *e)
 {
+    // Disable delete key for unknown files to avoid data inconsistency
+    // Users should use the Bind button or clear the hasher to remove entries
     if(e->type() == QEvent::KeyPress)
     {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(e);
         if(keyEvent->key() == Qt::Key_Delete)
         {
-            setUpdatesEnabled(0);
-            QList<QTableWidgetItem *> selitems = selectedItems();
-            QList<int> selrows;
-            while(!selitems.isEmpty())
-            {
-                if(!selrows.contains(selitems.first()->row()))
-                {
-                    selrows.append(selitems.first()->row());
-                    selitems.pop_front();
-                }
-                else
-                {
-                    selitems.pop_front();
-                }
-            }
-            std::sort(selrows.begin(), selrows.end());
-            while(!selrows.isEmpty())
-            {
-                int item = selrows.last();
-                selrows.pop_back();
-                removeRow(item);
-            }
-            setUpdatesEnabled(1);
+            // Ignore delete key for now
             return true;
         }
         else
@@ -4885,6 +4865,17 @@ void Window::onUnknownFileBindClicked(int row)
             }
         }
         unknownFilesData = newMap;
+        
+        // Hide the widget if no more unknown files
+        if(unknownFiles->rowCount() == 0)
+        {
+            unknownFiles->hide();
+            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
+            if(unknownFilesLabel)
+            {
+                unknownFilesLabel->hide();
+            }
+        }
         
         LOG(QString("Successfully bound unknown file to anime %1, episode %2")
             .arg(fileData.selectedAid)

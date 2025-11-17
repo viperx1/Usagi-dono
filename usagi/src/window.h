@@ -24,6 +24,8 @@
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTreeWidget>
 #include <QtWidgets/QScrollArea>
+#include <QtWidgets/QCompleter>
+#include <QtWidgets/QMessageBox>
 #include <QXmlStreamReader>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
