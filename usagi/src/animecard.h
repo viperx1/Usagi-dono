@@ -45,7 +45,21 @@ public:
     void setAiredText(const QString& airedText);
     void setStatistics(int normalEpisodes, int totalNormalEpisodes, int normalViewed, int otherEpisodes, int otherViewed);
     void setPoster(const QPixmap& pixmap);
-    void setTags(const QString& tags);
+    void setRating(const QString& rating);
+    
+    // Tag structure for storing tag data
+    struct TagInfo {
+        QString name;
+        int id;
+        int weight;
+        
+        // For sorting by weight (highest first)
+        bool operator<(const TagInfo& other) const {
+            return weight > other.weight;
+        }
+    };
+    
+    void setTags(const QList<TagInfo>& tags);
     
     // File and Episode management structures
     struct FileInfo {
@@ -55,6 +69,7 @@ public:
         QString state;
         bool viewed;
         QString storage;
+        QString localFilePath;  // Path to local file if tracked
         qint64 lastPlayed;
         QString resolution;
         QString quality;
@@ -123,6 +138,7 @@ private:
     QLabel *m_titleLabel;
     QLabel *m_typeLabel;
     QLabel *m_airedLabel;
+    QLabel *m_ratingLabel;
     QLabel *m_tagsLabel;
     QLabel *m_statsLabel;
     QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy

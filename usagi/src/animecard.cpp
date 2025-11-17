@@ -4,6 +4,7 @@
 #include <QMouseEvent>
 #include <QTreeWidgetItem>
 #include <QDateTime>
+#include <QFile>
 
 AnimeCard::AnimeCard(QWidget *parent)
     : QFrame(parent)
@@ -69,10 +70,14 @@ void AnimeCard::setupUI()
     m_airedLabel->setStyleSheet("font-size: 9pt; color: #666;");
     m_infoLayout->addWidget(m_airedLabel);
     
+    m_ratingLabel = new QLabel("", this);
+    m_ratingLabel->setStyleSheet("font-size: 9pt; color: #666;");
+    m_infoLayout->addWidget(m_ratingLabel);
+    
     m_tagsLabel = new QLabel("", this);
     m_tagsLabel->setWordWrap(true);
     m_tagsLabel->setStyleSheet("font-size: 8pt; color: #888; font-style: italic;");
-    m_tagsLabel->setMaximumHeight(30);
+    // Remove maximum height to allow vertical expansion
     m_infoLayout->addWidget(m_tagsLabel);
     
     m_statsLabel = new QLabel("Episodes: 0/0 | Viewed: 0/0", this);
@@ -159,12 +164,28 @@ void AnimeCard::setStatistics(int normalEpisodes, int totalNormalEpisodes, int n
     updateStatisticsLabel();
 }
 
-void AnimeCard::setTags(const QString& tags)
+void AnimeCard::setTags(const QList<TagInfo>& tags)
 {
-    if (!tags.isEmpty()) {
-        m_tagsLabel->setText("Tags: " + tags);
-    } else {
+    if (tags.isEmpty()) {
         m_tagsLabel->setText("");
+        return;
+    }
+    
+    // Tags are already sorted by weight (highest first)
+    QStringList tagNames;
+    for (const TagInfo& tag : tags) {
+        tagNames << tag.name;
+    }
+    
+    m_tagsLabel->setText("Tags: " + tagNames.join(", "));
+}
+
+void AnimeCard::setRating(const QString& rating)
+{
+    if (!rating.isEmpty()) {
+        m_ratingLabel->setText("Rating: " + rating);
+    } else {
+        m_ratingLabel->setText("");
     }
 }
 
@@ -229,27 +250,52 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeText += QString(" (%1 files)").arg(episode.files.size());
     }
     
-    // Column 0: empty (no play button for episode parent)
-    episodeItem->setText(0, "");
-    episodeItem->setData(0, Qt::UserRole, 0);  // 0 means no button
+    // Column 0: Play button if any file exists
+    // Check if any file in this episode exists locally
+    bool anyFileExists = false;
+    int existingFileLid = 0;
+    for (const FileInfo& file : episode.files) {
+        if (!file.localFilePath.isEmpty() && QFile::exists(file.localFilePath)) {
+            anyFileExists = true;
+            existingFileLid = file.lid;
+            break;  // Found at least one file that exists
+        }
+    }
+    
+    if (anyFileExists) {
+        episodeItem->setText(0, "▶"); // Play button if any file exists
+        episodeItem->setTextAlignment(0, Qt::AlignCenter);  // Center the play button
+        episodeItem->setData(0, Qt::UserRole, 1);  // 1 means show button
+        episodeItem->setForeground(0, QBrush(QColor(0, 150, 0))); // Green for available
+        // Store the lid of the first available file for playback
+        episodeItem->setData(1, Qt::UserRole, existingFileLid);
+    } else {
+        episodeItem->setText(0, "");
+        episodeItem->setData(0, Qt::UserRole, 0);  // 0 means no button
+        episodeItem->setData(1, Qt::UserRole, 0);  // 0 means it's an episode with no files
+    }
     
     // Column 1: Episode info
     episodeItem->setText(1, episodeText);
-    episodeItem->setData(1, Qt::UserRole, 0);  // 0 means it's an episode, not a file
     episodeItem->setData(1, Qt::UserRole + 1, episode.eid);
     
     // Add file children
     for (const FileInfo& file : episode.files) {
         QTreeWidgetItem *fileItem = new QTreeWidgetItem(episodeItem);
         
-        // Column 0: Play button text (same as tree view)
-        if (file.state == "Deleted") {
-            fileItem->setText(0, "✗"); // X for deleted
-            fileItem->setForeground(0, QBrush(QColor(Qt::red)));
-        } else if (file.viewed) {
-            fileItem->setText(0, "✓"); // Checkmark for watched
+        // Column 0: Play button - reflects file existence, not watch state
+        // Check if local file exists
+        bool fileExists = false;
+        if (!file.localFilePath.isEmpty()) {
+            fileExists = QFile::exists(file.localFilePath);
+        }
+        
+        if (fileExists) {
+            fileItem->setText(0, "▶"); // Play button for existing files
+            fileItem->setForeground(0, QBrush(QColor(0, 150, 0))); // Green for available
         } else {
-            fileItem->setText(0, "▶"); // Play button
+            fileItem->setText(0, "✗"); // X for missing files
+            fileItem->setForeground(0, QBrush(QColor(Qt::red)));
         }
         
         // Format file text with version indicator

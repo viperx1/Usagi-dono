@@ -62,7 +62,8 @@ void MyListCardManager::loadAllCards()
     QString query = "SELECT m.aid, "
                     "a.nameromaji, a.nameenglish, a.eptotal, "
                     "at.title as anime_title, "
-                    "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
+                    "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+                    "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list "
                     "FROM mylist m "
                     "LEFT JOIN anime a ON m.aid = a.aid "
                     "LEFT JOIN anime_titles at ON m.aid = at.aid AND at.type = 1 "
@@ -325,6 +326,36 @@ void MyListCardManager::processBatchedUpdates()
     }
 }
 
+// Helper function to parse tag lists into TagInfo objects
+static QList<AnimeCard::TagInfo> parseTags(const QString& tagNames, const QString& tagIds, const QString& tagWeights)
+{
+    QList<AnimeCard::TagInfo> tags;
+    
+    if (tagNames.isEmpty() || tagIds.isEmpty() || tagWeights.isEmpty()) {
+        return tags;
+    }
+    
+    QStringList names = tagNames.split(',');
+    QStringList ids = tagIds.split(',');
+    QStringList weights = tagWeights.split(',');
+    
+    // All three lists should have the same size
+    int count = qMin(qMin(names.size(), ids.size()), weights.size());
+    
+    for (int i = 0; i < count; ++i) {
+        AnimeCard::TagInfo tag;
+        tag.name = names[i].trimmed();
+        tag.id = ids[i].trimmed().toInt();
+        tag.weight = weights[i].trimmed().toInt();
+        tags.append(tag);
+    }
+    
+    // Sort by weight (highest first)
+    std::sort(tags.begin(), tags.end());
+    
+    return tags;
+}
+
 AnimeCard* MyListCardManager::createCard(int aid)
 {
     QSqlDatabase db = QSqlDatabase::database();
@@ -337,7 +368,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QSqlQuery q(db);
     q.prepare("SELECT a.nameromaji, a.nameenglish, a.eptotal, "
               "at.title as anime_title, "
-              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
+              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+              "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list "
               "FROM anime a "
               "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
               "WHERE a.aid = ?");
@@ -358,6 +390,10 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QString picname = q.value(8).toString();
     QByteArray posterData = q.value(9).toByteArray();
     QString category = q.value(10).toString();
+    QString rating = q.value(11).toString();
+    QString tagNameList = q.value(12).toString();
+    QString tagIdList = q.value(13).toString();
+    QString tagWeightList = q.value(14).toString();
     
     // Determine anime name
     if (animeName.isEmpty() && !animeNameEnglish.isEmpty()) {
@@ -392,9 +428,28 @@ AnimeCard* MyListCardManager::createCard(int aid)
         m_animeNeedingMetadata.insert(aid);
     }
     
-    // Set tags/categories
-    if (!category.isEmpty()) {
-        card->setTags(category);
+    // Set tags from parsed tag lists (prefer this over category)
+    QList<AnimeCard::TagInfo> tags = parseTags(tagNameList, tagIdList, tagWeightList);
+    if (!tags.isEmpty()) {
+        card->setTags(tags);
+    } else if (!category.isEmpty()) {
+        // Fallback to category if no tag data
+        QList<AnimeCard::TagInfo> categoryTags;
+        QStringList categoryNames = category.split(',');
+        int weight = 1000;  // Arbitrary high weight for category fallback
+        for (const QString& catName : categoryNames) {
+            AnimeCard::TagInfo tag;
+            tag.name = catName.trimmed();
+            tag.id = 0;
+            tag.weight = weight--;
+            categoryTags.append(tag);
+        }
+        card->setTags(categoryTags);
+    }
+    
+    // Set rating
+    if (!rating.isEmpty()) {
+        card->setRating(rating);
     }
     
     // Load poster asynchronously
@@ -467,7 +522,8 @@ void MyListCardManager::updateCardFromDatabase(int aid)
     QSqlQuery q(db);
     q.prepare("SELECT a.nameromaji, a.nameenglish, "
               "at.title as anime_title, "
-              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category "
+              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+              "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list "
               "FROM anime a "
               "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
               "WHERE a.aid = ?");
@@ -489,6 +545,10 @@ void MyListCardManager::updateCardFromDatabase(int aid)
     QString picname = q.value(7).toString();
     QByteArray posterData = q.value(8).toByteArray();
     QString category = q.value(9).toString();
+    QString rating = q.value(10).toString();
+    QString tagNameList = q.value(11).toString();
+    QString tagIdList = q.value(12).toString();
+    QString tagWeightList = q.value(13).toString();
     
     // Update anime name
     if (animeName.isEmpty() && !animeNameEnglish.isEmpty()) {
@@ -512,9 +572,28 @@ void MyListCardManager::updateCardFromDatabase(int aid)
         card->setAired(airedDates);
     }
     
-    // Update tags/categories
-    if (!category.isEmpty()) {
-        card->setTags(category);
+    // Update tags from parsed tag lists (prefer this over category)
+    QList<AnimeCard::TagInfo> tags = parseTags(tagNameList, tagIdList, tagWeightList);
+    if (!tags.isEmpty()) {
+        card->setTags(tags);
+    } else if (!category.isEmpty()) {
+        // Fallback to category if no tag data
+        QList<AnimeCard::TagInfo> categoryTags;
+        QStringList categoryNames = category.split(',');
+        int weight = 1000;  // Arbitrary high weight for category fallback
+        for (const QString& catName : categoryNames) {
+            AnimeCard::TagInfo tag;
+            tag.name = catName.trimmed();
+            tag.id = 0;
+            tag.weight = weight--;
+            categoryTags.append(tag);
+        }
+        card->setTags(categoryTags);
+    }
+    
+    // Update rating
+    if (!rating.isEmpty()) {
+        card->setRating(rating);
     }
     
     // Update poster if available
@@ -623,6 +702,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
             
             fileInfo.viewed = (viewed != 0);
             fileInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
+            fileInfo.localFilePath = localFilePath;  // Store local file path for existence check
             fileInfo.lastPlayed = lastPlayed;
             fileInfo.resolution = resolution;
             fileInfo.quality = quality;
