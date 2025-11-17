@@ -239,9 +239,29 @@ void MyListCardManager::onAnimeUpdated(int aid)
     // Schedule card update
     updateCardAnimeInfo(aid);
     
-    // Remove from tracking
+    // Remove from tracking and hide warning
     QMutexLocker locker(&m_mutex);
     m_animeNeedingMetadata.remove(aid);
+    AnimeCard *card = m_cards.value(aid, nullptr);
+    locker.unlock();
+    
+    if (card) {
+        card->setNeedsFetch(false);
+    }
+}
+
+void MyListCardManager::onFetchDataRequested(int aid)
+{
+    LOG(QString("[MyListCardManager] Manual fetch requested for anime %1").arg(aid));
+    
+    QMutexLocker locker(&m_mutex);
+    
+    // Request metadata if not already requested
+    if (!m_animeMetadataRequested.contains(aid)) {
+        m_animeMetadataRequested.insert(aid);
+        locker.unlock();
+        requestAnimeMetadata(aid);
+    }
 }
 
 void MyListCardManager::onPosterDownloadFinished(QNetworkReply *reply)
@@ -490,10 +510,12 @@ AnimeCard* MyListCardManager::createCard(int aid)
     m_cards[aid] = card;
     locker.unlock();
     
-    // Request missing metadata if needed
-    if (m_animeNeedingMetadata.contains(aid) && !m_animeMetadataRequested.contains(aid)) {
-        requestAnimeMetadata(aid);
-        m_animeMetadataRequested.insert(aid);
+    // Connect fetch data request signal from card
+    connect(card, &AnimeCard::fetchDataRequested, this, &MyListCardManager::onFetchDataRequested);
+    
+    // Show warning indicator if metadata is missing (instead of auto-fetching)
+    if (m_animeNeedingMetadata.contains(aid)) {
+        card->setNeedsFetch(true);
     }
     
     emit cardCreated(aid, card);

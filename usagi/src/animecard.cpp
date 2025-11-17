@@ -2,6 +2,8 @@
 #include "playbuttondelegate.h"
 #include <QPainter>
 #include <QMouseEvent>
+#include <QContextMenuEvent>
+#include <QMenu>
 #include <QTreeWidgetItem>
 #include <QDateTime>
 #include <QFile>
@@ -89,6 +91,16 @@ void AnimeCard::setupUI()
     m_topLayout->addLayout(m_infoLayout, 1);
     
     m_mainLayout->addLayout(m_topLayout);
+    
+    // Warning label (positioned absolutely in top-right corner)
+    m_warningLabel = new QLabel(this);
+    m_warningLabel->setText("⚠");  // Warning triangle emoji
+    m_warningLabel->setStyleSheet("font-size: 20pt; color: #FFD700; background-color: transparent;");
+    m_warningLabel->setFixedSize(30, 30);
+    m_warningLabel->setAlignment(Qt::AlignCenter);
+    m_warningLabel->move(getCardSize().width() - 35, 5);  // Position in top-right corner
+    m_warningLabel->setToolTip("Missing metadata - Right-click to fetch data");
+    m_warningLabel->hide();  // Hidden by default
     
     // Episode tree (bottom section) - now supports episode->file hierarchy with play button
     m_episodeTree = new QTreeWidget(this);
@@ -385,6 +397,15 @@ void AnimeCard::clearEpisodes()
     m_episodeTree->clear();
 }
 
+void AnimeCard::setNeedsFetch(bool needsFetch)
+{
+    if (needsFetch) {
+        m_warningLabel->show();
+    } else {
+        m_warningLabel->hide();
+    }
+}
+
 bool AnimeCard::operator<(const AnimeCard& other) const
 {
     // Default comparison by anime title
@@ -409,4 +430,16 @@ void AnimeCard::mousePressEvent(QMouseEvent *event)
         }
     }
     QFrame::mousePressEvent(event);
+}
+
+void AnimeCard::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu contextMenu(this);
+    
+    QAction *fetchDataAction = contextMenu.addAction("Fetch data");
+    connect(fetchDataAction, &QAction::triggered, this, [this]() {
+        emit fetchDataRequested(m_animeId);
+    });
+    
+    contextMenu.exec(event->globalPos());
 }

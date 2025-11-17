@@ -87,6 +87,9 @@ public slots:
     // Slot to handle poster download completion
     void onPosterDownloadFinished(QNetworkReply *reply);
     
+    // Slot to handle manual data fetch request
+    void onFetchDataRequested(int aid);
+    
 private slots:
     // Timer slot for batched updates
     void processBatchedUpdates();

@@ -47,6 +47,9 @@ public:
     void setPoster(const QPixmap& pixmap);
     void setRating(const QString& rating);
     
+    // Warning indicator for missing metadata
+    void setNeedsFetch(bool needsFetch);
+    
     // Tag structure for storing tag data
     struct TagInfo {
         QString name;
@@ -111,10 +114,12 @@ public:
 signals:
     void episodeClicked(int lid);
     void cardClicked(int aid);
+    void fetchDataRequested(int aid);
     
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
     
 private:
     void setupUI();
@@ -141,6 +146,7 @@ private:
     QLabel *m_ratingLabel;
     QLabel *m_tagsLabel;
     QLabel *m_statsLabel;
+    QLabel *m_warningLabel;  // Warning indicator for missing metadata
     QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy
     PlayButtonDelegate *m_playButtonDelegate;  // Delegate for play button column
     
