@@ -2747,7 +2747,12 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     
     QPushButton *bindButton = new QPushButton("Bind");
     bindButton->setEnabled(false);
+    // Store filepath in button property for later lookup
+    bindButton->setProperty("filepath", filepath);
+    
     QPushButton *notAnimeButton = new QPushButton("Not Anime");
+    // Store filepath in button property for later lookup
+    notAnimeButton->setProperty("filepath", filepath);
     
     actionLayout->addWidget(bindButton);
     actionLayout->addWidget(notAnimeButton);
@@ -2755,7 +2760,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     
     unknownFiles->setCellWidget(row, 3, actionContainer);
     
-    // Store file data
+    // Store file data with filepath as additional key for stable lookup
     UnknownFileData fileData;
     fileData.filename = filename;
     fileData.filepath = filepath;
@@ -2766,14 +2771,26 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     unknownFilesData[row] = fileData;
     
     // Connect anime search to populate episode suggestions
-    connect(animeSearch, &QLineEdit::textChanged, [this, row, animeSearch, episodeInput, bindButton]() {
+    connect(animeSearch, &QLineEdit::textChanged, [this, filepath, animeSearch, episodeInput, bindButton]() {
         QString searchText = animeSearch->text();
+        
+        // Find current row by filepath (stable identifier)
+        int currentRow = -1;
+        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
+            QTableWidgetItem *item = unknownFiles->item(i, 0);
+            if(item && item->toolTip() == filepath) {
+                currentRow = i;
+                break;
+            }
+        }
+        
+        if(currentRow < 0 || !unknownFilesData.contains(currentRow)) return;
         
         // Check if the text matches a valid anime from autocomplete (use cached data)
         if(cachedTitleToAid.contains(searchText))
         {
             int aid = cachedTitleToAid[searchText];
-            unknownFilesData[row].selectedAid = aid;
+            unknownFilesData[currentRow].selectedAid = aid;
             
             // Enable episode input
             episodeInput->setEnabled(true);
@@ -2789,14 +2806,26 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
             episodeInput->setEnabled(false);
             episodeInput->setPlaceholderText("Select anime first...");
             bindButton->setEnabled(false);
-            unknownFilesData[row].selectedAid = -1;
+            unknownFilesData[currentRow].selectedAid = -1;
         }
     });
     
     // Connect episode input to enable bind button when text is entered
-    connect(episodeInput, &QLineEdit::textChanged, [this, row, episodeInput, bindButton]() {
+    connect(episodeInput, &QLineEdit::textChanged, [this, filepath, episodeInput, bindButton]() {
+        // Find current row by filepath (stable identifier)
+        int currentRow = -1;
+        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
+            QTableWidgetItem *item = unknownFiles->item(i, 0);
+            if(item && item->toolTip() == filepath) {
+                currentRow = i;
+                break;
+            }
+        }
+        
+        if(currentRow < 0 || !unknownFilesData.contains(currentRow)) return;
+        
         QString epnoText = episodeInput->text().trimmed();
-        if(!epnoText.isEmpty() && unknownFilesData[row].selectedAid > 0)
+        if(!epnoText.isEmpty() && unknownFilesData[currentRow].selectedAid > 0)
         {
             bindButton->setEnabled(true);
         }
@@ -2806,14 +2835,48 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
         }
     });
     
-    // Connect bind button
-    connect(bindButton, &QPushButton::clicked, [this, row, episodeInput]() {
-        onUnknownFileBindClicked(row, episodeInput->text().trimmed());
+    // Connect bind button - use filepath to find current row dynamically
+    connect(bindButton, &QPushButton::clicked, [this, episodeInput]() {
+        QPushButton *btn = qobject_cast<QPushButton*>(sender());
+        if(!btn) return;
+        
+        QString filepath = btn->property("filepath").toString();
+        
+        // Find current row by filepath
+        int currentRow = -1;
+        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
+            QTableWidgetItem *item = unknownFiles->item(i, 0);
+            if(item && item->toolTip() == filepath) {
+                currentRow = i;
+                break;
+            }
+        }
+        
+        if(currentRow >= 0) {
+            onUnknownFileBindClicked(currentRow, episodeInput->text().trimmed());
+        }
     });
     
-    // Connect "Not Anime" button
-    connect(notAnimeButton, &QPushButton::clicked, [this, row]() {
-        onUnknownFileNotAnimeClicked(row);
+    // Connect "Not Anime" button - use filepath to find current row dynamically
+    connect(notAnimeButton, &QPushButton::clicked, [this]() {
+        QPushButton *btn = qobject_cast<QPushButton*>(sender());
+        if(!btn) return;
+        
+        QString filepath = btn->property("filepath").toString();
+        
+        // Find current row by filepath
+        int currentRow = -1;
+        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
+            QTableWidgetItem *item = unknownFiles->item(i, 0);
+            if(item && item->toolTip() == filepath) {
+                currentRow = i;
+                break;
+            }
+        }
+        
+        if(currentRow >= 0) {
+            onUnknownFileNotAnimeClicked(currentRow);
+        }
     });
 }
 
