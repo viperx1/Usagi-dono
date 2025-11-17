@@ -2,9 +2,13 @@
 #include "../usagi/src/mylistcardmanager.h"
 #include "../usagi/src/animecard.h"
 #include "../usagi/src/flowlayout.h"
+#include "../usagi/src/main.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+
+// Global adbapi used by MyListCardManager
+myAniDBApi *adbapi = nullptr;
 
 /**
  * Test suite for MyListCardManager
@@ -47,6 +51,12 @@ private:
 
 void TestMyListCardManager::initTestCase()
 {
+    // Set environment variable to signal test mode
+    qputenv("USAGI_TEST_MODE", "1");
+    
+    // Initialize the global adbapi object
+    adbapi = new myAniDBApi("test", 1);
+    
     // Create in-memory test database
     db = QSqlDatabase::addDatabase("QSQLITE", "test_connection");
     db.setDatabaseName(":memory:");
@@ -60,6 +70,9 @@ void TestMyListCardManager::initTestCase()
 
 void TestMyListCardManager::cleanupTestCase()
 {
+    delete adbapi;
+    adbapi = nullptr;
+    
     if (db.isOpen()) {
         db.close();
     }

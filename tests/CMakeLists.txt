@@ -1487,6 +1487,13 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/playbuttondelegate.cpp
     ../usagi/src/epno.cpp
     ../usagi/src/aired.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/myanidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
 )
 
@@ -1497,6 +1504,11 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
     ../usagi/src/playbuttondelegate.h
     ../usagi/src/epno.h
     ../usagi/src/aired.h
+    ../usagi/src/anidbapi.h
+    ../usagi/src/main.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
 )
 
