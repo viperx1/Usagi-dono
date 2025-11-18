@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QString>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -198,7 +198,7 @@ void TestApiOptimization::testBannedFlagBlocksCommunication()
     api->simulateBannedResponse("555 BANNED - Test ban");
     
     // Try to make a request - it should not be added to packets
-    QString tag = api->File(1024, "abcd1234");
+    (void)api->File(1024, "abcd1234");
     
     // The SendPacket timer should be stopped when banned
     // In a real scenario, no packets would be sent after ban
@@ -221,11 +221,11 @@ void TestApiOptimization::testFileCommandSkipsRequestWhenFileExists()
     insertTestGroup(3);
     
     // Try to request file info
-    QString tag = api->File(size, ed2k);
+    (void)api->File(size, ed2k);
     
     // Should return empty tag or log that request was skipped
     // Verify no packet was added
-    QString cmd = getLastPacketCommand();
+    (void)getLastPacketCommand();
     
     // If all data exists, no packet should be created
     // In this case we expect either empty or minimal request
@@ -244,7 +244,7 @@ void TestApiOptimization::testFileCommandReducesMaskWhenAnimeExists()
     insertTestAnime(5);
     
     // Request file info
-    QString tag = api->File(size, ed2k);
+    (void)api->File(size, ed2k);
     
     // Verify command was created (since episode and group data missing)
     QString cmd = getLastPacketCommand();
@@ -265,7 +265,7 @@ void TestApiOptimization::testFileCommandReducesMaskWhenEpisodeExists()
     insertTestEpisode(10);
     
     // Request file info
-    QString tag = api->File(size, ed2k);
+    (void)api->File(size, ed2k);
     
     // Verify command was created (since anime and group data missing)
     QString cmd = getLastPacketCommand();
@@ -283,7 +283,7 @@ void TestApiOptimization::testFileCommandReducesMaskWhenGroupExists()
     insertTestGroup(20);
     
     // Request file info
-    QString tag = api->File(size, ed2k);
+    (void)api->File(size, ed2k);
     
     // Verify command was created (since anime and episode data missing)
     QString cmd = getLastPacketCommand();
@@ -303,7 +303,7 @@ void TestApiOptimization::testAnimeCommandSkipsRequestWhenAnimeExists()
     QVERIFY(query.exec());
     
     // Try to request anime info
-    QString tag = api->Anime(aid);
+    (void)api->Anime(aid);
     
     // Should still make a request for fields not in database (ratings, tags, etc)
     // but with reduced mask excluding the fields we have
@@ -329,7 +329,7 @@ void TestApiOptimization::testEpisodeCommandSkipsRequestWhenEpisodeExists()
     QVERIFY(query.exec());
     
     // Try to request episode info
-    QString tag = api->Episode(eid);
+    (void)api->Episode(eid);
     
     // Should return empty tag since all critical episode data exists
     // Verify no new packet was added
@@ -341,7 +341,7 @@ void TestApiOptimization::testAnimeCommandExcludesNameFields()
 {
     // Request anime info for a non-existent anime
     int aid = 7777;
-    QString tag = api->Anime(aid);
+    (void)api->Anime(aid);
     
     // Get the generated command
     QString cmd = getLastPacketCommand();
@@ -368,7 +368,7 @@ void TestApiOptimization::testAnimeCommandReducesMaskForPartialData()
     QVERIFY(query.exec());
     
     // Try to request anime info
-    QString tag = api->Anime(aid);
+    (void)api->Anime(aid);
     
     // Should still make a request, but with reduced mask
     QString cmd = getLastPacketCommand();
@@ -391,7 +391,7 @@ void TestApiOptimization::testEpisodeCommandRequestsWhenPartialData()
     QVERIFY(query.exec());
     
     // Try to request episode info
-    QString tag = api->Episode(eid);
+    (void)api->Episode(eid);
     
     // Should make a request because critical field (epno) is missing
     QString cmd = getLastPacketCommand();

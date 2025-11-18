@@ -7,6 +7,8 @@
 #include <QElapsedTimer>
 #include <QRegularExpression>
 #include <QDateTime>
+#include <QStandardPaths>
+#include <QDir>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
@@ -22,10 +24,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		Logger::log("[AniDB Init] Starting DNS lookup for api.anidb.net (this may block)", __FILE__, __LINE__);
 		host = QHostInfo::fromName("api.anidb.net");
 		Logger::log("[AniDB Init] DNS lookup completed", __FILE__, __LINE__);
-		if(!host.addresses().isEmpty())
+		const QList<QHostAddress> addresses = host.addresses();
+		if(!addresses.isEmpty())
 		{
-			anidbaddr.setAddress(host.addresses().first().toIPv4Address());
-			Logger::log("[AniDB Init] DNS resolved successfully to " + host.addresses().first().toString(), __FILE__, __LINE__);
+			anidbaddr.setAddress(addresses.first().toIPv4Address());
+			Logger::log("[AniDB Init] DNS resolved successfully to " + addresses.first().toString(), __FILE__, __LINE__);
 		}
 		else
 		{
@@ -416,17 +419,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	if(ReplyID == "200"){ // 200 {str session_key} LOGIN ACCEPTED
 		SID = token.first();
 		loggedin = 1;
-        notifyLoggedIn(Tag, 200);
+		emit notifyLoggedIn(Tag, 200);
 	}
 	else if(ReplyID == "201"){ // 201 {str session_key} LOGIN ACCEPTED - NEW VERSION AVAILABLE
 		SID = token.first();
 		loggedin = 1;
-        notifyLoggedIn(Tag, 201);
+		emit notifyLoggedIn(Tag, 201);
 	}
     else if(ReplyID == "203"){ // 203 LOGGED OUT
         Logger::log("[AniDB Response] 203 LOGGED OUT - Tag: " + Tag, __FILE__, __LINE__);
 		loggedin = 0;
-        notifyLoggedOut(Tag, 203);
+		emit notifyLoggedOut(Tag, 203);
 	}
 	else if(ReplyID == "210"){ // 210 MYLIST ENTRY ADDED
 		// Parse lid from response message
@@ -505,7 +508,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 		}
 		
-		notifyMylistAdd(Tag, 210);
+		emit notifyMylistAdd(Tag, 210);
 	}
 	else if(ReplyID == "217"){ // 217 EXPORT QUEUED
 		Logger::log("[AniDB Response] 217 EXPORT QUEUED - Tag: " + Tag, __FILE__, __LINE__);
@@ -1014,7 +1017,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				query.exec(q);
 			}
 		}
-		notifyMylistAdd(Tag, 310);
+		emit notifyMylistAdd(Tag, 310);
 	}
 	else if(ReplyID == "311"){ // 311 MYLIST ENTRY EDITED
 		// Parse lid from response message
@@ -1093,13 +1096,13 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 		}
 		
-		notifyMylistAdd(Tag, 311);
+		emit notifyMylistAdd(Tag, 311);
 	}
 	else if(ReplyID == "312"){ // 312 NO SUCH MYLIST ENTRY
 		Logger::log("[AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag, __FILE__, __LINE__);
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
-        notifyMylistAdd(Tag, 320);
+        emit notifyMylistAdd(Tag, 320);
         // Mark packet as processed and received reply instead of deleting
         QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID).arg(Tag);
         LOG("Database update query: " + q + " Tag: " + Tag);
@@ -2648,7 +2651,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		query.prepare(mylistQuery);
 		
 		// Bind all fid values
-		for (int fid : fids)
+		for (const int fid : fids)
 		{
 			query.addBindValue(fid);
 		}

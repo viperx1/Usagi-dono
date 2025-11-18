@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <QDirIterator>
 
 HasherThreadPool *hasherThreadPool = nullptr;
 myAniDBApi *adbapi;
@@ -982,8 +983,6 @@ void Window::ButtonHasherStartClick()
 		// Process files with progress="0" or progress="1" (already hashed but not yet API-processed)
 		if(progress == "0" || progress == "1")
 		{
-			QString filePath = hashes->item(i, 2)->text();
-			
 			// Check if file has pending API calls (tags in columns 5 or 6)
 			// Tags are "?" initially, set to actual tag when API call is queued, and "0" when completed/not needed
 			QString fileTag = hashes->item(i, 5)->text();
@@ -1080,7 +1079,7 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	
 	// Reset all thread progress bars
-	for (QProgressBar *bar : threadProgressBars) {
+	for (QProgressBar* const bar : threadProgressBars) {
 		bar->setValue(0);
 		bar->setMaximum(1);
 	}
@@ -4639,7 +4638,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Remove all cards from layout
-	for (AnimeCard *card : animeCards) {
+	for (AnimeCard* const card : animeCards) {
 		mylistCardLayout->removeWidget(card);
 	}
 	
@@ -4751,7 +4750,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Re-add cards to layout in sorted order
-	for (AnimeCard *card : animeCards) {
+	for (AnimeCard* const card : animeCards) {
 		mylistCardLayout->addWidget(card);
 	}
 }
@@ -4873,7 +4872,7 @@ void Window::onPosterDownloadFinished(QNetworkReply *reply)
 	LOG(QString("Poster downloaded and stored for anime %1").arg(aid));
 	
 	// Update the card if it exists
-	for (AnimeCard *card : animeCards) {
+	for (AnimeCard* const card : animeCards) {
 		if (card->getAnimeId() == aid) {
 			card->setPoster(poster);
 			animeNeedingPoster.remove(aid);

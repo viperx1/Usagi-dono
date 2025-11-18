@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -76,7 +76,7 @@ void TestBatchHashRetrieval::testBatchGetLocalFileHashes()
     QSqlQuery query(db);
     query.prepare(queryStr);
     
-    for (const QString& path : paths) {
+    for (const QString& path : qAsConst(paths)) {
         query.addBindValue(path);
     }
     
@@ -124,7 +124,7 @@ void TestBatchHashRetrieval::testBatchGetLocalFileHashesPartialResults()
     QSqlQuery query(db);
     query.prepare(queryStr);
     
-    for (const QString& path : paths) {
+    for (const QString& path : qAsConst(paths)) {
         query.addBindValue(path);
     }
     

@@ -1,6 +1,11 @@
 #ifndef WINDOW_H
 #define WINDOW_H
-#include <QtGui>
+#include <QtWidgets/QWidget>
+#include <QtGui/QColor>
+#include <QtGui/QBrush>
+#include <QtGui/QPixmap>
+#include <QtGui/QKeyEvent>
+#include <QtGui/QCloseEvent>
 #include <QtAlgorithms>
 #include <QRegularExpression>
 #include <QMutex>

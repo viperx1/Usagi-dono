@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include "../usagi/src/hash/ed2k.h"
 #include <string>
 #include <cstring>

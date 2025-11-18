@@ -11,7 +11,7 @@
  * not EpsTotal (which includes all episode types including specials).
  */
 
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QString>
 
 class TestEpisodeColumnFormat : public QObject

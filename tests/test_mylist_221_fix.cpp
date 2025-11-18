@@ -12,7 +12,7 @@
  * and correctly map response fields starting with fid at index 0.
  */
 
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -63,11 +63,10 @@ void TestMylist221Fix::testMylistResponseParsing()
     // Test demonstrates the bug and the fix
     
     // Example MYLIST command and response from AniDB API
-    QString mylistCommand = "MYLIST lid=123456";
     QString mylistResponse = "221 MYLIST\n789012|297776|18795|16325|1609459200|1|1640995200|HDD|BluRay||1";
     
     // The response format is: fid|eid|aid|gid|date|state|viewdate|storage|source|other|filestate
-    // Note: lid (123456) is NOT in the response - it's known from the command parameter
+    // Note: lid (123456) from MYLIST command is NOT in the response - it's known from the command parameter
     
     // Parse the response
     QStringList lines = mylistResponse.split("\n");

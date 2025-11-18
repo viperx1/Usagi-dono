@@ -102,7 +102,8 @@ void MyListCardManager::clearAllCards()
     
     if (m_layout) {
         // Remove cards from layout and delete them
-        for (AnimeCard *card : m_cards.values()) {
+        const auto cardValues = m_cards.values();
+        for (AnimeCard* const card : cardValues) {
             m_layout->removeWidget(card);
             delete card;
         }
@@ -377,7 +378,7 @@ void MyListCardManager::processBatchedUpdates()
     
     LOG(QString("[MyListCardManager] Processing %1 batched card updates").arg(toUpdate.size()));
     
-    for (int aid : toUpdate) {
+    for (const int aid : toUpdate) {
         updateCardFromDatabase(aid);
     }
 }

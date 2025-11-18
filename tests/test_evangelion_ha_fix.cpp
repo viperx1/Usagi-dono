@@ -7,7 +7,7 @@
  * the mylist export parser correctly updates the eps field from the XML.
  */
 
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>

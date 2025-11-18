@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include "../usagi/src/mylistcardmanager.h"
 #include "../usagi/src/animecard.h"
 #include "../usagi/src/flowlayout.h"
@@ -6,6 +6,8 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QSignalSpy>
+
 
 // Import static plugins for Qt static builds
 // Required for: QNetworkAccessManager, QSqlDatabase (QSQLITE), and platform integration

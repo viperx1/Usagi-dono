@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include "../usagi/src/aired.h"
 #include <QDate>
 

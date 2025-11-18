@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QTemporaryDir>
+#include <QXmlStreamReader>
 
 class TestMylistXMLParser : public QObject
 {

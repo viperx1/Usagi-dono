@@ -1,7 +1,10 @@
 #ifndef ANIDBAPI_H
 #define ANIDBAPI_H
 
-#include <QtNetwork>
+#include <QtNetwork/QUdpSocket>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkReply>
+#include <QtNetwork/QNetworkRequest>
 #include <QHostAddress>
 #include <QHostInfo>
 #include <QSqlDatabase>
@@ -11,7 +14,6 @@
 #include <QtWidgets/QMessageBox>
 #include <QElapsedTimer>
 #include <QTimer>
-//#include <QTextCodec>
 #include <bitset>
 #include <zlib.h>
 #include "hash/ed2k.h"
