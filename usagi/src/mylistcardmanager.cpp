@@ -885,5 +885,3 @@ MyListCardManager::AnimeStats MyListCardManager::calculateStatistics(int aid)
     
     return stats;
 }
-
-#include "moc_mylistcardmanager.cpp"
