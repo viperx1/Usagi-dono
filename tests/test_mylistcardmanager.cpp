@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include "../usagi/src/mylistcardmanager.h"
 #include "../usagi/src/animecard.h"
 #include "../usagi/src/flowlayout.h"

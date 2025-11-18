@@ -12,7 +12,7 @@
  * and correctly map response fields starting with fid at index 0.
  */
 
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>

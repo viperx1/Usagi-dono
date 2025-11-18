@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include "../usagi/src/logger.h"

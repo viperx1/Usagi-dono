@@ -1,4 +1,4 @@
-#include <QtTest/QtTest>
+#include <QTest>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include "../usagi/src/aired.h"
