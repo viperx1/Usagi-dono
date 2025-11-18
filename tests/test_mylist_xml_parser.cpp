@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QTemporaryDir>
+#include <QXmlStreamReader>
 
 class TestMylistXMLParser : public QObject
 {

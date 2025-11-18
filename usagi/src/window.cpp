@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <QDirIterator>
 
 HasherThreadPool *hasherThreadPool = nullptr;
 myAniDBApi *adbapi;

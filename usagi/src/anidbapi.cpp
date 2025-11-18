@@ -8,6 +8,7 @@
 #include <QRegularExpression>
 #include <QDateTime>
 #include <QStandardPaths>
+#include <QDir>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
