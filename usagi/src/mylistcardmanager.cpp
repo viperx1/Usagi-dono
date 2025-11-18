@@ -102,7 +102,8 @@ void MyListCardManager::clearAllCards()
     
     if (m_layout) {
         // Remove cards from layout and delete them
-        for (AnimeCard* const card : m_cards.values()) {
+        const auto cardValues = m_cards.values();
+        for (AnimeCard* const card : cardValues) {
             m_layout->removeWidget(card);
             delete card;
         }

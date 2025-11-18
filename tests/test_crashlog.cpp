@@ -481,7 +481,7 @@ void TestCrashLog::testStackTraceHasFunctionNames()
     int framesWithNames = 0;
     int totalFrames = 0;
     
-    for (const QString& line : lines) {
+    for (const QString& line : qAsConst(lines)) {
         // Skip the header line
         if (line.contains("Stack Trace:")) {
             continue;
