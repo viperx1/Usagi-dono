@@ -1081,7 +1081,7 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	
 	// Reset all thread progress bars
-	for (QProgressBar *bar : threadProgressBars) {
+	for (QProgressBar* const bar : threadProgressBars) {
 		bar->setValue(0);
 		bar->setMaximum(1);
 	}
@@ -4640,7 +4640,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Remove all cards from layout
-	for (AnimeCard *card : animeCards) {
+	for (AnimeCard* const card : animeCards) {
 		mylistCardLayout->removeWidget(card);
 	}
 	
@@ -4752,7 +4752,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Re-add cards to layout in sorted order
-	for (AnimeCard *card : animeCards) {
+	for (AnimeCard* const card : animeCards) {
 		mylistCardLayout->addWidget(card);
 	}
 }
@@ -4874,7 +4874,7 @@ void Window::onPosterDownloadFinished(QNetworkReply *reply)
 	LOG(QString("Poster downloaded and stored for anime %1").arg(aid));
 	
 	// Update the card if it exists
-	for (AnimeCard *card : animeCards) {
+	for (AnimeCard* const card : animeCards) {
 		if (card->getAnimeId() == aid) {
 			card->setPoster(poster);
 			animeNeedingPoster.remove(aid);
