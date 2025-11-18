@@ -7,6 +7,13 @@
 #include <QSqlQuery>
 #include <QSqlError>
 
+// Import static plugins for Qt static builds (required for QNetworkAccessManager)
+#ifdef QT_STATIC
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
+#endif
+
 // Global adbapi used by MyListCardManager
 myAniDBApi *adbapi = nullptr;
 
