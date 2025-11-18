@@ -66,8 +66,9 @@ void TestMyListCardManager::initTestCase()
     // Initialize the global adbapi object
     adbapi = new myAniDBApi("test", 1);
     
-    // Create in-memory test database
-    db = QSqlDatabase::addDatabase("QSQLITE", "test_connection");
+    // Create in-memory test database (use default connection, not named)
+    // MyListCardManager uses QSqlDatabase::database() which requires the default connection
+    db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(":memory:");
     
     if (!db.open()) {
@@ -85,7 +86,8 @@ void TestMyListCardManager::cleanupTestCase()
     if (db.isOpen()) {
         db.close();
     }
-    QSqlDatabase::removeDatabase("test_connection");
+    // Remove default database connection (no name parameter)
+    QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
 }
 
 void TestMyListCardManager::init()

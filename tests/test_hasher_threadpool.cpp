@@ -5,6 +5,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSet>
+#include <QCoreApplication>
 #include "../usagi/src/hasherthreadpool.h"
 #include "../usagi/src/anidbapi.h"
 #include "../usagi/src/main.h"
@@ -283,38 +284,52 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     int initialRequests = requestSpy.count();
     QVERIFY(initialRequests >= 3); // Should have requests from all 3 threads
     
-    // Feed files to the pool one by one as they're requested
+    // Feed initial batch of files immediately (one per thread)
     int filesAdded = 0;
+    for (int i = 0; i < 3 && i < numFiles; i++)
+    {
+        pool.addFile(filePaths[i]);
+        filesAdded++;
+    }
+    
+    // Wait and feed remaining files as they're requested
     int loopIterations = 0;
-    const int maxLoopIterations = 300; // Prevent infinite loop (30 seconds max)
+    const int maxLoopIterations = 200; // Prevent infinite loop (20 seconds max)
+    int lastRequestCount = requestSpy.count();
+    int noProgressIterations = 0;
     
     while (filesAdded < numFiles && loopIterations < maxLoopIterations)
     {
         loopIterations++;
         
-        // Wait for a request
+        // Process events to ensure signals are delivered
+        QCoreApplication::processEvents();
+        QTest::qWait(100);
+        
         int currentRequests = requestSpy.count();
-        if (currentRequests > initialRequests + filesAdded)
+        
+        // If we have new requests and files to add, add them
+        if (currentRequests > lastRequestCount && filesAdded < numFiles)
         {
-            pool.addFile(filePaths[filesAdded]);
-            filesAdded++;
-            QTest::qWait(50); // Small delay to simulate realistic timing
+            // Add files for all pending requests
+            int requestsToFill = currentRequests - lastRequestCount;
+            for (int i = 0; i < requestsToFill && filesAdded < numFiles; i++)
+            {
+                pool.addFile(filePaths[filesAdded]);
+                filesAdded++;
+            }
+            lastRequestCount = currentRequests;
+            noProgressIterations = 0;
         }
         else
         {
-            QTest::qWait(100); // Wait for more requests
-        }
-        
-        // Safety timeout to prevent infinite loop
-        if (filesAdded == 0 && requestSpy.count() == initialRequests)
-        {
-            // Add first batch of files to get things moving
-            for (int i = 0; i < 3 && i < numFiles; i++)
+            noProgressIterations++;
+            // If no progress for 5 iterations (500ms), something is wrong
+            if (noProgressIterations > 5 && filesAdded < numFiles)
             {
-                pool.addFile(filePaths[i]);
-                filesAdded++;
+                QFAIL(QString("Test stalled: added %1 of %2 files, %3 requests received, no progress for 500ms")
+                      .arg(filesAdded).arg(numFiles).arg(currentRequests).toUtf8().constData());
             }
-            QTest::qWait(100);
         }
     }
     
