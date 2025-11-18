@@ -983,8 +983,6 @@ void Window::ButtonHasherStartClick()
 		// Process files with progress="0" or progress="1" (already hashed but not yet API-processed)
 		if(progress == "0" || progress == "1")
 		{
-			QString filePath = hashes->item(i, 2)->text();
-			
 			// Check if file has pending API calls (tags in columns 5 or 6)
 			// Tags are "?" initially, set to actual tag when API call is queued, and "0" when completed/not needed
 			QString fileTag = hashes->item(i, 5)->text();
