@@ -65,6 +65,7 @@ enum MyListColumn {
 
 class hashes_ : public QTableWidget
 {
+	Q_OBJECT
 public:
 	bool event(QEvent *e);
 };
@@ -83,6 +84,10 @@ class EpisodeTreeWidgetItem : public QTreeWidgetItem
 {
 public:
     EpisodeTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent) {}
+    
+    // Prevent copying to avoid slicing
+    EpisodeTreeWidgetItem(const EpisodeTreeWidgetItem&) = delete;
+    EpisodeTreeWidgetItem& operator=(const EpisodeTreeWidgetItem&) = delete;
     
     void setEpno(const epno& ep) { m_epno = ep; }
     epno getEpno() const { return m_epno; }
@@ -152,7 +157,11 @@ class AnimeTreeWidgetItem : public QTreeWidgetItem
 public:
     AnimeTreeWidgetItem(QTreeWidget *parent) : QTreeWidgetItem(parent) {}
     
-    void setAired(const aired& airedDates) { m_aired = airedDates; }
+    // Prevent copying to avoid slicing
+    AnimeTreeWidgetItem(const AnimeTreeWidgetItem&) = delete;
+    AnimeTreeWidgetItem& operator=(const AnimeTreeWidgetItem&) = delete;
+    
+    void setAired(aired airedDates) { m_aired = airedDates; }
     aired getAired() const { return m_aired; }
     
     bool operator<(const QTreeWidgetItem &other) const override
@@ -235,6 +244,10 @@ public:
     };
     
     explicit FileTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent), m_fileType(Other) {}
+    
+    // Prevent copying to avoid slicing
+    FileTreeWidgetItem(const FileTreeWidgetItem&) = delete;
+    FileTreeWidgetItem& operator=(const FileTreeWidgetItem&) = delete;
     
     void setFileType(FileType type) { m_fileType = type; }
     FileType getFileType() const { return m_fileType; }
