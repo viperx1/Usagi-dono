@@ -276,8 +276,13 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     
     // Feed files to the pool one by one as they're requested
     int filesAdded = 0;
-    while (filesAdded < numFiles)
+    int loopIterations = 0;
+    const int maxLoopIterations = 300; // Prevent infinite loop (30 seconds max)
+    
+    while (filesAdded < numFiles && loopIterations < maxLoopIterations)
     {
+        loopIterations++;
+        
         // Wait for a request
         int currentRequests = requestSpy.count();
         if (currentRequests > initialRequests + filesAdded)
@@ -302,6 +307,13 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
             }
             QTest::qWait(100);
         }
+    }
+    
+    // If we hit max iterations, fail the test with a clear message
+    if (filesAdded < numFiles)
+    {
+        QFAIL(QString("Test timed out: only added %1 of %2 files after %3 iterations")
+              .arg(filesAdded).arg(numFiles).arg(loopIterations).toUtf8().constData());
     }
     
     // Signal completion
