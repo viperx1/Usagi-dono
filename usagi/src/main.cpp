@@ -9,6 +9,7 @@
 #include <QtPlugin>
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
+Q_IMPORT_PLUGIN(QSQLiteDriverPlugin)
 #endif
 
 //myAniDBApi *adbapi;
