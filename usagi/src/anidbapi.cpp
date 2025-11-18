@@ -24,10 +24,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		Logger::log("[AniDB Init] Starting DNS lookup for api.anidb.net (this may block)", __FILE__, __LINE__);
 		host = QHostInfo::fromName("api.anidb.net");
 		Logger::log("[AniDB Init] DNS lookup completed", __FILE__, __LINE__);
-		if(!host.addresses().isEmpty())
+		const QList<QHostAddress> addresses = host.addresses();
+		if(!addresses.isEmpty())
 		{
-			anidbaddr.setAddress(host.addresses().first().toIPv4Address());
-			Logger::log("[AniDB Init] DNS resolved successfully to " + host.addresses().first().toString(), __FILE__, __LINE__);
+			anidbaddr.setAddress(addresses.first().toIPv4Address());
+			Logger::log("[AniDB Init] DNS resolved successfully to " + addresses.first().toString(), __FILE__, __LINE__);
 		}
 		else
 		{
@@ -2650,7 +2651,7 @@ QMap<QString, std::bitset<2>> AniDBApi::batchLocalIdentify(const QList<QPair<qin
 		query.prepare(mylistQuery);
 		
 		// Bind all fid values
-		for (int fid : fids)
+		for (const int fid : fids)
 		{
 			query.addBindValue(fid);
 		}

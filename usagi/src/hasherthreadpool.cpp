@@ -50,7 +50,7 @@ HasherThreadPool::~HasherThreadPool()
     wait();
     
     // Clean up worker threads
-    for (HasherThread *worker : workers)
+    for (HasherThread* const worker : workers)
     {
         delete worker;
     }
@@ -63,7 +63,7 @@ void HasherThreadPool::addFile(const QString &filePath)
     if (filePath.isEmpty())
     {
         LOG("HasherThreadPool: Signaling completion to all worker threads");
-        for (HasherThread *worker : workers)
+        for (HasherThread* const worker : workers)
         {
             worker->addFile(QString());
         }
@@ -117,7 +117,7 @@ void HasherThreadPool::start()
     finishedThreads = 0;
     
     // Start all worker threads
-    for (HasherThread *worker : workers)
+    for (HasherThread* const worker : workers)
     {
         worker->start();
     }
@@ -138,7 +138,7 @@ void HasherThreadPool::stop()
     }
     
     // Stop all worker threads
-    for (HasherThread *worker : workers)
+    for (HasherThread* const worker : workers)
     {
         worker->stop();
     }
@@ -149,7 +149,7 @@ void HasherThreadPool::broadcastStopHasher()
     LOG("HasherThreadPool: Broadcasting stop hasher signal to all workers");
     
     // Signal all workers to stop their current hashing operations
-    for (HasherThread *worker : workers)
+    for (HasherThread* const worker : workers)
     {
         worker->stopHashing();
     }
@@ -159,7 +159,7 @@ bool HasherThreadPool::wait(unsigned long msecs)
 {
     // Wait for all worker threads to finish
     bool allFinished = true;
-    for (HasherThread *worker : workers)
+    for (HasherThread* const worker : workers)
     {
         if (!worker->wait(msecs))
         {
