@@ -7,6 +7,7 @@
 #include <QElapsedTimer>
 #include <QRegularExpression>
 #include <QDateTime>
+#include <QStandardPaths>
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
