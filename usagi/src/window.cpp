@@ -1079,7 +1079,7 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	
 	// Reset all thread progress bars
-	for (QProgressBar* const bar : threadProgressBars) {
+	for (QProgressBar* const bar : std::as_const(threadProgressBars)) {
 		bar->setValue(0);
 		bar->setMaximum(1);
 	}
@@ -1405,7 +1405,7 @@ void Window::loadUnboundFiles()
     unknownFiles->setUpdatesEnabled(false);
     
     // Add each unbound file to the unknown files widget
-    for(const AniDBApi::FileHashInfo& fileInfo : unboundFiles)
+    for(const AniDBApi::FileHashInfo& fileInfo : std::as_const(unboundFiles))
     {
         QFileInfo qFileInfo(fileInfo.path);
         QString filename = qFileInfo.fileName();
@@ -1909,7 +1909,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	QString exportUrl;
 	
 	// Try BBCode format first: [url=URL]text[/url]
-	QRegularExpression bbcodeRegex("\\[url=(https?://[^\\]]+\\.tgz)\\]");
+	static const QRegularExpression bbcodeRegex("\\[url=(https?://[^\\]]+\\.tgz)\\]");
 	QRegularExpressionMatch bbcodeMatch = bbcodeRegex.match(message);
 	
 	if(bbcodeMatch.hasMatch())
@@ -1919,7 +1919,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	else
 	{
 		// Fallback to plain URL format
-		QRegularExpression plainRegex("https?://[^\\s\\]]+\\.tgz");
+		static const QRegularExpression plainRegex("https?://[^\\s\\]]+\\.tgz");
 		QRegularExpressionMatch plainMatch = plainRegex.match(message);
 		if(plainMatch.hasMatch())
 		{
@@ -2789,7 +2789,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     unknownFilesData[row] = fileData;
     
     // Connect anime search to populate episode suggestions
-    connect(animeSearch, &QLineEdit::textChanged, [this, filepath, animeSearch, episodeInput, bindButton]() {
+    connect(animeSearch, &QLineEdit::textChanged, this, [this, filepath, animeSearch, episodeInput, bindButton]() {
         QString searchText = animeSearch->text();
         
         // Find current row by filepath (stable identifier)
@@ -2829,7 +2829,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     });
     
     // Connect episode input to enable bind button when text is entered
-    connect(episodeInput, &QLineEdit::textChanged, [this, filepath, episodeInput, bindButton]() {
+    connect(episodeInput, &QLineEdit::textChanged, this, [this, filepath, episodeInput, bindButton]() {
         // Find current row by filepath (stable identifier)
         int currentRow = -1;
         for(int i = 0; i < unknownFiles->rowCount(); ++i) {
@@ -2854,7 +2854,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     });
     
     // Connect bind button - use filepath to find current row dynamically
-    connect(bindButton, &QPushButton::clicked, [this, bindButton, episodeInput, filepath]() {
+    connect(bindButton, &QPushButton::clicked, this, [this, bindButton, episodeInput, filepath]() {
         // Find current row by filepath
         int currentRow = -1;
         for(int i = 0; i < unknownFiles->rowCount(); ++i) {

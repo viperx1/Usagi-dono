@@ -192,8 +192,7 @@ void PlaybackManager::handleStatusReply()
     // Use regex to extract position and duration
     // Pattern matches: OnStatus("file", "state", pos_ms, "pos_str", dur_ms, "dur_str"...)
     // The first field is a quoted filename (match \"...\"), then state, position, etc.
-    QString pattern = "OnStatus\\(\"[^\"]*\",\\s*\"([^\"]+)\",\\s*(\\d+),\\s*\"[^\"]+\",\\s*(\\d+),\\s*\"[^\"]+\"";
-    QRegularExpression regex(pattern);
+    static const QRegularExpression regex("OnStatus\\(\"[^\"]*\",\\s*\"([^\"]+)\",\\s*(\\d+),\\s*\"[^\"]+\",\\s*(\\d+),\\s*\"[^\"]+\"");
     QRegularExpressionMatch match = regex.match(response);
     
     if (match.hasMatch()) {

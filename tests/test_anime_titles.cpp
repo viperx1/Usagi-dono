@@ -116,7 +116,7 @@ void TestAnimeTitles::testAnimeTitlesTableExists()
 void TestAnimeTitles::testLastUpdateTimestampStorage()
 {
     // Test that we can store and retrieve the last update timestamp
-    qint64 testTimestamp = QDateTime::currentDateTime().toSecsSinceEpoch();
+    qint64 testTimestamp = QDateTime::currentSecsSinceEpoch();
     
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery query(db);

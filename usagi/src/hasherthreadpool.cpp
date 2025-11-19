@@ -50,7 +50,7 @@ HasherThreadPool::~HasherThreadPool()
     wait();
     
     // Clean up worker threads
-    for (HasherThread* const worker : workers)
+    for (HasherThread* const worker : std::as_const(workers))
     {
         delete worker;
     }
@@ -63,7 +63,7 @@ void HasherThreadPool::addFile(const QString &filePath)
     if (filePath.isEmpty())
     {
         LOG("HasherThreadPool: Signaling completion to all worker threads");
-        for (HasherThread* const worker : workers)
+        for (HasherThread* const worker : std::as_const(workers))
         {
             worker->addFile(QString());
         }
@@ -117,7 +117,7 @@ void HasherThreadPool::start()
     finishedThreads = 0;
     
     // Start all worker threads
-    for (HasherThread* const worker : workers)
+    for (HasherThread* const worker : std::as_const(workers))
     {
         worker->start();
     }
@@ -138,7 +138,7 @@ void HasherThreadPool::stop()
     }
     
     // Stop all worker threads
-    for (HasherThread* const worker : workers)
+    for (HasherThread* const worker : std::as_const(workers))
     {
         worker->stop();
     }
@@ -149,7 +149,7 @@ void HasherThreadPool::broadcastStopHasher()
     LOG("HasherThreadPool: Broadcasting stop hasher signal to all workers");
     
     // Signal all workers to stop their current hashing operations
-    for (HasherThread* const worker : workers)
+    for (HasherThread* const worker : std::as_const(workers))
     {
         worker->stopHashing();
     }
@@ -159,7 +159,7 @@ bool HasherThreadPool::wait(unsigned long msecs)
 {
     // Wait for all worker threads to finish
     bool allFinished = true;
-    for (HasherThread* const worker : workers)
+    for (HasherThread* const worker : std::as_const(workers))
     {
         if (!worker->wait(msecs))
         {
@@ -172,7 +172,7 @@ bool HasherThreadPool::wait(unsigned long msecs)
 bool HasherThreadPool::isRunning() const
 {
     // Check if any worker thread is running
-    for (const HasherThread *worker : workers)
+    for (const HasherThread *worker : std::as_const(workers))
     {
         if (worker->isRunning())
         {

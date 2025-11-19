@@ -229,8 +229,7 @@ void AnimeCard::updateStatisticsLabel()
     }
     
     QString statsText = QString("Episodes: %1 | Viewed: %2")
-        .arg(episodeText)
-        .arg(viewedText);
+        .arg(episodeText, viewedText);
     m_statsLabel->setText(statsText);
 }
 
@@ -252,8 +251,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     QString episodeText;
     if (episode.episodeNumber.isValid()) {
         episodeText = QString("Ep %1: %2")
-            .arg(episode.episodeNumber.toDisplayString())
-            .arg(episode.episodeTitle);
+            .arg(episode.episodeNumber.toDisplayString(), episode.episodeTitle);
     } else {
         episodeText = QString("Episode: %1").arg(episode.episodeTitle);
     }
@@ -369,10 +367,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         
         // Add tooltip with file info
         QString tooltip = QString("File: %1\nStorage: %2\nState: %3\nViewed: %4")
-            .arg(file.fileName)
-            .arg(file.storage)
-            .arg(file.state)
-            .arg(file.viewed ? "Yes" : "No");
+            .arg(file.fileName, file.storage, file.state, file.viewed ? "Yes" : "No");
         
         if (!file.resolution.isEmpty()) {
             tooltip += QString("\nResolution: %1").arg(file.resolution);

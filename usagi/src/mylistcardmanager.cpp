@@ -378,7 +378,7 @@ void MyListCardManager::processBatchedUpdates()
     
     LOG(QString("[MyListCardManager] Processing %1 batched card updates").arg(toUpdate.size()));
     
-    for (const int aid : toUpdate) {
+    for (const int aid : std::as_const(toUpdate)) {
         updateCardFromDatabase(aid);
     }
 }
@@ -494,7 +494,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
         QList<AnimeCard::TagInfo> categoryTags;
         QStringList categoryNames = category.split(',');
         int weight = 1000;  // Arbitrary high weight for category fallback
-        for (const QString& catName : categoryNames) {
+        for (const QString& catName : std::as_const(categoryNames)) {
             AnimeCard::TagInfo tag;
             tag.name = catName.trimmed();
             tag.id = 0;
@@ -641,7 +641,7 @@ void MyListCardManager::updateCardFromDatabase(int aid)
         QList<AnimeCard::TagInfo> categoryTags;
         QStringList categoryNames = category.split(',');
         int weight = 1000;  // Arbitrary high weight for category fallback
-        for (const QString& catName : categoryNames) {
+        for (const QString& catName : std::as_const(categoryNames)) {
             AnimeCard::TagInfo tag;
             tag.name = catName.trimmed();
             tag.id = 0;
@@ -793,7 +793,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
         return false;
     });
     
-    for (const AnimeCard::EpisodeInfo& episodeInfo : episodeList) {
+    for (const AnimeCard::EpisodeInfo& episodeInfo : std::as_const(episodeList)) {
         card->addEpisode(episodeInfo);
     }
 }
