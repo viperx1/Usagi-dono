@@ -2871,7 +2871,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     });
     
     // Connect "Not Anime" button - use filepath to find current row dynamically
-    connect(notAnimeButton, &QPushButton::clicked, [this, notAnimeButton, filepath]() {
+    connect(notAnimeButton, &QPushButton::clicked, this, [this, notAnimeButton, filepath]() {
         LOG("Not Anime button clicked");
         LOG(QString("Not Anime button filepath: %1").arg(filepath));
         
@@ -3622,7 +3622,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					if(!animeQueryExec.exec())
 					{
 						LOG(QString("Warning: Failed to insert anime record (aid=%1): %2")
-							.arg(currentAid).arg(animeQueryExec.lastError().text()));
+							.arg(currentAid, animeQueryExec.lastError().text()));
 					}
 				}
 				
@@ -3642,7 +3642,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					if(!animeQueryExec.exec())
 					{
 						LOG(QString("Warning: Failed to update anime episode counts (aid=%1): %2")
-							.arg(currentAid).arg(animeQueryExec.lastError().text()));
+							.arg(currentAid, animeQueryExec.lastError().text()));
 					}
 				}
 				
@@ -3688,7 +3688,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					if(!animeQueryExec.exec())
 					{
 						LOG(QString("Warning: Failed to update anime metadata (aid=%1): %2")
-							.arg(currentAid).arg(animeQueryExec.lastError().text()));
+							.arg(currentAid, animeQueryExec.lastError().text()));
 					}
 				}
 			}
@@ -3713,17 +3713,13 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					QString episodeQuery = QString("INSERT OR REPLACE INTO `episode` "
 						"(`eid`, `epno`, `name`, `nameromaji`, `namekanji`) "
 						"VALUES (%1, '%2', '%3', '%4', '%5')")
-						.arg(currentEid)
-						.arg(epNo_escaped)
-						.arg(epName_escaped)
-						.arg(epNameRomaji_escaped)
-						.arg(epNameKanji_escaped);
+						.arg(currentEid, epNo_escaped, epName_escaped, epNameRomaji_escaped, epNameKanji_escaped);
 					
 					QSqlQuery episodeQueryExec(db);
 					if(!episodeQueryExec.exec(episodeQuery))
 					{
 						LOG(QString("Warning: Failed to insert episode data (eid=%1): %2")
-							.arg(currentEid).arg(episodeQueryExec.lastError().text()));
+							.arg(currentEid, episodeQueryExec.lastError().text()));
 					}
 				}
 			}
@@ -3757,14 +3753,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 					"COALESCE((SELECT `playback_position` FROM `mylist` WHERE `lid` = %1), 0), "
 					"COALESCE((SELECT `playback_duration` FROM `mylist` WHERE `lid` = %1), 0), "
 					"COALESCE((SELECT `last_played` FROM `mylist` WHERE `lid` = %1), 0))")
-					.arg(lid)  // LId from File element
-					.arg(fid.isEmpty() ? "0" : fid)  // Id from File element
-					.arg(currentEid.isEmpty() ? "0" : currentEid)  // Id from Ep element
-					.arg(currentAid)  // Id from Anime element
-					.arg(gid.isEmpty() ? "0" : gid)
-					.arg(myState.isEmpty() ? "0" : myState)  // MyState as state
-					.arg(viewed)
-					.arg(storage_escaped);
+					.arg(lid, fid.isEmpty() ? "0" : fid, currentEid.isEmpty() ? "0" : currentEid, currentAid, gid.isEmpty() ? "0" : gid, myState.isEmpty() ? "0" : myState, viewed, storage_escaped);
 				
 				QSqlQuery query(db);
 				if(query.exec(q))
@@ -3773,7 +3762,7 @@ int Window::parseMylistExport(const QString &tarGzPath)
 				}
 				else
 				{
-					LOG(QString("Error inserting mylist entry (lid=%1): %2").arg(lid).arg(query.lastError().text()));
+					LOG(QString("Error inserting mylist entry (lid=%1): %2").arg(lid, query.lastError().text()));
 				}
 			}
 		}
@@ -4638,7 +4627,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Remove all cards from layout
-	for (AnimeCard* const card : animeCards) {
+	for (AnimeCard* const card : qAsConst(animeCards)) {
 		mylistCardLayout->removeWidget(card);
 	}
 	
@@ -4750,7 +4739,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Re-add cards to layout in sorted order
-	for (AnimeCard* const card : animeCards) {
+	for (AnimeCard* const card : qAsConst(animeCards)) {
 		mylistCardLayout->addWidget(card);
 	}
 }
@@ -4872,7 +4861,7 @@ void Window::onPosterDownloadFinished(QNetworkReply *reply)
 	LOG(QString("Poster downloaded and stored for anime %1").arg(aid));
 	
 	// Update the card if it exists
-	for (AnimeCard* const card : animeCards) {
+	for (AnimeCard* const card : qAsConst(animeCards)) {
 		if (card->getAnimeId() == aid) {
 			card->setPoster(poster);
 			animeNeedingPoster.remove(aid);
@@ -4953,9 +4942,7 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     // Note: The AniDB API has an undocumented length limit for the 'other' field
     // Testing shows ~100 chars works reliably, so we truncate to stay safe
     QString otherField = QString("File: %1\nHash: %2\nSize: %3")
-        .arg(fileData.filename)
-        .arg(fileData.hash)
-        .arg(fileData.size);
+        .arg(fileData.filename, fileData.hash, fileData.size);
     
     // Truncate if too long (limit to 100 chars to stay within API limits)
     if(otherField.length() > 100)
