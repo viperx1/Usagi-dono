@@ -1079,7 +1079,7 @@ void Window::ButtonHasherStopClick()
 	progressTotalLabel->setText("");
 	
 	// Reset all thread progress bars
-	for (QProgressBar* const bar : threadProgressBars) {
+	for (QProgressBar* const bar : std::as_const(threadProgressBars)) {
 		bar->setValue(0);
 		bar->setMaximum(1);
 	}
@@ -1405,7 +1405,7 @@ void Window::loadUnboundFiles()
     unknownFiles->setUpdatesEnabled(false);
     
     // Add each unbound file to the unknown files widget
-    for(const AniDBApi::FileHashInfo& fileInfo : unboundFiles)
+    for(const AniDBApi::FileHashInfo& fileInfo : std::as_const(unboundFiles))
     {
         QFileInfo qFileInfo(fileInfo.path);
         QString filename = qFileInfo.fileName();
