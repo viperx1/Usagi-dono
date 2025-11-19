@@ -2,9 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi_tests LANGUAGES CXX)
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Note: C++ standard is inherited from root CMakeLists.txt (C++17)
 
 # Enable debug symbols for crash log stack traces
 # This allows crash logs to show function names from Usagi codebase
