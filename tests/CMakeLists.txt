@@ -1541,3 +1541,34 @@ if(WIN32)
 endif()
 
 add_test(NAME test_mylistcardmanager COMMAND test_mylistcardmanager -v2)
+
+# Test: Background loading functionality
+set(BACKGROUND_LOADING_TEST_SOURCES
+    test_background_loading.cpp
+)
+
+add_executable(test_background_loading ${BACKGROUND_LOADING_TEST_SOURCES})
+
+target_compile_definitions(test_background_loading PRIVATE CRYPTOPP_DEBUG=0)
+
+# For static Qt builds
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_background_loading PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
+target_link_libraries(test_background_loading PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+    Qt6::Concurrent
+)
+
+# Force console subsystem for LLVM MinGW on Windows
+if(WIN32)
+    target_link_options(test_background_loading PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_background_loading COMMAND test_background_loading -v2)
