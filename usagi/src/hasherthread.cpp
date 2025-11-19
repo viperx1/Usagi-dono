@@ -13,6 +13,11 @@ HasherThread::HasherThread(int threadId)
 
 HasherThread::~HasherThread()
 {
+    cleanupHasher();
+}
+
+void HasherThread::cleanupHasher()
+{
     // Clean up hasher instance if it exists
     if (hasher != nullptr)
     {
@@ -31,10 +36,7 @@ void HasherThread::run()
     }
     
     // Recreate hasher instance for this run (in case thread is being restarted)
-    if (hasher != nullptr)
-    {
-        delete hasher;
-    }
+    cleanupHasher();
     hasher = new ed2k();
     
     // Reconnect hasher signals with thread ID parameter
@@ -116,11 +118,7 @@ void HasherThread::run()
     LOG(QString("HasherThread %1 finished processing files [hasherthread.cpp]").arg(threadId));
     
     // Clean up hasher instance
-    if (hasher != nullptr)
-    {
-        delete hasher;
-        hasher = nullptr;
-    }
+    cleanupHasher();
 }
 
 void HasherThread::stop()

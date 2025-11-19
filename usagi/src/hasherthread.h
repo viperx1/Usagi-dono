@@ -34,6 +34,8 @@ signals:
     void notifyFileHashed(int threadId, ed2k::ed2kfilestruct fileData);
     
 private:
+    void cleanupHasher(); // Helper to clean up hasher instance
+    
     QMutex mutex;
     QWaitCondition condition;
     QQueue<QString> fileQueue;
