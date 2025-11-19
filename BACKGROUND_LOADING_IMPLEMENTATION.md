@@ -11,7 +11,7 @@ From the issue logs, the application was unresponsive during startup while loadi
 
 ## Solution Overview
 
-Implemented background loading using Qt's `QtConcurrent` and `QFutureWatcher` to offload heavy database operations to worker threads, allowing the UI to remain responsive during startup.
+Implemented background loading using Qt's `QtConcurrent` and progressive UI updates to offload all heavy database operations to worker threads, allowing the UI to remain responsive during startup.
 
 ## Implementation Details
 
@@ -26,9 +26,16 @@ Added required includes:
 Added data structures and watchers:
 ```cpp
 // Future watchers for background loading
-QFutureWatcher<void> *mylistLoadingWatcher;
+QFutureWatcher<QList<int>> *mylistLoadingWatcher;  // Returns list of AIDs
 QFutureWatcher<void> *animeTitlesLoadingWatcher;
 QFutureWatcher<void> *unboundFilesLoadingWatcher;
+
+// Progressive card loading to keep UI responsive
+QTimer *progressiveCardLoadingTimer;
+QList<int> pendingCardsToLoad;
+void loadNextCardBatch();
+static const int CARD_LOADING_BATCH_SIZE = 10; // Load 10 cards per timer tick
+static const int CARD_LOADING_TIMER_INTERVAL = 10; // Process every 10ms
 
 // Data structures for background loading results
 struct UnboundFileData {
@@ -49,19 +56,25 @@ void onUnboundFilesLoadingFinished();
 
 ### 2. Window Constructor (`window.cpp`)
 
-Initialize the future watchers and connect signals:
+Initialize the future watchers and progressive loading timer:
 ```cpp
 // Initialize background loading watchers
-mylistLoadingWatcher = new QFutureWatcher<void>(this);
+mylistLoadingWatcher = new QFutureWatcher<QList<int>>(this);
 animeTitlesLoadingWatcher = new QFutureWatcher<void>(this);
 unboundFilesLoadingWatcher = new QFutureWatcher<void>(this);
 
-connect(mylistLoadingWatcher, &QFutureWatcher<void>::finished,
+connect(mylistLoadingWatcher, &QFutureWatcher<QList<int>>::finished,
         this, &Window::onMylistLoadingFinished);
 connect(animeTitlesLoadingWatcher, &QFutureWatcher<void>::finished,
         this, &Window::onAnimeTitlesLoadingFinished);
 connect(unboundFilesLoadingWatcher, &QFutureWatcher<void>::finished,
         this, &Window::onUnboundFilesLoadingFinished);
+
+// Initialize timer for progressive card loading
+progressiveCardLoadingTimer = new QTimer(this);
+progressiveCardLoadingTimer->setSingleShot(false);
+progressiveCardLoadingTimer->setInterval(CARD_LOADING_TIMER_INTERVAL);
+connect(progressiveCardLoadingTimer, &QTimer::timeout, this, &Window::loadNextCardBatch);
 ```
 
 ### 3. Startup Initialization (`window.cpp`)
@@ -81,23 +94,86 @@ void Window::startupInitialization()
 
 ### 4. Background Loading Implementation
 
-#### Mylist Loading
-Since `AnimeCard` widgets **must** be created in the UI thread, we use `QTimer::singleShot` to defer execution by 100ms, allowing the UI to become responsive first:
+#### Mylist Loading (Proper Background + Progressive UI)
+The database query runs in a background thread, then cards are created progressively in the UI thread:
 
 ```cpp
-QTimer::singleShot(100, this, [this]() {
-    LOG("Deferred mylist loading starting...");
-    loadMylistFromDatabase();
-    restoreMylistSorting();
-    mylistStatusLabel->setText("MyList Status: Ready");
+// In background thread - query anime IDs only
+QFuture<QList<int>> mylistFuture = QtConcurrent::run([]() -> QList<int> {
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MylistThread");
+    db.setDatabaseName(QSqlDatabase::database().databaseName());
+    
+    if (!db.open()) {
+        return QList<int>();
+    }
+    
+    // Query only AIDs (lightweight query)
+    QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY "
+                   "(SELECT nameromaji FROM anime WHERE aid = m.aid)";
+    
+    QSqlQuery q(db);
+    QList<int> aids;
+    
+    if (q.exec()) {
+        while (q.next()) {
+            aids.append(q.value(0).toInt());
+        }
+    }
+    
+    db.close();
+    QSqlDatabase::removeDatabase("MylistThread");
+    
+    return aids;
 });
+mylistLoadingWatcher->setFuture(mylistFuture);
 ```
 
-**Why 100ms delay works:**
-- UI event loop gets control immediately
-- Window appears responsive to user
-- 100ms is imperceptible to users
-- Database queries still complete quickly
+When the background query completes:
+```cpp
+void Window::onMylistLoadingFinished()
+{
+    QList<int> aids = mylistLoadingWatcher->result();
+    pendingCardsToLoad = aids;
+    
+    // Start progressive loading
+    if (!pendingCardsToLoad.isEmpty()) {
+        progressiveCardLoadingTimer->start();
+    }
+}
+```
+
+Progressive card creation in UI thread:
+```cpp
+void Window::loadNextCardBatch()
+{
+    if (pendingCardsToLoad.isEmpty()) {
+        progressiveCardLoadingTimer->stop();
+        // Apply sorting
+        restoreMylistSorting();
+        sortMylistCards(mylistSortComboBox->currentIndex());
+        return;
+    }
+    
+    // Load 10 cards per timer tick
+    int cardsToLoad = qMin(CARD_LOADING_BATCH_SIZE, pendingCardsToLoad.size());
+    
+    for (int i = 0; i < cardsToLoad; ++i) {
+        int aid = pendingCardsToLoad.takeFirst();
+        // Create card (must be in UI thread for QWidget)
+        cardManager->updateOrAddMylistEntry(lid);
+    }
+    
+    // Update progress status
+    mylistStatusLabel->setText(QString("MyList Status: Loading... %1 of %2")
+        .arg(loaded).arg(loaded + remaining));
+}
+```
+
+**Why this approach works:**
+- Initial database query (finding AIDs) runs in background thread - **no UI blocking**
+- Card creation (which requires UI thread for QWidget) happens progressively
+- 10 cards per 10ms = ~100 cards/second with event loop yielding between batches
+- UI remains responsive throughout the entire process
 
 #### Anime Titles Cache Loading
 Runs in a background thread using `QtConcurrent::run()`:
