@@ -1909,7 +1909,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	QString exportUrl;
 	
 	// Try BBCode format first: [url=URL]text[/url]
-	QRegularExpression bbcodeRegex("\\[url=(https?://[^\\]]+\\.tgz)\\]");
+	static const QRegularExpression bbcodeRegex("\\[url=(https?://[^\\]]+\\.tgz)\\]");
 	QRegularExpressionMatch bbcodeMatch = bbcodeRegex.match(message);
 	
 	if(bbcodeMatch.hasMatch())
@@ -1919,7 +1919,7 @@ void Window::getNotifyMessageReceived(int nid, QString message)
 	else
 	{
 		// Fallback to plain URL format
-		QRegularExpression plainRegex("https?://[^\\s\\]]+\\.tgz");
+		static const QRegularExpression plainRegex("https?://[^\\s\\]]+\\.tgz");
 		QRegularExpressionMatch plainMatch = plainRegex.match(message);
 		if(plainMatch.hasMatch())
 		{

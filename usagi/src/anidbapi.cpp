@@ -753,7 +753,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Logger::log("[AniDB Response] 230 ANIME command: " + animeCmd, __FILE__, __LINE__);
 			
 			// Extract amask as string for proper 7-byte parsing
-			QRegularExpression amaskRegex("amask=([0-9a-fA-F]+)");
+			static const QRegularExpression amaskRegex("amask=([0-9a-fA-F]+)");
 			QRegularExpressionMatch amaskMatch = amaskRegex.match(animeCmd);
 			if (amaskMatch.hasMatch())
 			{
@@ -870,7 +870,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			{
 				// AID is NOT in the response, need to get it from the command
 				// Extract AID from the command string
-				QRegularExpression aidRegex("aid=(\\d+)");
+				static const QRegularExpression aidRegex("aid=(\\d+)");
 				QRegularExpressionMatch aidMatch = aidRegex.match(animeCmd);
 				if (aidMatch.hasMatch())
 				{
@@ -4497,7 +4497,7 @@ QString AniDBApi::convertToISODate(const QString& dateStr)
 		return QString();
 	
 	// Check if it's already in ISO format (YYYY-MM-DD with optional Z)
-	QRegularExpression isoRegex("^\\d{4}-\\d{2}-\\d{2}Z?$");
+	static const QRegularExpression isoRegex("^\\d{4}-\\d{2}-\\d{2}Z?$");
 	if(isoRegex.match(dateStr).hasMatch())
 	{
 		// Ensure it ends with Z
@@ -4508,7 +4508,7 @@ QString AniDBApi::convertToISODate(const QString& dateStr)
 	}
 	
 	// Check if it's a Unix timestamp (all digits)
-	QRegularExpression timestampRegex("^\\d+$");
+	static const QRegularExpression timestampRegex("^\\d+$");
 	if(timestampRegex.match(dateStr).hasMatch())
 	{
 		bool ok;
@@ -4926,11 +4926,11 @@ bool AniDBApi::extractMasksFromCommand(const QString& command, unsigned int& fma
 	amask = 0;
 	
 	// Extract fmask using regex (only for FILE commands)
-	QRegularExpression fmaskRegex("fmask=([0-9a-fA-F]+)");
+	static const QRegularExpression fmaskRegex("fmask=([0-9a-fA-F]+)");
 	QRegularExpressionMatch fmaskMatch = fmaskRegex.match(command);
 	
 	// Extract amask using regex
-	QRegularExpression amaskRegex("amask=([0-9a-fA-F]+)");
+	static const QRegularExpression amaskRegex("amask=([0-9a-fA-F]+)");
 	QRegularExpressionMatch amaskMatch = amaskRegex.match(command);
 	
 	bool success = false;
