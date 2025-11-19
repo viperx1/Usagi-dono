@@ -1612,25 +1612,33 @@ void Window::startBackgroundLoading()
                 return;
             }
             
-            // Query directly from the database (same logic as AniDBApi::getUnboundFiles)
+            // Query unbound files using same criteria as AniDBApi::getUnboundFiles
+            // binding_status = 0 (not_bound) AND status = 3 (not in anidb)
             QSqlQuery query(db);
-            query.exec("SELECT path, ed2k FROM local_files WHERE api_checked = 1 AND fid = 0");
+            query.prepare("SELECT `path`, `filename`, `ed2k_hash` FROM `local_files` WHERE `binding_status` = 0 AND `status` = 3 AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
             
-            while (query.next()) {
-                UnboundFileData fileData;
-                fileData.filepath = query.value(0).toString();
-                fileData.hash = query.value(1).toString();
-                
-                QFileInfo qFileInfo(fileData.filepath);
-                fileData.filename = qFileInfo.fileName();
-                
-                // Get file size if file exists
-                fileData.size = 0;
-                if (qFileInfo.exists()) {
-                    fileData.size = qFileInfo.size();
+            if (!query.exec()) {
+                LOG(QString("Background thread: Failed to query unbound files: %1").arg(query.lastError().text()));
+            } else {
+                while (query.next()) {
+                    UnboundFileData fileData;
+                    fileData.filepath = query.value(0).toString();
+                    fileData.filename = query.value(1).toString();
+                    if (fileData.filename.isEmpty()) {
+                        QFileInfo qFileInfo(fileData.filepath);
+                        fileData.filename = qFileInfo.fileName();
+                    }
+                    fileData.hash = query.value(2).toString();
+                    
+                    // Get file size if file exists
+                    QFileInfo qFileInfo(fileData.filepath);
+                    fileData.size = 0;
+                    if (qFileInfo.exists()) {
+                        fileData.size = qFileInfo.size();
+                    }
+                    
+                    tempUnboundFiles.append(fileData);
                 }
-                
-                tempUnboundFiles.append(fileData);
             }
             
             db.close();
