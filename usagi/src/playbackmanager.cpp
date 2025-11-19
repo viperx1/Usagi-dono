@@ -245,7 +245,7 @@ void PlaybackManager::handleStatusReply()
         }
     } else {
         LOG(QString("Failed to parse MPC-HC status response (length %1). Response: %2").arg(response.length()).arg(response));
-        LOG(QString("Regex pattern used: %1").arg(pattern));
+        LOG(QString("Regex pattern used: %1").arg(regex.pattern()));
     }
     
     reply->deleteLater();
