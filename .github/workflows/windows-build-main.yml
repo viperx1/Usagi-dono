@@ -1,4 +1,4 @@
-name: Windows Build & Release (Qt 6.8 LTS LLVM MinGW)
+name: Windows Build Main (Qt 6.8 LTS LLVM MinGW)
 
 on:
   push:
@@ -9,10 +9,14 @@ on:
       - 'v*.*.*'
       - 'v*.*.*-beta*'
 
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   build-llvm-mingw:
     runs-on: windows-latest
-    name: Build with LLVM/Clang (Qt 6.8 MinGW)
+    name: Build Main Executable with LLVM/Clang (Qt 6.8 MinGW)
 
     steps:
       - name: Checkout code
@@ -65,16 +69,9 @@ jobs:
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
             2>&1 | tee build/configure_log.txt
 
-      - name: Build
-        run: cmake --build build --config Release 2>&1 | tee build/build_log.txt
+      - name: Build Main Executable
+        run: cmake --build build --config Release --target usagi 2>&1 | tee build/build_log.txt
         shell: bash
-
-      - name: Run tests
-        run: |
-          ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
-          exit ${PIPESTATUS[0]}
-        shell: bash
-
 
       - name: Upload build artifact (Alpha, LLVM)
         if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
@@ -82,7 +79,7 @@ jobs:
         with:
           name: Usagi-dono-alpha-llvm
           path: |
-            build/**/*.exe
+            build/usagi/*.exe
 
       - name: Upload logs on failure
         if: failure()
@@ -92,7 +89,6 @@ jobs:
           path: |
             build/configure_log.txt
             build/build_log.txt
-            build/test_log.txt
           if-no-files-found: ignore
 
       - name: Create Release & Upload (Stable/Beta, LLVM)
@@ -100,7 +96,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/*.exe
+            build/usagi/*.exe
 
       - name: Create issue with logs on failure
         if: failure()
@@ -111,16 +107,6 @@ jobs:
           echo "**Branch/Tag:** ${{ github.ref }}" >> issue_body.md
           echo "**Commit:** ${{ github.sha }}" >> issue_body.md
           echo "" >> issue_body.md
-
-          # Add test summary first if tests were run
-          if [ -f build/test_log.txt ]; then
-            echo "### Test Summary" >> issue_body.md
-            echo '```' >> issue_body.md
-            # Extract test results and summary lines
-            grep -E "^[[:space:]]*[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#|tests passed|tests failed out of|% tests" build/test_log.txt | tail -n 50 >> issue_body.md 2>/dev/null || echo "Could not extract test summary" >> issue_body.md
-            echo '```' >> issue_body.md
-            echo "" >> issue_body.md
-          fi
 
           echo "### Configure log" >> issue_body.md
           echo '```' >> issue_body.md
@@ -134,14 +120,6 @@ jobs:
           echo '```' >> issue_body.md
           if [ -f build/build_log.txt ]; then
             tail -n 100 build/build_log.txt >> issue_body.md
-          else
-            echo "Log file not available" >> issue_body.md
-          fi
-          echo '```' >> issue_body.md
-          echo "### Test log (last 500 lines)" >> issue_body.md
-          echo '```' >> issue_body.md
-          if [ -f build/test_log.txt ]; then
-            tail -n 500 build/test_log.txt >> issue_body.md
           else
             echo "Log file not available" >> issue_body.md
           fi

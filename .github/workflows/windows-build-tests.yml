@@ -1,0 +1,147 @@
+name: Windows Build Tests (Qt 6.8 LTS LLVM MinGW)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  build-llvm-mingw:
+    runs-on: windows-latest
+    name: Build and Run Tests with LLVM/Clang (Qt 6.8 MinGW)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.8 (LLVM MinGW)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_llvm_mingw'
+          cache: true
+
+      - name: Cache LLVM-MinGW
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: C:\llvm-mingw
+          key: llvm-mingw-20251007
+
+      - name: Download LLVM-MinGW
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20251007/llvm-mingw-20251007-ucrt-x86_64.zip" -OutFile "C:\llvm-mingw.zip"
+          Expand-Archive -Path "C:\llvm-mingw.zip" -DestinationPath "C:\llvm-mingw"
+
+      - name: Add LLVM-MinGW to PATH
+        run: |
+          echo "C:\llvm-mingw\bin" >> $GITHUB_PATH
+        shell: powershell
+
+      - name: Create build directory
+        shell: bash
+        run: mkdir -p build
+
+      - name: Configure (CMake)
+        shell: bash
+        run: |
+          cmake -S . -B build -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER="clang.exe" \
+            -DCMAKE_CXX_COMPILER="clang++.exe" \
+            -DCMAKE_C_COMPILER_TARGET=x86_64-w64-mingw32 \
+            -DCMAKE_CXX_COMPILER_TARGET=x86_64-w64-mingw32 \
+            -DCMAKE_C_COMPILER_FRONTEND_VARIANT=GNU \
+            -DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=GNU \
+            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
+            -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
+            2>&1 | tee build/configure_log.txt
+
+      - name: Build Tests
+        run: cmake --build build --config Release 2>&1 | tee build/build_log.txt
+        shell: bash
+
+      - name: Run tests
+        run: |
+          ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
+          exit ${PIPESTATUS[0]}
+        shell: bash
+
+      - name: Upload test artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-executables
+          path: |
+            build/tests/**/*.exe
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-failure
+          path: |
+            build/configure_log.txt
+            build/build_log.txt
+            build/test_log.txt
+          if-no-files-found: ignore
+
+      - name: Create issue with logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "🚨 **Build/Test failed for workflow:** ${{ github.workflow }}" > issue_body.md
+          echo "" >> issue_body.md
+          echo "**Branch/Tag:** ${{ github.ref }}" >> issue_body.md
+          echo "**Commit:** ${{ github.sha }}" >> issue_body.md
+          echo "" >> issue_body.md
+
+          # Add test summary first if tests were run
+          if [ -f build/test_log.txt ]; then
+            echo "### Test Summary" >> issue_body.md
+            echo '```' >> issue_body.md
+            # Extract test results and summary lines
+            grep -E "^[[:space:]]*[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#|tests passed|tests failed out of|% tests" build/test_log.txt | tail -n 50 >> issue_body.md 2>/dev/null || echo "Could not extract test summary" >> issue_body.md
+            echo '```' >> issue_body.md
+            echo "" >> issue_body.md
+          fi
+
+          echo "### Configure log" >> issue_body.md
+          echo '```' >> issue_body.md
+          if [ -f build/configure_log.txt ]; then
+            tail -n 100 build/configure_log.txt >> issue_body.md
+          else
+            echo "Log file not available" >> issue_body.md
+          fi
+          echo '```' >> issue_body.md
+          echo "### Build log" >> issue_body.md
+          echo '```' >> issue_body.md
+          if [ -f build/build_log.txt ]; then
+            tail -n 100 build/build_log.txt >> issue_body.md
+          else
+            echo "Log file not available" >> issue_body.md
+          fi
+          echo '```' >> issue_body.md
+          echo "### Test log (last 500 lines)" >> issue_body.md
+          echo '```' >> issue_body.md
+          if [ -f build/test_log.txt ]; then
+            tail -n 500 build/test_log.txt >> issue_body.md
+          else
+            echo "Log file not available" >> issue_body.md
+          fi
+          echo '```' >> issue_body.md
+          echo "" >> issue_body.md
+          echo "**Note:** Full logs are available in the workflow run artifacts." >> issue_body.md
+
+          gh issue create \
+            --title "🚨 Tests failed: ${{ github.workflow }} on ${{ github.ref }}" \
+            --body-file issue_body.md \
+            --label ci-failure,bug
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
