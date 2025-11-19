@@ -1502,31 +1502,38 @@ void Window::startBackgroundLoading()
         // This runs in a background thread
         LOG("Background thread: Loading mylist anime IDs...");
         
-        // Create separate database connection for this thread
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MylistThread");
-        db.setDatabaseName(dbName);
-        
-        if (!db.open()) {
-            LOG("Background thread: Failed to open database for mylist");
-            return QList<int>();
-        }
-        
-        // Query all anime IDs in mylist (same query as MyListCardManager but only get AIDs)
-        QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY "
-                       "(SELECT nameromaji FROM anime WHERE aid = m.aid)";
-        
-        QSqlQuery q(db);
         QList<int> aids;
         
-        if (q.exec(query)) {
-            while (q.next()) {
-                aids.append(q.value(0).toInt());
+        {
+            // Create separate database connection for this thread
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MylistThread");
+            db.setDatabaseName(dbName);
+            
+            if (!db.open()) {
+                LOG("Background thread: Failed to open database for mylist");
+                QSqlDatabase::removeDatabase("MylistThread");
+                return QList<int>();
             }
-        } else {
-            LOG(QString("Background thread: Error loading mylist: %1").arg(q.lastError().text()));
+            
+            // Query all anime IDs in mylist (same query as MyListCardManager but only get AIDs)
+            QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY "
+                           "(SELECT nameromaji FROM anime WHERE aid = m.aid)";
+            
+            QSqlQuery q(db);
+            
+            if (q.exec(query)) {
+                while (q.next()) {
+                    aids.append(q.value(0).toInt());
+                }
+            } else {
+                LOG(QString("Background thread: Error loading mylist: %1").arg(q.lastError().text()));
+            }
+            
+            db.close();
+            // Query object q is destroyed here when leaving scope
         }
         
-        db.close();
+        // Now safe to remove database connection
         QSqlDatabase::removeDatabase("MylistThread");
         
         LOG(QString("Background thread: Loaded %1 mylist anime IDs").arg(aids.size()));
@@ -1545,31 +1552,37 @@ void Window::startBackgroundLoading()
         
         LOG("Background thread: Loading anime titles cache...");
         
-        // We need to use a separate database connection for this thread
-        // Qt SQL requires each thread to have its own connection
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "AnimeTitlesThread");
-        db.setDatabaseName(dbName);
-        
-        if (!db.open()) {
-            LOG("Background thread: Failed to open database for anime titles");
-            return;
-        }
-        
-        QSqlQuery query(db);
-        query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
-        
         QStringList tempTitles;
         QMap<QString, int> tempTitleToAid;
         
-        while (query.next()) {
-            int aid = query.value(0).toInt();
-            QString title = query.value(1).toString();
-            QString displayText = QString("%1: %2").arg(aid).arg(title);
-            tempTitles << displayText;
-            tempTitleToAid[displayText] = aid;
+        {
+            // We need to use a separate database connection for this thread
+            // Qt SQL requires each thread to have its own connection
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "AnimeTitlesThread");
+            db.setDatabaseName(dbName);
+            
+            if (!db.open()) {
+                LOG("Background thread: Failed to open database for anime titles");
+                QSqlDatabase::removeDatabase("AnimeTitlesThread");
+                return;
+            }
+            
+            QSqlQuery query(db);
+            query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
+            
+            while (query.next()) {
+                int aid = query.value(0).toInt();
+                QString title = query.value(1).toString();
+                QString displayText = QString("%1: %2").arg(aid).arg(title);
+                tempTitles << displayText;
+                tempTitleToAid[displayText] = aid;
+            }
+            
+            db.close();
+            // Query object is destroyed here when leaving scope
         }
         
-        db.close();
+        // Now safe to remove database connection
         QSqlDatabase::removeDatabase("AnimeTitlesThread");
         
         LOG(QString("Background thread: Loaded %1 anime titles").arg(tempTitles.size()));
@@ -1586,38 +1599,45 @@ void Window::startBackgroundLoading()
         // This runs in a background thread
         LOG("Background thread: Loading unbound files...");
         
-        // Create separate database connection for this thread
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "UnboundFilesThread");
-        db.setDatabaseName(dbName);
-        
-        if (!db.open()) {
-            LOG("Background thread: Failed to open database for unbound files");
-            return;
-        }
-        
-        // Query directly from the database (same logic as AniDBApi::getUnboundFiles)
-        QSqlQuery query(db);
-        query.exec("SELECT path, ed2k FROM local_files WHERE api_checked = 1 AND fid = 0");
-        
         QList<UnboundFileData> tempUnboundFiles;
-        while (query.next()) {
-            UnboundFileData fileData;
-            fileData.filepath = query.value(0).toString();
-            fileData.hash = query.value(1).toString();
+        
+        {
+            // Create separate database connection for this thread
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "UnboundFilesThread");
+            db.setDatabaseName(dbName);
             
-            QFileInfo qFileInfo(fileData.filepath);
-            fileData.filename = qFileInfo.fileName();
-            
-            // Get file size if file exists
-            fileData.size = 0;
-            if (qFileInfo.exists()) {
-                fileData.size = qFileInfo.size();
+            if (!db.open()) {
+                LOG("Background thread: Failed to open database for unbound files");
+                QSqlDatabase::removeDatabase("UnboundFilesThread");
+                return;
             }
             
-            tempUnboundFiles.append(fileData);
+            // Query directly from the database (same logic as AniDBApi::getUnboundFiles)
+            QSqlQuery query(db);
+            query.exec("SELECT path, ed2k FROM local_files WHERE api_checked = 1 AND fid = 0");
+            
+            while (query.next()) {
+                UnboundFileData fileData;
+                fileData.filepath = query.value(0).toString();
+                fileData.hash = query.value(1).toString();
+                
+                QFileInfo qFileInfo(fileData.filepath);
+                fileData.filename = qFileInfo.fileName();
+                
+                // Get file size if file exists
+                fileData.size = 0;
+                if (qFileInfo.exists()) {
+                    fileData.size = qFileInfo.size();
+                }
+                
+                tempUnboundFiles.append(fileData);
+            }
+            
+            db.close();
+            // Query object is destroyed here when leaving scope
         }
         
-        db.close();
+        // Now safe to remove database connection
         QSqlDatabase::removeDatabase("UnboundFilesThread");
         
         LOG(QString("Background thread: Loaded %1 unbound files").arg(tempUnboundFiles.size()));
