@@ -4627,7 +4627,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Remove all cards from layout
-	for (AnimeCard* const card : qAsConst(animeCards)) {
+	for (AnimeCard* const card : std::as_const(animeCards)) {
 		mylistCardLayout->removeWidget(card);
 	}
 	
@@ -4739,7 +4739,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Re-add cards to layout in sorted order
-	for (AnimeCard* const card : qAsConst(animeCards)) {
+	for (AnimeCard* const card : std::as_const(animeCards)) {
 		mylistCardLayout->addWidget(card);
 	}
 }
@@ -4861,7 +4861,7 @@ void Window::onPosterDownloadFinished(QNetworkReply *reply)
 	LOG(QString("Poster downloaded and stored for anime %1").arg(aid));
 	
 	// Update the card if it exists
-	for (AnimeCard* const card : qAsConst(animeCards)) {
+	for (AnimeCard* const card : std::as_const(animeCards)) {
 		if (card->getAnimeId() == aid) {
 			card->setPoster(poster);
 			animeNeedingPoster.remove(aid);
@@ -4942,7 +4942,9 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     // Note: The AniDB API has an undocumented length limit for the 'other' field
     // Testing shows ~100 chars works reliably, so we truncate to stay safe
     QString otherField = QString("File: %1\nHash: %2\nSize: %3")
-        .arg(fileData.filename, fileData.hash, fileData.size);
+        .arg(fileData.filename)
+        .arg(fileData.hash)
+        .arg(fileData.size);
     
     // Truncate if too long (limit to 100 chars to stay within API limits)
     if(otherField.length() > 100)
