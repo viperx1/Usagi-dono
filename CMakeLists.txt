@@ -15,8 +15,8 @@ set(CMAKE_CXX_LINK_EXECUTABLE
 # 🧠 COMPILER CONFIGURATION
 # ==========================================================
 
-# Use modern enough C++ standard
-set(CMAKE_CXX_STANDARD 11)
+# Use modern C++ standard (C++17)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ==========================================================
