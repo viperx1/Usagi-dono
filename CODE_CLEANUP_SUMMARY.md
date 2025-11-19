@@ -144,17 +144,50 @@ static const QMap<int, QString> typeNames = {
 
 **Impact**: Eliminated 4 lines and improved code structure
 
+### 6. UI Delegate and Layout Simplifications
+**Files**: `usagi/src/playbuttondelegate.h/.cpp`, `usagi/src/flowlayout.cpp`
+
+**Problem**: Repeated qobject_cast pattern in PlayButtonDelegate and verbose if-else in FlowLayout.
+
+**Solution**: 
+- Extracted `getTreeWidget()` helper method in PlayButtonDelegate
+- Simplified FlowLayout spacing methods with ternary operators
+
+**Impact**: Eliminated ~10 lines and improved readability
+
+### 7. HasherThread Cleanup Logic
+**File**: `usagi/src/hasherthread.h/.cpp`
+
+**Problem**: Hasher cleanup code was repeated in 3 places (destructor, start of run(), end of run()).
+
+**Solution**: Extracted `cleanupHasher()` helper method:
+```cpp
+void HasherThread::cleanupHasher()
+{
+    if (hasher != nullptr)
+    {
+        delete hasher;
+        hasher = nullptr;
+    }
+}
+```
+
+**Impact**: Eliminated ~9 lines and ensures consistent cleanup behavior
+
 ## Statistics
 
 ### Code Reduction
-- **Total lines eliminated**: 134 lines
+- **Total lines eliminated**: 150+ lines
 - **MyListCardManager**: ~60 lines
 - **Window**: ~36 lines
 - **AniDBApi settings**: ~17 lines
 - **AnimeCard**: Reorganized (moved to slots)
 - **epno**: ~4 lines
+- **PlayButtonDelegate**: ~10 lines (reduced complexity)
+- **FlowLayout**: ~6 lines
+- **HasherThread**: ~9 lines (reduced complexity)
 
-### Files Modified (7 source files + headers + docs)
+### Files Modified (10 source files + headers + docs)
 - `usagi/src/animecard.h` - Converted setters to slots
 - `usagi/src/mylistcardmanager.h/.cpp` - Added helper functions
 - `usagi/src/window.cpp` - Uses shared utility
@@ -163,6 +196,9 @@ static const QMap<int, QString> typeNames = {
 - `usagi/src/anidbapi.cpp` - Uses saveSetting() helper
 - `usagi/src/anidbapi_settings.cpp` - Simplified all setters
 - `usagi/src/epno.cpp` - Refactored with maps (NEW)
+- `usagi/src/playbuttondelegate.h/.cpp` - Extracted helper (NEW)
+- `usagi/src/flowlayout.cpp` - Simplified spacing (NEW)
+- `usagi/src/hasherthread.h/.cpp` - Cleanup helper (NEW)
 - `usagi/CMakeLists.txt` - Added new header to build
 - `CODE_CLEANUP_SUMMARY.md` - This document
 
@@ -211,7 +247,7 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 
 ## Benefits
 
-1. **Reduced Duplication**: 134 lines of duplicate code eliminated
+1. **Reduced Duplication**: 150+ lines of duplicate code eliminated
 2. **Improved Maintainability**: Changes to logic only need to be made in one place
 3. **Better Architecture**: Slots enable signal-based communication
 4. **Clearer Intent**: Helper functions and maps have descriptive names
@@ -219,6 +255,7 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 6. **DRY Principle**: Common logic centralized in utilities
 7. **Data-Driven**: Maps replace procedural if-else chains
 8. **Future Extensibility**: Easy to add observers, new types, or settings
+9. **Thread Safety**: Consistent cleanup patterns prevent memory leaks
 
 ## Testing
 
