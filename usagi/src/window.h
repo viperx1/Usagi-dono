@@ -32,6 +32,8 @@
 #include <QtWidgets/QCompleter>
 #include <QtWidgets/QMessageBox>
 #include <QXmlStreamReader>
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrent>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
 #include "epno.h"
@@ -482,6 +484,32 @@ private:
 	QList<HashedFileInfo> pendingHashedFilesQueue;
 	QTimer *hashedFilesProcessingTimer;
 	void processPendingHashedFiles();
+	
+	// Background loading support to prevent UI freeze
+	QFutureWatcher<QList<int>> *mylistLoadingWatcher;  // Returns list of AIDs
+	QFutureWatcher<void> *animeTitlesLoadingWatcher;
+	QFutureWatcher<void> *unboundFilesLoadingWatcher;
+	void startBackgroundLoading();
+	void onMylistLoadingFinished();
+	void onAnimeTitlesLoadingFinished();
+	void onUnboundFilesLoadingFinished();
+	
+	// Progressive card loading to keep UI responsive
+	QTimer *progressiveCardLoadingTimer;
+	QList<int> pendingCardsToLoad;
+	void loadNextCardBatch();
+	static const int CARD_LOADING_BATCH_SIZE = 10; // Load 10 cards per timer tick
+	static const int CARD_LOADING_TIMER_INTERVAL = 10; // Process every 10ms
+	
+	// Data structures for background loading results
+	struct UnboundFileData {
+		QString filename;
+		QString filepath;
+		QString hash;
+		qint64 size;
+	};
+	QList<UnboundFileData> loadedUnboundFiles;
+	QMutex backgroundLoadingMutex; // Protect shared data between threads
 
 
 public slots:

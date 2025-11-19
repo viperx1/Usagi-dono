@@ -6,6 +6,11 @@
 #include "logger.h"
 #include "playbuttondelegate.h"
 #include <QElapsedTimer>
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrent>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -15,6 +20,10 @@ HasherThreadPool *hasherThreadPool = nullptr;
 myAniDBApi *adbapi;
 extern Window *window;
 settings_struct settings;
+
+// Define static constants for Window class
+const int Window::CARD_LOADING_BATCH_SIZE;
+const int Window::CARD_LOADING_TIMER_INTERVAL;
 
 
 Window::Window()
@@ -456,6 +465,24 @@ Window::Window()
     hashedFilesProcessingTimer->setSingleShot(false);
     hashedFilesProcessingTimer->setInterval(HASHED_FILES_TIMER_INTERVAL);
     connect(hashedFilesProcessingTimer, &QTimer::timeout, this, &Window::processPendingHashedFiles);
+    
+    // Initialize background loading watchers
+    mylistLoadingWatcher = new QFutureWatcher<QList<int>>(this);
+    animeTitlesLoadingWatcher = new QFutureWatcher<void>(this);
+    unboundFilesLoadingWatcher = new QFutureWatcher<void>(this);
+    
+    connect(mylistLoadingWatcher, &QFutureWatcher<QList<int>>::finished,
+            this, &Window::onMylistLoadingFinished);
+    connect(animeTitlesLoadingWatcher, &QFutureWatcher<void>::finished,
+            this, &Window::onAnimeTitlesLoadingFinished);
+    connect(unboundFilesLoadingWatcher, &QFutureWatcher<void>::finished,
+            this, &Window::onUnboundFilesLoadingFinished);
+    
+    // Initialize timer for progressive card loading
+    progressiveCardLoadingTimer = new QTimer(this);
+    progressiveCardLoadingTimer->setSingleShot(false);
+    progressiveCardLoadingTimer->setInterval(CARD_LOADING_TIMER_INTERVAL);
+    connect(progressiveCardLoadingTimer, &QTimer::timeout, this, &Window::loadNextCardBatch);
     
     // Load directory watcher settings from database
     bool watcherEnabledSetting = adbapi->getWatcherEnabled();
@@ -1371,16 +1398,13 @@ void Window::startupInitialization()
 //    debugPrintDatabaseInfoForLid(424184693);
     LOG("DEBUG: Finished printing database information for requested lid values");
     
-    mylistStatusLabel->setText("MyList Status: Loading from database...");
-    loadMylistFromDatabase();
+    mylistStatusLabel->setText("MyList Status: Loading in background...");
     
-    // Restore sorting preferences from database or use default
-    restoreMylistSorting();
+    // Start background loading - this will offload heavy operations to worker threads
+    startBackgroundLoading();
     
-    // Load unbound files from database
-    loadUnboundFiles();
-    
-    mylistStatusLabel->setText("MyList Status: Ready");
+    // Note: The rest of the initialization (sorting, unbound files) will be done
+    // in the completion handlers: onMylistLoadingFinished(), onAnimeTitlesLoadingFinished(), etc.
 }
 
 void Window::loadUnboundFiles()
@@ -1453,6 +1477,300 @@ void Window::loadAnimeTitlesCache()
     
     animeTitlesCacheLoaded = true;
     LOG(QString("Loaded %1 anime titles into cache").arg(cachedAnimeTitles.size()));
+}
+
+// Start background loading for all heavy operations
+void Window::startBackgroundLoading()
+{
+    LOG("Starting background loading of mylist data, anime titles, and unbound files...");
+    
+    // Capture database name in main thread before launching background threads
+    QString dbName;
+    {
+        QSqlDatabase db = QSqlDatabase::database();
+        if (db.isValid() && db.isOpen()) {
+            dbName = db.databaseName();
+        } else {
+            LOG("Error: Main database is not open");
+            return;
+        }
+    }
+    
+    // Load mylist anime IDs in background thread
+    // The database query is done in background, but card creation happens in UI thread
+    QFuture<QList<int>> mylistFuture = QtConcurrent::run([dbName]() -> QList<int> {
+        // This runs in a background thread
+        LOG("Background thread: Loading mylist anime IDs...");
+        
+        QList<int> aids;
+        
+        {
+            // Create separate database connection for this thread
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MylistThread");
+            db.setDatabaseName(dbName);
+            
+            if (!db.open()) {
+                LOG("Background thread: Failed to open database for mylist");
+                QSqlDatabase::removeDatabase("MylistThread");
+                return QList<int>();
+            }
+            
+            // Query all anime IDs in mylist (same query as MyListCardManager but only get AIDs)
+            QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY "
+                           "(SELECT nameromaji FROM anime WHERE aid = m.aid)";
+            
+            QSqlQuery q(db);
+            
+            if (q.exec(query)) {
+                while (q.next()) {
+                    aids.append(q.value(0).toInt());
+                }
+            } else {
+                LOG(QString("Background thread: Error loading mylist: %1").arg(q.lastError().text()));
+            }
+            
+            db.close();
+            // Query object q is destroyed here when leaving scope
+        }
+        
+        // Now safe to remove database connection
+        QSqlDatabase::removeDatabase("MylistThread");
+        
+        LOG(QString("Background thread: Loaded %1 mylist anime IDs").arg(aids.size()));
+        
+        return aids;
+    });
+    mylistLoadingWatcher->setFuture(mylistFuture);
+    
+    // Start anime titles cache loading in background thread
+    QFuture<void> titlesFuture = QtConcurrent::run([this, dbName]() {
+        // This runs in a background thread
+        // Load anime titles from database into temporary storage
+        if (animeTitlesCacheLoaded) {
+            return; // Already loaded
+        }
+        
+        LOG("Background thread: Loading anime titles cache...");
+        
+        QStringList tempTitles;
+        QMap<QString, int> tempTitleToAid;
+        
+        {
+            // We need to use a separate database connection for this thread
+            // Qt SQL requires each thread to have its own connection
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "AnimeTitlesThread");
+            db.setDatabaseName(dbName);
+            
+            if (!db.open()) {
+                LOG("Background thread: Failed to open database for anime titles");
+                QSqlDatabase::removeDatabase("AnimeTitlesThread");
+                return;
+            }
+            
+            QSqlQuery query(db);
+            query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
+            
+            while (query.next()) {
+                int aid = query.value(0).toInt();
+                QString title = query.value(1).toString();
+                QString displayText = QString("%1: %2").arg(aid).arg(title);
+                tempTitles << displayText;
+                tempTitleToAid[displayText] = aid;
+            }
+            
+            db.close();
+            // Query object is destroyed here when leaving scope
+        }
+        
+        // Now safe to remove database connection
+        QSqlDatabase::removeDatabase("AnimeTitlesThread");
+        
+        LOG(QString("Background thread: Loaded %1 anime titles").arg(tempTitles.size()));
+        
+        // Store the data in member variables with mutex protection
+        QMutexLocker locker(&backgroundLoadingMutex);
+        cachedAnimeTitles = tempTitles;
+        cachedTitleToAid = tempTitleToAid;
+    });
+    animeTitlesLoadingWatcher->setFuture(titlesFuture);
+    
+    // Start unbound files loading in background thread
+    QFuture<void> unboundFuture = QtConcurrent::run([this, dbName]() {
+        // This runs in a background thread
+        LOG("Background thread: Loading unbound files...");
+        
+        QList<UnboundFileData> tempUnboundFiles;
+        
+        {
+            // Create separate database connection for this thread
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "UnboundFilesThread");
+            db.setDatabaseName(dbName);
+            
+            if (!db.open()) {
+                LOG("Background thread: Failed to open database for unbound files");
+                QSqlDatabase::removeDatabase("UnboundFilesThread");
+                return;
+            }
+            
+            // Query unbound files using same criteria as AniDBApi::getUnboundFiles
+            // binding_status = 0 (not_bound) AND status = 3 (not in anidb)
+            QSqlQuery query(db);
+            query.prepare("SELECT `path`, `filename`, `ed2k_hash` FROM `local_files` WHERE `binding_status` = 0 AND `status` = 3 AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
+            
+            if (!query.exec()) {
+                LOG(QString("Background thread: Failed to query unbound files: %1").arg(query.lastError().text()));
+            } else {
+                while (query.next()) {
+                    UnboundFileData fileData;
+                    fileData.filepath = query.value(0).toString();
+                    fileData.filename = query.value(1).toString();
+                    if (fileData.filename.isEmpty()) {
+                        QFileInfo qFileInfo(fileData.filepath);
+                        fileData.filename = qFileInfo.fileName();
+                    }
+                    fileData.hash = query.value(2).toString();
+                    
+                    // Get file size if file exists
+                    QFileInfo qFileInfo(fileData.filepath);
+                    fileData.size = 0;
+                    if (qFileInfo.exists()) {
+                        fileData.size = qFileInfo.size();
+                    }
+                    
+                    tempUnboundFiles.append(fileData);
+                }
+            }
+            
+            db.close();
+            // Query object is destroyed here when leaving scope
+        }
+        
+        // Now safe to remove database connection
+        QSqlDatabase::removeDatabase("UnboundFilesThread");
+        
+        LOG(QString("Background thread: Loaded %1 unbound files").arg(tempUnboundFiles.size()));
+        
+        // Store the data with mutex protection
+        QMutexLocker locker(&backgroundLoadingMutex);
+        loadedUnboundFiles = tempUnboundFiles;
+    });
+    unboundFilesLoadingWatcher->setFuture(unboundFuture);
+}
+
+// Called when mylist loading finishes (in UI thread)
+void Window::onMylistLoadingFinished()
+{
+    // Get the loaded AIDs from the future
+    QList<int> aids = mylistLoadingWatcher->result();
+    
+    LOG(QString("Background loading: Mylist query complete with %1 anime, starting progressive card creation...").arg(aids.size()));
+    
+    // Store AIDs for progressive loading
+    pendingCardsToLoad = aids;
+    
+    // Clear existing cards
+    cardManager->clearAllCards();
+    
+    // Start progressive loading timer
+    if (!pendingCardsToLoad.isEmpty()) {
+        progressiveCardLoadingTimer->start();
+        mylistStatusLabel->setText(QString("MyList Status: Loading %1 anime...").arg(pendingCardsToLoad.size()));
+    } else {
+        mylistStatusLabel->setText("MyList Status: No anime in mylist");
+    }
+}
+
+// Load cards progressively in small batches to keep UI responsive
+void Window::loadNextCardBatch()
+{
+    if (pendingCardsToLoad.isEmpty()) {
+        // All cards loaded
+        progressiveCardLoadingTimer->stop();
+        
+        // Get all cards for backward compatibility
+        animeCards = cardManager->getAllCards();
+        
+        // Apply sorting
+        restoreMylistSorting();
+        sortMylistCards(mylistSortComboBox->currentIndex());
+        
+        mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
+        LOG(QString("[Progressive Loading] All cards loaded: %1 anime").arg(animeCards.size()));
+        return;
+    }
+    
+    // Load next batch of cards
+    int cardsToLoad = qMin(CARD_LOADING_BATCH_SIZE, pendingCardsToLoad.size());
+    
+    for (int i = 0; i < cardsToLoad; ++i) {
+        int aid = pendingCardsToLoad.takeFirst();
+        
+        // Create card using the card manager
+        // This calls createCard() which does the database query for this specific anime
+        AnimeCard *card = cardManager->getCard(aid);
+        if (!card) {
+            // Card doesn't exist, create it
+            // We need to trigger card creation through updateOrAddMylistEntry
+            // but we need a lid. Since we only have aid, let's query for one lid
+            QSqlDatabase db = QSqlDatabase::database();
+            if (db.isOpen()) {
+                QSqlQuery q(db);
+                q.prepare("SELECT lid FROM mylist WHERE aid = ? LIMIT 1");
+                q.addBindValue(aid);
+                if (q.exec() && q.next()) {
+                    int lid = q.value(0).toInt();
+                    cardManager->updateOrAddMylistEntry(lid);
+                }
+            }
+        }
+    }
+    
+    // Update status
+    int remaining = pendingCardsToLoad.size();
+    int loaded = animeCards.size();
+    mylistStatusLabel->setText(QString("MyList Status: Loading... %1 of %2").arg(loaded).arg(loaded + remaining));
+}
+
+// Called when anime titles loading finishes (in UI thread)
+void Window::onAnimeTitlesLoadingFinished()
+{
+    QMutexLocker locker(&backgroundLoadingMutex);
+    LOG("Background loading: Anime titles cache loaded successfully");
+    animeTitlesCacheLoaded = true;
+    
+    // The data is already loaded in cachedAnimeTitles and cachedTitleToAid
+    // by the background thread, so we just need to mark it as loaded
+}
+
+// Called when unbound files loading finishes (in UI thread)
+void Window::onUnboundFilesLoadingFinished()
+{
+    QMutexLocker locker(&backgroundLoadingMutex);
+    
+    LOG(QString("Background loading: Unbound files loaded, adding %1 files to UI...").arg(loadedUnboundFiles.size()));
+    
+    if (loadedUnboundFiles.isEmpty()) {
+        LOG("No unbound files found");
+        return;
+    }
+    
+    // Make a copy to release the mutex quickly
+    QList<UnboundFileData> filesToAdd = loadedUnboundFiles;
+    loadedUnboundFiles.clear();
+    locker.unlock();
+    
+    // Disable updates during bulk insertion for performance
+    unknownFiles->setUpdatesEnabled(false);
+    
+    // Add each unbound file to the unknown files widget
+    for (const UnboundFileData& fileData : std::as_const(filesToAdd)) {
+        unknownFilesInsertRow(fileData.filename, fileData.filepath, fileData.hash, fileData.size);
+    }
+    
+    // Re-enable updates after bulk insertion
+    unknownFiles->setUpdatesEnabled(true);
+    
+    LOG(QString("Successfully added %1 unbound files to UI").arg(filesToAdd.size()));
 }
 
 void Window::saveMylistSorting()
