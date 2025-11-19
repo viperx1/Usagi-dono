@@ -560,6 +560,7 @@ public slots:
     void onUnknownFileEpisodeSelected(int row);
     void onUnknownFileBindClicked(int row, const QString& epno);
     void onUnknownFileNotAnimeClicked(int row);
+    void onUnknownFileRecheckClicked(int row);
 
 signals:
 	void notifyStopHasher();

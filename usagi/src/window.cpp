@@ -1677,7 +1677,7 @@ unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
     setColumnWidth(0, 400);
     setColumnWidth(1, 300);
     setColumnWidth(2, 200);
-    setColumnWidth(3, 150);  // 50% wider than original 100
+    setColumnWidth(3, 220);  // Increased to accommodate Re-check button
     setMaximumHeight(200); // Limit height so it doesn't dominate the UI
 }
 
@@ -1805,6 +1805,44 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 {
                     updateOrAddMylistEntry(lid);
                 }
+                
+                // Remove from unknown files widget if present (re-check succeeded)
+                for(int row = 0; row < unknownFiles->rowCount(); ++row)
+                {
+                    QTableWidgetItem *item = unknownFiles->item(row, 0);
+                    if(item && item->toolTip() == localPath)
+                    {
+                        LOG(QString("Re-check succeeded (310), removing from unknown files: %1").arg(item->text()));
+                        unknownFiles->removeRow(row);
+                        unknownFilesData.remove(row);
+                        
+                        // Update row indices in unknownFilesData map
+                        QMap<int, UnknownFileData> newMap;
+                        for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
+                        {
+                            int oldRow = it.key();
+                            if(oldRow > row) {
+                                newMap[oldRow - 1] = it.value();
+                            } else {
+                                newMap[oldRow] = it.value();
+                            }
+                        }
+                        unknownFilesData = newMap;
+                        
+                        // Hide the widget if no more unknown files
+                        if(unknownFiles->rowCount() == 0)
+                        {
+                            unknownFiles->hide();
+                            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
+                            if(unknownFilesLabel)
+                            {
+                                unknownFilesLabel->hide();
+                            }
+                        }
+                        break;
+                    }
+                }
+                
                 return;
             }
             if(code == 320)
@@ -1872,6 +1910,44 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 				{
 					updateOrAddMylistEntry(lid);
 				}
+				
+				// Remove from unknown files widget if present (re-check succeeded)
+				for(int row = 0; row < unknownFiles->rowCount(); ++row)
+				{
+					QTableWidgetItem *item = unknownFiles->item(row, 0);
+					if(item && item->toolTip() == localPath)
+					{
+						LOG(QString("Re-check succeeded (311/210), removing from unknown files: %1").arg(item->text()));
+						unknownFiles->removeRow(row);
+						unknownFilesData.remove(row);
+						
+						// Update row indices in unknownFilesData map
+						QMap<int, UnknownFileData> newMap;
+						for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
+						{
+							int oldRow = it.key();
+							if(oldRow > row) {
+								newMap[oldRow - 1] = it.value();
+							} else {
+								newMap[oldRow] = it.value();
+							}
+						}
+						unknownFilesData = newMap;
+						
+						// Hide the widget if no more unknown files
+						if(unknownFiles->rowCount() == 0)
+						{
+							unknownFiles->hide();
+							QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
+							if(unknownFilesLabel)
+							{
+								unknownFilesLabel->hide();
+							}
+						}
+						break;
+					}
+				}
+				
 				return;
 			}
 		}
@@ -2772,8 +2848,14 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     // Store filepath in button property for later lookup
     notAnimeButton->setProperty("filepath", filepath);
     
+    QPushButton *recheckButton = new QPushButton("Re-check");
+    // Store filepath in button property for later lookup
+    recheckButton->setProperty("filepath", filepath);
+    recheckButton->setToolTip("Re-validate this file against AniDB (in case it was added since last check)");
+    
     actionLayout->addWidget(bindButton);
     actionLayout->addWidget(notAnimeButton);
+    actionLayout->addWidget(recheckButton);
     actionContainer->setLayout(actionLayout);
     
     unknownFiles->setCellWidget(row, 3, actionContainer);
@@ -2889,6 +2971,30 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
         
         if(currentRow >= 0) {
             onUnknownFileNotAnimeClicked(currentRow);
+        } else {
+            LOG("ERROR: Could not find row for filepath");
+        }
+    });
+    
+    // Connect "Re-check" button - use filepath to find current row dynamically
+    connect(recheckButton, &QPushButton::clicked, this, [this, recheckButton, filepath]() {
+        LOG("Re-check button clicked");
+        LOG(QString("Re-check button filepath: %1").arg(filepath));
+        
+        // Find current row by filepath
+        int currentRow = -1;
+        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
+            QTableWidgetItem *item = unknownFiles->item(i, 0);
+            if(item && item->toolTip() == filepath) {
+                currentRow = i;
+                break;
+            }
+        }
+        
+        LOG(QString("Re-check button found row: %1").arg(currentRow));
+        
+        if(currentRow >= 0) {
+            onUnknownFileRecheckClicked(currentRow);
         } else {
             LOG("ERROR: Could not find row for filepath");
         }
@@ -5058,4 +5164,63 @@ void Window::onUnknownFileNotAnimeClicked(int row)
     }
     
     LOG(QString("Successfully marked file as not anime: %1").arg(fileData.filename));
+}
+
+void Window::onUnknownFileRecheckClicked(int row)
+{
+    if(!unknownFilesData.contains(row))
+    {
+        LOG(QString("Error: Unknown file data not found for row %1").arg(row));
+        return;
+    }
+    
+    UnknownFileData &fileData = unknownFilesData[row];
+    
+    LOG(QString("Re-checking file against AniDB: %1").arg(fileData.filename));
+    LOG(QString("Hash: %1, Size: %2").arg(fileData.hash).arg(fileData.size));
+    
+    // Check if file is already in hashes table
+    bool fileInHashesTable = false;
+    int hashesRow = -1;
+    for(int i = 0; i < hashes->rowCount(); ++i)
+    {
+        QString hashPath = hashes->item(i, 2)->text();
+        if(hashPath == fileData.filepath)
+        {
+            fileInHashesTable = true;
+            hashesRow = i;
+            break;
+        }
+    }
+    
+    // If file is not in hashes table, add it first
+    if(!fileInHashesTable)
+    {
+        LOG(QString("File not in hashes table, adding: %1").arg(fileData.filename));
+        QFileInfo fileInfo(fileData.filepath);
+        hashesinsertrow(fileInfo, Qt::Unchecked, fileData.hash);
+        hashesRow = hashes->rowCount() - 1;
+    }
+    else
+    {
+        LOG(QString("File already in hashes table at row %1").arg(hashesRow));
+    }
+    
+    // Call MylistAdd API with the hash and size
+    // The response will be handled by getNotifyMylistAdd
+    QString tag = adbapi->MylistAdd(fileData.size, fileData.hash, 
+                                     markwatched->checkState(), 
+                                     hasherFileState->currentIndex(), 
+                                     storage->text());
+    
+    // Store the tag in the hashes table for response matching
+    if(hashesRow >= 0 && hashesRow < hashes->rowCount())
+    {
+        hashes->item(hashesRow, 6)->setText(tag);
+        // Update progress indicator to show it's being checked
+        hashes->item(hashesRow, 1)->setText("1"); // Checking
+        LOG(QString("Sent re-check request with tag: %1").arg(tag));
+    }
+    
+    LOG(QString("Re-check initiated for file: %1").arg(fileData.filename));
 }
