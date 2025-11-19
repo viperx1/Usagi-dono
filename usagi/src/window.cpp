@@ -2789,7 +2789,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     unknownFilesData[row] = fileData;
     
     // Connect anime search to populate episode suggestions
-    connect(animeSearch, &QLineEdit::textChanged, [this, filepath, animeSearch, episodeInput, bindButton]() {
+    connect(animeSearch, &QLineEdit::textChanged, this, [this, filepath, animeSearch, episodeInput, bindButton]() {
         QString searchText = animeSearch->text();
         
         // Find current row by filepath (stable identifier)
@@ -2829,7 +2829,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     });
     
     // Connect episode input to enable bind button when text is entered
-    connect(episodeInput, &QLineEdit::textChanged, [this, filepath, episodeInput, bindButton]() {
+    connect(episodeInput, &QLineEdit::textChanged, this, [this, filepath, episodeInput, bindButton]() {
         // Find current row by filepath (stable identifier)
         int currentRow = -1;
         for(int i = 0; i < unknownFiles->rowCount(); ++i) {
@@ -2854,7 +2854,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     });
     
     // Connect bind button - use filepath to find current row dynamically
-    connect(bindButton, &QPushButton::clicked, [this, bindButton, episodeInput, filepath]() {
+    connect(bindButton, &QPushButton::clicked, this, [this, bindButton, episodeInput, filepath]() {
         // Find current row by filepath
         int currentRow = -1;
         for(int i = 0; i < unknownFiles->rowCount(); ++i) {
