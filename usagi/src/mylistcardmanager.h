@@ -120,6 +120,11 @@ private:
     };
     AnimeStats calculateStatistics(int aid);
     
+    // Helper functions for common operations
+    QString determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid);
+    QList<AnimeCard::TagInfo> getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category);
+    void updateCardAiredDates(AnimeCard* card, const QString& startDate, const QString& endDate);
+    
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;
     
