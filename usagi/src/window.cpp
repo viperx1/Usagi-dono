@@ -1484,15 +1484,27 @@ void Window::startBackgroundLoading()
 {
     LOG("Starting background loading of mylist data, anime titles, and unbound files...");
     
+    // Capture database name in main thread before launching background threads
+    QString dbName;
+    {
+        QSqlDatabase db = QSqlDatabase::database();
+        if (db.isValid() && db.isOpen()) {
+            dbName = db.databaseName();
+        } else {
+            LOG("Error: Main database is not open");
+            return;
+        }
+    }
+    
     // Load mylist anime IDs in background thread
     // The database query is done in background, but card creation happens in UI thread
-    QFuture<QList<int>> mylistFuture = QtConcurrent::run([]() -> QList<int> {
+    QFuture<QList<int>> mylistFuture = QtConcurrent::run([dbName]() -> QList<int> {
         // This runs in a background thread
         LOG("Background thread: Loading mylist anime IDs...");
         
         // Create separate database connection for this thread
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MylistThread");
-        db.setDatabaseName(QSqlDatabase::database().databaseName());
+        db.setDatabaseName(dbName);
         
         if (!db.open()) {
             LOG("Background thread: Failed to open database for mylist");
@@ -1524,7 +1536,7 @@ void Window::startBackgroundLoading()
     mylistLoadingWatcher->setFuture(mylistFuture);
     
     // Start anime titles cache loading in background thread
-    QFuture<void> titlesFuture = QtConcurrent::run([this]() {
+    QFuture<void> titlesFuture = QtConcurrent::run([this, dbName]() {
         // This runs in a background thread
         // Load anime titles from database into temporary storage
         if (animeTitlesCacheLoaded) {
@@ -1536,7 +1548,7 @@ void Window::startBackgroundLoading()
         // We need to use a separate database connection for this thread
         // Qt SQL requires each thread to have its own connection
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "AnimeTitlesThread");
-        db.setDatabaseName(QSqlDatabase::database().databaseName());
+        db.setDatabaseName(dbName);
         
         if (!db.open()) {
             LOG("Background thread: Failed to open database for anime titles");
@@ -1570,13 +1582,13 @@ void Window::startBackgroundLoading()
     animeTitlesLoadingWatcher->setFuture(titlesFuture);
     
     // Start unbound files loading in background thread
-    QFuture<void> unboundFuture = QtConcurrent::run([this]() {
+    QFuture<void> unboundFuture = QtConcurrent::run([this, dbName]() {
         // This runs in a background thread
         LOG("Background thread: Loading unbound files...");
         
         // Create separate database connection for this thread
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "UnboundFilesThread");
-        db.setDatabaseName(QSqlDatabase::database().databaseName());
+        db.setDatabaseName(dbName);
         
         if (!db.open()) {
             LOG("Background thread: Failed to open database for unbound files");
