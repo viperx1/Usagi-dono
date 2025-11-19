@@ -22,7 +22,7 @@ Logger* Logger::instance()
     // across threads (see Qt documentation for QMutex memory ordering guarantees)
     if (!s_instance)
     {
-        QMutexLocker locker(s_instanceMutex);
+        QMutexLocker locker(s_instanceMutex());
         if (!s_instance)
         {
             s_instance = new Logger();
