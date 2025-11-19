@@ -21,6 +21,10 @@ myAniDBApi *adbapi;
 extern Window *window;
 settings_struct settings;
 
+// Define static constants for Window class
+const int Window::CARD_LOADING_BATCH_SIZE;
+const int Window::CARD_LOADING_TIMER_INTERVAL;
+
 
 Window::Window()
 {
