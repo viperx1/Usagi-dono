@@ -174,10 +174,22 @@ void HasherThread::cleanupHasher()
 
 **Impact**: Eliminated ~9 lines and ensures consistent cleanup behavior
 
+### 8. Mask Class Magic Constant
+**File**: `usagi/src/mask.h/.cpp`
+
+**Problem**: Magic constant `0x00FFFFFFFFFFFFFFULL` was repeated 5 times throughout the Mask class, making the intent unclear.
+
+**Solution**: Extracted `SEVEN_BYTE_MASK` constant:
+```cpp
+static constexpr uint64_t SEVEN_BYTE_MASK = 0x00FFFFFFFFFFFFFFULL;
+```
+
+**Impact**: Replaced 5 instances with named constant, making byte 8 masking intent explicit
+
 ## Statistics
 
 ### Code Reduction
-- **Total lines eliminated**: 150+ lines
+- **Total lines eliminated**: 160+ lines
 - **MyListCardManager**: ~60 lines
 - **Window**: ~36 lines
 - **AniDBApi settings**: ~17 lines
@@ -186,8 +198,9 @@ void HasherThread::cleanupHasher()
 - **PlayButtonDelegate**: ~10 lines (reduced complexity)
 - **FlowLayout**: ~6 lines
 - **HasherThread**: ~9 lines (reduced complexity)
+- **Mask**: Named constant (improved clarity)
 
-### Files Modified (10 source files + headers + docs)
+### Files Modified (11 source files + headers + docs)
 - `usagi/src/animecard.h` - Converted setters to slots
 - `usagi/src/mylistcardmanager.h/.cpp` - Added helper functions
 - `usagi/src/window.cpp` - Uses shared utility
@@ -199,6 +212,7 @@ void HasherThread::cleanupHasher()
 - `usagi/src/playbuttondelegate.h/.cpp` - Extracted helper (NEW)
 - `usagi/src/flowlayout.cpp` - Simplified spacing (NEW)
 - `usagi/src/hasherthread.h/.cpp` - Cleanup helper (NEW)
+- `usagi/src/mask.h/.cpp` - Named constant (NEW)
 - `usagi/CMakeLists.txt` - Added new header to build
 - `CODE_CLEANUP_SUMMARY.md` - This document
 
@@ -247,7 +261,7 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 
 ## Benefits
 
-1. **Reduced Duplication**: 150+ lines of duplicate code eliminated
+1. **Reduced Duplication**: 160+ lines of duplicate code eliminated
 2. **Improved Maintainability**: Changes to logic only need to be made in one place
 3. **Better Architecture**: Slots enable signal-based communication
 4. **Clearer Intent**: Helper functions and maps have descriptive names
@@ -256,6 +270,7 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 7. **Data-Driven**: Maps replace procedural if-else chains
 8. **Future Extensibility**: Easy to add observers, new types, or settings
 9. **Thread Safety**: Consistent cleanup patterns prevent memory leaks
+10. **Named Constants**: Magic numbers replaced with self-documenting constants
 
 ## Testing
 
