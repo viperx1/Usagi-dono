@@ -463,16 +463,22 @@ Window::Window()
     connect(hashedFilesProcessingTimer, &QTimer::timeout, this, &Window::processPendingHashedFiles);
     
     // Initialize background loading watchers
-    mylistLoadingWatcher = new QFutureWatcher<void>(this);
+    mylistLoadingWatcher = new QFutureWatcher<QList<int>>(this);
     animeTitlesLoadingWatcher = new QFutureWatcher<void>(this);
     unboundFilesLoadingWatcher = new QFutureWatcher<void>(this);
     
-    connect(mylistLoadingWatcher, &QFutureWatcher<void>::finished,
+    connect(mylistLoadingWatcher, &QFutureWatcher<QList<int>>::finished,
             this, &Window::onMylistLoadingFinished);
     connect(animeTitlesLoadingWatcher, &QFutureWatcher<void>::finished,
             this, &Window::onAnimeTitlesLoadingFinished);
     connect(unboundFilesLoadingWatcher, &QFutureWatcher<void>::finished,
             this, &Window::onUnboundFilesLoadingFinished);
+    
+    // Initialize timer for progressive card loading
+    progressiveCardLoadingTimer = new QTimer(this);
+    progressiveCardLoadingTimer->setSingleShot(false);
+    progressiveCardLoadingTimer->setInterval(CARD_LOADING_TIMER_INTERVAL);
+    connect(progressiveCardLoadingTimer, &QTimer::timeout, this, &Window::loadNextCardBatch);
     
     // Load directory watcher settings from database
     bool watcherEnabledSetting = adbapi->getWatcherEnabled();
@@ -1474,15 +1480,44 @@ void Window::startBackgroundLoading()
 {
     LOG("Starting background loading of mylist data, anime titles, and unbound files...");
     
-    // For mylist, we can't truly background load because AnimeCard widgets must be created in UI thread
-    // But we can defer the execution using a short timer to let the UI become responsive first
-    // This is better than blocking immediately
-    QTimer::singleShot(100, this, [this]() {
-        LOG("Deferred mylist loading starting...");
-        loadMylistFromDatabase();
-        restoreMylistSorting();
-        mylistStatusLabel->setText("MyList Status: Ready");
+    // Load mylist anime IDs in background thread
+    // The database query is done in background, but card creation happens in UI thread
+    QFuture<QList<int>> mylistFuture = QtConcurrent::run([]() -> QList<int> {
+        // This runs in a background thread
+        LOG("Background thread: Loading mylist anime IDs...");
+        
+        // Create separate database connection for this thread
+        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MylistThread");
+        db.setDatabaseName(QSqlDatabase::database().databaseName());
+        
+        if (!db.open()) {
+            LOG("Background thread: Failed to open database for mylist");
+            return QList<int>();
+        }
+        
+        // Query all anime IDs in mylist (same query as MyListCardManager but only get AIDs)
+        QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY "
+                       "(SELECT nameromaji FROM anime WHERE aid = m.aid)";
+        
+        QSqlQuery q(db);
+        QList<int> aids;
+        
+        if (q.exec(query)) {
+            while (q.next()) {
+                aids.append(q.value(0).toInt());
+            }
+        } else {
+            LOG(QString("Background thread: Error loading mylist: %1").arg(q.lastError().text()));
+        }
+        
+        db.close();
+        QSqlDatabase::removeDatabase("MylistThread");
+        
+        LOG(QString("Background thread: Loaded %1 mylist anime IDs").arg(aids.size()));
+        
+        return aids;
     });
+    mylistLoadingWatcher->setFuture(mylistFuture);
     
     // Start anime titles cache loading in background thread
     QFuture<void> titlesFuture = QtConcurrent::run([this]() {
@@ -1581,8 +1616,75 @@ void Window::startBackgroundLoading()
 // Called when mylist loading finishes (in UI thread)
 void Window::onMylistLoadingFinished()
 {
-    // This is no longer used since mylist loading is deferred via QTimer::singleShot
-    // Kept for potential future use
+    // Get the loaded AIDs from the future
+    QList<int> aids = mylistLoadingWatcher->result();
+    
+    LOG(QString("Background loading: Mylist query complete with %1 anime, starting progressive card creation...").arg(aids.size()));
+    
+    // Store AIDs for progressive loading
+    pendingCardsToLoad = aids;
+    
+    // Clear existing cards
+    cardManager->clearAllCards();
+    
+    // Start progressive loading timer
+    if (!pendingCardsToLoad.isEmpty()) {
+        progressiveCardLoadingTimer->start();
+        mylistStatusLabel->setText(QString("MyList Status: Loading %1 anime...").arg(pendingCardsToLoad.size()));
+    } else {
+        mylistStatusLabel->setText("MyList Status: No anime in mylist");
+    }
+}
+
+// Load cards progressively in small batches to keep UI responsive
+void Window::loadNextCardBatch()
+{
+    if (pendingCardsToLoad.isEmpty()) {
+        // All cards loaded
+        progressiveCardLoadingTimer->stop();
+        
+        // Get all cards for backward compatibility
+        animeCards = cardManager->getAllCards();
+        
+        // Apply sorting
+        restoreMylistSorting();
+        sortMylistCards(mylistSortComboBox->currentIndex());
+        
+        mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
+        LOG(QString("[Progressive Loading] All cards loaded: %1 anime").arg(animeCards.size()));
+        return;
+    }
+    
+    // Load next batch of cards
+    int cardsToLoad = qMin(CARD_LOADING_BATCH_SIZE, pendingCardsToLoad.size());
+    
+    for (int i = 0; i < cardsToLoad; ++i) {
+        int aid = pendingCardsToLoad.takeFirst();
+        
+        // Create card using the card manager
+        // This calls createCard() which does the database query for this specific anime
+        AnimeCard *card = cardManager->getCard(aid);
+        if (!card) {
+            // Card doesn't exist, create it
+            // We need to trigger card creation through updateOrAddMylistEntry
+            // but we need a lid. Since we only have aid, let's query for one lid
+            QSqlDatabase db = QSqlDatabase::database();
+            if (db.isOpen()) {
+                QSqlQuery q(db);
+                q.prepare("SELECT lid FROM mylist WHERE aid = ? LIMIT 1");
+                q.addBindValue(aid);
+                if (q.exec() && q.next()) {
+                    int lid = q.value(0).toInt();
+                    cardManager->updateOrAddMylistEntry(lid);
+                }
+            }
+        }
+    }
+    
+    // Update status
+    int remaining = pendingCardsToLoad.size();
+    int loaded = animeCards.size();
+    mylistStatusLabel->setText(QString("MyList Status: Loading... %1 of %2").arg(loaded).arg(loaded + remaining));
 }
 
 // Called when anime titles loading finishes (in UI thread)

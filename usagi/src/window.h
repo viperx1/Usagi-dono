@@ -486,7 +486,7 @@ private:
 	void processPendingHashedFiles();
 	
 	// Background loading support to prevent UI freeze
-	QFutureWatcher<void> *mylistLoadingWatcher;
+	QFutureWatcher<QList<int>> *mylistLoadingWatcher;  // Returns list of AIDs
 	QFutureWatcher<void> *animeTitlesLoadingWatcher;
 	QFutureWatcher<void> *unboundFilesLoadingWatcher;
 	void startBackgroundLoading();
@@ -494,11 +494,14 @@ private:
 	void onAnimeTitlesLoadingFinished();
 	void onUnboundFilesLoadingFinished();
 	
+	// Progressive card loading to keep UI responsive
+	QTimer *progressiveCardLoadingTimer;
+	QList<int> pendingCardsToLoad;
+	void loadNextCardBatch();
+	static const int CARD_LOADING_BATCH_SIZE = 10; // Load 10 cards per timer tick
+	static const int CARD_LOADING_TIMER_INTERVAL = 10; // Process every 10ms
+	
 	// Data structures for background loading results
-	struct AnimeTitlesCacheData {
-		QStringList titles;
-		QMap<QString, int> titleToAid;
-	};
 	struct UnboundFileData {
 		QString filename;
 		QString filepath;
