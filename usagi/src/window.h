@@ -32,6 +32,8 @@
 #include <QtWidgets/QCompleter>
 #include <QtWidgets/QMessageBox>
 #include <QXmlStreamReader>
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrent>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
 #include "epno.h"
@@ -482,6 +484,29 @@ private:
 	QList<HashedFileInfo> pendingHashedFilesQueue;
 	QTimer *hashedFilesProcessingTimer;
 	void processPendingHashedFiles();
+	
+	// Background loading support to prevent UI freeze
+	QFutureWatcher<void> *mylistLoadingWatcher;
+	QFutureWatcher<void> *animeTitlesLoadingWatcher;
+	QFutureWatcher<void> *unboundFilesLoadingWatcher;
+	void startBackgroundLoading();
+	void onMylistLoadingFinished();
+	void onAnimeTitlesLoadingFinished();
+	void onUnboundFilesLoadingFinished();
+	
+	// Data structures for background loading results
+	struct AnimeTitlesCacheData {
+		QStringList titles;
+		QMap<QString, int> titleToAid;
+	};
+	struct UnboundFileData {
+		QString filename;
+		QString filepath;
+		QString hash;
+		qint64 size;
+	};
+	QList<UnboundFileData> loadedUnboundFiles;
+	QMutex backgroundLoadingMutex; // Protect shared data between threads
 
 
 public slots:
