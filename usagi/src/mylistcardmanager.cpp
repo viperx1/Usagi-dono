@@ -1,4 +1,5 @@
 #include "mylistcardmanager.h"
+#include "animeutils.h"
 #include "logger.h"
 #include "main.h"
 #include <QSqlDatabase>
@@ -415,19 +416,7 @@ static QList<AnimeCard::TagInfo> parseTags(const QString& tagNames, const QStrin
 
 QString MyListCardManager::determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid)
 {
-    QString animeName = nameRomaji;
-    
-    if (animeName.isEmpty() && !nameEnglish.isEmpty()) {
-        animeName = nameEnglish;
-    }
-    if (animeName.isEmpty() && !animeTitle.isEmpty()) {
-        animeName = animeTitle;
-    }
-    if (animeName.isEmpty()) {
-        animeName = QString("Anime #%1").arg(aid);
-    }
-    
-    return animeName;
+    return AnimeUtils::determineAnimeName(nameRomaji, nameEnglish, animeTitle, aid);
 }
 
 QList<AnimeCard::TagInfo> MyListCardManager::getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category)

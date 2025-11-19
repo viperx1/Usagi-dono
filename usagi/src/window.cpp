@@ -1,5 +1,6 @@
 #include "main.h"
 #include "window.h"
+#include "animeutils.h"
 #include "hasherthreadpool.h"
 #include "hasherthread.h"
 #include "crashlog.h"
@@ -2796,19 +2797,8 @@ void Window::updateOrAddMylistEntry(int lid)
 	QString startDate = q.value(14).toString();
 	QString endDate = q.value(15).toString();
 	
-	// Determine anime name (same logic as loadMylistFromDatabase)
-	if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
-	{
-		animeName = animeNameEnglish;
-	}
-	if(animeName.isEmpty() && !animeTitle.isEmpty())
-	{
-		animeName = animeTitle;
-	}
-	if(animeName.isEmpty())
-	{
-		animeName = QString("Anime #%1").arg(aid);
-	}
+	// Determine anime name using utility function
+	animeName = AnimeUtils::determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
 	
 	// Disable sorting temporarily to prevent issues during updates
 	bool sortingEnabled = mylistTreeWidget->isSortingEnabled();
@@ -3426,23 +3416,8 @@ void Window::loadMylistFromDatabase()
 			fileExists = fileInfo.exists() && fileInfo.isFile();
 		}
 		
-		// Use English name if romaji is empty
-		if(animeName.isEmpty() && !animeNameEnglish.isEmpty())
-		{
-			animeName = animeNameEnglish;
-		}
-		
-		// If anime name is still empty, try anime_titles table
-		if(animeName.isEmpty() && !animeTitle.isEmpty())
-		{
-			animeName = animeTitle;
-		}
-		
-		// If anime name is still empty, use aid
-		if(animeName.isEmpty())
-		{
-			animeName = QString("Anime #%1").arg(aid);
-		}
+		// Determine anime name using utility function
+		animeName = AnimeUtils::determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
 		
 		// Get or create the anime parent item
 		AnimeTreeWidgetItem *animeItem;

@@ -75,6 +75,7 @@ set(HEADERS
     src/animecard.h
     src/flowlayout.h
     src/mylistcardmanager.h
+    src/animeutils.h
 )
 
 # Create executable
