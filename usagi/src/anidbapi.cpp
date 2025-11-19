@@ -449,7 +449,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QStringList params = mylistAddCmd.split("&");
 			QString size, ed2k, viewed = "0", state = "0", storage = "";
 			
-			for(const QString& param : params)
+			for(const QString& param : std::as_const(params))
 			{
 				if(param.contains("size="))
 					size = param.mid(param.indexOf("size=") + 5).split("&").first();
@@ -1037,7 +1037,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QStringList params = mylistAddCmd.split("&");
 			QString size, ed2k, viewed = "0", state = "0", storage = "";
 			
-			for(const QString& param : params)
+			for(const QString& param : std::as_const(params))
 			{
 				if(param.contains("size="))
 					size = param.mid(param.indexOf("size=") + 5).split("&").first();
@@ -2735,7 +2735,7 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 		QStringList params = mylistAddCmd.split("&");
 		QString sizeStr, ed2k;
 		
-		for(const QString& param : params)
+		for(const QString& param : std::as_const(params))
 		{
 			if(param.contains("size="))
 				sizeStr = param.mid(param.indexOf("size=") + 5).split("&").first();
@@ -3406,7 +3406,7 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 	
 	int count = 0;
 	int progressInterval = 1000; // Report progress every 1000 titles
-	for(const QString &line : lines)
+	for(const QString &line : std::as_const(lines))
 	{
 		// Skip comments and empty lines
 		if(line.startsWith('#') || line.trimmed().isEmpty())
