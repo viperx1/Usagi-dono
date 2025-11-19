@@ -3,6 +3,10 @@ name: Windows Build Tests (Qt 6.8 LTS LLVM MinGW)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   build-llvm-mingw:
     runs-on: windows-latest
