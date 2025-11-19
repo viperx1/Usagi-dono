@@ -76,7 +76,7 @@ void TestBatchHashRetrieval::testBatchGetLocalFileHashes()
     QSqlQuery query(db);
     query.prepare(queryStr);
     
-    for (const QString& path : qAsConst(paths)) {
+    for (const QString& path : std::as_const(paths)) {
         query.addBindValue(path);
     }
     
@@ -124,7 +124,7 @@ void TestBatchHashRetrieval::testBatchGetLocalFileHashesPartialResults()
     QSqlQuery query(db);
     query.prepare(queryStr);
     
-    for (const QString& path : qAsConst(paths)) {
+    for (const QString& path : std::as_const(paths)) {
         query.addBindValue(path);
     }
     

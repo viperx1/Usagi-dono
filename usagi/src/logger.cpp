@@ -2,12 +2,14 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>
+#include <QMutexLocker>
 
 // Static instance pointer and mutex for thread safety
 // Note: The instance is intentionally never deleted as it should live for the
 // application's lifetime. This is standard practice for application-level singletons.
 static Logger* s_instance = nullptr;
-static QMutex s_instanceMutex;
+// Using Q_GLOBAL_STATIC ensures proper construction and destruction order
+Q_GLOBAL_STATIC(QMutex, s_instanceMutex)
 
 Logger::Logger() : QObject(nullptr)
 {
@@ -20,7 +22,7 @@ Logger* Logger::instance()
     // across threads (see Qt documentation for QMutex memory ordering guarantees)
     if (!s_instance)
     {
-        QMutexLocker locker(&s_instanceMutex);
+        QMutexLocker locker(s_instanceMutex);
         if (!s_instance)
         {
             s_instance = new Logger();

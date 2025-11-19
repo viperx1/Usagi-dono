@@ -481,7 +481,7 @@ void TestCrashLog::testStackTraceHasFunctionNames()
     int framesWithNames = 0;
     int totalFrames = 0;
     
-    for (const QString& line : qAsConst(lines)) {
+    for (const QString& line : std::as_const(lines)) {
         // Skip the header line
         if (line.contains("Stack Trace:")) {
             continue;
@@ -513,7 +513,7 @@ void TestCrashLog::testStackTraceHasFunctionNames()
                     
                     // Check if all characters are hex digits
                     bool allHex = true;
-                    for (const QChar& c : hexPart) {
+                    for (const QChar& c : std::as_const(hexPart)) {
                         if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
                             allHex = false;
                             break;
