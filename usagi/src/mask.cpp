@@ -9,7 +9,7 @@ Mask::Mask(const QString& hexString) : mask(0)
 	setFromString(hexString);
 }
 
-Mask::Mask(uint64_t value) : mask(value & 0x00FFFFFFFFFFFFFFULL)
+Mask::Mask(uint64_t value) : mask(value & SEVEN_BYTE_MASK)
 {
 	// Mask off byte 8 (keep only lower 56 bits)
 }
@@ -49,12 +49,12 @@ void Mask::setFromString(const QString& hexString)
 	}
 	
 	// Ensure byte 8 is 0 (mask off upper 8 bits)
-	mask &= 0x00FFFFFFFFFFFFFFULL;
+	mask &= SEVEN_BYTE_MASK;
 }
 
 void Mask::setValue(uint64_t value)
 {
-	mask = value & 0x00FFFFFFFFFFFFFFULL;
+	mask = value & SEVEN_BYTE_MASK;
 }
 
 void Mask::setByte(int byteIndex, uint8_t value)
@@ -72,7 +72,7 @@ void Mask::setByte(int byteIndex, uint8_t value)
 	mask = (mask & ~byteMask) | (static_cast<uint64_t>(value) << shiftAmount);
 	
 	// Ensure byte 8 stays 0
-	mask &= 0x00FFFFFFFFFFFFFFULL;
+	mask &= SEVEN_BYTE_MASK;
 }
 
 QString Mask::toString() const
@@ -113,7 +113,7 @@ Mask Mask::operator&(const Mask& other) const
 Mask Mask::operator~() const
 {
 	// NOT operation, but keep byte 8 as 0
-	return Mask((~mask) & 0x00FFFFFFFFFFFFFFULL);
+	return Mask((~mask) & SEVEN_BYTE_MASK);
 }
 
 Mask& Mask::operator|=(const Mask& other)

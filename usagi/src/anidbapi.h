@@ -418,6 +418,12 @@ public:
 	// Auto-fetch settings
 	bool getAutoFetchEnabled();
 	void setAutoFetchEnabled(bool enabled);
+	
+private:
+	// Helper method for saving settings to database
+	void saveSetting(const QString& name, const QString& value);
+	
+public:
     /* Settings End === */
 	
 	/* === Anime Titles Start */

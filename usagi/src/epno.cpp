@@ -1,5 +1,6 @@
 #include "epno.h"
 #include "logger.h"
+#include <QMap>
 
 // Static flag to log only once
 static bool s_epnoLogged = false;
@@ -23,21 +24,18 @@ epno::epno(const QString& epnoString)
 epno::epno(int type, int number)
     : m_type(type), m_number(number), m_rawString("")
 {
-    // Generate raw string from type and number
-    QString prefix;
-    if(type == 2)
-        prefix = "S";
-    else if(type == 3)
-        prefix = "C";
-    else if(type == 4)
-        prefix = "T";
-    else if(type == 5)
-        prefix = "P";
-    else if(type == 6)
-        prefix = "O";
+    // Map of type to prefix
+    static const QMap<int, QString> typePrefixes = {
+        {2, "S"}, // Special
+        {3, "C"}, // Credit
+        {4, "T"}, // Trailer
+        {5, "P"}, // Parody
+        {6, "O"}  // Other
+    };
     
-    if(!prefix.isEmpty())
-        m_rawString = prefix + QString::number(number);
+    // Generate raw string from type and number
+    if(typePrefixes.contains(type))
+        m_rawString = typePrefixes[type] + QString::number(number);
     else
         m_rawString = QString::number(number);
 }
@@ -51,38 +49,36 @@ void epno::parse(const QString& str)
         return;
     }
     
+    // Map of prefix to type
+    static const QMap<QString, int> prefixTypes = {
+        {"S", 2}, // Special
+        {"C", 3}, // Credit
+        {"T", 4}, // Trailer
+        {"P", 5}, // Parody
+        {"O", 6}  // Other
+    };
+    
     QString upper = str.toUpper();
     QString numericPart;
     
-    // Determine type based on prefix
-    if(upper.startsWith("S"))
+    // Check for type prefix
+    if(!upper.isEmpty())
     {
-        m_type = 2;  // Special
-        numericPart = str.mid(1);
-    }
-    else if(upper.startsWith("C"))
-    {
-        m_type = 3;  // Credit
-        numericPart = str.mid(1);
-    }
-    else if(upper.startsWith("T"))
-    {
-        m_type = 4;  // Trailer
-        numericPart = str.mid(1);
-    }
-    else if(upper.startsWith("P"))
-    {
-        m_type = 5;  // Parody
-        numericPart = str.mid(1);
-    }
-    else if(upper.startsWith("O"))
-    {
-        m_type = 6;  // Other
-        numericPart = str.mid(1);
+        QString firstChar = upper.left(1);
+        if(prefixTypes.contains(firstChar))
+        {
+            m_type = prefixTypes[firstChar];
+            numericPart = str.mid(1);
+        }
+        else
+        {
+            m_type = 1;  // Regular episode
+            numericPart = str;
+        }
     }
     else
     {
-        m_type = 1;  // Regular episode
+        m_type = 1;
         numericPart = str;
     }
     
@@ -101,19 +97,19 @@ QString epno::toDisplayString() const
     if(!isValid())
         return "";
     
-    // Format based on type
+    // Map of type to display name
+    static const QMap<int, QString> typeNames = {
+        {2, "Special"},
+        {3, "Credit"},
+        {4, "Trailer"},
+        {5, "Parody"},
+        {6, "Other"}
+    };
+    
     QString numStr = QString::number(m_number);
     
-    if(m_type == 2)
-        return QString("Special %1").arg(numStr);
-    else if(m_type == 3)
-        return QString("Credit %1").arg(numStr);
-    else if(m_type == 4)
-        return QString("Trailer %1").arg(numStr);
-    else if(m_type == 5)
-        return QString("Parody %1").arg(numStr);
-    else if(m_type == 6)
-        return QString("Other %1").arg(numStr);
+    if(typeNames.contains(m_type))
+        return QString("%1 %2").arg(typeNames[m_type], numStr);
     else
         return numStr;  // Regular episode - just the number
 }

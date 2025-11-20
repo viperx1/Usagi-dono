@@ -3376,10 +3376,7 @@ void AniDBApi::onAnimeTitlesDownloaded(QNetworkReply *reply)
 	
 	// Update last download timestamp
 	lastAnimeTitlesUpdate = QDateTime::currentDateTime();
-	QSqlQuery query(db);
-	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'last_anime_titles_update', '%1');")
-				.arg(lastAnimeTitlesUpdate.toSecsSinceEpoch());
-	query.exec(q);
+	saveSetting("last_anime_titles_update", QString::number(lastAnimeTitlesUpdate.toSecsSinceEpoch()));
 	
 	LOG(QString("Anime titles updated successfully at %1").arg(lastAnimeTitlesUpdate.toString()));
 }
@@ -3509,23 +3506,11 @@ void AniDBApi::checkForNotifications()
 
 void AniDBApi::saveExportQueueState()
 {
-	QSqlQuery query(db);
-	
-	// Save isExportQueued
-	QString q1 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued', '%1');").arg(isExportQueued ? "1" : "0");
-	query.exec(q1);
-	
-	// Save notifyCheckAttempts
-	QString q2 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_check_attempts', '%1');").arg(notifyCheckAttempts);
-	query.exec(q2);
-	
-	// Save notifyCheckIntervalMs
-	QString q3 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_check_interval_ms', '%1');").arg(notifyCheckIntervalMs);
-	query.exec(q3);
-	
-	// Save exportQueuedTimestamp
-	QString q4 = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, 'export_queued_timestamp', '%1');").arg(exportQueuedTimestamp);
-	query.exec(q4);
+	// Save export queue state settings
+	saveSetting("export_queued", isExportQueued ? "1" : "0");
+	saveSetting("export_check_attempts", QString::number(notifyCheckAttempts));
+	saveSetting("export_check_interval_ms", QString::number(notifyCheckIntervalMs));
+	saveSetting("export_queued_timestamp", QString::number(exportQueuedTimestamp));
 	
 	Logger::log("[AniDB Export] Saved export queue state to database", __FILE__, __LINE__);
 }

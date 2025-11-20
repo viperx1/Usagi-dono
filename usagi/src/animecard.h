@@ -37,19 +37,6 @@ public:
     explicit AnimeCard(QWidget *parent = nullptr);
     virtual ~AnimeCard();
     
-    // Setters for anime data
-    void setAnimeId(int aid);
-    void setAnimeTitle(const QString& title);
-    void setAnimeType(const QString& type);
-    void setAired(const aired& airedDates);
-    void setAiredText(const QString& airedText);
-    void setStatistics(int normalEpisodes, int totalNormalEpisodes, int normalViewed, int otherEpisodes, int otherViewed);
-    void setPoster(const QPixmap& pixmap);
-    void setRating(const QString& rating);
-    
-    // Warning indicator for missing metadata
-    void setNeedsFetch(bool needsFetch);
-    
     // Tag structure for storing tag data
     struct TagInfo {
         QString name;
@@ -61,8 +48,6 @@ public:
             return weight > other.weight;
         }
     };
-    
-    void setTags(const QList<TagInfo>& tags);
     
     // File and Episode management structures
     struct FileInfo {
@@ -87,9 +72,6 @@ public:
         QList<FileInfo> files;  // Multiple files per episode
     };
     
-    void addEpisode(const EpisodeInfo& episode);
-    void clearEpisodes();
-    
     // Getters
     int getAnimeId() const { return m_animeId; }
     QString getAnimeTitle() const { return m_animeTitle; }
@@ -110,6 +92,21 @@ public:
     static QSize getCardSize() { return QSize(600, 450); }  // Increased from 500x350 to accommodate 50% larger poster
     QSize sizeHint() const override { return getCardSize(); }
     QSize minimumSizeHint() const override { return getCardSize(); }
+    
+public slots:
+    // Slots for anime data updates
+    void setAnimeId(int aid);
+    void setAnimeTitle(const QString& title);
+    void setAnimeType(const QString& type);
+    void setAired(const aired& airedDates);
+    void setAiredText(const QString& airedText);
+    void setStatistics(int normalEpisodes, int totalNormalEpisodes, int normalViewed, int otherEpisodes, int otherViewed);
+    void setPoster(const QPixmap& pixmap);
+    void setRating(const QString& rating);
+    void setNeedsFetch(bool needsFetch);
+    void setTags(const QList<TagInfo>& tags);
+    void addEpisode(const EpisodeInfo& episode);
+    void clearEpisodes();
     
 signals:
     void episodeClicked(int lid);
