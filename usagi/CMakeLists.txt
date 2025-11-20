@@ -52,6 +52,7 @@ set(SOURCES
     src/animecard.cpp
     src/flowlayout.cpp
     src/mylistcardmanager.cpp
+    src/watchchunkmanager.cpp
 )
 
 # Header files
@@ -75,6 +76,7 @@ set(HEADERS
     src/animecard.h
     src/flowlayout.h
     src/mylistcardmanager.h
+    src/watchchunkmanager.h
 )
 
 # Create executable

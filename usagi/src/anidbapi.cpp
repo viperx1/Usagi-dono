@@ -158,6 +158,22 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `playback_duration` INTEGER DEFAULT 0");
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `last_played` INTEGER DEFAULT 0");
 		
+		// Add local watch status column - separate from AniDB viewed status
+		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_watched` INTEGER DEFAULT 0");
+		
+		// Create watch_chunks table for chunk-based watch tracking
+		// Tracks which 1-minute chunks of a file have been watched
+		query.exec("CREATE TABLE IF NOT EXISTS `watch_chunks`("
+		           "`id` INTEGER PRIMARY KEY AUTOINCREMENT, "
+		           "`lid` INTEGER NOT NULL, "
+		           "`chunk_index` INTEGER NOT NULL, "
+		           "`watched_at` INTEGER NOT NULL, "
+		           "UNIQUE(`lid`, `chunk_index`)"
+		           ");");
+		
+		// Create index for efficient chunk lookups
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_watch_chunks_lid` ON `watch_chunks`(`lid`);");
+		
 		Logger::log("[AniDB Init] Committing database transaction", __FILE__, __LINE__);
 		db.commit();
 		Logger::log("[AniDB Init] Database transaction committed", __FILE__, __LINE__);
