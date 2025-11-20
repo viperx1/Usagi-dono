@@ -186,12 +186,29 @@ static constexpr uint64_t SEVEN_BYTE_MASK = 0x00FFFFFFFFFFFFFFULL;
 
 **Impact**: Replaced 5 instances with named constant, making byte 8 masking intent explicit
 
+### 9. Play Button Icon Constants
+**Files**: `usagi/src/window.h/.cpp`
+
+**Problem**: Play button icons (▶, ✓, ✗, "") were hardcoded 22+ times throughout window.cpp, making updates difficult and error-prone.
+
+**Solution**: Created `PlayIcons` namespace with named constants:
+```cpp
+namespace PlayIcons {
+    constexpr const char* PLAY = "▶";       // Play button
+    constexpr const char* WATCHED = "✓";    // Checkmark
+    constexpr const char* NOT_FOUND = "✗";  // X mark
+    constexpr const char* EMPTY = "";       // No icon
+}
+```
+
+**Impact**: Replaced 22+ hardcoded icon strings with named constants, centralizing icon definitions
+
 ## Statistics
 
 ### Code Reduction
-- **Total lines eliminated**: 160+ lines
+- **Total lines eliminated**: 170+ lines
 - **MyListCardManager**: ~60 lines
-- **Window**: ~36 lines
+- **Window**: ~36 lines (utilities) + 22+ icon replacements
 - **AniDBApi settings**: ~17 lines
 - **AnimeCard**: Reorganized (moved to slots)
 - **epno**: ~4 lines
@@ -199,11 +216,12 @@ static constexpr uint64_t SEVEN_BYTE_MASK = 0x00FFFFFFFFFFFFFFULL;
 - **FlowLayout**: ~6 lines
 - **HasherThread**: ~9 lines (reduced complexity)
 - **Mask**: Named constant (improved clarity)
+- **PlayIcons**: Centralized constants (improved maintainability)
 
-### Files Modified (11 source files + headers + docs)
+### Files Modified (12 source files + headers + docs)
 - `usagi/src/animecard.h` - Converted setters to slots
 - `usagi/src/mylistcardmanager.h/.cpp` - Added helper functions
-- `usagi/src/window.cpp` - Uses shared utility
+- `usagi/src/window.h/.cpp` - Shared utilities, icon constants (NEW)
 - `usagi/src/animeutils.h` - New shared utility header (NEW)
 - `usagi/src/anidbapi.h` - Added saveSetting() helper
 - `usagi/src/anidbapi.cpp` - Uses saveSetting() helper
@@ -261,7 +279,7 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 
 ## Benefits
 
-1. **Reduced Duplication**: 160+ lines of duplicate code eliminated
+1. **Reduced Duplication**: 170+ lines of duplicate code eliminated
 2. **Improved Maintainability**: Changes to logic only need to be made in one place
 3. **Better Architecture**: Slots enable signal-based communication
 4. **Clearer Intent**: Helper functions and maps have descriptive names
@@ -270,7 +288,8 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 7. **Data-Driven**: Maps replace procedural if-else chains
 8. **Future Extensibility**: Easy to add observers, new types, or settings
 9. **Thread Safety**: Consistent cleanup patterns prevent memory leaks
-10. **Named Constants**: Magic numbers replaced with self-documenting constants
+10. **Named Constants**: Magic numbers and strings replaced with self-documenting constants
+11. **Centralized UI Elements**: Icon changes require updates in only one place
 
 ## Testing
 
