@@ -43,6 +43,7 @@
 #include "animecard.h"
 #include "flowlayout.h"
 #include "mylistcardmanager.h"
+#include "uicolors.h"
 //#include "hasherthread.h"
 
 // Forward declarations

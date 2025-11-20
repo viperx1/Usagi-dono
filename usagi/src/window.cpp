@@ -857,11 +857,11 @@ void Window::insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeIte
 				epRange = QString("%1-%2").arg(rangeStart).arg(rangeEnd);
 			}
 			placeholderItem->setText(COL_EPISODE, epRange);
-			placeholderItem->setForeground(COL_EPISODE, QBrush(QColor(Qt::red)));
+			placeholderItem->setForeground(COL_EPISODE, QBrush(UIColors::FILE_NOT_FOUND));
 			
 			// Column 3: Episode title in red
 			placeholderItem->setText(COL_EPISODE_TITLE, "Missing");
-			placeholderItem->setForeground(COL_EPISODE_TITLE, QBrush(QColor(Qt::red)));
+			placeholderItem->setForeground(COL_EPISODE_TITLE, QBrush(UIColors::FILE_NOT_FOUND));
 			
 			// Set data for sorting - use negative value to sort before real episodes
 			placeholderItem->setData(0, Qt::UserRole, -rangeStart);
@@ -3597,16 +3597,16 @@ void Window::loadMylistFromDatabase()
 		switch(type)
 		{
 			case FileTreeWidgetItem::Video:
-				fileColor = QColor(230, 240, 255); // Light blue
+				fileColor = UIColors::FILE_QUALITY_HIGH; // Light blue
 				break;
 			case FileTreeWidgetItem::Subtitle:
-				fileColor = QColor(255, 250, 230); // Light yellow
+				fileColor = UIColors::FILE_QUALITY_MEDIUM; // Light yellow
 				break;
 			case FileTreeWidgetItem::Audio:
-				fileColor = QColor(255, 230, 240); // Light pink
+				fileColor = UIColors::FILE_QUALITY_LOW; // Light pink
 				break;
 			case FileTreeWidgetItem::Other:
-				fileColor = QColor(240, 240, 240); // Light gray
+				fileColor = UIColors::FILE_QUALITY_UNKNOWN; // Light gray
 				break;
 		}
 		
@@ -3648,7 +3648,7 @@ void Window::loadMylistFromDatabase()
 		if (type == FileTreeWidgetItem::Video) {
 			if (!fileExists) {
 				fileItem->setText(COL_PLAY, PlayIcons::NOT_FOUND); // X for file not found
-				fileItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red))); // Red color for disabled
+				fileItem->setForeground(COL_PLAY, QBrush(UIColors::FILE_NOT_FOUND)); // Red color for disabled
 				fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 			} else if (viewed) {
 				fileItem->setText(COL_PLAY, PlayIcons::WATCHED); // Checkmark for watched
@@ -3731,7 +3731,7 @@ void Window::loadMylistFromDatabase()
 			if(!hasAvailableFile)
 			{
 				episodeItem->setText(COL_PLAY, PlayIcons::NOT_FOUND); // X if no files exist
-				episodeItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red)));
+				episodeItem->setForeground(COL_PLAY, QBrush(UIColors::FILE_NOT_FOUND));
 				episodeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 			}
 			else if(episodeViewed)
@@ -3870,7 +3870,7 @@ void Window::loadMylistFromDatabase()
 		if(!hasAnyAvailableFile && (normalEpisodes > 0 || otherEpisodes > 0))
 		{
 			animeItem->setText(COL_PLAY, PlayIcons::NOT_FOUND); // X if no files exist for any episode
-			animeItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red)));
+			animeItem->setForeground(COL_PLAY, QBrush(UIColors::FILE_NOT_FOUND));
 			animeItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
 		}
 		else if(allNormalWatched)
