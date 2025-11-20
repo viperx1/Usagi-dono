@@ -3701,7 +3701,7 @@ void Window::loadMylistFromDatabase()
 					hasAvailableFile = true;
 				}
 				// Check if file is locally watched (has checkmark in play column)
-				if(fileItem->text(COL_PLAY) == "✓")
+				if(fileItem->text(COL_PLAY) == PlayIcons::WATCHED)
 				{
 					episodeViewed = true;
 				}
@@ -4676,11 +4676,11 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 			
 			// Check if file doesn't exist
 			QString currentText = item->text(PLAY_COLUMN);
-			if (currentText == "✗") {
+			if (currentText == PlayIcons::NOT_FOUND) {
 				// Keep the X if file doesn't exist (sort key already set to 2)
 				return;
 			}
-			item->setText(PLAY_COLUMN, localWatched ? "✓" : "▶");
+			item->setText(PLAY_COLUMN, localWatched ? PlayIcons::WATCHED : PlayIcons::PLAY);
 			item->setData(PLAY_COLUMN, Qt::UserRole, localWatched ? 1 : 0); // Update sort key
 		}
 	}
@@ -4694,7 +4694,7 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 				hasVideoFile = true;
 				// Check play button status (✓ means locally watched)
-				if (fileItem->text(COL_PLAY) == "✓") {
+				if (fileItem->text(COL_PLAY) == PlayIcons::WATCHED) {
 					episodeViewed = true;
 					break;
 				}
@@ -4702,10 +4702,10 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		}
 		
 		if (hasVideoFile) {
-			item->setText(PLAY_COLUMN, episodeViewed ? "✓" : "▶");
+			item->setText(PLAY_COLUMN, episodeViewed ? PlayIcons::WATCHED : PlayIcons::PLAY);
 			item->setData(PLAY_COLUMN, Qt::UserRole, episodeViewed ? 1 : 0); // Update sort key
 		} else {
-			item->setText(PLAY_COLUMN, "");
+			item->setText(PLAY_COLUMN, PlayIcons::EMPTY);
 			item->setData(PLAY_COLUMN, Qt::UserRole, 2); // Update sort key (unavailable)
 		}
 		
@@ -4730,7 +4730,7 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 					hasVideoFile = true;
 					// Check play button status (✓ means locally watched)
-					if (fileItem->text(COL_PLAY) == "✓") {
+					if (fileItem->text(COL_PLAY) == PlayIcons::WATCHED) {
 						episodeViewed = true;
 						break;
 					}
@@ -4747,10 +4747,10 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		
 		if (totalEpisodes > 0) {
 			if (viewedEpisodes == totalEpisodes) {
-				item->setText(PLAY_COLUMN, "✓");
+				item->setText(PLAY_COLUMN, PlayIcons::WATCHED);
 				item->setData(PLAY_COLUMN, Qt::UserRole, 1); // Update sort key
 			} else {
-				item->setText(PLAY_COLUMN, "▶");
+				item->setText(PLAY_COLUMN, PlayIcons::PLAY);
 				item->setData(PLAY_COLUMN, Qt::UserRole, 0); // Update sort key
 			}
 		} else {
