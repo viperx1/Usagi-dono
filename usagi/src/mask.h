@@ -117,6 +117,9 @@ public:
 	bool operator!=(const Mask& other) const;
 
 private:
+	// Mask for 7 bytes (56 bits), byte 8 always 0
+	static constexpr uint64_t SEVEN_BYTE_MASK = 0x00FFFFFFFFFFFFFFULL;
+	
 	uint64_t mask; ///< 64-bit storage for 7-byte mask (byte 8 always 0)
 };
 

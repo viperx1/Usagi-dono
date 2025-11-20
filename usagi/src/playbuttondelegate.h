@@ -25,6 +25,9 @@ signals:
     void playButtonClicked(const QModelIndex &index);
 
 private:
+    // Helper to get tree widget from model
+    QTreeWidget* getTreeWidget(QAbstractItemModel *model) const;
+    
     mutable QModelIndex m_hoveredIndex;
     mutable bool m_isPressed;
 };

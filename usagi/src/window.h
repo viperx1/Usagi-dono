@@ -43,6 +43,7 @@
 #include "animecard.h"
 #include "flowlayout.h"
 #include "mylistcardmanager.h"
+#include "uicolors.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -64,6 +65,14 @@ enum MyListColumn {
     COL_AIRED = 9,
     COL_LAST_PLAYED = 10
 };
+
+// Play button icons used in tree widget
+namespace PlayIcons {
+    constexpr const char* PLAY = "▶";       // Play button (file exists, not watched)
+    constexpr const char* WATCHED = "✓";    // Checkmark (file watched)
+    constexpr const char* NOT_FOUND = "✗";  // X mark (file not found)
+    constexpr const char* EMPTY = "";       // No button/icon
+}
 
 class hashes_ : public QTableWidget
 {

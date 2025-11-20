@@ -9,6 +9,11 @@ PlayButtonDelegate::PlayButtonDelegate(QObject *parent)
 {
 }
 
+QTreeWidget* PlayButtonDelegate::getTreeWidget(QAbstractItemModel *model) const
+{
+    return qobject_cast<QTreeWidget*>(const_cast<QAbstractItemModel*>(model)->parent());
+}
+
 void PlayButtonDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
                                 const QModelIndex &index) const
 {
@@ -65,14 +70,14 @@ bool PlayButtonDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
     if (event->type() == QEvent::MouseMove) {
         m_hoveredIndex = index;
         // Trigger repaint for hover effect
-        if (QTreeWidget *tree = qobject_cast<QTreeWidget*>(const_cast<QAbstractItemModel*>(model)->parent())) {
+        if (QTreeWidget *tree = getTreeWidget(model)) {
             tree->viewport()->update(option.rect);
         }
         return true;
     }
     else if (event->type() == QEvent::Leave) {
         m_hoveredIndex = QModelIndex();
-        if (QTreeWidget *tree = qobject_cast<QTreeWidget*>(const_cast<QAbstractItemModel*>(model)->parent())) {
+        if (QTreeWidget *tree = getTreeWidget(model)) {
             tree->viewport()->update();
         }
         return true;
@@ -82,7 +87,7 @@ bool PlayButtonDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
         if (mouseEvent->button() == Qt::LeftButton) {
             m_isPressed = true;
             m_hoveredIndex = index;
-            if (QTreeWidget *tree = qobject_cast<QTreeWidget*>(const_cast<QAbstractItemModel*>(model)->parent())) {
+            if (QTreeWidget *tree = getTreeWidget(model)) {
                 tree->viewport()->update(option.rect);
             }
             return true;
@@ -95,7 +100,7 @@ bool PlayButtonDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
             if (m_hoveredIndex == index) {
                 emit playButtonClicked(index);
             }
-            if (QTreeWidget *tree = qobject_cast<QTreeWidget*>(const_cast<QAbstractItemModel*>(model)->parent())) {
+            if (QTreeWidget *tree = getTreeWidget(model)) {
                 tree->viewport()->update(option.rect);
             }
             return true;

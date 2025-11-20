@@ -1,4 +1,5 @@
 #include "mylistcardmanager.h"
+#include "animeutils.h"
 #include "logger.h"
 #include "main.h"
 #include <QSqlDatabase>
@@ -413,6 +414,56 @@ static QList<AnimeCard::TagInfo> parseTags(const QString& tagNames, const QStrin
     return tags;
 }
 
+QString MyListCardManager::determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid)
+{
+    return AnimeUtils::determineAnimeName(nameRomaji, nameEnglish, animeTitle, aid);
+}
+
+QList<AnimeCard::TagInfo> MyListCardManager::getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category)
+{
+    QList<AnimeCard::TagInfo> tags = parseTags(tagNames, tagIds, tagWeights);
+    
+    if (!tags.isEmpty()) {
+        return tags;
+    }
+    
+    // Fallback to category if no tag data
+    if (category.isEmpty()) {
+        return tags;  // Empty list
+    }
+    
+    QList<AnimeCard::TagInfo> categoryTags;
+    QStringList categoryNames = category.split(',');
+    int weight = 1000;  // Arbitrary high weight for category fallback
+    
+    for (const QString& catName : std::as_const(categoryNames)) {
+        AnimeCard::TagInfo tag;
+        tag.name = catName.trimmed();
+        tag.id = 0;
+        tag.weight = weight--;
+        categoryTags.append(tag);
+    }
+    
+    return categoryTags;
+}
+
+void MyListCardManager::updateCardAiredDates(AnimeCard* card, const QString& startDate, const QString& endDate)
+{
+    if (!startDate.isEmpty()) {
+        aired airedDates(startDate, endDate);
+        card->setAired(airedDates);
+    } else {
+        card->setAiredText("Unknown");
+        
+        // Track that this anime needs metadata if we have access to aid
+        int aid = card->getAnimeId();
+        if (aid > 0) {
+            QMutexLocker locker(&m_mutex);
+            m_animeNeedingMetadata.insert(aid);
+        }
+    }
+}
+
 AnimeCard* MyListCardManager::createCard(int aid)
 {
     QSqlDatabase db = QSqlDatabase::database();
@@ -452,16 +503,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QString tagIdList = q.value(13).toString();
     QString tagWeightList = q.value(14).toString();
     
-    // Determine anime name
-    if (animeName.isEmpty() && !animeNameEnglish.isEmpty()) {
-        animeName = animeNameEnglish;
-    }
-    if (animeName.isEmpty() && !animeTitle.isEmpty()) {
-        animeName = animeTitle;
-    }
-    if (animeName.isEmpty()) {
-        animeName = QString("Anime #%1").arg(aid);
-    }
+    // Determine anime name using helper
+    animeName = determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
     
     // Create card
     AnimeCard *card = new AnimeCard(nullptr);
@@ -476,32 +519,13 @@ AnimeCard* MyListCardManager::createCard(int aid)
         m_animeNeedingMetadata.insert(aid);
     }
     
-    // Set aired dates
-    if (!startDate.isEmpty()) {
-        aired airedDates(startDate, endDate);
-        card->setAired(airedDates);
-    } else {
-        card->setAiredText("Unknown");
-        m_animeNeedingMetadata.insert(aid);
-    }
+    // Set aired dates using helper
+    updateCardAiredDates(card, startDate, endDate);
     
-    // Set tags from parsed tag lists (prefer this over category)
-    QList<AnimeCard::TagInfo> tags = parseTags(tagNameList, tagIdList, tagWeightList);
+    // Set tags using helper (handles category fallback)
+    QList<AnimeCard::TagInfo> tags = getTagsOrCategoryFallback(tagNameList, tagIdList, tagWeightList, category);
     if (!tags.isEmpty()) {
         card->setTags(tags);
-    } else if (!category.isEmpty()) {
-        // Fallback to category if no tag data
-        QList<AnimeCard::TagInfo> categoryTags;
-        QStringList categoryNames = category.split(',');
-        int weight = 1000;  // Arbitrary high weight for category fallback
-        for (const QString& catName : std::as_const(categoryNames)) {
-            AnimeCard::TagInfo tag;
-            tag.name = catName.trimmed();
-            tag.id = 0;
-            tag.weight = weight--;
-            categoryTags.append(tag);
-        }
-        card->setTags(categoryTags);
     }
     
     // Set rating
@@ -610,13 +634,8 @@ void MyListCardManager::updateCardFromDatabase(int aid)
     QString tagIdList = q.value(12).toString();
     QString tagWeightList = q.value(13).toString();
     
-    // Update anime name
-    if (animeName.isEmpty() && !animeNameEnglish.isEmpty()) {
-        animeName = animeNameEnglish;
-    }
-    if (animeName.isEmpty() && !animeTitle.isEmpty()) {
-        animeName = animeTitle;
-    }
+    // Update anime name using helper
+    animeName = determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
     if (!animeName.isEmpty()) {
         card->setAnimeTitle(animeName);
     }
@@ -626,29 +645,16 @@ void MyListCardManager::updateCardFromDatabase(int aid)
         card->setAnimeType(typeName);
     }
     
-    // Update aired dates
+    // Update aired dates using helper
     if (!startDate.isEmpty()) {
         aired airedDates(startDate, endDate);
         card->setAired(airedDates);
     }
     
-    // Update tags from parsed tag lists (prefer this over category)
-    QList<AnimeCard::TagInfo> tags = parseTags(tagNameList, tagIdList, tagWeightList);
+    // Update tags using helper (handles category fallback)
+    QList<AnimeCard::TagInfo> tags = getTagsOrCategoryFallback(tagNameList, tagIdList, tagWeightList, category);
     if (!tags.isEmpty()) {
         card->setTags(tags);
-    } else if (!category.isEmpty()) {
-        // Fallback to category if no tag data
-        QList<AnimeCard::TagInfo> categoryTags;
-        QStringList categoryNames = category.split(',');
-        int weight = 1000;  // Arbitrary high weight for category fallback
-        for (const QString& catName : std::as_const(categoryNames)) {
-            AnimeCard::TagInfo tag;
-            tag.name = catName.trimmed();
-            tag.id = 0;
-            tag.weight = weight--;
-            categoryTags.append(tag);
-        }
-        card->setTags(categoryTags);
     }
     
     // Update rating

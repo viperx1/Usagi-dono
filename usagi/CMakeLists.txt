@@ -77,6 +77,8 @@ set(HEADERS
     src/flowlayout.h
     src/mylistcardmanager.h
     src/watchchunkmanager.h
+    src/animeutils.h
+    src/uicolors.h
 )
 
 # Create executable

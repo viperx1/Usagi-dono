@@ -1,6 +1,7 @@
 #include "animecard.h"
 #include "playbuttondelegate.h"
 #include "logger.h"
+#include "uicolors.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
@@ -284,7 +285,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setText(1, "▶"); // Play button if any file exists
         episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the play button
         episodeItem->setData(1, Qt::UserRole, 1);  // 1 means show button
-        episodeItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
+        episodeItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         // Store the lid of the first available file for playback
         episodeItem->setData(2, Qt::UserRole, existingFileLid);
     } else {
@@ -292,7 +293,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setText(1, "✗"); // X for missing files
         episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the marker
         episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
-        episodeItem->setForeground(1, QBrush(QColor(Qt::red))); // Red for missing
+        episodeItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND)); // Red for missing
         episodeItem->setData(2, Qt::UserRole, 0);  // 0 means it's an episode with no files
     }
     
@@ -316,10 +317,10 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         
         if (fileExists) {
             fileItem->setText(1, "▶"); // Play button for existing files
-            fileItem->setForeground(1, QBrush(QColor(0, 150, 0))); // Green for available
+            fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         } else {
             fileItem->setText(1, "✗"); // X for missing files
-            fileItem->setForeground(1, QBrush(QColor(Qt::red)));
+            fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
         }
         
         // Format file text with version indicator
@@ -362,7 +363,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         
         // Color code file text based on state
         if (file.viewed) {
-            fileItem->setForeground(2, QBrush(QColor(0, 150, 0))); // Green for viewed
+            fileItem->setForeground(2, QBrush(UIColors::FILE_WATCHED)); // Green for viewed
         }
         
         // Add tooltip with file info
