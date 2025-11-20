@@ -257,23 +257,47 @@ void MyListCardManager::onAnimeUpdated(int aid)
 
 void MyListCardManager::onFetchDataRequested(int aid)
 {
-    LOG(QString("[MyListCardManager] Manual fetch requested for anime %1").arg(aid));
+    LOG(QString("[MyListCardManager] Fetch data requested for anime %1").arg(aid));
     
     QMutexLocker locker(&m_mutex);
     
-    bool needsMetadata = false;
-    bool needsPoster = false;
+    // Check what data is missing
+    bool needsMetadata = m_animeNeedingMetadata.contains(aid);
+    bool needsPoster = m_animeNeedingPoster.contains(aid);
+    bool hasEpisodesNeedingData = false;
     
-    // Request metadata if not already requested
+    // Check if any episodes need data
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        q.prepare("SELECT DISTINCT e.eid FROM mylist m "
+                 "LEFT JOIN episode e ON m.eid = e.eid "
+                 "WHERE m.aid = ? AND (e.name IS NULL OR e.name = '' OR e.epno IS NULL OR e.epno = '')");
+        q.addBindValue(aid);
+        if (q.exec() && q.next()) {
+            hasEpisodesNeedingData = true;
+        }
+    }
+    
+    LOG(QString("[MyListCardManager] Data check for aid=%1: needsMetadata=%2, needsPoster=%3, hasEpisodesNeedingData=%4, alreadyRequested=%5")
+        .arg(aid).arg(needsMetadata).arg(needsPoster).arg(hasEpisodesNeedingData).arg(m_animeMetadataRequested.contains(aid)));
+    
+    bool requestedAnything = false;
+    
+    // Request metadata if needed and not already requested
     if (!m_animeMetadataRequested.contains(aid)) {
         m_animeMetadataRequested.insert(aid);
         needsMetadata = true;
+        requestedAnything = true;
+        LOG(QString("[MyListCardManager] Will request anime metadata for aid=%1").arg(aid));
     }
     
     // Request poster if needed and not already downloaded
     if (m_animeNeedingPoster.contains(aid) && m_animePicnames.contains(aid)) {
         QString picname = m_animePicnames[aid];
         needsPoster = true;
+        requestedAnything = true;
+        LOG(QString("[MyListCardManager] Will download poster for aid=%1, picname=%2").arg(aid).arg(picname));
         locker.unlock();
         
         if (needsMetadata) {
@@ -287,6 +311,10 @@ void MyListCardManager::onFetchDataRequested(int aid)
         if (needsMetadata) {
             requestAnimeMetadata(aid);
         }
+    }
+    
+    if (!requestedAnything) {
+        LOG(QString("[MyListCardManager] No data needs to be fetched for aid=%1 (already complete or requested)").arg(aid));
     }
 }
 

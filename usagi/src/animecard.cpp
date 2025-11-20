@@ -9,6 +9,8 @@
 #include <QTreeWidgetItem>
 #include <QDateTime>
 #include <QFile>
+#include <QScreen>
+#include <QGuiApplication>
 
 AnimeCard::AnimeCard(QWidget *parent)
     : QFrame(parent)
@@ -558,18 +560,21 @@ void AnimeCard::mousePressEvent(QMouseEvent *event)
         QPoint pos = event->pos();
         if (!m_isHidden && m_posterLabel->geometry().contains(pos) && m_posterLabel->isVisible()) {
             showPosterOverlay();
+            // Don't propagate to parent - we handled it
+            event->accept();
             return;
         }
         
         // Emit signal when card is clicked (but not when episode tree is clicked or poster is clicked)
         if (!m_episodeTree->geometry().contains(pos)) {
+            LOG(QString("[AnimeCard] Card clicked for aid=%1, m_needsFetch=%2").arg(m_animeId).arg(m_needsFetch));
             emit cardClicked(m_animeId);
+            
             // Auto-fetch missing data when card is clicked if data is needed
-            if (m_needsFetch) {
-                LOG(QString("[AnimeCard] Emitting fetchDataRequested for aid=%1 (m_needsFetch=%2)")
-                    .arg(m_animeId).arg(m_needsFetch));
-                emit fetchDataRequested(m_animeId);
-            }
+            // Always emit fetchDataRequested - let MyListCardManager decide what needs fetching
+            LOG(QString("[AnimeCard] Emitting fetchDataRequested for aid=%1 (m_needsFetch=%2)")
+                .arg(m_animeId).arg(m_needsFetch));
+            emit fetchDataRequested(m_animeId);
         }
     }
     QFrame::mousePressEvent(event);
@@ -679,7 +684,7 @@ void AnimeCard::showPosterOverlay()
         }
         
         m_posterOverlay = new QLabel(topWidget);
-        m_posterOverlay->setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint);
+        m_posterOverlay->setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         m_posterOverlay->setAttribute(Qt::WA_TranslucentBackground);
         m_posterOverlay->setScaledContents(false);
         m_posterOverlay->setAlignment(Qt::AlignCenter);
@@ -699,6 +704,34 @@ void AnimeCard::showPosterOverlay()
     // Center the overlay over the poster label position, using original poster dimensions
     int x = globalPos.x() + (m_posterLabel->width() - originalSize.width()) / 2;
     int y = globalPos.y() + (m_posterLabel->height() - originalSize.height()) / 2;
+    
+    // Get screen geometry to ensure overlay stays within screen bounds
+    QScreen *screen = QGuiApplication::screenAt(globalPos);
+    if (!screen) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    
+    if (screen) {
+        QRect screenGeometry = screen->geometry();
+        
+        // Adjust x position if overlay goes off right edge of screen
+        if (x + originalSize.width() > screenGeometry.right()) {
+            x = screenGeometry.right() - originalSize.width();
+        }
+        // Adjust x position if overlay goes off left edge of screen
+        if (x < screenGeometry.left()) {
+            x = screenGeometry.left();
+        }
+        
+        // Adjust y position if overlay goes off bottom edge of screen
+        if (y + originalSize.height() > screenGeometry.bottom()) {
+            y = screenGeometry.bottom() - originalSize.height();
+        }
+        // Adjust y position if overlay goes off top edge of screen
+        if (y < screenGeometry.top()) {
+            y = screenGeometry.top();
+        }
+    }
     
     m_posterOverlay->setGeometry(x, y, originalSize.width(), originalSize.height());
     
