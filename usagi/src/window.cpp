@@ -5318,11 +5318,11 @@ void Window::onPlayAnimeFromCard(int aid)
 	}
 	
 	QSqlQuery q(db);
-	q.prepare("SELECT m.lid, e.epno, m.local_watched, lf.path "
+	q.prepare("SELECT m.lid, e.epno, m.local_watched, lf.path, m.eid "
 	          "FROM mylist m "
 	          "LEFT JOIN episode e ON m.eid = e.eid "
 	          "LEFT JOIN local_files lf ON m.local_file = lf.id "
-	          "WHERE m.aid = ? AND lf.path IS NOT NULL "
+	          "WHERE m.aid = ? AND lf.path IS NOT NULL AND e.epno IS NOT NULL "
 	          "ORDER BY e.epno, m.lid");
 	q.addBindValue(aid);
 	
@@ -5332,12 +5332,13 @@ void Window::onPlayAnimeFromCard(int aid)
 			int lid = q.value(0).toInt();
 			int localWatched = q.value(2).toInt();
 			QString localPath = q.value(3).toString();
+			int eid = q.value(4).toInt();
 			
 			// Check if file exists
 			if (!localPath.isEmpty() && QFile::exists(localPath)) {
 				if (localWatched == 0) {
 					// Found first unwatched episode with available file
-					LOG(QString("Playing first unwatched episode LID: %1").arg(lid));
+					LOG(QString("Playing first unwatched episode LID: %1, EID: %2").arg(lid).arg(eid));
 					startPlaybackForFile(lid);
 					return;
 				}
@@ -5349,15 +5350,16 @@ void Window::onPlayAnimeFromCard(int aid)
 		if (q.isValid()) {
 			int lid = q.value(0).toInt();
 			QString localPath = q.value(3).toString();
+			int eid = q.value(4).toInt();
 			if (!localPath.isEmpty() && QFile::exists(localPath)) {
-				LOG(QString("All episodes watched, playing first episode LID: %1").arg(lid));
+				LOG(QString("All episodes watched, playing first episode LID: %1, EID: %2").arg(lid).arg(eid));
 				startPlaybackForFile(lid);
 				return;
 			}
 		}
 	}
 	
-	LOG(QString("No playable episodes found for anime ID: %1").arg(aid));
+	LOG(QString("No playable episodes found for anime ID: %1 (files with episode data only)").arg(aid));
 }
 
 void Window::onResetWatchSession(int aid)
