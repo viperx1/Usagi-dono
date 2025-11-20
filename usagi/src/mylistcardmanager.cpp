@@ -701,7 +701,8 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
                         "f.filename, m.last_played, "
                         "lf.path as local_file_path, "
                         "f.resolution, f.quality, "
-                        "g.name as group_name "
+                        "g.name as group_name, "
+                        "m.local_watched "
                         "FROM mylist m "
                         "LEFT JOIN episode e ON m.eid = e.eid "
                         "LEFT JOIN file f ON m.fid = f.fid "
@@ -731,6 +732,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
             QString resolution = episodeQuery.value(11).toString();
             QString quality = episodeQuery.value(12).toString();
             QString groupName = episodeQuery.value(13).toString();
+            int localWatched = episodeQuery.value(14).toInt();
             
             // Get or create episode entry
             if (!episodeMap.contains(eid)) {
@@ -767,6 +769,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
             }
             
             fileInfo.viewed = (viewed != 0);
+            fileInfo.localWatched = (localWatched != 0);
             fileInfo.storage = !localFilePath.isEmpty() ? localFilePath : storage;
             fileInfo.localFilePath = localFilePath;  // Store local file path for existence check
             fileInfo.lastPlayed = lastPlayed;

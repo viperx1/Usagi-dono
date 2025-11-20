@@ -56,6 +56,7 @@ public:
         QString fileName;
         QString state;
         bool viewed;
+        bool localWatched;  // Local watch status (chunk-based tracking)
         QString storage;
         QString localFilePath;  // Path to local file if tracked
         qint64 lastPlayed;
@@ -107,11 +108,14 @@ public slots:
     void setTags(const QList<TagInfo>& tags);
     void addEpisode(const EpisodeInfo& episode);
     void clearEpisodes();
+    void updateNextEpisodeIndicator();  // Update which episode will play next
     
 signals:
     void episodeClicked(int lid);
     void cardClicked(int aid);
     void fetchDataRequested(int aid);
+    void playAnimeRequested(int aid);  // Play next unwatched episode
+    void resetWatchSessionRequested(int aid);  // Reset local watch status
     
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -144,6 +148,9 @@ private:
     QLabel *m_tagsLabel;
     QLabel *m_statsLabel;
     QLabel *m_warningLabel;  // Warning indicator for missing metadata
+    QLabel *m_nextEpisodeLabel;  // Shows which episode will play next
+    QPushButton *m_playButton;  // Play button for the anime
+    QPushButton *m_resetSessionButton;  // Reset watch session button
     QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy
     PlayButtonDelegate *m_playButtonDelegate;  // Delegate for play button column
     

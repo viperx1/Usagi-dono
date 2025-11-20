@@ -12,6 +12,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QFile>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -181,6 +182,8 @@ Window::Window()
         // Connect individual card signals
         connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
         connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
+        connect(card, &AnimeCard::playAnimeRequested, this, &Window::onPlayAnimeFromCard);
+        connect(card, &AnimeCard::resetWatchSessionRequested, this, &Window::onResetWatchSession);
     });
     
     connect(cardManager, &MyListCardManager::cardUpdated, this, [this](int aid) {
@@ -5301,6 +5304,99 @@ void Window::onCardEpisodeClicked(int lid)
 	LOG(QString("Episode clicked with LID: %1").arg(lid));
 	// Start playback for the episode
 	startPlaybackForFile(lid);
+}
+
+void Window::onPlayAnimeFromCard(int aid)
+{
+	LOG(QString("Play anime requested from card for anime ID: %1").arg(aid));
+	
+	// Find the first unwatched episode (based on local_watched) for this anime
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("Cannot play anime: Database not open");
+		return;
+	}
+	
+	QSqlQuery q(db);
+	q.prepare("SELECT m.lid, e.epno, m.local_watched, lf.path "
+	          "FROM mylist m "
+	          "LEFT JOIN episode e ON m.eid = e.eid "
+	          "LEFT JOIN local_files lf ON m.local_file = lf.id "
+	          "WHERE m.aid = ? AND lf.path IS NOT NULL "
+	          "ORDER BY e.epno, m.lid");
+	q.addBindValue(aid);
+	
+	if (q.exec()) {
+		// Find first unwatched episode
+		while (q.next()) {
+			int lid = q.value(0).toInt();
+			int localWatched = q.value(2).toInt();
+			QString localPath = q.value(3).toString();
+			
+			// Check if file exists
+			if (!localPath.isEmpty() && QFile::exists(localPath)) {
+				if (localWatched == 0) {
+					// Found first unwatched episode with available file
+					LOG(QString("Playing first unwatched episode LID: %1").arg(lid));
+					startPlaybackForFile(lid);
+					return;
+				}
+			}
+		}
+		
+		// If all episodes are watched, play the first available one
+		q.first();
+		if (q.isValid()) {
+			int lid = q.value(0).toInt();
+			QString localPath = q.value(3).toString();
+			if (!localPath.isEmpty() && QFile::exists(localPath)) {
+				LOG(QString("All episodes watched, playing first episode LID: %1").arg(lid));
+				startPlaybackForFile(lid);
+				return;
+			}
+		}
+	}
+	
+	LOG(QString("No playable episodes found for anime ID: %1").arg(aid));
+}
+
+void Window::onResetWatchSession(int aid)
+{
+	LOG(QString("Reset watch session requested for anime ID: %1").arg(aid));
+	
+	// Clear local_watched status for all episodes of this anime
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("Cannot reset watch session: Database not open");
+		return;
+	}
+	
+	// Clear local_watched in mylist
+	QSqlQuery q(db);
+	q.prepare("UPDATE mylist SET local_watched = 0 WHERE aid = ?");
+	q.addBindValue(aid);
+	
+	if (!q.exec()) {
+		LOG(QString("Error resetting local_watched: %1").arg(q.lastError().text()));
+		return;
+	}
+	
+	// Clear watch chunks for all episodes of this anime
+	QSqlQuery q2(db);
+	q2.prepare("DELETE FROM watch_chunks WHERE lid IN (SELECT lid FROM mylist WHERE aid = ?)");
+	q2.addBindValue(aid);
+	
+	if (!q2.exec()) {
+		LOG(QString("Error clearing watch chunks: %1").arg(q2.lastError().text()));
+		return;
+	}
+	
+	LOG(QString("Watch session reset for anime ID: %1").arg(aid));
+	
+	// Reload the card view to reflect the changes
+	if (mylistUseCardView) {
+		loadMylistAsCards();
+	}
 }
 
 // Unknown files handling slots
