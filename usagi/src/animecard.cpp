@@ -699,8 +699,8 @@ bool AnimeCard::eventFilter(QObject *watched, QEvent *event)
     if (watched == m_posterOverlay && event->type() == QEvent::Leave) {
         // Check if mouse has moved to poster label - if not, hide overlay
         QPoint globalPos = QCursor::pos();
-        QRect posterRect = m_posterLabel->mapToGlobal(QPoint(0, 0));
-        posterRect.setSize(m_posterLabel->size());
+        QPoint posterGlobalPos = m_posterLabel->mapToGlobal(QPoint(0, 0));
+        QRect posterRect(posterGlobalPos, m_posterLabel->size());
         if (!posterRect.contains(globalPos)) {
             // Mouse has left overlay and is not over poster - hide it
             hidePosterOverlay();
