@@ -265,6 +265,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
     bool needsMetadata = m_animeNeedingMetadata.contains(aid);
     bool needsPoster = m_animeNeedingPoster.contains(aid);
     bool hasEpisodesNeedingData = false;
+    int episodesNeedingDataCount = 0;
     
     // Check if any episodes need data
     QSqlDatabase db = QSqlDatabase::database();
@@ -274,13 +275,19 @@ void MyListCardManager::onFetchDataRequested(int aid)
                  "LEFT JOIN episode e ON m.eid = e.eid "
                  "WHERE m.aid = ? AND (e.name IS NULL OR e.name = '' OR e.epno IS NULL OR e.epno = '')");
         q.addBindValue(aid);
-        if (q.exec() && q.next()) {
-            hasEpisodesNeedingData = true;
+        if (q.exec()) {
+            while (q.next()) {
+                int eid = q.value(0).toInt();
+                if (eid > 0) {
+                    hasEpisodesNeedingData = true;
+                    episodesNeedingDataCount++;
+                }
+            }
         }
     }
     
-    LOG(QString("[MyListCardManager] Data check for aid=%1: needsMetadata=%2, needsPoster=%3, hasEpisodesNeedingData=%4, alreadyRequested=%5")
-        .arg(aid).arg(needsMetadata).arg(needsPoster).arg(hasEpisodesNeedingData).arg(m_animeMetadataRequested.contains(aid)));
+    LOG(QString("[MyListCardManager] Data check for aid=%1: needsMetadata=%2, needsPoster=%3, hasEpisodesNeedingData=%4 (count=%5), alreadyRequested=%6")
+        .arg(aid).arg(needsMetadata).arg(needsPoster).arg(hasEpisodesNeedingData).arg(episodesNeedingDataCount).arg(m_animeMetadataRequested.contains(aid)));
     
     bool requestedAnything = false;
     
@@ -311,6 +318,11 @@ void MyListCardManager::onFetchDataRequested(int aid)
         if (needsMetadata) {
             requestAnimeMetadata(aid);
         }
+    }
+    
+    if (hasEpisodesNeedingData) {
+        LOG(QString("[MyListCardManager] Note: %1 episodes need data for aid=%2 - episode data fetched via FILE command")
+            .arg(episodesNeedingDataCount).arg(aid));
     }
     
     if (!requestedAnything) {
