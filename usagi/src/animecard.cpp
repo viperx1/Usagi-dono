@@ -561,11 +561,13 @@ void AnimeCard::mousePressEvent(QMouseEvent *event)
             return;
         }
         
-        // Emit signal when card is clicked (but not when episode tree is clicked)
+        // Emit signal when card is clicked (but not when episode tree is clicked or poster is clicked)
         if (!m_episodeTree->geometry().contains(pos)) {
             emit cardClicked(m_animeId);
             // Auto-fetch missing data when card is clicked if data is needed
             if (m_needsFetch) {
+                LOG(QString("[AnimeCard] Emitting fetchDataRequested for aid=%1 (m_needsFetch=%2)")
+                    .arg(m_animeId).arg(m_needsFetch));
                 emit fetchDataRequested(m_animeId);
             }
         }
@@ -647,9 +649,19 @@ void AnimeCard::enterEvent(QEnterEvent *event)
 
 void AnimeCard::leaveEvent(QEvent *event)
 {
-    // Hide poster overlay when mouse leaves card
-    hidePosterOverlay();
+    // Don't hide overlay here - it's handled by eventFilter on poster label
     QFrame::leaveEvent(event);
+}
+
+bool AnimeCard::eventFilter(QObject *watched, QEvent *event)
+{
+    // Check if this is a leave event on the poster label
+    if (watched == m_posterLabel && event->type() == QEvent::Leave) {
+        // Hide the poster overlay when mouse leaves the poster label
+        hidePosterOverlay();
+    }
+    
+    return QFrame::eventFilter(watched, event);
 }
 
 void AnimeCard::showPosterOverlay()
@@ -658,49 +670,42 @@ void AnimeCard::showPosterOverlay()
         return;
     }
     
-    // Create overlay if it doesn't exist
+    // Create overlay if it doesn't exist - parent it to the top-level widget to avoid clipping
     if (!m_posterOverlay) {
-        m_posterOverlay = new QLabel(this);
+        // Find the top-level widget (main window)
+        QWidget *topWidget = this;
+        while (topWidget->parentWidget()) {
+            topWidget = topWidget->parentWidget();
+        }
+        
+        m_posterOverlay = new QLabel(topWidget);
+        m_posterOverlay->setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint);
+        m_posterOverlay->setAttribute(Qt::WA_TranslucentBackground);
         m_posterOverlay->setScaledContents(false);
         m_posterOverlay->setAlignment(Qt::AlignCenter);
         m_posterOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 200); border: 2px solid white;");
         m_posterOverlay->setMouseTracking(true);
-        m_posterOverlay->raise();
+        
+        // Install event filter to detect when mouse leaves the poster label
+        m_posterLabel->installEventFilter(this);
     }
     
-    // Get the original poster size
+    // Get the original poster size (100% size, no scaling)
     QSize originalSize = m_originalPoster.size();
     
-    // Position overlay over the poster label, but use original poster size
-    QRect posterRect = m_posterLabel->geometry();
+    // Get poster label position in global coordinates
+    QPoint globalPos = m_posterLabel->mapToGlobal(QPoint(0, 0));
     
-    // Center the overlay over the poster label, but with original poster dimensions
-    int x = posterRect.x() + (posterRect.width() - originalSize.width()) / 2;
-    int y = posterRect.y() + (posterRect.height() - originalSize.height()) / 2;
-    
-    // Make sure overlay doesn't go outside card bounds
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x + originalSize.width() > width()) {
-        // If original size is too wide, scale it down
-        originalSize.scale(width(), height(), Qt::KeepAspectRatio);
-        x = (width() - originalSize.width()) / 2;
-    }
-    if (y + originalSize.height() > height()) {
-        // If original size is too tall, scale it down
-        originalSize.scale(width(), height(), Qt::KeepAspectRatio);
-        y = (height() - originalSize.height()) / 2;
-    }
+    // Center the overlay over the poster label position, using original poster dimensions
+    int x = globalPos.x() + (m_posterLabel->width() - originalSize.width()) / 2;
+    int y = globalPos.y() + (m_posterLabel->height() - originalSize.height()) / 2;
     
     m_posterOverlay->setGeometry(x, y, originalSize.width(), originalSize.height());
     
-    // Show original poster at original size (or scaled down if too large)
-    QPixmap displayPoster = m_originalPoster;
-    if (m_originalPoster.size() != originalSize) {
-        displayPoster = m_originalPoster.scaled(originalSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    }
-    m_posterOverlay->setPixmap(displayPoster);
+    // Show original poster at 100% original size
+    m_posterOverlay->setPixmap(m_originalPoster);
     m_posterOverlay->show();
+    m_posterOverlay->raise();
 }
 
 void AnimeCard::hidePosterOverlay()
