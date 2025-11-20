@@ -148,6 +148,7 @@ private:
     int m_otherViewed;
     qint64 m_lastPlayed;  // Most recent last_played timestamp from episodes
     bool m_isHidden;  // Hidden state of card
+    bool m_needsFetch;  // Whether card needs data fetching
     QPixmap m_originalPoster;  // Store original poster for overlay
     
     // UI elements
