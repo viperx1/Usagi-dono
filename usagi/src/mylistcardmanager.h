@@ -96,6 +96,9 @@ public slots:
     // Slot to handle mark episode watched request
     void onMarkEpisodeWatchedRequested(int eid);
     
+    // Slot to handle mark file watched request
+    void onMarkFileWatchedRequested(int lid);
+    
 private slots:
     // Timer slot for batched updates
     void processBatchedUpdates();

@@ -120,6 +120,7 @@ signals:
     void resetWatchSessionRequested(int aid);  // Reset local watch status
     void hideCardRequested(int aid);  // Hide card request
     void markEpisodeWatchedRequested(int eid);  // Mark episode as watched
+    void markFileWatchedRequested(int lid);  // Mark file as watched
     
 protected:
     void paintEvent(QPaintEvent *event) override;

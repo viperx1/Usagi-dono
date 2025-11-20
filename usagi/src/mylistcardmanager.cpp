@@ -611,6 +611,9 @@ AnimeCard* MyListCardManager::createCard(int aid)
     // Connect mark episode watched signal
     connect(card, &AnimeCard::markEpisodeWatchedRequested, this, &MyListCardManager::onMarkEpisodeWatchedRequested);
     
+    // Connect mark file watched signal
+    connect(card, &AnimeCard::markFileWatchedRequested, this, &MyListCardManager::onMarkFileWatchedRequested);
+    
     // Show warning indicator if metadata or poster is missing (instead of auto-fetching)
     if (m_animeNeedingMetadata.contains(aid) || m_animeNeedingPoster.contains(aid)) {
         card->setNeedsFetch(true);
@@ -1002,6 +1005,43 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     
     int aid = q.value(0).toInt();
     LOG(QString("[MyListCardManager] Marked episode eid=%1 as watched, updating card for aid=%2").arg(eid).arg(aid));
+    
+    // Update the card to reflect the change
+    updateCardAnimeInfo(aid);
+}
+
+void MyListCardManager::onMarkFileWatchedRequested(int lid)
+{
+    LOG(QString("[MyListCardManager] Mark file watched requested for lid=%1").arg(lid));
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[MyListCardManager] Database not open");
+        return;
+    }
+    
+    // Update this specific file to viewed=1
+    QSqlQuery q(db);
+    q.prepare("UPDATE mylist SET viewed = 1 WHERE lid = ?");
+    q.addBindValue(lid);
+    
+    if (!q.exec()) {
+        LOG(QString("[MyListCardManager] Failed to mark file watched lid=%1: %2")
+            .arg(lid).arg(q.lastError().text()));
+        return;
+    }
+    
+    // Find the anime ID for this file
+    q.prepare("SELECT DISTINCT aid FROM mylist WHERE lid = ?");
+    q.addBindValue(lid);
+    
+    if (!q.exec() || !q.next()) {
+        LOG(QString("[MyListCardManager] Failed to find anime for file lid=%1").arg(lid));
+        return;
+    }
+    
+    int aid = q.value(0).toInt();
+    LOG(QString("[MyListCardManager] Marked file lid=%1 as watched, updating card for aid=%2").arg(lid).arg(aid));
     
     // Update the card to reflect the change
     updateCardAnimeInfo(aid);

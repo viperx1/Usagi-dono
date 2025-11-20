@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QScreen>
 #include <QGuiApplication>
+#include <QCursor>
 
 AnimeCard::AnimeCard(QWidget *parent)
     : QFrame(parent)
@@ -178,14 +179,26 @@ void AnimeCard::setupUI()
             return;
         }
         
-        // Check if this is an episode item (has no parent)
+        QMenu contextMenu(this);
+        
+        // Check if this is an episode item (has no parent) or a file item (has parent)
         if (!item->parent()) {
+            // Episode item - mark all files in episode as watched
             int eid = item->data(2, Qt::UserRole + 1).toInt();
             if (eid > 0) {
-                QMenu contextMenu(this);
-                QAction *markWatchedAction = contextMenu.addAction("Mark as watched");
+                QAction *markWatchedAction = contextMenu.addAction("Mark episode as watched");
                 connect(markWatchedAction, &QAction::triggered, this, [this, eid]() {
                     emit markEpisodeWatchedRequested(eid);
+                });
+                contextMenu.exec(m_episodeTree->mapToGlobal(pos));
+            }
+        } else {
+            // File item - mark this specific file as watched
+            int lid = item->data(2, Qt::UserRole).toInt();
+            if (lid > 0) {
+                QAction *markFileWatchedAction = contextMenu.addAction("Mark file as watched");
+                connect(markFileWatchedAction, &QAction::triggered, this, [this, lid]() {
+                    emit markFileWatchedRequested(lid);
                 });
                 contextMenu.exec(m_episodeTree->mapToGlobal(pos));
             }
@@ -662,8 +675,36 @@ bool AnimeCard::eventFilter(QObject *watched, QEvent *event)
 {
     // Check if this is a leave event on the poster label
     if (watched == m_posterLabel && event->type() == QEvent::Leave) {
-        // Hide the poster overlay when mouse leaves the poster label
-        hidePosterOverlay();
+        // Only hide if mouse is not over the overlay
+        if (m_posterOverlay && m_posterOverlay->isVisible()) {
+            // Check if mouse is actually over the overlay
+            QPoint globalPos = QCursor::pos();
+            QRect overlayRect = m_posterOverlay->geometry();
+            if (!overlayRect.contains(globalPos)) {
+                // Mouse has left poster and is not over overlay - hide it
+                hidePosterOverlay();
+            }
+        }
+    }
+    
+    // Check if mouse enters poster label while overlay is visible - keep it visible
+    if (watched == m_posterLabel && event->type() == QEvent::Enter) {
+        // If overlay is visible, keep it that way
+        if (m_posterOverlay && m_posterOverlay->isVisible()) {
+            m_posterOverlay->raise();
+        }
+    }
+    
+    // Check if mouse leaves the overlay itself
+    if (watched == m_posterOverlay && event->type() == QEvent::Leave) {
+        // Check if mouse has moved to poster label - if not, hide overlay
+        QPoint globalPos = QCursor::pos();
+        QRect posterRect = m_posterLabel->mapToGlobal(QPoint(0, 0));
+        posterRect.setSize(m_posterLabel->size());
+        if (!posterRect.contains(globalPos)) {
+            // Mouse has left overlay and is not over poster - hide it
+            hidePosterOverlay();
+        }
     }
     
     return QFrame::eventFilter(watched, event);
@@ -686,10 +727,14 @@ void AnimeCard::showPosterOverlay()
         m_posterOverlay = new QLabel(topWidget);
         m_posterOverlay->setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         m_posterOverlay->setAttribute(Qt::WA_TranslucentBackground);
+        m_posterOverlay->setAttribute(Qt::WA_Hover);
         m_posterOverlay->setScaledContents(false);
         m_posterOverlay->setAlignment(Qt::AlignCenter);
         m_posterOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 200); border: 2px solid white;");
         m_posterOverlay->setMouseTracking(true);
+        
+        // Install event filter on overlay itself to track mouse leave
+        m_posterOverlay->installEventFilter(this);
         
         // Install event filter to detect when mouse leaves the poster label
         m_posterLabel->installEventFilter(this);
