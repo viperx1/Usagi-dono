@@ -90,6 +90,12 @@ public slots:
     // Slot to handle manual data fetch request
     void onFetchDataRequested(int aid);
     
+    // Slot to handle hide card request
+    void onHideCardRequested(int aid);
+    
+    // Slot to handle mark episode watched request
+    void onMarkEpisodeWatchedRequested(int eid);
+    
 private slots:
     // Timer slot for batched updates
     void processBatchedUpdates();

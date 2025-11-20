@@ -85,6 +85,7 @@ public:
     int getOtherEpisodes() const { return m_otherEpisodes; }
     int getOtherViewed() const { return m_otherViewed; }
     qint64 getLastPlayed() const { return m_lastPlayed; }
+    bool isHidden() const { return m_isHidden; }
     
     // Sorting support
     bool operator<(const AnimeCard& other) const;
@@ -109,6 +110,7 @@ public slots:
     void addEpisode(const EpisodeInfo& episode);
     void clearEpisodes();
     void updateNextEpisodeIndicator();  // Update which episode will play next
+    void setHidden(bool hidden);  // Set card hidden state
     
 signals:
     void episodeClicked(int lid);
@@ -116,15 +118,22 @@ signals:
     void fetchDataRequested(int aid);
     void playAnimeRequested(int aid);  // Play next unwatched episode
     void resetWatchSessionRequested(int aid);  // Reset local watch status
+    void hideCardRequested(int aid);  // Hide card request
+    void markEpisodeWatchedRequested(int eid);  // Mark episode as watched
     
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
+    void enterEvent(QEnterEvent *event) override;
+    void leaveEvent(QEvent *event) override;
     
 private:
     void setupUI();
     void updateStatisticsLabel();
+    void showPosterOverlay();
+    void hidePosterOverlay();
+    void updateCardBackgroundForUnwatchedEpisodes();
     
     // Data members
     int m_animeId;
@@ -138,6 +147,8 @@ private:
     int m_otherEpisodes;
     int m_otherViewed;
     qint64 m_lastPlayed;  // Most recent last_played timestamp from episodes
+    bool m_isHidden;  // Hidden state of card
+    QPixmap m_originalPoster;  // Store original poster for overlay
     
     // UI elements
     QLabel *m_posterLabel;
@@ -153,6 +164,7 @@ private:
     QPushButton *m_resetSessionButton;  // Reset watch session button
     QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy
     PlayButtonDelegate *m_playButtonDelegate;  // Delegate for play button column
+    QLabel *m_posterOverlay;  // Full-size poster overlay
     
     QVBoxLayout *m_mainLayout;
     QHBoxLayout *m_topLayout;

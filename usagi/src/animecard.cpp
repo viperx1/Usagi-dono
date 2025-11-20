@@ -19,6 +19,8 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_otherEpisodes(0)
     , m_otherViewed(0)
     , m_lastPlayed(0)
+    , m_isHidden(false)
+    , m_posterOverlay(nullptr)
 {
     setupUI();
     
@@ -49,11 +51,12 @@ void AnimeCard::setupUI()
     // Poster (left side) - increased by 50%
     m_posterLabel = new QLabel(this);
     m_posterLabel->setFixedSize(240, 330);  // Increased by 50% from 160x220
-    m_posterLabel->setScaledContents(true);
+    m_posterLabel->setScaledContents(false);  // Changed to false to maintain aspect ratio
     m_posterLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);
     m_posterLabel->setAlignment(Qt::AlignCenter);
     m_posterLabel->setText("No\nImage");
     m_posterLabel->setStyleSheet("background-color: #f0f0f0; color: #999;");
+    m_posterLabel->setMouseTracking(true);
     m_topLayout->addWidget(m_posterLabel);
     
     // Info section (right side)
@@ -163,6 +166,28 @@ void AnimeCard::setupUI()
             }
         }
     });
+    
+    // Connect tree widget context menu
+    m_episodeTree->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_episodeTree, &QTreeWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
+        QTreeWidgetItem *item = m_episodeTree->itemAt(pos);
+        if (!item) {
+            return;
+        }
+        
+        // Check if this is an episode item (has no parent)
+        if (!item->parent()) {
+            int eid = item->data(2, Qt::UserRole + 1).toInt();
+            if (eid > 0) {
+                QMenu contextMenu(this);
+                QAction *markWatchedAction = contextMenu.addAction("Mark as watched");
+                connect(markWatchedAction, &QAction::triggered, this, [this, eid]() {
+                    emit markEpisodeWatchedRequested(eid);
+                });
+                contextMenu.exec(m_episodeTree->mapToGlobal(pos));
+            }
+        }
+    });
 }
 
 void AnimeCard::setAnimeId(int aid)
@@ -264,7 +289,12 @@ void AnimeCard::updateStatisticsLabel()
 void AnimeCard::setPoster(const QPixmap& pixmap)
 {
     if (!pixmap.isNull()) {
-        m_posterLabel->setPixmap(pixmap);
+        // Store original poster for overlay
+        m_originalPoster = pixmap;
+        
+        // Scale pixmap to fit within poster label while maintaining aspect ratio
+        QPixmap scaledPixmap = pixmap.scaled(m_posterLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        m_posterLabel->setPixmap(scaledPixmap);
         m_posterLabel->setText("");
         m_posterLabel->setStyleSheet("");
     }
@@ -450,6 +480,9 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     
     // Update next episode indicator
     updateNextEpisodeIndicator();
+    
+    // Update card background for unwatched episodes
+    updateCardBackgroundForUnwatchedEpisodes();
 }
 
 void AnimeCard::clearEpisodes()
@@ -519,10 +552,20 @@ void AnimeCard::paintEvent(QPaintEvent *event)
 void AnimeCard::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        // Emit signal when card is clicked (but not when episode tree is clicked)
+        // Check if click is on poster - show overlay
         QPoint pos = event->pos();
+        if (m_posterLabel->geometry().contains(pos)) {
+            showPosterOverlay();
+            return;
+        }
+        
+        // Emit signal when card is clicked (but not when episode tree is clicked)
         if (!m_episodeTree->geometry().contains(pos)) {
             emit cardClicked(m_animeId);
+            // Auto-fetch missing data when card is clicked
+            if (m_warningLabel->isVisible()) {
+                emit fetchDataRequested(m_animeId);
+            }
         }
     }
     QFrame::mousePressEvent(event);
@@ -537,5 +580,95 @@ void AnimeCard::contextMenuEvent(QContextMenuEvent *event)
         emit fetchDataRequested(m_animeId);
     });
     
+    QAction *hideAction = contextMenu.addAction(m_isHidden ? "Unhide" : "Hide");
+    connect(hideAction, &QAction::triggered, this, [this]() {
+        emit hideCardRequested(m_animeId);
+    });
+    
     contextMenu.exec(event->globalPos());
+}
+
+void AnimeCard::setHidden(bool hidden)
+{
+    m_isHidden = hidden;
+}
+
+void AnimeCard::enterEvent(QEnterEvent *event)
+{
+    QFrame::enterEvent(event);
+}
+
+void AnimeCard::leaveEvent(QEvent *event)
+{
+    // Hide poster overlay when mouse leaves card
+    hidePosterOverlay();
+    QFrame::leaveEvent(event);
+}
+
+void AnimeCard::showPosterOverlay()
+{
+    if (m_originalPoster.isNull()) {
+        return;
+    }
+    
+    // Create overlay if it doesn't exist
+    if (!m_posterOverlay) {
+        m_posterOverlay = new QLabel(this);
+        m_posterOverlay->setScaledContents(false);
+        m_posterOverlay->setAlignment(Qt::AlignCenter);
+        m_posterOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 200); border: 2px solid white;");
+        m_posterOverlay->setMouseTracking(true);
+        m_posterOverlay->raise();
+    }
+    
+    // Position overlay over the poster label
+    QRect posterRect = m_posterLabel->geometry();
+    m_posterOverlay->setGeometry(posterRect);
+    
+    // Scale original poster to fit overlay
+    QPixmap scaledPoster = m_originalPoster.scaled(posterRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    m_posterOverlay->setPixmap(scaledPoster);
+    m_posterOverlay->show();
+}
+
+void AnimeCard::hidePosterOverlay()
+{
+    if (m_posterOverlay) {
+        m_posterOverlay->hide();
+    }
+}
+
+void AnimeCard::updateCardBackgroundForUnwatchedEpisodes()
+{
+    // Check if there are unwatched episodes
+    bool hasUnwatchedEpisodes = false;
+    int topLevelCount = m_episodeTree->topLevelItemCount();
+    
+    for (int i = 0; i < topLevelCount; i++) {
+        QTreeWidgetItem *episodeItem = m_episodeTree->topLevelItem(i);
+        
+        // Check if any file in this episode is unwatched
+        int childCount = episodeItem->childCount();
+        
+        for (int j = 0; j < childCount; j++) {
+            QTreeWidgetItem *fileItem = episodeItem->child(j);
+            // Check if file's play button is a play symbol (meaning not locally watched)
+            QString playText = fileItem->text(1);
+            if (playText == "▶") {
+                hasUnwatchedEpisodes = true;
+                break;
+            }
+        }
+        
+        if (hasUnwatchedEpisodes) {
+            break;
+        }
+    }
+    
+    // Apply green background if there are unwatched episodes
+    if (hasUnwatchedEpisodes) {
+        setStyleSheet("QFrame { background-color: #e8f5e9; }");  // Light green background
+    } else {
+        setStyleSheet("");  // Reset to default
+    }
 }

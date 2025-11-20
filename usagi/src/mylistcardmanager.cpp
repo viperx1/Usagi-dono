@@ -477,7 +477,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     q.prepare("SELECT a.nameromaji, a.nameenglish, a.eptotal, "
               "at.title as anime_title, "
               "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
-              "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list "
+              "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden "
               "FROM anime a "
               "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
               "WHERE a.aid = ?");
@@ -502,6 +502,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QString tagNameList = q.value(12).toString();
     QString tagIdList = q.value(13).toString();
     QString tagWeightList = q.value(14).toString();
+    bool isHidden = q.value(15).toInt() == 1;
     
     // Determine anime name using helper
     animeName = determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
@@ -510,6 +511,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     AnimeCard *card = new AnimeCard(nullptr);
     card->setAnimeId(aid);
     card->setAnimeTitle(animeName);
+    card->setHidden(isHidden);
     
     // Set type
     if (!typeName.isEmpty()) {
@@ -574,6 +576,12 @@ AnimeCard* MyListCardManager::createCard(int aid)
     
     // Connect fetch data request signal from card
     connect(card, &AnimeCard::fetchDataRequested, this, &MyListCardManager::onFetchDataRequested);
+    
+    // Connect hide card request signal
+    connect(card, &AnimeCard::hideCardRequested, this, &MyListCardManager::onHideCardRequested);
+    
+    // Connect mark episode watched signal
+    connect(card, &AnimeCard::markEpisodeWatchedRequested, this, &MyListCardManager::onMarkEpisodeWatchedRequested);
     
     // Show warning indicator if metadata or poster is missing (instead of auto-fetching)
     if (m_animeNeedingMetadata.contains(aid) || m_animeNeedingPoster.contains(aid)) {
@@ -894,4 +902,81 @@ MyListCardManager::AnimeStats MyListCardManager::calculateStatistics(int aid)
     stats.otherViewed = viewedOtherEpisodes.size();
     
     return stats;
+}
+
+void MyListCardManager::onHideCardRequested(int aid)
+{
+    LOG(QString("[MyListCardManager] Hide card requested for anime %1").arg(aid));
+    
+    QMutexLocker locker(&m_mutex);
+    AnimeCard *card = m_cards.value(aid, nullptr);
+    
+    if (!card) {
+        LOG(QString("[MyListCardManager] Card not found for hide request aid=%1").arg(aid));
+        return;
+    }
+    
+    // Toggle hidden state
+    bool isHidden = card->isHidden();
+    card->setHidden(!isHidden);
+    
+    // Update database to persist hidden state
+    locker.unlock();
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        // Add hidden column if it doesn't exist
+        q.exec("ALTER TABLE anime ADD COLUMN hidden INTEGER DEFAULT 0");
+        
+        // Update hidden state
+        q.prepare("UPDATE anime SET hidden = ? WHERE aid = ?");
+        q.addBindValue(!isHidden ? 1 : 0);
+        q.addBindValue(aid);
+        if (!q.exec()) {
+            LOG(QString("[MyListCardManager] Failed to update hidden state for aid=%1: %2")
+                .arg(aid).arg(q.lastError().text()));
+        } else {
+            LOG(QString("[MyListCardManager] Updated hidden state for aid=%1 to %2").arg(aid).arg(!isHidden));
+            // Trigger card sorting/repositioning
+            emit cardNeedsSorting(aid);
+        }
+    }
+}
+
+void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
+{
+    LOG(QString("[MyListCardManager] Mark episode watched requested for eid=%1").arg(eid));
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[MyListCardManager] Database not open");
+        return;
+    }
+    
+    // Update all files for this episode to viewed=1
+    QSqlQuery q(db);
+    q.prepare("UPDATE mylist SET viewed = 1 WHERE eid = ?");
+    q.addBindValue(eid);
+    
+    if (!q.exec()) {
+        LOG(QString("[MyListCardManager] Failed to mark episode watched eid=%1: %2")
+            .arg(eid).arg(q.lastError().text()));
+        return;
+    }
+    
+    // Find the anime ID for this episode
+    q.prepare("SELECT DISTINCT aid FROM mylist WHERE eid = ?");
+    q.addBindValue(eid);
+    
+    if (!q.exec() || !q.next()) {
+        LOG(QString("[MyListCardManager] Failed to find anime for episode eid=%1").arg(eid));
+        return;
+    }
+    
+    int aid = q.value(0).toInt();
+    LOG(QString("[MyListCardManager] Marked episode eid=%1 as watched, updating card for aid=%2").arg(eid).arg(aid));
+    
+    // Update the card to reflect the change
+    updateCardAnimeInfo(aid);
 }
