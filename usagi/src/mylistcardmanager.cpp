@@ -926,8 +926,6 @@ void MyListCardManager::onHideCardRequested(int aid)
     QSqlDatabase db = QSqlDatabase::database();
     if (db.isOpen()) {
         QSqlQuery q(db);
-        // Add hidden column if it doesn't exist
-        q.exec("ALTER TABLE anime ADD COLUMN hidden INTEGER DEFAULT 0");
         
         // Update hidden state
         q.prepare("UPDATE anime SET hidden = ? WHERE aid = ?");
