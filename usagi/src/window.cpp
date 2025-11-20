@@ -3352,7 +3352,8 @@ void Window::loadMylistFromDatabase()
 					"f.filetype, f.resolution, f.quality, "
 					"(SELECT name FROM `group` WHERE gid = m.gid) as group_name, "
 					"f.filename, m.gid, m.last_played, "
-					"lf.path as local_file_path "
+					"lf.path as local_file_path, "
+					"m.local_watched "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
@@ -3414,6 +3415,7 @@ void Window::loadMylistFromDatabase()
 		int gid = q.value(22).toInt();
 		qint64 lastPlayed = q.value(23).toLongLong();
 		QString localFilePath = q.value(24).toString();
+		int localWatched = q.value(25).toInt();  // New: local watched status
 		
 		// Check if file exists
 		bool fileExists = false;
@@ -3675,7 +3677,7 @@ void Window::loadMylistFromDatabase()
 				fileItem->setText(COL_PLAY, "✗"); // X for file not found
 				fileItem->setForeground(COL_PLAY, QBrush(QColor(Qt::red))); // Red color for disabled
 				fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
-			} else if (viewed) {
+			} else if (localWatched) {  // Use local_watched status for play button
 				fileItem->setText(COL_PLAY, "✓"); // Checkmark for watched
 				fileItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 			} else {
@@ -3723,7 +3725,8 @@ void Window::loadMylistFromDatabase()
 				{
 					hasAvailableFile = true;
 				}
-				if(fileItem->text(COL_VIEWED) == "Yes")
+				// Check if file is locally watched (has checkmark in play column)
+				if(fileItem->text(COL_PLAY) == "✓")
 				{
 					episodeViewed = true;
 				}
@@ -4679,15 +4682,31 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		// This is a file item
 		FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(item);
 		if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-			bool viewed = (item->text(COL_VIEWED) == "Yes");
+			// Get LID from the item
+			int lid = item->text(MYLIST_ID_COLUMN).toInt();
+			
+			// Query local_watched status from database
+			bool localWatched = false;
+			if (lid > 0) {
+				QSqlDatabase db = QSqlDatabase::database();
+				if (db.isOpen()) {
+					QSqlQuery q(db);
+					q.prepare("SELECT local_watched FROM mylist WHERE lid = ?");
+					q.addBindValue(lid);
+					if (q.exec() && q.next()) {
+						localWatched = (q.value(0).toInt() == 1);
+					}
+				}
+			}
+			
 			// Check if file doesn't exist
 			QString currentText = item->text(PLAY_COLUMN);
 			if (currentText == "✗") {
 				// Keep the X if file doesn't exist (sort key already set to 2)
 				return;
 			}
-			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
-			item->setData(PLAY_COLUMN, Qt::UserRole, viewed ? 1 : 0); // Update sort key
+			item->setText(PLAY_COLUMN, localWatched ? "✓" : "▶");
+			item->setData(PLAY_COLUMN, Qt::UserRole, localWatched ? 1 : 0); // Update sort key
 		}
 	}
 	else if (parent && !parent->parent()) {
@@ -4699,7 +4718,8 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 				hasVideoFile = true;
-				if (fileItem->text(COL_VIEWED) == "Yes") {
+				// Check play button status (✓ means locally watched)
+				if (fileItem->text(COL_PLAY) == "✓") {
 					episodeViewed = true;
 					break;
 				}
@@ -4734,7 +4754,8 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 					hasVideoFile = true;
-					if (fileItem->text(COL_VIEWED) == "Yes") {
+					// Check play button status (✓ means locally watched)
+					if (fileItem->text(COL_PLAY) == "✓") {
 						episodeViewed = true;
 						break;
 					}
