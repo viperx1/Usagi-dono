@@ -88,6 +88,33 @@ void AnimeCard::setupUI()
     m_statsLabel->setStyleSheet("font-size: 9pt; color: #333;");
     m_infoLayout->addWidget(m_statsLabel);
     
+    // Next episode indicator
+    m_nextEpisodeLabel = new QLabel("Next: N/A", this);
+    m_nextEpisodeLabel->setStyleSheet("font-size: 9pt; color: #666; font-style: italic;");
+    m_infoLayout->addWidget(m_nextEpisodeLabel);
+    
+    // Button layout for play and reset buttons
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->setSpacing(5);
+    
+    m_playButton = new QPushButton("▶ Play Next", this);
+    m_playButton->setStyleSheet("font-size: 9pt; padding: 4px 8px;");
+    m_playButton->setToolTip("Play the next unwatched episode");
+    connect(m_playButton, &QPushButton::clicked, this, [this]() {
+        emit playAnimeRequested(m_animeId);
+    });
+    buttonLayout->addWidget(m_playButton);
+    
+    m_resetSessionButton = new QPushButton("↻ Reset Session", this);
+    m_resetSessionButton->setStyleSheet("font-size: 9pt; padding: 4px 8px;");
+    m_resetSessionButton->setToolTip("Clear local watch status for all episodes");
+    connect(m_resetSessionButton, &QPushButton::clicked, this, [this]() {
+        emit resetWatchSessionRequested(m_animeId);
+    });
+    buttonLayout->addWidget(m_resetSessionButton);
+    
+    m_infoLayout->addLayout(buttonLayout);
+    
     m_infoLayout->addStretch();
     
     m_topLayout->addLayout(m_infoLayout, 1);
@@ -265,36 +292,53 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     // Column 0: Empty - expand button only (Qt handles this automatically)
     episodeItem->setText(0, "");
     
-    // Column 1: Play button if any file exists
-    // Check if any file in this episode exists locally
+    // Column 1: Play button for episode - check file availability and watch status
+    // Check if any file in this episode exists locally and watch status
     bool anyFileExists = false;
+    bool allFilesWatched = true;
     int existingFileLid = 0;
     for (const FileInfo& file : episode.files) {      
         if (!file.localFilePath.isEmpty()) {
             bool exists = QFile::exists(file.localFilePath);
             if (exists) {
                 anyFileExists = true;
-                existingFileLid = file.lid;
-                break;  // Found at least one file that exists
+                if (!file.localWatched) {
+                    allFilesWatched = false;
+                }
+                if (existingFileLid == 0 && !file.localWatched) {
+                    // Store first unwatched file for playback
+                    existingFileLid = file.lid;
+                }
+                if (existingFileLid == 0) {
+                    // If all watched, store first file anyway
+                    existingFileLid = file.lid;
+                }
             }
         } 
     }
     
-    // Debug logging for play button visibility
-    if (anyFileExists) {
-        episodeItem->setText(1, "▶"); // Play button if any file exists
-        episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the play button
-        episodeItem->setData(1, Qt::UserRole, 1);  // 1 means show button
-        episodeItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
-        // Store the lid of the first available file for playback
-        episodeItem->setData(2, Qt::UserRole, existingFileLid);
-    } else {
-        // Show X marker for episodes with missing files (consistent with file rows)
+    // Set play button based on watch status and file availability
+    if (!anyFileExists) {
+        // Show X marker for episodes with missing files
         episodeItem->setText(1, "✗"); // X for missing files
-        episodeItem->setTextAlignment(1, Qt::AlignCenter);  // Center the marker
+        episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
         episodeItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND)); // Red for missing
-        episodeItem->setData(2, Qt::UserRole, 0);  // 0 means it's an episode with no files
+        episodeItem->setData(2, Qt::UserRole, 0);
+    } else if (anyFileExists && allFilesWatched) {
+        // Show checkmark if all files are locally watched
+        episodeItem->setText(1, "✓"); // Checkmark for watched
+        episodeItem->setTextAlignment(1, Qt::AlignCenter);
+        episodeItem->setData(1, Qt::UserRole, 2);  // 2 means watched
+        episodeItem->setForeground(1, QBrush(UIColors::FILE_WATCHED));
+        episodeItem->setData(2, Qt::UserRole, existingFileLid);
+    } else {
+        // Show play button if files exist and not all watched
+        episodeItem->setText(1, "▶"); // Play button if files exist
+        episodeItem->setTextAlignment(1, Qt::AlignCenter);
+        episodeItem->setData(1, Qt::UserRole, 1);  // 1 means show button
+        episodeItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
+        episodeItem->setData(2, Qt::UserRole, existingFileLid);
     }
     
     // Column 2: Episode info
@@ -308,19 +352,22 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         // Column 0: Empty - no expand button for files
         fileItem->setText(0, "");
         
-        // Column 1: Play button - reflects file existence, not watch state
+        // Column 1: Play button - reflects local watch status and file existence
         // Check if local file exists
         bool fileExists = false;
         if (!file.localFilePath.isEmpty()) {
             fileExists = QFile::exists(file.localFilePath);
         }
         
-        if (fileExists) {
-            fileItem->setText(1, "▶"); // Play button for existing files
-            fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
-        } else {
+        if (!fileExists) {
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
+        } else if (file.localWatched) {
+            fileItem->setText(1, "✓"); // Checkmark for locally watched
+            fileItem->setForeground(1, QBrush(UIColors::FILE_WATCHED));
+        } else {
+            fileItem->setText(1, "▶"); // Play button for unwatched files
+            fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         }
         
         // Format file text with version indicator
@@ -400,11 +447,50 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     episodeItem->setExpanded(false);
     
     m_episodeTree->addTopLevelItem(episodeItem);
+    
+    // Update next episode indicator
+    updateNextEpisodeIndicator();
 }
 
 void AnimeCard::clearEpisodes()
 {
     m_episodeTree->clear();
+}
+
+void AnimeCard::updateNextEpisodeIndicator()
+{
+    // Find the first unwatched episode (based on local_watched status)
+    int topLevelCount = m_episodeTree->topLevelItemCount();
+    
+    for (int i = 0; i < topLevelCount; i++) {
+        QTreeWidgetItem *episodeItem = m_episodeTree->topLevelItem(i);
+        
+        // Check if any file in this episode is unwatched
+        bool episodeWatched = true;
+        int childCount = episodeItem->childCount();
+        
+        for (int j = 0; j < childCount; j++) {
+            QTreeWidgetItem *fileItem = episodeItem->child(j);
+            // Check if file's play button is not a checkmark (meaning not locally watched)
+            QString playText = fileItem->text(1);
+            if (playText != "✓" && playText == "▶") {
+                episodeWatched = false;
+                break;
+            }
+        }
+        
+        if (!episodeWatched) {
+            // Found the first unwatched episode
+            QString episodeText = episodeItem->text(2);
+            m_nextEpisodeLabel->setText("Next: " + episodeText);
+            m_playButton->setEnabled(true);
+            return;
+        }
+    }
+    
+    // All episodes watched or no episodes
+    m_nextEpisodeLabel->setText("Next: All watched");
+    m_playButton->setEnabled(false);
 }
 
 void AnimeCard::setNeedsFetch(bool needsFetch)

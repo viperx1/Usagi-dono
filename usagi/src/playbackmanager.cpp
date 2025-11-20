@@ -1,4 +1,5 @@
 #include "playbackmanager.h"
+#include "watchchunkmanager.h"
 #include "logger.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -22,6 +23,9 @@ PlaybackManager::PlaybackManager(QObject *parent)
     connect(m_statusTimer, &QTimer::timeout, this, &PlaybackManager::checkPlaybackStatus);
     
     m_networkManager = new QNetworkAccessManager(this);
+    
+    // Initialize watch chunk manager
+    m_watchChunkManager = new WatchChunkManager(this);
 }
 
 PlaybackManager::~PlaybackManager()
@@ -210,6 +214,20 @@ void PlaybackManager::handleStatusReply()
         if (position != m_lastPosition || duration != m_lastDuration) {
             m_lastPosition = position;
             m_lastDuration = duration;
+            
+            // Record watched chunk (1-minute chunks)
+            if (duration > 0 && position > 0) {
+                int chunkIndex = position / WatchChunkManager::getChunkSizeSeconds();
+                m_watchChunkManager->recordChunk(m_currentLid, chunkIndex);
+                
+                // Check if file should be marked as locally watched based on chunks
+                if (!m_watchChunkManager->getLocalWatchedStatus(m_currentLid)) {
+                    if (m_watchChunkManager->shouldMarkAsWatched(m_currentLid, duration)) {
+                        m_watchChunkManager->updateLocalWatchedStatus(m_currentLid, true);
+                        LOG(QString("File marked as locally watched based on chunks: LID %1").arg(m_currentLid));
+                    }
+                }
+            }
             
             // Save to database periodically
             m_saveCounter++;

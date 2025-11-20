@@ -570,6 +570,8 @@ public slots:
     void loadMylistAsCards();
     void onCardClicked(int aid);
     void onCardEpisodeClicked(int lid);
+    void onPlayAnimeFromCard(int aid);
+    void onResetWatchSession(int aid);
     
     // Poster download slots
     void onPosterDownloadFinished(QNetworkReply *reply);

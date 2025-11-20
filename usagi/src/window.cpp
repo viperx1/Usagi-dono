@@ -12,6 +12,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QFile>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -181,6 +182,8 @@ Window::Window()
         // Connect individual card signals
         connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
         connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
+        connect(card, &AnimeCard::playAnimeRequested, this, &Window::onPlayAnimeFromCard);
+        connect(card, &AnimeCard::resetWatchSessionRequested, this, &Window::onResetWatchSession);
     });
     
     connect(cardManager, &MyListCardManager::cardUpdated, this, [this](int aid) {
@@ -3342,7 +3345,8 @@ void Window::loadMylistFromDatabase()
 					"f.filetype, f.resolution, f.quality, "
 					"(SELECT name FROM `group` WHERE gid = m.gid) as group_name, "
 					"f.filename, m.gid, m.last_played, "
-					"lf.path as local_file_path "
+					"lf.path as local_file_path, "
+					"m.local_watched "
 					"FROM mylist m "
 					"LEFT JOIN anime a ON m.aid = a.aid "
 					"LEFT JOIN episode e ON m.eid = e.eid "
@@ -3404,6 +3408,7 @@ void Window::loadMylistFromDatabase()
 		int gid = q.value(22).toInt();
 		qint64 lastPlayed = q.value(23).toLongLong();
 		QString localFilePath = q.value(24).toString();
+		int localWatched = q.value(25).toInt();  // New: local watched status
 		
 		// Check if file exists
 		bool fileExists = false;
@@ -3650,7 +3655,7 @@ void Window::loadMylistFromDatabase()
 				fileItem->setText(COL_PLAY, PlayIcons::NOT_FOUND); // X for file not found
 				fileItem->setForeground(COL_PLAY, QBrush(UIColors::FILE_NOT_FOUND)); // Red color for disabled
 				fileItem->setData(COL_PLAY, Qt::UserRole, 2); // Sort key for unavailable
-			} else if (viewed) {
+			} else if (localWatched) {  // Use local_watched status for play button
 				fileItem->setText(COL_PLAY, PlayIcons::WATCHED); // Checkmark for watched
 				fileItem->setData(COL_PLAY, Qt::UserRole, 1); // Sort key for viewed
 			} else {
@@ -3698,7 +3703,8 @@ void Window::loadMylistFromDatabase()
 				{
 					hasAvailableFile = true;
 				}
-				if(fileItem->text(COL_VIEWED) == "Yes")
+				// Check if file is locally watched (has checkmark in play column)
+				if(fileItem->text(COL_PLAY) == PlayIcons::WATCHED)
 				{
 					episodeViewed = true;
 				}
@@ -4654,15 +4660,31 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		// This is a file item
 		FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(item);
 		if (file && file->getFileType() == FileTreeWidgetItem::Video) {
-			bool viewed = (item->text(COL_VIEWED) == "Yes");
+			// Get LID from the item
+			int lid = item->text(MYLIST_ID_COLUMN).toInt();
+			
+			// Query local_watched status from database
+			bool localWatched = false;
+			if (lid > 0) {
+				QSqlDatabase db = QSqlDatabase::database();
+				if (db.isOpen()) {
+					QSqlQuery q(db);
+					q.prepare("SELECT local_watched FROM mylist WHERE lid = ?");
+					q.addBindValue(lid);
+					if (q.exec() && q.next()) {
+						localWatched = (q.value(0).toInt() == 1);
+					}
+				}
+			}
+			
 			// Check if file doesn't exist
 			QString currentText = item->text(PLAY_COLUMN);
-			if (currentText == "✗") {
+			if (currentText == PlayIcons::NOT_FOUND) {
 				// Keep the X if file doesn't exist (sort key already set to 2)
 				return;
 			}
-			item->setText(PLAY_COLUMN, viewed ? "✓" : "▶");
-			item->setData(PLAY_COLUMN, Qt::UserRole, viewed ? 1 : 0); // Update sort key
+			item->setText(PLAY_COLUMN, localWatched ? PlayIcons::WATCHED : PlayIcons::PLAY);
+			item->setData(PLAY_COLUMN, Qt::UserRole, localWatched ? 1 : 0); // Update sort key
 		}
 	}
 	else if (parent && !parent->parent()) {
@@ -4674,7 +4696,8 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 			FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 			if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 				hasVideoFile = true;
-				if (fileItem->text(COL_VIEWED) == "Yes") {
+				// Check play button status (✓ means locally watched)
+				if (fileItem->text(COL_PLAY) == PlayIcons::WATCHED) {
 					episodeViewed = true;
 					break;
 				}
@@ -4682,10 +4705,10 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		}
 		
 		if (hasVideoFile) {
-			item->setText(PLAY_COLUMN, episodeViewed ? "✓" : "▶");
+			item->setText(PLAY_COLUMN, episodeViewed ? PlayIcons::WATCHED : PlayIcons::PLAY);
 			item->setData(PLAY_COLUMN, Qt::UserRole, episodeViewed ? 1 : 0); // Update sort key
 		} else {
-			item->setText(PLAY_COLUMN, "");
+			item->setText(PLAY_COLUMN, PlayIcons::EMPTY);
 			item->setData(PLAY_COLUMN, Qt::UserRole, 2); // Update sort key (unavailable)
 		}
 		
@@ -4709,7 +4732,8 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 				FileTreeWidgetItem *file = dynamic_cast<FileTreeWidgetItem*>(fileItem);
 				if (file && file->getFileType() == FileTreeWidgetItem::Video) {
 					hasVideoFile = true;
-					if (fileItem->text(COL_VIEWED) == "Yes") {
+					// Check play button status (✓ means locally watched)
+					if (fileItem->text(COL_PLAY) == PlayIcons::WATCHED) {
 						episodeViewed = true;
 						break;
 					}
@@ -4726,10 +4750,10 @@ void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
 		
 		if (totalEpisodes > 0) {
 			if (viewedEpisodes == totalEpisodes) {
-				item->setText(PLAY_COLUMN, "✓");
+				item->setText(PLAY_COLUMN, PlayIcons::WATCHED);
 				item->setData(PLAY_COLUMN, Qt::UserRole, 1); // Update sort key
 			} else {
-				item->setText(PLAY_COLUMN, "▶");
+				item->setText(PLAY_COLUMN, PlayIcons::PLAY);
 				item->setData(PLAY_COLUMN, Qt::UserRole, 0); // Update sort key
 			}
 		} else {
@@ -5280,6 +5304,101 @@ void Window::onCardEpisodeClicked(int lid)
 	LOG(QString("Episode clicked with LID: %1").arg(lid));
 	// Start playback for the episode
 	startPlaybackForFile(lid);
+}
+
+void Window::onPlayAnimeFromCard(int aid)
+{
+	LOG(QString("Play anime requested from card for anime ID: %1").arg(aid));
+	
+	// Find the first unwatched episode (based on local_watched) for this anime
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("Cannot play anime: Database not open");
+		return;
+	}
+	
+	QSqlQuery q(db);
+	q.prepare("SELECT m.lid, e.epno, m.local_watched, lf.path, m.eid "
+	          "FROM mylist m "
+	          "LEFT JOIN episode e ON m.eid = e.eid "
+	          "LEFT JOIN local_files lf ON m.local_file = lf.id "
+	          "WHERE m.aid = ? AND lf.path IS NOT NULL AND e.epno IS NOT NULL "
+	          "ORDER BY e.epno, m.lid");
+	q.addBindValue(aid);
+	
+	if (q.exec()) {
+		// Find first unwatched episode
+		while (q.next()) {
+			int lid = q.value(0).toInt();
+			int localWatched = q.value(2).toInt();
+			QString localPath = q.value(3).toString();
+			int eid = q.value(4).toInt();
+			
+			// Check if file exists
+			if (!localPath.isEmpty() && QFile::exists(localPath)) {
+				if (localWatched == 0) {
+					// Found first unwatched episode with available file
+					LOG(QString("Playing first unwatched episode LID: %1, EID: %2").arg(lid).arg(eid));
+					startPlaybackForFile(lid);
+					return;
+				}
+			}
+		}
+		
+		// If all episodes are watched, play the first available one
+		q.first();
+		if (q.isValid()) {
+			int lid = q.value(0).toInt();
+			QString localPath = q.value(3).toString();
+			int eid = q.value(4).toInt();
+			if (!localPath.isEmpty() && QFile::exists(localPath)) {
+				LOG(QString("All episodes watched, playing first episode LID: %1, EID: %2").arg(lid).arg(eid));
+				startPlaybackForFile(lid);
+				return;
+			}
+		}
+	}
+	
+	LOG(QString("No playable episodes found for anime ID: %1 (files with episode data only)").arg(aid));
+}
+
+void Window::onResetWatchSession(int aid)
+{
+	LOG(QString("Reset watch session requested for anime ID: %1").arg(aid));
+	
+	// Clear local_watched status for all episodes of this anime
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("Cannot reset watch session: Database not open");
+		return;
+	}
+	
+	// Clear local_watched in mylist
+	QSqlQuery q(db);
+	q.prepare("UPDATE mylist SET local_watched = 0 WHERE aid = ?");
+	q.addBindValue(aid);
+	
+	if (!q.exec()) {
+		LOG(QString("Error resetting local_watched: %1").arg(q.lastError().text()));
+		return;
+	}
+	
+	// Clear watch chunks for all episodes of this anime
+	QSqlQuery q2(db);
+	q2.prepare("DELETE FROM watch_chunks WHERE lid IN (SELECT lid FROM mylist WHERE aid = ?)");
+	q2.addBindValue(aid);
+	
+	if (!q2.exec()) {
+		LOG(QString("Error clearing watch chunks: %1").arg(q2.lastError().text()));
+		return;
+	}
+	
+	LOG(QString("Watch session reset for anime ID: %1").arg(aid));
+	
+	// Reload the card view to reflect the changes
+	if (mylistUseCardView) {
+		loadMylistAsCards();
+	}
 }
 
 // Unknown files handling slots

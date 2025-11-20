@@ -9,6 +9,9 @@
 #include <QNetworkReply>
 #include <QRegularExpression>
 
+// Forward declaration
+class WatchChunkManager;
+
 /**
  * @brief Manages media playback and tracking
  * 
@@ -105,6 +108,7 @@ private:
     
     QTimer *m_statusTimer;
     QNetworkAccessManager *m_networkManager;
+    WatchChunkManager *m_watchChunkManager;  // Chunk-based watch tracking
     
     // Configuration constants
     static const int MPC_WEB_PORT = 13579;
