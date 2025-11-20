@@ -203,26 +203,51 @@ namespace PlayIcons {
 
 **Impact**: Replaced 22+ hardcoded icon strings with named constants, centralizing icon definitions
 
+### 10. UI Color Constants
+**Files**: `usagi/src/uicolors.h` (new), `usagi/src/window.h/.cpp`, `usagi/src/animecard.cpp`
+
+**Problem**: UI colors (red, green, light blue, etc.) were hardcoded 13+ times throughout window.cpp and animecard.cpp, making theme changes difficult.
+
+**Solution**: Created `uicolors.h` with `UIColors` namespace:
+```cpp
+namespace UIColors {
+    // Status colors
+    inline const QColor FILE_NOT_FOUND = QColor(Qt::red);        // Red for missing files
+    inline const QColor FILE_AVAILABLE = QColor(0, 150, 0);      // Green for available
+    inline const QColor FILE_WATCHED = QColor(0, 150, 0);        // Green for watched
+    
+    // File quality colors (backgrounds)
+    inline const QColor FILE_QUALITY_HIGH = QColor(230, 240, 255);   // Light blue
+    inline const QColor FILE_QUALITY_MEDIUM = QColor(255, 250, 230); // Light yellow
+    inline const QColor FILE_QUALITY_LOW = QColor(255, 230, 240);    // Light pink
+    inline const QColor FILE_QUALITY_UNKNOWN = QColor(240, 240, 240); // Light gray
+}
+```
+
+**Impact**: Replaced 13+ hardcoded color instances, centralizing UI theming
+
 ## Statistics
 
 ### Code Reduction
-- **Total lines eliminated**: 170+ lines
+- **Total lines eliminated**: 180+ lines
 - **MyListCardManager**: ~60 lines
-- **Window**: ~36 lines (utilities) + 22+ icon replacements
+- **Window**: ~36 lines (utilities) + 22+ icon replacements + 9 color replacements
 - **AniDBApi settings**: ~17 lines
-- **AnimeCard**: Reorganized (moved to slots)
+- **AnimeCard**: Reorganized (moved to slots) + 4 color replacements
 - **epno**: ~4 lines
 - **PlayButtonDelegate**: ~10 lines (reduced complexity)
 - **FlowLayout**: ~6 lines
 - **HasherThread**: ~9 lines (reduced complexity)
 - **Mask**: Named constant (improved clarity)
 - **PlayIcons**: Centralized constants (improved maintainability)
+- **UIColors**: Centralized theming (13+ replacements)
 
-### Files Modified (12 source files + headers + docs)
-- `usagi/src/animecard.h` - Converted setters to slots
+### Files Modified (13 source files + headers + docs)
+- `usagi/src/animecard.h/.cpp` - Converted setters to slots, color constants
 - `usagi/src/mylistcardmanager.h/.cpp` - Added helper functions
-- `usagi/src/window.h/.cpp` - Shared utilities, icon constants (NEW)
+- `usagi/src/window.h/.cpp` - Shared utilities, icon/color constants (NEW)
 - `usagi/src/animeutils.h` - New shared utility header (NEW)
+- `usagi/src/uicolors.h` - New color constants header (NEW)
 - `usagi/src/anidbapi.h` - Added saveSetting() helper
 - `usagi/src/anidbapi.cpp` - Uses saveSetting() helper
 - `usagi/src/anidbapi_settings.cpp` - Simplified all setters
@@ -231,7 +256,7 @@ namespace PlayIcons {
 - `usagi/src/flowlayout.cpp` - Simplified spacing (NEW)
 - `usagi/src/hasherthread.h/.cpp` - Cleanup helper (NEW)
 - `usagi/src/mask.h/.cpp` - Named constant (NEW)
-- `usagi/CMakeLists.txt` - Added new header to build
+- `usagi/CMakeLists.txt` - Added new headers to build
 - `CODE_CLEANUP_SUMMARY.md` - This document
 
 ## Design Improvements
@@ -279,7 +304,7 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 
 ## Benefits
 
-1. **Reduced Duplication**: 170+ lines of duplicate code eliminated
+1. **Reduced Duplication**: 180+ lines of duplicate code eliminated
 2. **Improved Maintainability**: Changes to logic only need to be made in one place
 3. **Better Architecture**: Slots enable signal-based communication
 4. **Clearer Intent**: Helper functions and maps have descriptive names
@@ -289,7 +314,8 @@ static const QMap<int, QString> typePrefixes = {{2, "S"}, {3, "C"}, ...};
 8. **Future Extensibility**: Easy to add observers, new types, or settings
 9. **Thread Safety**: Consistent cleanup patterns prevent memory leaks
 10. **Named Constants**: Magic numbers and strings replaced with self-documenting constants
-11. **Centralized UI Elements**: Icon changes require updates in only one place
+11. **Centralized UI Elements**: Icon and color changes require updates in only one place
+12. **Easy Theming**: All UI colors in one header for simple theme customization
 
 ## Testing
 
