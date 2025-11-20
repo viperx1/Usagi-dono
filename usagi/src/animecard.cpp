@@ -591,6 +591,51 @@ void AnimeCard::contextMenuEvent(QContextMenuEvent *event)
 void AnimeCard::setHidden(bool hidden)
 {
     m_isHidden = hidden;
+    
+    // Update visual representation based on hidden state
+    if (hidden) {
+        // Hide most elements, show only title as a compact view
+        m_posterLabel->hide();
+        m_typeLabel->hide();
+        m_airedLabel->hide();
+        m_ratingLabel->hide();
+        m_tagsLabel->hide();
+        m_statsLabel->hide();
+        m_nextEpisodeLabel->hide();
+        m_playButton->hide();
+        m_resetSessionButton->hide();
+        m_episodeTree->hide();
+        m_warningLabel->hide();
+        
+        // Make card smaller for title-only display
+        setFixedSize(QSize(600, 40));
+        
+        // Make title more prominent
+        m_titleLabel->setStyleSheet("font-weight: bold; font-size: 10pt; color: #888;");
+    } else {
+        // Show all elements in normal view
+        m_posterLabel->show();
+        m_typeLabel->show();
+        m_airedLabel->show();
+        m_ratingLabel->show();
+        m_tagsLabel->show();
+        m_statsLabel->show();
+        m_nextEpisodeLabel->show();
+        m_playButton->show();
+        m_resetSessionButton->show();
+        m_episodeTree->show();
+        
+        // Restore normal size
+        setFixedSize(getCardSize());
+        
+        // Restore title style
+        m_titleLabel->setStyleSheet("font-weight: bold; font-size: 12pt;");
+        
+        // Show warning if needed
+        if (m_warningLabel && !m_warningLabel->toolTip().isEmpty()) {
+            // Warning visibility is managed by setNeedsFetch
+        }
+    }
 }
 
 void AnimeCard::enterEvent(QEnterEvent *event)
