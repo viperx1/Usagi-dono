@@ -15,7 +15,7 @@
 
 // UI icon constants
 namespace {
-    const char* DOWNLOAD_ICON = "\xE2\xAC\x87";  // UTF-8 encoded down arrow (⬇)
+    const QString DOWNLOAD_ICON = QString::fromUtf8("\xE2\xAC\x87");  // UTF-8 encoded down arrow (⬇)
 }
 
 AnimeCard::AnimeCard(QWidget *parent)
