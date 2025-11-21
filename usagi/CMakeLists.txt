@@ -102,6 +102,7 @@ endif()
 # For static Qt builds, order matters: Qt6::Concurrent depends on Qt6::Core,
 # so Qt6::Concurrent must come before Qt6::Core in the link order.
 # Qt6::Core is listed again at the end (line 111) to resolve circular dependencies.
+# Note: Qt6::Core is linked again later for Windows to resolve QtConcurrent dependencies
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
     Qt6::Network
@@ -145,6 +146,12 @@ if(WIN32)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
         endif()
     endif()
+    
+    # Link Qt6::Core again at the end for ALL Windows builds (not just static)
+    # This resolves QtConcurrent dependencies on QUnhandledException and other Qt6::Core symbols
+    # that may not be properly resolved in the first link pass with LLVM MinGW
+    # QUnhandledException requires proper exception handling support from Qt6::Core
+    target_link_libraries(usagi PRIVATE Qt6::Core)
     
     # Force console subsystem for LLVM MinGW
     # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
