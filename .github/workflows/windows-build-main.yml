@@ -1,6 +1,7 @@
 name: Windows Build Main (Qt 6.8 LTS LLVM MinGW)
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
