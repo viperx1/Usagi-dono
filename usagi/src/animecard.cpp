@@ -359,9 +359,9 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     bool anyFileExists = false;
     bool allFilesWatched = true;
     int unwatchedFileLid = 0;
-    int unwatchedFileVersion = 0;
+    int unwatchedFileVersion = -1;  // Start at -1 to handle files with version 0
     int watchedFileLid = 0;
-    int watchedFileVersion = 0;
+    int watchedFileVersion = -1;  // Start at -1 to handle files with version 0
     
     for (const FileInfo& file : episode.files) {      
         if (!file.localFilePath.isEmpty()) {
