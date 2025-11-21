@@ -265,7 +265,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
     bool needsMetadata = m_animeNeedingMetadata.contains(aid);
     bool needsPoster = m_animeNeedingPoster.contains(aid);
     bool hasEpisodesNeedingData = false;
-    int episodesNeedingDataCount = 0;
+    QSet<int> episodesNeedingData;
     
     // Check if any episodes need data
     QSqlDatabase db = QSqlDatabase::database();
@@ -280,14 +280,14 @@ void MyListCardManager::onFetchDataRequested(int aid)
                 int eid = q.value(0).toInt();
                 if (eid > 0) {
                     hasEpisodesNeedingData = true;
-                    episodesNeedingDataCount++;
+                    episodesNeedingData.insert(eid);
                 }
             }
         }
     }
     
     LOG(QString("[MyListCardManager] Data check for aid=%1: needsMetadata=%2, needsPoster=%3, hasEpisodesNeedingData=%4 (count=%5), alreadyRequested=%6")
-        .arg(aid).arg(needsMetadata).arg(needsPoster).arg(hasEpisodesNeedingData).arg(episodesNeedingDataCount).arg(m_animeMetadataRequested.contains(aid)));
+        .arg(aid).arg(needsMetadata).arg(needsPoster).arg(hasEpisodesNeedingData).arg(episodesNeedingData.size()).arg(m_animeMetadataRequested.contains(aid)));
     
     bool requestedAnything = false;
     
@@ -320,9 +320,13 @@ void MyListCardManager::onFetchDataRequested(int aid)
         }
     }
     
+    // Request episode data for episodes that need it
     if (hasEpisodesNeedingData) {
-        LOG(QString("[MyListCardManager] Note: %1 episodes need data for aid=%2 - episode data fetched via FILE command")
-            .arg(episodesNeedingDataCount).arg(aid));
+        LOG(QString("[MyListCardManager] Requesting episode data for %1 episodes of aid=%2").arg(episodesNeedingData.size()).arg(aid));
+        for (int eid : episodesNeedingData) {
+            emit episodeDataRequested(eid);
+        }
+        requestedAnything = true;
     }
     
     if (!requestedAnything) {
@@ -995,9 +999,13 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
         return;
     }
     
-    // Update all files for this episode to viewed=1
+    // Get current timestamp for viewdate
+    qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
+    
+    // Update all files for this episode to viewed=1 with viewdate
     QSqlQuery q(db);
-    q.prepare("UPDATE mylist SET viewed = 1 WHERE eid = ?");
+    q.prepare("UPDATE mylist SET viewed = 1, viewdate = ? WHERE eid = ?");
+    q.addBindValue(currentTimestamp);
     q.addBindValue(eid);
     
     if (!q.exec()) {
@@ -1006,20 +1014,40 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
         return;
     }
     
-    // Find the anime ID for this episode
-    q.prepare("SELECT DISTINCT aid FROM mylist WHERE eid = ?");
+    int rowsAffected = q.numRowsAffected();
+    LOG(QString("[MyListCardManager] Marked %1 file(s) as watched for episode eid=%2").arg(rowsAffected).arg(eid));
+    
+    // Get all files for this episode to update API
+    q.prepare("SELECT lid, size, ed2k, aid FROM mylist m "
+              "INNER JOIN file f ON m.fid = f.fid "
+              "WHERE m.eid = ?");
     q.addBindValue(eid);
     
-    if (!q.exec() || !q.next()) {
-        LOG(QString("[MyListCardManager] Failed to find anime for episode eid=%1").arg(eid));
+    if (!q.exec()) {
+        LOG(QString("[MyListCardManager] Failed to query files for episode eid=%1").arg(eid));
         return;
     }
     
-    int aid = q.value(0).toInt();
-    LOG(QString("[MyListCardManager] Marked episode eid=%1 as watched, updating card for aid=%2").arg(eid).arg(aid));
+    int aid = 0;
+    // Emit API update requests for each file
+    while (q.next()) {
+        int lid = q.value(0).toInt();
+        int size = q.value(1).toInt();
+        QString ed2k = q.value(2).toString();
+        aid = q.value(3).toInt();
+        
+        // Emit signal for API update (will be handled by Window to call anidb->UpdateFile)
+        emit fileNeedsApiUpdate(lid, size, ed2k, 1);
+    }
     
-    // Update the card immediately to reflect the change
-    updateCardFromDatabase(aid);
+    if (aid > 0) {
+        LOG(QString("[MyListCardManager] Requesting play button update for aid=%1").arg(aid));
+        // Emit signal to update play buttons in tree view
+        emit playButtonsNeedUpdate(aid);
+        
+        // Update the card immediately to reflect the change
+        updateCardFromDatabase(aid);
+    }
 }
 
 void MyListCardManager::onMarkFileWatchedRequested(int lid)
@@ -1032,9 +1060,13 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
         return;
     }
     
-    // Update this specific file to viewed=1
+    // Get current timestamp for viewdate
+    qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
+    
+    // Update this specific file to viewed=1 with viewdate
     QSqlQuery q(db);
-    q.prepare("UPDATE mylist SET viewed = 1 WHERE lid = ?");
+    q.prepare("UPDATE mylist SET viewed = 1, viewdate = ? WHERE lid = ?");
+    q.addBindValue(currentTimestamp);
     q.addBindValue(lid);
     
     if (!q.exec()) {
@@ -1043,17 +1075,30 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
         return;
     }
     
-    // Find the anime ID for this file
-    q.prepare("SELECT DISTINCT aid FROM mylist WHERE lid = ?");
+    LOG(QString("[MyListCardManager] Marked file lid=%1 as watched").arg(lid));
+    
+    // Get file info for API update
+    q.prepare("SELECT m.aid, f.size, f.ed2k FROM mylist m "
+              "INNER JOIN file f ON m.fid = f.fid "
+              "WHERE m.lid = ?");
     q.addBindValue(lid);
     
     if (!q.exec() || !q.next()) {
-        LOG(QString("[MyListCardManager] Failed to find anime for file lid=%1").arg(lid));
+        LOG(QString("[MyListCardManager] Failed to find file info for lid=%1").arg(lid));
         return;
     }
     
     int aid = q.value(0).toInt();
+    int size = q.value(1).toInt();
+    QString ed2k = q.value(2).toString();
+    
     LOG(QString("[MyListCardManager] Marked file lid=%1 as watched, updating card for aid=%2").arg(lid).arg(aid));
+    
+    // Emit signal for API update (will be handled by Window to call anidb->UpdateFile)
+    emit fileNeedsApiUpdate(lid, size, ed2k, 1);
+    
+    // Emit signal to update play buttons in tree view
+    emit playButtonsNeedUpdate(aid);
     
     // Update the card immediately to reflect the change
     updateCardFromDatabase(aid);
