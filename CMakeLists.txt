@@ -141,7 +141,7 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     message(STATUS "Detected static Qt6 libraries - configuring for static build")
     
     # Force QT_STATIC in compiler flags to ensure it's seen by all compilation units
-    # This is critical for proper linkage of QUnhandledException in QtConcurrent with Qt 6.8.x
+    # This is critical for proper linkage of QUnhandledException in QtConcurrent with Qt 6.8.0-6.8.3
     # Using add_compile_options instead of add_compile_definitions ensures the flag is
     # passed to the compiler for ALL sources, including generated MOC files
     add_compile_options(-DQT_STATIC -DQT_STATICPLUGIN)
