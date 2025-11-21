@@ -9,6 +9,9 @@
 #include <QTreeWidgetItem>
 #include <QDateTime>
 #include <QFile>
+#include <QScreen>
+#include <QGuiApplication>
+#include <QCursor>
 
 AnimeCard::AnimeCard(QWidget *parent)
     : QFrame(parent)
@@ -19,6 +22,9 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_otherEpisodes(0)
     , m_otherViewed(0)
     , m_lastPlayed(0)
+    , m_isHidden(false)
+    , m_needsFetch(false)
+    , m_posterOverlay(nullptr)
 {
     setupUI();
     
@@ -49,11 +55,12 @@ void AnimeCard::setupUI()
     // Poster (left side) - increased by 50%
     m_posterLabel = new QLabel(this);
     m_posterLabel->setFixedSize(240, 330);  // Increased by 50% from 160x220
-    m_posterLabel->setScaledContents(true);
+    m_posterLabel->setScaledContents(false);  // Changed to false to maintain aspect ratio
     m_posterLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);
     m_posterLabel->setAlignment(Qt::AlignCenter);
     m_posterLabel->setText("No\nImage");
     m_posterLabel->setStyleSheet("background-color: #f0f0f0; color: #999;");
+    m_posterLabel->setMouseTracking(true);
     m_topLayout->addWidget(m_posterLabel);
     
     // Info section (right side)
@@ -163,6 +170,40 @@ void AnimeCard::setupUI()
             }
         }
     });
+    
+    // Connect tree widget context menu
+    m_episodeTree->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_episodeTree, &QTreeWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
+        QTreeWidgetItem *item = m_episodeTree->itemAt(pos);
+        if (!item) {
+            return;
+        }
+        
+        QMenu contextMenu(this);
+        
+        // Check if this is an episode item (has no parent) or a file item (has parent)
+        if (!item->parent()) {
+            // Episode item - mark all files in episode as watched
+            int eid = item->data(2, Qt::UserRole + 1).toInt();
+            if (eid > 0) {
+                QAction *markWatchedAction = contextMenu.addAction("Mark episode as watched");
+                connect(markWatchedAction, &QAction::triggered, this, [this, eid]() {
+                    emit markEpisodeWatchedRequested(eid);
+                });
+                contextMenu.exec(m_episodeTree->mapToGlobal(pos));
+            }
+        } else {
+            // File item - mark this specific file as watched
+            int lid = item->data(2, Qt::UserRole).toInt();
+            if (lid > 0) {
+                QAction *markFileWatchedAction = contextMenu.addAction("Mark file as watched");
+                connect(markFileWatchedAction, &QAction::triggered, this, [this, lid]() {
+                    emit markFileWatchedRequested(lid);
+                });
+                contextMenu.exec(m_episodeTree->mapToGlobal(pos));
+            }
+        }
+    });
 }
 
 void AnimeCard::setAnimeId(int aid)
@@ -264,7 +305,12 @@ void AnimeCard::updateStatisticsLabel()
 void AnimeCard::setPoster(const QPixmap& pixmap)
 {
     if (!pixmap.isNull()) {
-        m_posterLabel->setPixmap(pixmap);
+        // Store original poster for overlay
+        m_originalPoster = pixmap;
+        
+        // Scale pixmap to fit within poster label while maintaining aspect ratio
+        QPixmap scaledPixmap = pixmap.scaled(m_posterLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        m_posterLabel->setPixmap(scaledPixmap);
         m_posterLabel->setText("");
         m_posterLabel->setStyleSheet("");
     }
@@ -450,6 +496,9 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     
     // Update next episode indicator
     updateNextEpisodeIndicator();
+    
+    // Update card background for unwatched episodes
+    updateCardBackgroundForUnwatchedEpisodes();
 }
 
 void AnimeCard::clearEpisodes()
@@ -495,6 +544,7 @@ void AnimeCard::updateNextEpisodeIndicator()
 
 void AnimeCard::setNeedsFetch(bool needsFetch)
 {
+    m_needsFetch = needsFetch;
     if (needsFetch) {
         m_warningLabel->show();
     } else {
@@ -519,10 +569,25 @@ void AnimeCard::paintEvent(QPaintEvent *event)
 void AnimeCard::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        // Emit signal when card is clicked (but not when episode tree is clicked)
+        // Check if click is on poster - show overlay (only if not hidden)
         QPoint pos = event->pos();
+        if (!m_isHidden && m_posterLabel->geometry().contains(pos) && m_posterLabel->isVisible()) {
+            showPosterOverlay();
+            // Don't propagate to parent - we handled it
+            event->accept();
+            return;
+        }
+        
+        // Emit signal when card is clicked (but not when episode tree is clicked or poster is clicked)
         if (!m_episodeTree->geometry().contains(pos)) {
+            LOG(QString("[AnimeCard] Card clicked for aid=%1, m_needsFetch=%2").arg(m_animeId).arg(m_needsFetch));
             emit cardClicked(m_animeId);
+            
+            // Auto-fetch missing data when card is clicked if data is needed
+            // Always emit fetchDataRequested - let MyListCardManager decide what needs fetching
+            LOG(QString("[AnimeCard] Emitting fetchDataRequested for aid=%1 (m_needsFetch=%2)")
+                .arg(m_animeId).arg(m_needsFetch));
+            emit fetchDataRequested(m_animeId);
         }
     }
     QFrame::mousePressEvent(event);
@@ -537,5 +602,228 @@ void AnimeCard::contextMenuEvent(QContextMenuEvent *event)
         emit fetchDataRequested(m_animeId);
     });
     
+    QAction *hideAction = contextMenu.addAction(m_isHidden ? "Unhide" : "Hide");
+    connect(hideAction, &QAction::triggered, this, [this]() {
+        emit hideCardRequested(m_animeId);
+    });
+    
     contextMenu.exec(event->globalPos());
+}
+
+void AnimeCard::setHidden(bool hidden)
+{
+    m_isHidden = hidden;
+    
+    // Update visual representation based on hidden state
+    if (hidden) {
+        // Hide most elements, show only title as a compact view
+        m_posterLabel->hide();
+        m_typeLabel->hide();
+        m_airedLabel->hide();
+        m_ratingLabel->hide();
+        m_tagsLabel->hide();
+        m_statsLabel->hide();
+        m_nextEpisodeLabel->hide();
+        m_playButton->hide();
+        m_resetSessionButton->hide();
+        m_episodeTree->hide();
+        m_warningLabel->hide();
+        
+        // Make card smaller for title-only display
+        setFixedSize(QSize(600, 40));
+        
+        // Make title more prominent
+        m_titleLabel->setStyleSheet("font-weight: bold; font-size: 10pt; color: #888;");
+    } else {
+        // Show all elements in normal view
+        m_posterLabel->show();
+        m_typeLabel->show();
+        m_airedLabel->show();
+        m_ratingLabel->show();
+        m_tagsLabel->show();
+        m_statsLabel->show();
+        m_nextEpisodeLabel->show();
+        m_playButton->show();
+        m_resetSessionButton->show();
+        m_episodeTree->show();
+        
+        // Restore normal size
+        setFixedSize(getCardSize());
+        
+        // Restore title style
+        m_titleLabel->setStyleSheet("font-weight: bold; font-size: 12pt;");
+        
+        // Show warning if needed
+        if (m_warningLabel && !m_warningLabel->toolTip().isEmpty()) {
+            // Warning visibility is managed by setNeedsFetch
+        }
+    }
+}
+
+void AnimeCard::enterEvent(QEnterEvent *event)
+{
+    QFrame::enterEvent(event);
+}
+
+void AnimeCard::leaveEvent(QEvent *event)
+{
+    // Don't hide overlay here - it's handled by eventFilter on poster label
+    QFrame::leaveEvent(event);
+}
+
+bool AnimeCard::eventFilter(QObject *watched, QEvent *event)
+{
+    // Check if this is a leave event on the poster label
+    if (watched == m_posterLabel && event->type() == QEvent::Leave) {
+        // Only hide if mouse is not over the overlay
+        if (m_posterOverlay && m_posterOverlay->isVisible()) {
+            // Check if mouse is actually over the overlay
+            QPoint globalPos = QCursor::pos();
+            QRect overlayRect = m_posterOverlay->geometry();
+            if (!overlayRect.contains(globalPos)) {
+                // Mouse has left poster and is not over overlay - hide it
+                hidePosterOverlay();
+            }
+        }
+    }
+    
+    // Check if mouse enters poster label while overlay is visible - keep it visible
+    if (watched == m_posterLabel && event->type() == QEvent::Enter) {
+        // If overlay is visible, keep it that way
+        if (m_posterOverlay && m_posterOverlay->isVisible()) {
+            m_posterOverlay->raise();
+        }
+    }
+    
+    // Check if mouse leaves the overlay itself
+    if (watched == m_posterOverlay && event->type() == QEvent::Leave) {
+        // Check if mouse has moved to poster label - if not, hide overlay
+        QPoint globalPos = QCursor::pos();
+        QPoint posterGlobalPos = m_posterLabel->mapToGlobal(QPoint(0, 0));
+        QRect posterRect(posterGlobalPos, m_posterLabel->size());
+        if (!posterRect.contains(globalPos)) {
+            // Mouse has left overlay and is not over poster - hide it
+            hidePosterOverlay();
+        }
+    }
+    
+    return QFrame::eventFilter(watched, event);
+}
+
+void AnimeCard::showPosterOverlay()
+{
+    if (m_originalPoster.isNull()) {
+        return;
+    }
+    
+    // Create overlay if it doesn't exist - parent it to the top-level widget to avoid clipping
+    if (!m_posterOverlay) {
+        // Find the top-level widget (main window)
+        QWidget *topWidget = this;
+        while (topWidget->parentWidget()) {
+            topWidget = topWidget->parentWidget();
+        }
+        
+        m_posterOverlay = new QLabel(topWidget);
+        m_posterOverlay->setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+        m_posterOverlay->setAttribute(Qt::WA_TranslucentBackground);
+        m_posterOverlay->setAttribute(Qt::WA_Hover);
+        m_posterOverlay->setScaledContents(false);
+        m_posterOverlay->setAlignment(Qt::AlignCenter);
+        m_posterOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 200); border: 2px solid white;");
+        m_posterOverlay->setMouseTracking(true);
+        
+        // Install event filter on overlay itself to track mouse leave
+        m_posterOverlay->installEventFilter(this);
+        
+        // Install event filter to detect when mouse leaves the poster label
+        m_posterLabel->installEventFilter(this);
+    }
+    
+    // Get the original poster size (100% size, no scaling)
+    QSize originalSize = m_originalPoster.size();
+    
+    // Get poster label position in global coordinates
+    QPoint globalPos = m_posterLabel->mapToGlobal(QPoint(0, 0));
+    
+    // Center the overlay over the poster label position, using original poster dimensions
+    int x = globalPos.x() + (m_posterLabel->width() - originalSize.width()) / 2;
+    int y = globalPos.y() + (m_posterLabel->height() - originalSize.height()) / 2;
+    
+    // Get screen geometry to ensure overlay stays within screen bounds
+    QScreen *screen = QGuiApplication::screenAt(globalPos);
+    if (!screen) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    
+    if (screen) {
+        QRect screenGeometry = screen->geometry();
+        
+        // Adjust x position if overlay goes off right edge of screen
+        if (x + originalSize.width() > screenGeometry.right()) {
+            x = screenGeometry.right() - originalSize.width();
+        }
+        // Adjust x position if overlay goes off left edge of screen
+        if (x < screenGeometry.left()) {
+            x = screenGeometry.left();
+        }
+        
+        // Adjust y position if overlay goes off bottom edge of screen
+        if (y + originalSize.height() > screenGeometry.bottom()) {
+            y = screenGeometry.bottom() - originalSize.height();
+        }
+        // Adjust y position if overlay goes off top edge of screen
+        if (y < screenGeometry.top()) {
+            y = screenGeometry.top();
+        }
+    }
+    
+    m_posterOverlay->setGeometry(x, y, originalSize.width(), originalSize.height());
+    
+    // Show original poster at 100% original size
+    m_posterOverlay->setPixmap(m_originalPoster);
+    m_posterOverlay->show();
+    m_posterOverlay->raise();
+}
+
+void AnimeCard::hidePosterOverlay()
+{
+    if (m_posterOverlay) {
+        m_posterOverlay->hide();
+    }
+}
+
+void AnimeCard::updateCardBackgroundForUnwatchedEpisodes()
+{
+    // Check if there are unwatched episodes
+    bool hasUnwatchedEpisodes = false;
+    int topLevelCount = m_episodeTree->topLevelItemCount();
+    
+    for (int i = 0; i < topLevelCount; i++) {
+        QTreeWidgetItem *episodeItem = m_episodeTree->topLevelItem(i);
+        
+        // Check if any file in this episode is unwatched
+        int childCount = episodeItem->childCount();
+        
+        for (int j = 0; j < childCount; j++) {
+            QTreeWidgetItem *fileItem = episodeItem->child(j);
+            // Check if file's play button is a play symbol (meaning not locally watched)
+            QString playText = fileItem->text(1);
+            if (playText == "▶") {
+                hasUnwatchedEpisodes = true;
+                break;
+            }
+        }
+        
+        if (hasUnwatchedEpisodes) {
+            break;
+        }
+    }
+    
+    // Apply green background if there are unwatched episodes
+    if (hasUnwatchedEpisodes) {
+        setStyleSheet("QFrame { background-color: #e8f5e9; }");  // Light green background
+    } else {
+        setStyleSheet("");  // Reset to default
+    }
 }

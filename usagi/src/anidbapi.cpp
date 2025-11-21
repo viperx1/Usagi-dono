@@ -124,6 +124,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// Add cache tracking columns for anime data requests
 		query.exec("ALTER TABLE `anime` ADD COLUMN `last_mask` TEXT");
 		query.exec("ALTER TABLE `anime` ADD COLUMN `last_checked` INTEGER");
+		// Add hidden column for card visibility (for existing databases)
+		query.exec("ALTER TABLE `anime` ADD COLUMN `hidden` INTEGER DEFAULT 0");
 		// Create local_files table for directory watcher feature
 		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 		// binding_status: 0=not_bound, 1=bound_to_anime, 2=not_anime

@@ -77,6 +77,15 @@ signals:
     // Emitted when a card needs to be sorted
     void cardNeedsSorting(int aid);
     
+    // Emitted when a file should be marked watched on AniDB API
+    void fileNeedsApiUpdate(int lid, int size, QString ed2khash, int viewed);
+    
+    // Emitted when play buttons need to be updated for an anime
+    void playButtonsNeedUpdate(int aid);
+    
+    // Emitted when episode data should be requested from AniDB
+    void episodeDataRequested(int eid);
+    
 public slots:
     // Slot to handle episode updates from API
     void onEpisodeUpdated(int eid, int aid);
@@ -89,6 +98,15 @@ public slots:
     
     // Slot to handle manual data fetch request
     void onFetchDataRequested(int aid);
+    
+    // Slot to handle hide card request
+    void onHideCardRequested(int aid);
+    
+    // Slot to handle mark episode watched request
+    void onMarkEpisodeWatchedRequested(int eid);
+    
+    // Slot to handle mark file watched request
+    void onMarkFileWatchedRequested(int lid);
     
 private slots:
     // Timer slot for batched updates
