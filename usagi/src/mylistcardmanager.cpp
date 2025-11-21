@@ -1018,13 +1018,14 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     LOG(QString("[MyListCardManager] Marked %1 file(s) as watched for episode eid=%2").arg(rowsAffected).arg(eid));
     
     // Get all files for this episode to update API
-    q.prepare("SELECT lid, size, ed2k, aid FROM mylist m "
+    q.prepare("SELECT m.lid, f.size, f.ed2k, m.aid FROM mylist m "
               "INNER JOIN file f ON m.fid = f.fid "
               "WHERE m.eid = ?");
     q.addBindValue(eid);
     
     if (!q.exec()) {
-        LOG(QString("[MyListCardManager] Failed to query files for episode eid=%1").arg(eid));
+        LOG(QString("[MyListCardManager] Failed to query files for episode eid=%1: %2")
+            .arg(eid).arg(q.lastError().text()));
         return;
     }
     
