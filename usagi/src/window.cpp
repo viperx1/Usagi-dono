@@ -5425,9 +5425,9 @@ void Window::onResetWatchSession(int aid)
 	
 	LOG(QString("Watch session reset for anime ID: %1").arg(aid));
 	
-	// Reload the card view to reflect the changes
-	if (mylistUseCardView) {
-		loadMylistAsCards();
+	// Update only the affected card to reflect the changes
+	if (mylistUseCardView && cardManager) {
+		cardManager->updateCardAnimeInfo(aid);
 	}
 }
 
