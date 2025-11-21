@@ -1018,8 +1018,8 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     int aid = q.value(0).toInt();
     LOG(QString("[MyListCardManager] Marked episode eid=%1 as watched, updating card for aid=%2").arg(eid).arg(aid));
     
-    // Update the card to reflect the change
-    updateCardAnimeInfo(aid);
+    // Update the card immediately to reflect the change
+    updateCardFromDatabase(aid);
 }
 
 void MyListCardManager::onMarkFileWatchedRequested(int lid)
@@ -1055,6 +1055,6 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
     int aid = q.value(0).toInt();
     LOG(QString("[MyListCardManager] Marked file lid=%1 as watched, updating card for aid=%2").arg(lid).arg(aid));
     
-    // Update the card to reflect the change
-    updateCardAnimeInfo(aid);
+    // Update the card immediately to reflect the change
+    updateCardFromDatabase(aid);
 }
