@@ -230,3 +230,6 @@ int WatchChunkManager::getTotalChunks(int durationSeconds) const
     // Calculate total number of chunks, rounding up
     return static_cast<int>(std::ceil(static_cast<double>(durationSeconds) / CHUNK_SIZE_SECONDS));
 }
+
+// Include the MOC-generated file (only needed if AUTOMOC doesn't handle it)
+#include "moc_watchchunkmanager.cpp"
