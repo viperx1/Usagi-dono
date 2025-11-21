@@ -193,6 +193,36 @@ Window::Window()
         }
     });
     
+    // Connect episode data request signal to fetch missing episode data
+    connect(cardManager, &MyListCardManager::episodeDataRequested, this, [this](int eid) {
+        LOG(QString("[Window] episodeDataRequested signal received for eid=%1").arg(eid));
+        if (adbapi) {
+            LOG(QString("[Window] Requesting episode data from AniDB API for eid=%1").arg(eid));
+            adbapi->Episode(eid);
+        } else {
+            LOG(QString("[Window] ERROR: adbapi is null, cannot request episode data for eid=%1").arg(eid));
+        }
+    });
+    
+    // Connect file API update signal to update watched status on AniDB
+    connect(cardManager, &MyListCardManager::fileNeedsApiUpdate, this, [this](int lid, int size, QString ed2khash, int viewed) {
+        LOG(QString("[Window] Updating file watched status on AniDB for lid=%1, viewed=%2").arg(lid).arg(viewed));
+        if (adbapi) {
+            // Query state and storage from database to pass to UpdateFile
+            QSqlDatabase db = QSqlDatabase::database();
+            if (db.isOpen()) {
+                QSqlQuery q(db);
+                q.prepare("SELECT state, storage FROM mylist WHERE lid = ?");
+                q.addBindValue(lid);
+                if (q.exec() && q.next()) {
+                    int state = q.value(0).toInt();
+                    QString storage = q.value(1).toString();
+                    adbapi->UpdateFile(size, ed2khash, viewed, state, storage);
+                }
+            }
+        }
+    });
+    
     // Add toolbar for view toggle and sorting
     QHBoxLayout *mylistToolbar = new QHBoxLayout();
     
@@ -5199,36 +5229,6 @@ void Window::loadMylistAsCards()
 	        cardManager, &MyListCardManager::onEpisodeUpdated, Qt::UniqueConnection);
 	connect(adbapi, &myAniDBApi::notifyAnimeUpdated,
 	        cardManager, &MyListCardManager::onAnimeUpdated, Qt::UniqueConnection);
-	
-	// Connect episode data request signal to fetch missing episode data
-	connect(cardManager, &MyListCardManager::episodeDataRequested, this, [this](int eid) {
-		LOG(QString("[Window] episodeDataRequested signal received for eid=%1").arg(eid));
-		if (adbapi) {
-			LOG(QString("[Window] Requesting episode data from AniDB API for eid=%1").arg(eid));
-			adbapi->Episode(eid);
-		} else {
-			LOG(QString("[Window] ERROR: adbapi is null, cannot request episode data for eid=%1").arg(eid));
-		}
-	});
-	
-	// Connect file API update signal to update watched status on AniDB
-	connect(cardManager, &MyListCardManager::fileNeedsApiUpdate, this, [this](int lid, int size, QString ed2khash, int viewed) {
-		if (adbapi) {
-			LOG(QString("[Window] Updating file watched status on AniDB for lid=%1, viewed=%2").arg(lid).arg(viewed));
-			// Query state and storage from database to pass to UpdateFile
-			QSqlDatabase db = QSqlDatabase::database();
-			if (db.isOpen()) {
-				QSqlQuery q(db);
-				q.prepare("SELECT state, storage FROM mylist WHERE lid = ?");
-				q.addBindValue(lid);
-				if (q.exec() && q.next()) {
-					int state = q.value(0).toInt();
-					QString storage = q.value(1).toString();
-					adbapi->UpdateFile(size, ed2khash, viewed, state, storage);
-				}
-			}
-		}
-	});
 	
 	// Load all cards through the manager
 	cardManager->loadAllCards();
