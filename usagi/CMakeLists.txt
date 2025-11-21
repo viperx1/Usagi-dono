@@ -107,6 +107,9 @@ endif()
 # how lld (LLVM linker) resolves symbols, Qt6::Core must be present both before
 # and after Qt6::Concurrent in the link line.
 # 
+# Qt6::Core5Compat is added to resolve QUnhandledException linker errors with static Qt builds
+# on Windows LLVM MinGW.
+# 
 # Qt 6.9+ or different compilers/linkers may not require this specific ordering.
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
@@ -115,6 +118,7 @@ target_link_libraries(usagi PRIVATE
     Qt6::Gui
     Qt6::Core      # First reference to Qt6::Core (before Qt6::Concurrent)
     Qt6::Concurrent
+    Qt6::Core5Compat  # Provides QUnhandledException for static Qt builds
     Qt6::Core      # Second reference to Qt6::Core (after Qt6::Concurrent)
     z
 )
