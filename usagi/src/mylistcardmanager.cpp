@@ -271,18 +271,25 @@ void MyListCardManager::onFetchDataRequested(int aid)
     QSqlDatabase db = QSqlDatabase::database();
     if (db.isOpen()) {
         QSqlQuery q(db);
-        q.prepare("SELECT DISTINCT e.eid FROM mylist m "
+        // Check for episodes that either:
+        // 1. Don't exist in episode table at all (e.eid IS NULL)
+        // 2. Exist but have missing/empty name or epno fields
+        q.prepare("SELECT DISTINCT m.eid FROM mylist m "
                  "LEFT JOIN episode e ON m.eid = e.eid "
-                 "WHERE m.aid = ? AND (e.name IS NULL OR e.name = '' OR e.epno IS NULL OR e.epno = '')");
+                 "WHERE m.aid = ? AND m.eid > 0 AND (e.eid IS NULL OR e.name IS NULL OR e.name = '' OR e.epno IS NULL OR e.epno = '')");
         q.addBindValue(aid);
         if (q.exec()) {
+            LOG(QString("[MyListCardManager] Checking episodes for aid=%1").arg(aid));
             while (q.next()) {
                 int eid = q.value(0).toInt();
+                LOG(QString("[MyListCardManager]   Found episode needing data: eid=%1").arg(eid));
                 if (eid > 0) {
                     hasEpisodesNeedingData = true;
                     episodesNeedingData.insert(eid);
                 }
             }
+        } else {
+            LOG(QString("[MyListCardManager] Failed to query episodes needing data: %1").arg(q.lastError().text()));
         }
     }
     
