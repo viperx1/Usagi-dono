@@ -13,6 +13,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QFile>
+#include <QSet>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -5341,6 +5342,7 @@ void Window::onPlayAnimeFromCard(int aid)
 	LOG(QString("Play anime requested from card for anime ID: %1").arg(aid));
 	
 	// Find the first unwatched episode (based on local_watched) for this anime
+	// Prefer highest version (newest file with highest lid) within each episode
 	QSqlDatabase db = QSqlDatabase::database();
 	if (!db.isOpen()) {
 		LOG("Cannot play anime: Database not open");
@@ -5348,44 +5350,53 @@ void Window::onPlayAnimeFromCard(int aid)
 	}
 	
 	QSqlQuery q(db);
+	// Order by episode number, then by lid DESC to get newest files first
 	q.prepare("SELECT m.lid, e.epno, m.local_watched, lf.path, m.eid "
 	          "FROM mylist m "
 	          "LEFT JOIN episode e ON m.eid = e.eid "
 	          "LEFT JOIN local_files lf ON m.local_file = lf.id "
 	          "WHERE m.aid = ? AND lf.path IS NOT NULL AND e.epno IS NOT NULL "
-	          "ORDER BY e.epno, m.lid");
+	          "ORDER BY e.epno, m.lid DESC");
 	q.addBindValue(aid);
 	
 	if (q.exec()) {
-		// Find first unwatched episode
+		// Track which episodes we've seen to pick highest version file per episode
+		QSet<int> seenEpisodes;
+		int firstAvailableLid = 0;
+		
+		// Find first unwatched episode (with highest version file)
 		while (q.next()) {
 			int lid = q.value(0).toInt();
 			int localWatched = q.value(2).toInt();
 			QString localPath = q.value(3).toString();
 			int eid = q.value(4).toInt();
 			
+			// Skip if we've already processed this episode (we want the first file, which is highest version due to DESC order)
+			if (seenEpisodes.contains(eid)) {
+				continue;
+			}
+			seenEpisodes.insert(eid);
+			
 			// Check if file exists
 			if (!localPath.isEmpty() && QFile::exists(localPath)) {
+				if (firstAvailableLid == 0) {
+					firstAvailableLid = lid;
+				}
+				
 				if (localWatched == 0) {
-					// Found first unwatched episode with available file
-					LOG(QString("Playing first unwatched episode LID: %1, EID: %2").arg(lid).arg(eid));
+					// Found first unwatched episode with available file (highest version)
+					LOG(QString("Playing first unwatched episode LID: %1, EID: %2 (highest version)").arg(lid).arg(eid));
 					startPlaybackForFile(lid);
 					return;
 				}
 			}
 		}
 		
-		// If all episodes are watched, play the first available one
-		q.first();
-		if (q.isValid()) {
-			int lid = q.value(0).toInt();
-			QString localPath = q.value(3).toString();
-			int eid = q.value(4).toInt();
-			if (!localPath.isEmpty() && QFile::exists(localPath)) {
-				LOG(QString("All episodes watched, playing first episode LID: %1, EID: %2").arg(lid).arg(eid));
-				startPlaybackForFile(lid);
-				return;
-			}
+		// If all episodes are watched, play the first available one (highest version)
+		if (firstAvailableLid > 0) {
+			LOG(QString("All episodes watched, playing first episode LID: %1 (highest version)").arg(firstAvailableLid));
+			startPlaybackForFile(firstAvailableLid);
+			return;
 		}
 	}
 	

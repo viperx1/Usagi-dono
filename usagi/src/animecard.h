@@ -106,8 +106,8 @@ public slots:
     void setPoster(const QPixmap& pixmap);
     void setRating(const QString& rating);
     void setNeedsFetch(bool needsFetch);
-    void setTags(const QList<TagInfo>& tags);
-    void addEpisode(const EpisodeInfo& episode);
+    void setTags(const QList<AnimeCard::TagInfo>& tags);
+    void addEpisode(const AnimeCard::EpisodeInfo& episode);
     void clearEpisodes();
     void updateNextEpisodeIndicator();  // Update which episode will play next
     void setHidden(bool hidden);  // Set card hidden state
@@ -117,6 +117,7 @@ signals:
     void cardClicked(int aid);
     void fetchDataRequested(int aid);
     void playAnimeRequested(int aid);  // Play next unwatched episode
+    void downloadAnimeRequested(int aid);  // Download next unwatched episode
     void resetWatchSessionRequested(int aid);  // Reset local watch status
     void hideCardRequested(int aid);  // Hide card request
     void markEpisodeWatchedRequested(int eid);  // Mark episode as watched
@@ -164,6 +165,7 @@ private:
     QLabel *m_warningLabel;  // Warning indicator for missing metadata
     QLabel *m_nextEpisodeLabel;  // Shows which episode will play next
     QPushButton *m_playButton;  // Play button for the anime
+    QPushButton *m_downloadButton;  // Download button for the anime
     QPushButton *m_resetSessionButton;  // Reset watch session button
     QTreeWidget *m_episodeTree;  // Changed from QListWidget to support file hierarchy
     PlayButtonDelegate *m_playButtonDelegate;  // Delegate for play button column
