@@ -99,16 +99,23 @@ if(WIN32)
 endif()
 
 # Link Qt libraries
-# For static Qt builds, order matters: Qt6::Concurrent depends on Qt6::Core,
-# so Qt6::Concurrent must come before Qt6::Core in the link order.
-# Qt6::Core is listed again at the end (line 111) to resolve circular dependencies.
+# Important: Qt6::Core must appear both before AND after Qt6::Concurrent
+# to properly resolve circular dependencies with LLVM MinGW and QUnhandledException
+# 
+# WORKAROUND: This specific link order is required for Qt 6.8.0-6.8.3 with LLVM MinGW.
+# Qt6::Concurrent depends on Qt6::Core for QUnhandledException symbol, but due to
+# how lld (LLVM linker) resolves symbols, Qt6::Core must be present both before
+# and after Qt6::Concurrent in the link line.
+# 
+# Qt 6.9+ or different compilers/linkers may not require this specific ordering.
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
     Qt6::Gui
+    Qt6::Core      # First reference to Qt6::Core (before Qt6::Concurrent)
     Qt6::Concurrent
-    Qt6::Core
+    Qt6::Core      # Second reference to Qt6::Core (after Qt6::Concurrent)
     z
 )
 
@@ -128,8 +135,8 @@ if(WIN32)
             oleaut32     # OLE Automation
             uuid         # UUID functions
         )
-        # Link Qt6::Core again at the end to resolve any circular dependencies
-        target_link_libraries(usagi PRIVATE Qt6::Core)
+        # Note: Qt6::Core is linked again at the end of this Windows section (line 163)
+        # for both static and shared builds to resolve QtConcurrent circular dependencies
     endif()
 endif()
 
@@ -145,6 +152,15 @@ if(WIN32)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
         endif()
     endif()
+    
+    # Link Qt6::Core again at the end for ALL Windows builds
+    # This is the THIRD reference to Qt6::Core (after lines 116 and 118)
+    # 
+    # WORKAROUND for Qt 6.8.0-6.8.3 with LLVM MinGW:
+    # This resolves QtConcurrent dependencies on QUnhandledException and other Qt6::Core symbols
+    # that may not be properly resolved in earlier link passes with lld linker.
+    # Qt 6.9+ or different compilers may not require this workaround.
+    target_link_libraries(usagi PRIVATE Qt6::Core)
     
     # Force console subsystem for LLVM MinGW
     # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
