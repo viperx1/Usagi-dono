@@ -1002,9 +1002,9 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     // Get current timestamp for viewdate
     qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
     
-    // Update all files for this episode to viewed=1 with viewdate
+    // Update all files for this episode to viewed=1 and local_watched=1 with viewdate
     QSqlQuery q(db);
-    q.prepare("UPDATE mylist SET viewed = 1, viewdate = ? WHERE eid = ?");
+    q.prepare("UPDATE mylist SET viewed = 1, local_watched = 1, viewdate = ? WHERE eid = ?");
     q.addBindValue(currentTimestamp);
     q.addBindValue(eid);
     
@@ -1063,9 +1063,9 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
     // Get current timestamp for viewdate
     qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
     
-    // Update this specific file to viewed=1 with viewdate
+    // Update this specific file to viewed=1 and local_watched=1 with viewdate
     QSqlQuery q(db);
-    q.prepare("UPDATE mylist SET viewed = 1, viewdate = ? WHERE lid = ?");
+    q.prepare("UPDATE mylist SET viewed = 1, local_watched = 1, viewdate = ? WHERE lid = ?");
     q.addBindValue(currentTimestamp);
     q.addBindValue(lid);
     
