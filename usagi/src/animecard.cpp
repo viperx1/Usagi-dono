@@ -13,6 +13,11 @@
 #include <QGuiApplication>
 #include <QCursor>
 
+// UI icon constants
+namespace {
+    const char* DOWNLOAD_ICON = "\xE2\xAC\x87";  // UTF-8 encoded down arrow (⬇)
+}
+
 AnimeCard::AnimeCard(QWidget *parent)
     : QFrame(parent)
     , m_animeId(0)
@@ -113,7 +118,7 @@ void AnimeCard::setupUI()
     buttonLayout->addWidget(m_playButton);
     
     // Small download button with icon only
-    m_downloadButton = new QPushButton("⬇", this);
+    m_downloadButton = new QPushButton(DOWNLOAD_ICON, this);
     m_downloadButton->setStyleSheet("font-size: 11pt; padding: 4px 8px;");
     m_downloadButton->setToolTip("Download next unwatched episode");
     m_downloadButton->setMaximumWidth(30);  // Make it a small stub button
@@ -353,8 +358,11 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     // Prefer highest version (newest) file for playback
     bool anyFileExists = false;
     bool allFilesWatched = true;
-    int existingFileLid = 0;
-    int highestVersion = 0;
+    int unwatchedFileLid = 0;
+    int unwatchedFileVersion = 0;
+    int watchedFileLid = 0;
+    int watchedFileVersion = 0;
+    
     for (const FileInfo& file : episode.files) {      
         if (!file.localFilePath.isEmpty()) {
             bool exists = QFile::exists(file.localFilePath);
@@ -362,20 +370,24 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
                 anyFileExists = true;
                 if (!file.localWatched) {
                     allFilesWatched = false;
-                }
-                // Prefer highest version file for playback
-                if (!file.localWatched && file.version > highestVersion) {
-                    existingFileLid = file.lid;
-                    highestVersion = file.version;
-                }
-                // If all files are watched, still prefer highest version
-                if (existingFileLid == 0 && file.version > highestVersion) {
-                    existingFileLid = file.lid;
-                    highestVersion = file.version;
+                    // Track highest version unwatched file
+                    if (file.version > unwatchedFileVersion) {
+                        unwatchedFileLid = file.lid;
+                        unwatchedFileVersion = file.version;
+                    }
+                } else {
+                    // Track highest version watched file (fallback)
+                    if (file.version > watchedFileVersion) {
+                        watchedFileLid = file.lid;
+                        watchedFileVersion = file.version;
+                    }
                 }
             }
         } 
     }
+    
+    // Prefer unwatched file with highest version, fallback to watched file with highest version
+    int existingFileLid = unwatchedFileLid > 0 ? unwatchedFileLid : watchedFileLid;
     
     // Set play button based on watch status and file availability
     if (!anyFileExists) {
