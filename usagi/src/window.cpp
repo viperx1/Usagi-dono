@@ -5202,9 +5202,12 @@ void Window::loadMylistAsCards()
 	
 	// Connect episode data request signal to fetch missing episode data
 	connect(cardManager, &MyListCardManager::episodeDataRequested, this, [this](int eid) {
+		LOG(QString("[Window] episodeDataRequested signal received for eid=%1").arg(eid));
 		if (adbapi) {
-			LOG(QString("[Window] Requesting episode data for eid=%1").arg(eid));
+			LOG(QString("[Window] Requesting episode data from AniDB API for eid=%1").arg(eid));
 			adbapi->Episode(eid);
+		} else {
+			LOG(QString("[Window] ERROR: adbapi is null, cannot request episode data for eid=%1").arg(eid));
 		}
 	});
 	

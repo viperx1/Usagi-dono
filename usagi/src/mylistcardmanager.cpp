@@ -331,6 +331,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
     if (hasEpisodesNeedingData) {
         LOG(QString("[MyListCardManager] Requesting episode data for %1 episodes of aid=%2").arg(episodesNeedingData.size()).arg(aid));
         for (int eid : episodesNeedingData) {
+            LOG(QString("[MyListCardManager] Emitting episodeDataRequested signal for eid=%1").arg(eid));
             emit episodeDataRequested(eid);
         }
         requestedAnything = true;
