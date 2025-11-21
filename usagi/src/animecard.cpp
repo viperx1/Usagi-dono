@@ -112,6 +112,16 @@ void AnimeCard::setupUI()
     });
     buttonLayout->addWidget(m_playButton);
     
+    // Small download button with icon only
+    m_downloadButton = new QPushButton("⬇", this);
+    m_downloadButton->setStyleSheet("font-size: 11pt; padding: 4px 8px;");
+    m_downloadButton->setToolTip("Download next unwatched episode");
+    m_downloadButton->setMaximumWidth(30);  // Make it a small stub button
+    connect(m_downloadButton, &QPushButton::clicked, this, [this]() {
+        emit downloadAnimeRequested(m_animeId);
+    });
+    buttonLayout->addWidget(m_downloadButton);
+    
     m_resetSessionButton = new QPushButton("↻ Reset Session", this);
     m_resetSessionButton->setStyleSheet("font-size: 9pt; padding: 4px 8px;");
     m_resetSessionButton->setToolTip("Clear local watch status for all episodes");
@@ -340,9 +350,11 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     
     // Column 1: Play button for episode - check file availability and watch status
     // Check if any file in this episode exists locally and watch status
+    // Prefer highest version (newest) file for playback
     bool anyFileExists = false;
     bool allFilesWatched = true;
     int existingFileLid = 0;
+    int highestVersion = 0;
     for (const FileInfo& file : episode.files) {      
         if (!file.localFilePath.isEmpty()) {
             bool exists = QFile::exists(file.localFilePath);
@@ -351,13 +363,15 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
                 if (!file.localWatched) {
                     allFilesWatched = false;
                 }
-                if (existingFileLid == 0 && !file.localWatched) {
-                    // Store first unwatched file for playback
+                // Prefer highest version file for playback
+                if (!file.localWatched && file.version > highestVersion) {
                     existingFileLid = file.lid;
+                    highestVersion = file.version;
                 }
-                if (existingFileLid == 0) {
-                    // If all watched, store first file anyway
+                // If all files are watched, still prefer highest version
+                if (existingFileLid == 0 && file.version > highestVersion) {
                     existingFileLid = file.lid;
+                    highestVersion = file.version;
                 }
             }
         } 
@@ -625,6 +639,7 @@ void AnimeCard::setHidden(bool hidden)
         m_statsLabel->hide();
         m_nextEpisodeLabel->hide();
         m_playButton->hide();
+        m_downloadButton->hide();
         m_resetSessionButton->hide();
         m_episodeTree->hide();
         m_warningLabel->hide();
@@ -644,6 +659,7 @@ void AnimeCard::setHidden(bool hidden)
         m_statsLabel->show();
         m_nextEpisodeLabel->show();
         m_playButton->show();
+        m_downloadButton->show();
         m_resetSessionButton->show();
         m_episodeTree->show();
         
