@@ -106,8 +106,8 @@ public slots:
     void setPoster(const QPixmap& pixmap);
     void setRating(const QString& rating);
     void setNeedsFetch(bool needsFetch);
-    void setTags(const QList<TagInfo>& tags);
-    void addEpisode(const EpisodeInfo& episode);
+    void setTags(const QList<AnimeCard::TagInfo>& tags);
+    void addEpisode(const AnimeCard::EpisodeInfo& episode);
     void clearEpisodes();
     void updateNextEpisodeIndicator();  // Update which episode will play next
     void setHidden(bool hidden);  // Set card hidden state
