@@ -143,14 +143,15 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     
     # Force QT_STATIC in compiler flags to ensure it's seen by all compilation units
-    # This is critical for proper linkage of QUnhandledException in QtConcurrent
+    # This is critical for proper linkage of QUnhandledException in QtConcurrent with Qt 6.8.x
     add_compile_options(-DQT_STATIC -DQT_STATICPLUGIN)
     
     # Also add to Qt targets' interface to ensure MOC sees it
+    # Note: For IMPORTED targets (like Qt6::Core), setting INTERFACE properties
+    # may not affect the imported library itself, but ensures downstream targets
+    # that link against these targets will inherit the definitions.
     foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Concurrent Qt6::Test)
         if(TARGET ${qt_target})
-            # For IMPORTED targets, we can't modify properties, but we can try
-            # Note: This may not work for IMPORTED targets, but won't cause errors
             target_compile_definitions(${qt_target} INTERFACE QT_STATIC QT_STATICPLUGIN)
         endif()
     endforeach()

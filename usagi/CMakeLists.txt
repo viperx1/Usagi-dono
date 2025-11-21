@@ -101,7 +101,13 @@ endif()
 # Link Qt libraries
 # Important: Qt6::Core must appear both before AND after Qt6::Concurrent
 # to properly resolve circular dependencies with LLVM MinGW and QUnhandledException
-# Qt6::Concurrent depends on Qt6::Core for QUnhandledException symbol
+# 
+# WORKAROUND: This specific link order is required for Qt 6.8.0-6.8.3 with LLVM MinGW.
+# Qt6::Concurrent depends on Qt6::Core for QUnhandledException symbol, but due to
+# how lld (LLVM linker) resolves symbols, Qt6::Core must be present both before
+# and after Qt6::Concurrent in the link line.
+# 
+# Qt 6.9+ or different compilers/linkers may not require this specific ordering.
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
     Qt6::Network
@@ -150,7 +156,13 @@ if(WIN32)
     # Link Qt6::Core again at the end for ALL Windows builds (not just static)
     # This resolves QtConcurrent dependencies on QUnhandledException and other Qt6::Core symbols
     # that may not be properly resolved in the first link pass with LLVM MinGW
+    # 
+    # WORKAROUND: This is specifically needed for Qt 6.8.0-6.8.3 with LLVM MinGW due to
+    # circular dependency resolution issues between Qt6::Concurrent and Qt6::Core.
+    # Qt 6.9+ or different compilers may not require this workaround.
+    # 
     # QUnhandledException requires proper exception handling support from Qt6::Core
+    # but the symbol resolution depends on link order with lld linker.
     target_link_libraries(usagi PRIVATE Qt6::Core)
     
     # Force console subsystem for LLVM MinGW
