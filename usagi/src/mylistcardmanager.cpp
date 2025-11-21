@@ -271,18 +271,25 @@ void MyListCardManager::onFetchDataRequested(int aid)
     QSqlDatabase db = QSqlDatabase::database();
     if (db.isOpen()) {
         QSqlQuery q(db);
-        q.prepare("SELECT DISTINCT e.eid FROM mylist m "
+        // Check for episodes that either:
+        // 1. Don't exist in episode table at all (e.eid IS NULL)
+        // 2. Exist but have missing/empty name or epno fields
+        q.prepare("SELECT DISTINCT m.eid FROM mylist m "
                  "LEFT JOIN episode e ON m.eid = e.eid "
-                 "WHERE m.aid = ? AND (e.name IS NULL OR e.name = '' OR e.epno IS NULL OR e.epno = '')");
+                 "WHERE m.aid = ? AND m.eid > 0 AND (e.eid IS NULL OR e.name IS NULL OR e.name = '' OR e.epno IS NULL OR e.epno = '')");
         q.addBindValue(aid);
         if (q.exec()) {
+            LOG(QString("[MyListCardManager] Checking episodes for aid=%1").arg(aid));
             while (q.next()) {
                 int eid = q.value(0).toInt();
+                LOG(QString("[MyListCardManager]   Found episode needing data: eid=%1").arg(eid));
                 if (eid > 0) {
                     hasEpisodesNeedingData = true;
                     episodesNeedingData.insert(eid);
                 }
             }
+        } else {
+            LOG(QString("[MyListCardManager] Failed to query episodes needing data: %1").arg(q.lastError().text()));
         }
     }
     
@@ -324,6 +331,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
     if (hasEpisodesNeedingData) {
         LOG(QString("[MyListCardManager] Requesting episode data for %1 episodes of aid=%2").arg(episodesNeedingData.size()).arg(aid));
         for (int eid : episodesNeedingData) {
+            LOG(QString("[MyListCardManager] Emitting episodeDataRequested signal for eid=%1").arg(eid));
             emit episodeDataRequested(eid);
         }
         requestedAnything = true;
@@ -1002,9 +1010,9 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     // Get current timestamp for viewdate
     qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
     
-    // Update all files for this episode to viewed=1 with viewdate
+    // Update all files for this episode to viewed=1 and local_watched=1 with viewdate
     QSqlQuery q(db);
-    q.prepare("UPDATE mylist SET viewed = 1, viewdate = ? WHERE eid = ?");
+    q.prepare("UPDATE mylist SET viewed = 1, local_watched = 1, viewdate = ? WHERE eid = ?");
     q.addBindValue(currentTimestamp);
     q.addBindValue(eid);
     
@@ -1018,13 +1026,14 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     LOG(QString("[MyListCardManager] Marked %1 file(s) as watched for episode eid=%2").arg(rowsAffected).arg(eid));
     
     // Get all files for this episode to update API
-    q.prepare("SELECT lid, size, ed2k, aid FROM mylist m "
+    q.prepare("SELECT m.lid, f.size, f.ed2k, m.aid FROM mylist m "
               "INNER JOIN file f ON m.fid = f.fid "
               "WHERE m.eid = ?");
     q.addBindValue(eid);
     
     if (!q.exec()) {
-        LOG(QString("[MyListCardManager] Failed to query files for episode eid=%1").arg(eid));
+        LOG(QString("[MyListCardManager] Failed to query files for episode eid=%1: %2")
+            .arg(eid).arg(q.lastError().text()));
         return;
     }
     
@@ -1063,9 +1072,9 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
     // Get current timestamp for viewdate
     qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
     
-    // Update this specific file to viewed=1 with viewdate
+    // Update this specific file to viewed=1 and local_watched=1 with viewdate
     QSqlQuery q(db);
-    q.prepare("UPDATE mylist SET viewed = 1, viewdate = ? WHERE lid = ?");
+    q.prepare("UPDATE mylist SET viewed = 1, local_watched = 1, viewdate = ? WHERE lid = ?");
     q.addBindValue(currentTimestamp);
     q.addBindValue(lid);
     
