@@ -135,8 +135,8 @@ if(WIN32)
             oleaut32     # OLE Automation
             uuid         # UUID functions
         )
-        # Link Qt6::Core again at the end to resolve any circular dependencies
-        target_link_libraries(usagi PRIVATE Qt6::Core)
+        # Note: Qt6::Core is linked again at the end of this Windows section (line ~166)
+        # for both static and shared builds to resolve QtConcurrent circular dependencies
     endif()
 endif()
 
@@ -153,16 +153,13 @@ if(WIN32)
         endif()
     endif()
     
-    # Link Qt6::Core again at the end for ALL Windows builds (not just static)
+    # Link Qt6::Core again at the end for ALL Windows builds
+    # This is the THIRD reference to Qt6::Core (after lines 116 and 118)
+    # 
+    # WORKAROUND for Qt 6.8.0-6.8.3 with LLVM MinGW:
     # This resolves QtConcurrent dependencies on QUnhandledException and other Qt6::Core symbols
-    # that may not be properly resolved in the first link pass with LLVM MinGW
-    # 
-    # WORKAROUND: This is specifically needed for Qt 6.8.0-6.8.3 with LLVM MinGW due to
-    # circular dependency resolution issues between Qt6::Concurrent and Qt6::Core.
+    # that may not be properly resolved in earlier link passes with lld linker.
     # Qt 6.9+ or different compilers may not require this workaround.
-    # 
-    # QUnhandledException requires proper exception handling support from Qt6::Core
-    # but the symbol resolution depends on link order with lld linker.
     target_link_libraries(usagi PRIVATE Qt6::Core)
     
     # Force console subsystem for LLVM MinGW
