@@ -32,8 +32,7 @@
 #include <QtWidgets/QCompleter>
 #include <QtWidgets/QMessageBox>
 #include <QXmlStreamReader>
-#include <QFutureWatcher>
-#include <QtConcurrent/QtConcurrent>
+#include <QThread>
 #include "hash/ed2k.h"
 #include "anidbapi.h"
 #include "epno.h"
@@ -324,6 +323,62 @@ private:
     QString m_groupName;
 };
 
+// Worker thread for loading mylist anime IDs
+class MylistLoaderWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit MylistLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
+
+    void doWork();
+
+signals:
+    void finished(const QList<int> &aids);
+
+private:
+    QString m_dbName;
+};
+
+// Worker thread for loading anime titles cache
+class AnimeTitlesLoaderWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit AnimeTitlesLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
+
+    void doWork();
+
+signals:
+    void finished(const QStringList &titles, const QMap<QString, int> &titleToAid);
+
+private:
+    QString m_dbName;
+};
+
+// Data structure for unbound file information
+struct UnboundFileData {
+    QString filename;
+    QString filepath;
+    QString hash;
+    qint64 size;
+};
+
+// Worker thread for loading unbound files
+class UnboundFilesLoaderWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit UnboundFilesLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
+
+    void doWork();
+
+signals:
+    void finished(const QList<UnboundFileData> &files);
+
+private:
+    QString m_dbName;
+};
+
 class Window : public QWidget
 {
     Q_OBJECT
@@ -495,13 +550,13 @@ private:
 	void processPendingHashedFiles();
 	
 	// Background loading support to prevent UI freeze
-	QFutureWatcher<QList<int>> *mylistLoadingWatcher;  // Returns list of AIDs
-	QFutureWatcher<void> *animeTitlesLoadingWatcher;
-	QFutureWatcher<void> *unboundFilesLoadingWatcher;
+	QThread *mylistLoadingThread;
+	QThread *animeTitlesLoadingThread;
+	QThread *unboundFilesLoadingThread;
 	void startBackgroundLoading();
-	void onMylistLoadingFinished();
-	void onAnimeTitlesLoadingFinished();
-	void onUnboundFilesLoadingFinished();
+	void onMylistLoadingFinished(const QList<int> &aids);
+	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
+	void onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files);
 	
 	// Progressive card loading to keep UI responsive
 	QTimer *progressiveCardLoadingTimer;
@@ -510,15 +565,8 @@ private:
 	static const int CARD_LOADING_BATCH_SIZE = 10; // Load 10 cards per timer tick
 	static const int CARD_LOADING_TIMER_INTERVAL = 10; // Process every 10ms
 	
-	// Data structures for background loading results
-	struct UnboundFileData {
-		QString filename;
-		QString filepath;
-		QString hash;
-		qint64 size;
-	};
-	QList<UnboundFileData> loadedUnboundFiles;
-	QMutex backgroundLoadingMutex; // Protect shared data between threads
+	// Mutex for protecting shared data between threads
+	QMutex backgroundLoadingMutex;
 
 
 public slots:

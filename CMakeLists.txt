@@ -133,7 +133,7 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 # ⚙️ QT SETUP
 # ==========================================================
 
-find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Concurrent Core5Compat Test REQUIRED)
+find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 
 # Check if Qt is statically linked and add necessary definitions BEFORE any compilation
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -141,7 +141,6 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     message(STATUS "Detected static Qt6 libraries - configuring for static build")
     
     # Force QT_STATIC in compiler flags to ensure it's seen by all compilation units
-    # This is critical for proper linkage of QUnhandledException in QtConcurrent with Qt 6.8.0-6.8.3
     # Using add_compile_options instead of add_compile_definitions ensures the flag is
     # passed to the compiler for ALL sources, including generated MOC files
     add_compile_options(-DQT_STATIC -DQT_STATICPLUGIN)
@@ -149,7 +148,7 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     # Also add to Qt targets' interface to ensure MOC sees it
     # Note: For IMPORTED targets (like Qt6::Core), setting INTERFACE properties
     # ensures downstream targets that link against these targets will inherit the definitions.
-    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Concurrent Qt6::Core5Compat Qt6::Test)
+    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
         if(TARGET ${qt_target})
             target_compile_definitions(${qt_target} INTERFACE QT_STATIC QT_STATICPLUGIN)
         endif()
@@ -185,7 +184,7 @@ if(WIN32)
     
     # Clean up Qt target interface options
     # Qt6 imported targets might have MSVC-style flags in their INTERFACE_LINK_OPTIONS and INTERFACE_COMPILE_OPTIONS
-    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Concurrent Qt6::Core5Compat Qt6::Test)
+    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
         if(TARGET ${qt_target})
             # Clean up compile options (removes -Xclang --dependent-lib=msvcrt, -D_DLL, -D_MT)
             get_target_property(qt_compile_options ${qt_target} INTERFACE_COMPILE_OPTIONS)

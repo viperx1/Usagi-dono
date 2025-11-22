@@ -12,12 +12,106 @@
 #include <QCoreApplication>
 #include <QTimer>
 #include <QElapsedTimer>
-#include <QFutureWatcher>
-#include <QtConcurrent/QtConcurrent>
+#include <QThread>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+
+// Simple worker for testing
+class TestWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit TestWorker(QMutex *mutex, QStringList *results, bool *complete) 
+        : m_mutex(mutex), m_results(results), m_complete(complete) {}
+
+    void doWork() {
+        // Create separate database connection for this thread
+        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "TestThread");
+        db.setDatabaseName(QSqlDatabase::database().databaseName());
+        
+        if (!db.open()) {
+            emit finished();
+            return;
+        }
+        
+        QSqlQuery query(db);
+        query.exec("SELECT title FROM anime_titles LIMIT 5");
+        
+        QStringList tempResults;
+        while (query.next()) {
+            tempResults << query.value(0).toString();
+        }
+        
+        db.close();
+        QSqlDatabase::removeDatabase("TestThread");
+        
+        // Store results with mutex protection
+        QMutexLocker locker(m_mutex);
+        *m_results = tempResults;
+        *m_complete = true;
+        
+        emit finished();
+    }
+
+signals:
+    void finished();
+
+private:
+    QMutex *m_mutex;
+    QStringList *m_results;
+    bool *m_complete;
+};
+
+// Worker for mutex testing
+class MutexTestWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit MutexTestWorker(QMutex *mutex, QList<int> *data, int start, int end)
+        : m_mutex(mutex), m_data(data), m_start(start), m_end(end) {}
+
+    void doWork() {
+        for (int i = m_start; i < m_end; ++i) {
+            QMutexLocker locker(m_mutex);
+            m_data->append(i);
+        }
+        emit finished();
+    }
+
+signals:
+    void finished();
+
+private:
+    QMutex *m_mutex;
+    QList<int> *m_data;
+    int m_start;
+    int m_end;
+};
+
+// Worker for parallel load testing
+class ParallelLoadWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit ParallelLoadWorker(QMutex *mutex, bool *complete)
+        : m_mutex(mutex), m_complete(complete) {}
+
+    void doWork() {
+        QTest::qWait(100); // Simulate work
+        QMutexLocker locker(m_mutex);
+        *m_complete = true;
+        emit finished();
+    }
+
+signals:
+    void finished();
+
+private:
+    QMutex *m_mutex;
+    bool *m_complete;
+};
 
 class TestBackgroundLoading : public QObject
 {
@@ -80,37 +174,18 @@ private slots:
         QStringList results;
         bool loadComplete = false;
         
-        QFutureWatcher<void> watcher;
+        QThread *thread = new QThread();
+        TestWorker *worker = new TestWorker(&mutex, &results, &loadComplete);
+        worker->moveToThread(thread);
+        
         QEventLoop loop;
-        connect(&watcher, &QFutureWatcher<void>::finished, &loop, &QEventLoop::quit);
+        connect(thread, &QThread::started, worker, &TestWorker::doWork);
+        connect(worker, &TestWorker::finished, &loop, &QEventLoop::quit);
+        connect(worker, &TestWorker::finished, thread, &QThread::quit);
+        connect(thread, &QThread::finished, worker, &QObject::deleteLater);
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
         
-        QFuture<void> future = QtConcurrent::run([&mutex, &results, &loadComplete]() {
-            // Create separate database connection for this thread
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "TestThread");
-            db.setDatabaseName(QSqlDatabase::database().databaseName());
-            
-            if (!db.open()) {
-                return;
-            }
-            
-            QSqlQuery query(db);
-            query.exec("SELECT title FROM anime_titles LIMIT 5");
-            
-            QStringList tempResults;
-            while (query.next()) {
-                tempResults << query.value(0).toString();
-            }
-            
-            db.close();
-            QSqlDatabase::removeDatabase("TestThread");
-            
-            // Store results with mutex protection
-            QMutexLocker locker(&mutex);
-            results = tempResults;
-            loadComplete = true;
-        });
-        
-        watcher.setFuture(future);
+        thread->start();
         loop.exec(); // Wait for completion
         
         // Verify results
@@ -126,7 +201,13 @@ private slots:
         QMutex mutex;
         QList<int> sharedData;
         
-        QFutureWatcher<void> watcher1, watcher2;
+        QThread *thread1 = new QThread();
+        QThread *thread2 = new QThread();
+        MutexTestWorker *worker1 = new MutexTestWorker(&mutex, &sharedData, 0, 50);
+        MutexTestWorker *worker2 = new MutexTestWorker(&mutex, &sharedData, 50, 100);
+        worker1->moveToThread(thread1);
+        worker2->moveToThread(thread2);
+        
         QEventLoop loop;
         
         int completedCount = 0;
@@ -137,26 +218,19 @@ private slots:
             }
         };
         
-        connect(&watcher1, &QFutureWatcher<void>::finished, this, checkCompletion);
-        connect(&watcher2, &QFutureWatcher<void>::finished, this, checkCompletion);
+        connect(thread1, &QThread::started, worker1, &MutexTestWorker::doWork);
+        connect(thread2, &QThread::started, worker2, &MutexTestWorker::doWork);
+        connect(worker1, &MutexTestWorker::finished, checkCompletion);
+        connect(worker2, &MutexTestWorker::finished, checkCompletion);
+        connect(worker1, &MutexTestWorker::finished, thread1, &QThread::quit);
+        connect(worker2, &MutexTestWorker::finished, thread2, &QThread::quit);
+        connect(thread1, &QThread::finished, worker1, &QObject::deleteLater);
+        connect(thread2, &QThread::finished, worker2, &QObject::deleteLater);
+        connect(thread1, &QThread::finished, thread1, &QObject::deleteLater);
+        connect(thread2, &QThread::finished, thread2, &QObject::deleteLater);
         
-        // Start two threads that both write to shared data
-        QFuture<void> future1 = QtConcurrent::run([&mutex, &sharedData]() {
-            for (int i = 0; i < 50; ++i) {
-                QMutexLocker locker(&mutex);
-                sharedData.append(i);
-            }
-        });
-        
-        QFuture<void> future2 = QtConcurrent::run([&mutex, &sharedData]() {
-            for (int i = 50; i < 100; ++i) {
-                QMutexLocker locker(&mutex);
-                sharedData.append(i);
-            }
-        });
-        
-        watcher1.setFuture(future1);
-        watcher2.setFuture(future2);
+        thread1->start();
+        thread2->start();
         loop.exec(); // Wait for both to complete
         
         // Verify all data was written
@@ -197,7 +271,13 @@ private slots:
         bool load1Complete = false;
         bool load2Complete = false;
         
-        QFutureWatcher<void> watcher1, watcher2;
+        QThread *thread1 = new QThread();
+        QThread *thread2 = new QThread();
+        ParallelLoadWorker *worker1 = new ParallelLoadWorker(&mutex, &load1Complete);
+        ParallelLoadWorker *worker2 = new ParallelLoadWorker(&mutex, &load2Complete);
+        worker1->moveToThread(thread1);
+        worker2->moveToThread(thread2);
+        
         QEventLoop loop;
         
         int completedCount = 0;
@@ -208,24 +288,19 @@ private slots:
             }
         };
         
-        connect(&watcher1, &QFutureWatcher<void>::finished, this, checkCompletion);
-        connect(&watcher2, &QFutureWatcher<void>::finished, this, checkCompletion);
+        connect(thread1, &QThread::started, worker1, &ParallelLoadWorker::doWork);
+        connect(thread2, &QThread::started, worker2, &ParallelLoadWorker::doWork);
+        connect(worker1, &ParallelLoadWorker::finished, checkCompletion);
+        connect(worker2, &ParallelLoadWorker::finished, checkCompletion);
+        connect(worker1, &ParallelLoadWorker::finished, thread1, &QThread::quit);
+        connect(worker2, &ParallelLoadWorker::finished, thread2, &QThread::quit);
+        connect(thread1, &QThread::finished, worker1, &QObject::deleteLater);
+        connect(thread2, &QThread::finished, worker2, &QObject::deleteLater);
+        connect(thread1, &QThread::finished, thread1, &QObject::deleteLater);
+        connect(thread2, &QThread::finished, thread2, &QObject::deleteLater);
         
-        // Start two parallel loads
-        QFuture<void> future1 = QtConcurrent::run([&mutex, &load1Complete]() {
-            QTest::qWait(100); // Simulate work
-            QMutexLocker locker(&mutex);
-            load1Complete = true;
-        });
-        
-        QFuture<void> future2 = QtConcurrent::run([&mutex, &load2Complete]() {
-            QTest::qWait(100); // Simulate work
-            QMutexLocker locker(&mutex);
-            load2Complete = true;
-        });
-        
-        watcher1.setFuture(future1);
-        watcher2.setFuture(future2);
+        thread1->start();
+        thread2->start();
         loop.exec();
         
         qint64 elapsed = timer.elapsed();

@@ -691,14 +691,9 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
 endif()
 
 # Link Qt libraries
-# Note: For static Qt builds, order matters. Qt6::Concurrent depends on Qt6::Core,
-# so Qt6::Concurrent must come before Qt6::Core in the link order.
-# Qt6::Core5Compat is needed for QUnhandledException with static Qt builds on Windows.
 target_link_libraries(test_directorywatcher PRIVATE
     Qt6::Test
     Qt6::Sql
-    Qt6::Concurrent
-    Qt6::Core5Compat
     Qt6::Core
 )
 target_include_directories(test_directorywatcher PRIVATE
@@ -1563,8 +1558,6 @@ target_link_libraries(test_background_loading PRIVATE
     Qt6::Core
     Qt6::Test
     Qt6::Sql
-    Qt6::Concurrent
-    Qt6::Core5Compat
 )
 
 # Force console subsystem for LLVM MinGW on Windows
