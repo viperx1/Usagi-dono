@@ -116,6 +116,8 @@ endif()
 
 # Method 2: Check if library file has static extension
 # .a files are static libraries (MinGW, GCC, Clang on Windows/Unix/macOS)
+# Note: .lib files are NOT checked - on Windows with MSVC, .lib are import libraries
+# for DLLs (dynamic), not static libraries. This project uses MinGW, not MSVC.
 set(QT_IS_STATIC_BY_EXT FALSE)
 # Try IMPORTED_LOCATION first, then IMPORTED_LOCATION_RELEASE, then fall back to LOCATION
 get_target_property(qt_core_location Qt6::Core IMPORTED_LOCATION)
