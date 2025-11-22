@@ -147,6 +147,11 @@ if(WIN32)
     target_link_options(usagi PRIVATE
         "-Wl,--subsystem,console"  # GNU-style subsystem flag instead of MSVC /subsystem:console
     )
+    
+    # Link Qt6::Core again at the end to resolve circular dependencies
+    # This is necessary for both static and shared Qt builds on Windows
+    # to resolve QtConcurrent and QMetaType symbol dependencies
+    target_link_libraries(usagi PRIVATE Qt6::Core)
 endif()
 
 # Include directories
