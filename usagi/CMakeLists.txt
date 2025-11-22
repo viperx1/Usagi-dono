@@ -67,10 +67,11 @@ if(QT_IS_STATIC)
     
     # Import platform plugins for static Qt on Windows
     # QWindowsIntegrationPlugin: Required for Windows GUI (QPlatformIntegration)
-    # QWindowsVistaStylePlugin: Required for native Windows UI styling
     if(WIN32)
+        # Only import QWindowsIntegrationPlugin - it's essential for Windows GUI
+        # QWindowsVistaStylePlugin is optional and may not exist in all Qt builds
         qt_import_plugins(usagi
-            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+            INCLUDE Qt::QWindowsIntegrationPlugin
         )
     endif()
 endif()
