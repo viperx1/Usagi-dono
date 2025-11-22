@@ -17,34 +17,42 @@
 #include <QMutexLocker>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QFile>
 
 // Simple worker for testing
 class TestWorker : public QObject
 {
     Q_OBJECT
 public:
-    explicit TestWorker(QMutex *mutex, QStringList *results, bool *complete) 
-        : m_mutex(mutex), m_results(results), m_complete(complete) {}
+    explicit TestWorker(const QString &dbName, QMutex *mutex, QStringList *results, bool *complete) 
+        : m_dbName(dbName), m_mutex(mutex), m_results(results), m_complete(complete) {}
 
     void doWork() {
-        // Create separate database connection for this thread
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "TestThread");
-        db.setDatabaseName(QSqlDatabase::database().databaseName());
-        
-        if (!db.open()) {
-            emit finished();
-            return;
-        }
-        
-        QSqlQuery query(db);
-        query.exec("SELECT title FROM anime_titles LIMIT 5");
-        
         QStringList tempResults;
-        while (query.next()) {
-            tempResults << query.value(0).toString();
+        
+        {
+            // Create separate database connection for this thread
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "TestThread");
+            db.setDatabaseName(m_dbName);
+            
+            if (!db.open()) {
+                QSqlDatabase::removeDatabase("TestThread");
+                emit finished();
+                return;
+            }
+            
+            QSqlQuery query(db);
+            query.exec("SELECT title FROM anime_titles LIMIT 5");
+            
+            while (query.next()) {
+                tempResults << query.value(0).toString();
+            }
+            
+            db.close();
+            // Query and db objects are destroyed here when leaving scope
         }
         
-        db.close();
+        // Now safe to remove database connection
         QSqlDatabase::removeDatabase("TestThread");
         
         // Store results with mutex protection
@@ -57,6 +65,9 @@ public:
 
 signals:
     void finished();
+
+private:
+    QString m_dbName;
 
 private:
     QMutex *m_mutex;
@@ -120,9 +131,10 @@ class TestBackgroundLoading : public QObject
 private slots:
     void initTestCase()
     {
-        // Initialize test database
+        // Initialize test database with temporary file
+        // Use file-based database so worker threads can access the same data
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-        db.setDatabaseName(":memory:");
+        db.setDatabaseName("/tmp/test_background_loading.db");
         QVERIFY(db.open());
         
         // Create test tables
@@ -174,8 +186,11 @@ private slots:
         QStringList results;
         bool loadComplete = false;
         
+        // Get database name in main thread before creating worker
+        QString dbName = QSqlDatabase::database().databaseName();
+        
         QThread *thread = new QThread();
-        TestWorker *worker = new TestWorker(&mutex, &results, &loadComplete);
+        TestWorker *worker = new TestWorker(dbName, &mutex, &results, &loadComplete);
         worker->moveToThread(thread);
         
         QEventLoop loop;
@@ -318,6 +333,8 @@ private slots:
     {
         QSqlDatabase::database().close();
         QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
+        // Clean up temporary database file
+        QFile::remove("/tmp/test_background_loading.db");
     }
 };
 
