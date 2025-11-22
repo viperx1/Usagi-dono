@@ -124,8 +124,10 @@ if(WIN32)
             oleaut32     # OLE Automation
             uuid         # UUID functions
         )
-        # Note: Qt6::Core is linked again at the end of this Windows section (line 154)
-        # for both static and shared builds to resolve QMetaType circular dependencies
+        # Note: Qt6::Core is linked again at the end of the Windows section (line 157)
+        # This additional link is required for both static and shared builds to resolve 
+        # QMetaType circular dependencies. The implementation at line 157 is outside
+        # this static-build-only block so it applies to all Windows builds.
     endif()
 endif()
 
@@ -148,9 +150,10 @@ if(WIN32)
         "-Wl,--subsystem,console"  # GNU-style subsystem flag instead of MSVC /subsystem:console
     )
     
-    # Link Qt6::Core again at the end to resolve circular dependencies (applies to all Windows builds)
-    # This is necessary for both static and shared Qt builds on Windows with LLVM MinGW
+    # Link Qt6::Core again at the end to resolve circular dependencies
+    # This is necessary for both static and shared Qt builds on Windows
     # to resolve QMetaType symbol dependencies (e.g., registerConverterFunction, registerMutableViewFunction)
+    # Note: Project requires LLVM MinGW on Windows (enforced in root CMakeLists.txt)
     target_link_libraries(usagi PRIVATE Qt6::Core)
 endif()
 
