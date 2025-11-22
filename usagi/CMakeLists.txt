@@ -2,13 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# Detect Qt type once
-get_target_property(QT_CORE_TYPE Qt6::Core TYPE)
-set(IS_STATIC_QT FALSE)
-if(QT_CORE_TYPE STREQUAL "STATIC_LIBRARY")
-    set(IS_STATIC_QT TRUE)
-endif()
-
 # Source files
 set(SOURCES
     src/anidbapi.cpp
@@ -65,7 +58,7 @@ set(HEADERS
 add_executable(usagi ${SOURCES} ${HEADERS})
 
 # For static Qt builds, import required plugins
-if(IS_STATIC_QT)
+if(QT_IS_STATIC)
     # Import platform plugins for static Qt on Windows
     if(WIN32)
         qt_import_plugins(usagi
@@ -89,7 +82,7 @@ if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
     
     # For static Qt builds on Windows, add additional system libraries
-    if(IS_STATIC_QT)
+    if(QT_IS_STATIC)
         target_link_libraries(usagi PRIVATE
             winmm        # Windows multimedia
             version      # Version information
@@ -112,7 +105,7 @@ if(WIN32)
     target_link_libraries(usagi PRIVATE Qt6::Core)
     
     # For static Qt builds, link Qt6::EntryPoint which contains WinMain
-    if(IS_STATIC_QT)
+    if(QT_IS_STATIC)
         if(TARGET Qt6::EntryPoint)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
         endif()

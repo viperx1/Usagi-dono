@@ -116,8 +116,12 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     
     # Set MOC options for static Qt builds
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
+    
+    # Set variable for use in subdirectories
+    set(QT_IS_STATIC TRUE CACHE BOOL "Qt is statically linked" FORCE)
 else()
     message(STATUS "Detected dynamic Qt6 libraries - configuring for dynamic build")
+    set(QT_IS_STATIC FALSE CACHE BOOL "Qt is statically linked" FORCE)
 endif()
 
 set(CMAKE_AUTOMOC ON)
