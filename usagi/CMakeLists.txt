@@ -124,7 +124,7 @@ if(WIN32)
             oleaut32     # OLE Automation
             uuid         # UUID functions
         )
-        # Note: Qt6::Core is linked again at the end of this Windows section (line 163)
+        # Note: Qt6::Core is linked again at the end of this Windows section (line 154)
         # for both static and shared builds to resolve QtConcurrent circular dependencies
     endif()
 endif()
