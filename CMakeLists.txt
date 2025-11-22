@@ -107,9 +107,26 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 
 # Check if Qt is statically linked
+# Method 1: Check target type
 get_target_property(qt_core_type Qt6::Core TYPE)
+set(QT_IS_STATIC_BY_TYPE FALSE)
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    set(QT_IS_STATIC_BY_TYPE TRUE)
+endif()
+
+# Method 2: Check if library file has .a extension (for MinGW static builds)
+set(QT_IS_STATIC_BY_EXT FALSE)
+get_target_property(qt_core_location Qt6::Core LOCATION)
+if(qt_core_location)
+    if(qt_core_location MATCHES "\\.a$")
+        set(QT_IS_STATIC_BY_EXT TRUE)
+    endif()
+endif()
+
+# Qt is static if either method detects it
+if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT)
     message(STATUS "Detected static Qt6 libraries - configuring for static build")
+    message(STATUS "  Detection: TYPE=${qt_core_type}, LOCATION=${qt_core_location}")
     
     # Define QT_STATIC globally for static Qt builds
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
@@ -121,6 +138,7 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     set(QT_IS_STATIC TRUE CACHE BOOL "Qt is statically linked" FORCE)
 else()
     message(STATUS "Detected dynamic Qt6 libraries - configuring for dynamic build")
+    message(STATUS "  Detection: TYPE=${qt_core_type}, LOCATION=${qt_core_location}")
     set(QT_IS_STATIC FALSE CACHE BOOL "Qt is statically linked" FORCE)
 endif()
 
