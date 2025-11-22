@@ -145,6 +145,10 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     # passed to the compiler for ALL sources, including generated MOC files
     add_compile_options(-DQT_STATIC -DQT_STATICPLUGIN)
     
+    # CRITICAL: Set MOC options BEFORE enabling AUTOMOC
+    # MOC must see QT_STATIC when processing headers to generate correct linkage declarations
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
+    
     # Also add to Qt targets' interface to ensure MOC sees it
     # Note: For IMPORTED targets (like Qt6::Core), setting INTERFACE properties
     # ensures downstream targets that link against these targets will inherit the definitions.

@@ -17,17 +17,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 # Note: Qt6 is already found in the root CMakeLists.txt, no need to find it again
-
-# Enable automatic MOC
-set(CMAKE_AUTOMOC ON)
-
-# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
-# This is necessary so that Qt headers are processed with correct linkage declarations
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
-    # Make sure MOC-generated files also see QT_STATIC
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
-endif()
+# Note: CMAKE_AUTOMOC and CMAKE_AUTOMOC_MOC_OPTIONS are set in root CMakeLists.txt
 
 # Source files
 set(SOURCES
