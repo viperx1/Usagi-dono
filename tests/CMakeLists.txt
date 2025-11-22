@@ -10,15 +10,7 @@ project(usagi_tests LANGUAGES CXX)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 # Note: Qt6 is already found in the root CMakeLists.txt, no need to find it again
-
-# Enable automatic MOC
-set(CMAKE_AUTOMOC ON)
-
-# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
-endif()
+# Note: CMAKE_AUTOMOC and CMAKE_AUTOMOC_MOC_OPTIONS are set in root CMakeLists.txt
 
 # Enable testing
 enable_testing()
