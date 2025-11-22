@@ -57,8 +57,11 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds, import required plugins
+# For static Qt builds, import required plugins and set compile definitions
 if(QT_IS_STATIC)
+    # Explicitly set QT_STATIC for this target to ensure MOC and compilation units have it
+    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
+    
     # Import platform plugins for static Qt on Windows
     # QWindowsIntegrationPlugin: Required for Windows GUI (QPlatformIntegration)
     # QWindowsVistaStylePlugin: Required for native Windows UI styling
