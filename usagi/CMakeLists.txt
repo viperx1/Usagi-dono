@@ -111,14 +111,32 @@ if(WIN32)
         "-Wl,--subsystem,console"
     )
     
-    # Link Qt6::Core again at the end to resolve circular dependencies
-    target_link_libraries(usagi PRIVATE Qt6::Core)
-    
-    # For static Qt builds, link Qt6::EntryPoint which contains WinMain
+    # For static Qt builds on Windows, handle circular dependencies
+    # Static Qt libraries have circular dependencies that require special linking
     if(QT_IS_STATIC)
+        # Link Qt libraries again at the end to resolve circular dependencies
+        # Use --start-group and --end-group to handle circular references
+        target_link_options(usagi PRIVATE
+            "-Wl,--start-group"
+        )
+        target_link_libraries(usagi PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Widgets
+            Qt6::Network
+            Qt6::Sql
+        )
+        target_link_options(usagi PRIVATE
+            "-Wl,--end-group"
+        )
+        
+        # Link Qt6::EntryPoint which contains WinMain for static builds
         if(TARGET Qt6::EntryPoint)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
         endif()
+    else()
+        # For dynamic Qt, just link Qt6::Core again to resolve any remaining dependencies
+        target_link_libraries(usagi PRIVATE Qt6::Core)
     endif()
 endif()
 
