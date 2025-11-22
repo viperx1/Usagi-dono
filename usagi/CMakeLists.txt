@@ -125,7 +125,7 @@ if(WIN32)
             uuid         # UUID functions
         )
         # Note: Qt6::Core is linked again at the end of this Windows section (line 154)
-        # for both static and shared builds to resolve QtConcurrent circular dependencies
+        # for both static and shared builds to resolve QMetaType circular dependencies
     endif()
 endif()
 
@@ -148,9 +148,9 @@ if(WIN32)
         "-Wl,--subsystem,console"  # GNU-style subsystem flag instead of MSVC /subsystem:console
     )
     
-    # Link Qt6::Core again at the end to resolve circular dependencies
-    # This is necessary for both static and shared Qt builds on Windows
-    # to resolve QtConcurrent and QMetaType symbol dependencies
+    # Link Qt6::Core again at the end to resolve circular dependencies (applies to all Windows builds)
+    # This is necessary for both static and shared Qt builds on Windows with LLVM MinGW
+    # to resolve QMetaType symbol dependencies (e.g., registerConverterFunction, registerMutableViewFunction)
     target_link_libraries(usagi PRIVATE Qt6::Core)
 endif()
 
