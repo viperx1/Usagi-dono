@@ -463,7 +463,7 @@ add_test(NAME test_episode_column_format COMMAND test_episode_column_format -v2)
 # Test 10: MyList 221 response fix verification
 add_executable(test_mylist_221_fix test_mylist_221_fix.cpp)
 
-configure_test_for_static_qt(test_mylist_)
+configure_test_for_static_qt(test_mylist_221_fix)
 
 target_link_libraries(test_mylist_221_fix PRIVATE
     Qt6::Core
