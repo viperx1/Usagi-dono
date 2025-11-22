@@ -77,10 +77,32 @@ if(WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MINGW_TARGET_FLAG}")
     
     # Use the LLD linker with GNU-style interface (not lld-link)
-    # Combine all linker flags to avoid duplication
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld -g ${MINGW_TARGET_FLAG}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+    # Check if flags are already set to avoid duplication
+    string(FIND "${CMAKE_EXE_LINKER_FLAGS}" "-fuse-ld=lld" LLD_FOUND)
+    if(LLD_FOUND EQUAL -1)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+    endif()
+    
+    string(FIND "${CMAKE_EXE_LINKER_FLAGS}" "-g" DEBUG_FOUND)
+    if(DEBUG_FOUND EQUAL -1)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
+    endif()
+    
+    string(FIND "${CMAKE_EXE_LINKER_FLAGS}" "${MINGW_TARGET_FLAG}" TARGET_FOUND)
+    if(TARGET_FOUND EQUAL -1)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MINGW_TARGET_FLAG}")
+    endif()
+    
+    # Also set for shared and module linkers
+    string(FIND "${CMAKE_SHARED_LINKER_FLAGS}" "-fuse-ld=lld" LLD_SHARED_FOUND)
+    if(LLD_SHARED_FOUND EQUAL -1)
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+    endif()
+    
+    string(FIND "${CMAKE_MODULE_LINKER_FLAGS}" "-fuse-ld=lld" LLD_MODULE_FOUND)
+    if(LLD_MODULE_FOUND EQUAL -1)
+        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+    endif()
     
     # Override link rule templates to ensure GNU-style linking for LLVM MinGW
     set(CMAKE_CXX_LINK_EXECUTABLE
@@ -113,6 +135,7 @@ find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 # Method 1: Check target type
 get_target_property(qt_core_type Qt6::Core TYPE)
 set(QT_IS_STATIC_BY_TYPE FALSE)
+message(STATUS "Qt6::Core TYPE: ${qt_core_type}")
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
     set(QT_IS_STATIC_BY_TYPE TRUE)
 endif()
@@ -130,6 +153,7 @@ endif()
 if(NOT qt_core_location)
     get_target_property(qt_core_location Qt6::Core LOCATION)
 endif()
+message(STATUS "Qt6::Core location: ${qt_core_location}")
 if(qt_core_location)
     # Check for .a extension (static library for MinGW/GCC/Clang)
     if(qt_core_location MATCHES "\\.a$")
