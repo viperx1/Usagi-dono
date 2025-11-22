@@ -136,9 +136,6 @@ endif()
 
 # Qt is static if either method detects it
 if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT)
-    message(STATUS "Detected static Qt6 libraries - configuring for static build")
-    message(STATUS "  Detection: TYPE=${qt_core_type}, LOCATION=${qt_core_location}")
-    
     # Define QT_STATIC globally for static Qt builds
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     
@@ -148,8 +145,6 @@ if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT)
     # Set variable for use in subdirectories
     set(QT_IS_STATIC TRUE CACHE BOOL "Qt is statically linked" FORCE)
 else()
-    message(STATUS "Detected dynamic Qt6 libraries - configuring for dynamic build")
-    message(STATUS "  Detection: TYPE=${qt_core_type}, LOCATION=${qt_core_location}")
     set(QT_IS_STATIC FALSE CACHE BOOL "Qt is statically linked" FORCE)
 endif()
 
