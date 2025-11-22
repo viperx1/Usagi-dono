@@ -140,19 +140,33 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     set(QT_IS_STATIC_BY_TYPE TRUE)
 endif()
 
-# Method 2: Check if library file has static extension
-# .a files are static libraries (MinGW, GCC, Clang on Windows/Unix/macOS)
-# Note: .lib files are NOT checked - on Windows with MSVC, .lib are import libraries
-# for DLLs (dynamic), not static libraries. This project uses MinGW, not MSVC.
+# Method 2: Check the actual library file being linked
+# For Windows MinGW, we need to check IMPORTED_IMPLIB (what's actually linked)
+# not just LOCATION (which may point to the DLL)
+set(QT_IS_STATIC_BY_LINK_LIB FALSE)
+get_target_property(qt_core_implib Qt6::Core IMPORTED_IMPLIB_RELEASE)
+if(NOT qt_core_implib)
+    get_target_property(qt_core_implib Qt6::Core IMPORTED_IMPLIB)
+endif()
+if(NOT qt_core_implib)
+    get_target_property(qt_core_implib Qt6::Core IMPORTED_LOCATION_RELEASE)
+endif()
+if(NOT qt_core_implib)
+    get_target_property(qt_core_implib Qt6::Core IMPORTED_LOCATION)
+endif()
+message(STATUS "Qt6::Core link library: ${qt_core_implib}")
+# If the link library is a .a file and TYPE is SHARED_LIBRARY, 
+# this is actually a static library masquerading as dynamic
+if(qt_core_implib AND qt_core_type STREQUAL "SHARED_LIBRARY")
+    if(qt_core_implib MATCHES "\\.a$")
+        set(QT_IS_STATIC_BY_LINK_LIB TRUE)
+        message(STATUS "Qt6::Core: TYPE says SHARED but linking .a file - treating as STATIC")
+    endif()
+endif()
+
+# Method 3: Check if library file has static extension (old method, kept for non-Windows)
 set(QT_IS_STATIC_BY_EXT FALSE)
-# Try IMPORTED_LOCATION first, then IMPORTED_LOCATION_RELEASE, then fall back to LOCATION
-get_target_property(qt_core_location Qt6::Core IMPORTED_LOCATION)
-if(NOT qt_core_location)
-    get_target_property(qt_core_location Qt6::Core IMPORTED_LOCATION_RELEASE)
-endif()
-if(NOT qt_core_location)
-    get_target_property(qt_core_location Qt6::Core LOCATION)
-endif()
+get_target_property(qt_core_location Qt6::Core LOCATION)
 message(STATUS "Qt6::Core location: ${qt_core_location}")
 if(qt_core_location)
     # Check for .a extension (static library for MinGW/GCC/Clang)
@@ -161,8 +175,8 @@ if(qt_core_location)
     endif()
 endif()
 
-# Qt is static if either method detects it
-if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT)
+# Qt is static if any method detects it
+if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT OR QT_IS_STATIC_BY_LINK_LIB)
     # Define QT_STATIC globally for static Qt builds
     # This must be set as compile definitions AND in MOC options AND in CXX flags
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
