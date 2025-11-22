@@ -106,6 +106,20 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 
+# Check if Qt is statically linked
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    message(STATUS "Detected static Qt6 libraries - configuring for static build")
+    
+    # Define QT_STATIC globally for static Qt builds
+    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+    
+    # Set MOC options for static Qt builds
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
+else()
+    message(STATUS "Detected dynamic Qt6 libraries - configuring for dynamic build")
+endif()
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)

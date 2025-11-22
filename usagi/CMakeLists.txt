@@ -57,6 +57,20 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
+# For static Qt builds, import required plugins
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    # Ensure QT_STATIC is defined for this target
+    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
+    
+    # Import platform plugins for static Qt on Windows
+    if(WIN32)
+        qt_import_plugins(usagi
+            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+        )
+    endif()
+endif()
+
 # Link Qt libraries
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
@@ -71,6 +85,22 @@ target_link_libraries(usagi PRIVATE
 if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
     
+    # For static Qt builds on Windows, add additional system libraries
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        target_link_libraries(usagi PRIVATE
+            winmm        # Windows multimedia
+            version      # Version information
+            netapi32     # Network API
+            ws2_32       # Windows Sockets
+            iphlpapi     # IP Helper API
+            crypt32      # Cryptography API
+            ole32        # OLE32
+            oleaut32     # OLE Automation
+            uuid         # UUID functions
+        )
+    endif()
+    
     # Force console subsystem for LLVM MinGW
     target_link_options(usagi PRIVATE
         "-Wl,--subsystem,console"
@@ -78,6 +108,14 @@ if(WIN32)
     
     # Link Qt6::Core again at the end to resolve circular dependencies
     target_link_libraries(usagi PRIVATE Qt6::Core)
+    
+    # For static Qt builds, link Qt6::EntryPoint which contains WinMain
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        if(TARGET Qt6::EntryPoint)
+            target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
+        endif()
+    endif()
 endif()
 
 # Include directories
