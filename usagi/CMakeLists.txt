@@ -2,23 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# Note: C++ standard is inherited from root CMakeLists.txt (C++17)
-
-# Enable debug symbols for crash log stack traces
-# This allows crash logs to show function names from Usagi codebase
-# Using DWARF debug format for all platforms
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-
-# Disable CRYPTOPP_DEBUG to prevent Crypto++ library from installing signal handlers
-# that interfere with our crash log handler. CRYPTOPP_DEBUG causes CRYPTOPP_ASSERT
-# to raise SIGTRAP (Unix) or call DebugBreak() (Windows), which conflicts with
-# our SIGSEGV handler and prevents proper crash log stack trace collection.
-# By defining CRYPTOPP_DEBUG=0, we prevent it from being auto-enabled by DEBUG/_DEBUG.
-add_compile_definitions(CRYPTOPP_DEBUG=0)
-
-# Note: Qt6 is already found in the root CMakeLists.txt, no need to find it again
-# Note: CMAKE_AUTOMOC and CMAKE_AUTOMOC_MOC_OPTIONS are set in root CMakeLists.txt
-
 # Source files
 set(SOURCES
     src/anidbapi.cpp
@@ -88,16 +71,9 @@ target_link_libraries(usagi PRIVATE
 if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
     
-    # Force console subsystem for LLVM MinGW
-    # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
-    target_link_options(usagi PRIVATE
-        "-Wl,--subsystem,console"  # GNU-style subsystem flag instead of MSVC /subsystem:console
-    )
+    target_link_options(usagi PRIVATE "-Wl,--subsystem,console")
     
     # Link Qt6::Core again at the end to resolve circular dependencies
-    # This is necessary for dynamic Qt builds on Windows
-    # to resolve QMetaType symbol dependencies (e.g., registerConverterFunction, registerMutableViewFunction)
-    # Note: Project requires LLVM MinGW on Windows (enforced in root CMakeLists.txt)
     target_link_libraries(usagi PRIVATE Qt6::Core)
 endif()
 

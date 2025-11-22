@@ -2,17 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi_tests LANGUAGES CXX)
 
-# Note: C++ standard is inherited from root CMakeLists.txt (C++17)
-
-# Enable debug symbols for crash log stack traces
-# This allows crash logs to show function names from Usagi codebase
-# Using DWARF debug format for all platforms
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-
-# Note: Qt6 is already found in the root CMakeLists.txt, no need to find it again
-# Note: CMAKE_AUTOMOC and CMAKE_AUTOMOC_MOC_OPTIONS are set in root CMakeLists.txt
-
-# Enable testing
 enable_testing()
 
 # Test 1: Hash functions test
@@ -40,8 +29,8 @@ target_include_directories(test_hash PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
-# Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
+# Windows console subsystem
+
 if(WIN32)
     target_link_options(test_hash PRIVATE
         "-Wl,--subsystem,console"
@@ -71,7 +60,7 @@ target_include_directories(test_mask PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_mask PRIVATE
         "-Wl,--subsystem,console"
@@ -118,7 +107,7 @@ target_include_directories(test_anime_mask_parsing PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_anime_mask_parsing PRIVATE
         "-Wl,--subsystem,console"
@@ -149,8 +138,8 @@ target_link_libraries(test_crashlog PRIVATE
 if(WIN32)
     target_link_libraries(test_crashlog PRIVATE dbghelp)
     
-    # Force console subsystem for LLVM MinGW
-    # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
+    # Windows console subsystem
+    
     target_link_options(test_crashlog PRIVATE
         "-Wl,--subsystem,console"
     )
@@ -199,7 +188,7 @@ target_include_directories(test_anidbapi PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_anidbapi PRIVATE
         "-Wl,--subsystem,console"
@@ -245,7 +234,7 @@ target_include_directories(test_compression PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_compression PRIVATE
         "-Wl,--subsystem,console"
@@ -292,7 +281,7 @@ target_include_directories(test_anidb_timeout_retry PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_anidb_timeout_retry PRIVATE
         "-Wl,--subsystem,console"
@@ -338,7 +327,7 @@ target_include_directories(test_anime_titles PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_anime_titles PRIVATE
         "-Wl,--subsystem,console"
@@ -355,7 +344,7 @@ target_link_libraries(test_url_extraction PRIVATE
     Qt6::Test
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_url_extraction PRIVATE
         "-Wl,--subsystem,console"
@@ -373,7 +362,7 @@ target_link_libraries(test_mylist_xml_parser PRIVATE
     Qt6::Sql
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_mylist_xml_parser PRIVATE
         "-Wl,--subsystem,console"
@@ -390,7 +379,7 @@ target_link_libraries(test_export_template_verification PRIVATE
     Qt6::Test
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_export_template_verification PRIVATE
         "-Wl,--subsystem,console"
@@ -411,7 +400,7 @@ target_include_directories(test_epno PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_epno PRIVATE
         "-Wl,--subsystem,console"
@@ -428,7 +417,7 @@ target_link_libraries(test_episode_column_format PRIVATE
     Qt6::Test
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_episode_column_format PRIVATE
         "-Wl,--subsystem,console"
@@ -446,7 +435,7 @@ target_link_libraries(test_mylist_221_fix PRIVATE
     Qt6::Sql
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_mylist_221_fix PRIVATE
         "-Wl,--subsystem,console"
@@ -464,7 +453,7 @@ target_link_libraries(test_evangelion_ha_fix PRIVATE
     Qt6::Sql
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_evangelion_ha_fix PRIVATE
         "-Wl,--subsystem,console"
@@ -485,7 +474,7 @@ target_include_directories(test_aired PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_aired PRIVATE
         "-Wl,--subsystem,console"
@@ -507,7 +496,7 @@ target_include_directories(test_mylist_type_aired PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_mylist_type_aired PRIVATE
         "-Wl,--subsystem,console"
@@ -529,7 +518,7 @@ target_include_directories(test_mylist_columns_fix PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_mylist_columns_fix PRIVATE
         "-Wl,--subsystem,console"
@@ -550,7 +539,7 @@ target_include_directories(test_mylist_aired_sorting PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_mylist_aired_sorting PRIVATE
         "-Wl,--subsystem,console"
@@ -572,7 +561,7 @@ target_include_directories(test_directorywatcher PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_directorywatcher PRIVATE
         "-Wl,--subsystem,console"
@@ -618,7 +607,7 @@ target_include_directories(test_hash_storage PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_hash_storage PRIVATE
         "-Wl,--subsystem,console"
@@ -652,7 +641,7 @@ target_include_directories(test_logger PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_logger PRIVATE
         "-Wl,--subsystem,console"
@@ -698,7 +687,7 @@ target_include_directories(test_hash_reuse PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_hash_reuse PRIVATE
         "-Wl,--subsystem,console"
@@ -744,7 +733,7 @@ target_include_directories(test_batch_localidentify PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_batch_localidentify PRIVATE
         "-Wl,--subsystem,console"
@@ -789,7 +778,7 @@ target_include_directories(test_hash_duplicate_reuse PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_hash_duplicate_reuse PRIVATE
         "-Wl,--subsystem,console"
@@ -807,7 +796,7 @@ target_link_libraries(test_database_validation PRIVATE
     Qt6::Sql
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_database_validation PRIVATE
         "-Wl,--subsystem,console"
@@ -853,7 +842,7 @@ target_include_directories(test_thread_safety PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_thread_safety PRIVATE
         "-Wl,--subsystem,console"
@@ -899,7 +888,7 @@ target_include_directories(test_immediate_identification PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_immediate_identification PRIVATE
         "-Wl,--subsystem,console"
@@ -945,7 +934,7 @@ target_include_directories(test_batch_hash_retrieval PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_batch_hash_retrieval PRIVATE
         "-Wl,--subsystem,console"
@@ -991,7 +980,7 @@ target_include_directories(test_ui_freeze_fix PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_ui_freeze_fix PRIVATE
         "-Wl,--subsystem,console"
@@ -1044,7 +1033,7 @@ target_include_directories(test_hasher_thread PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_hasher_thread PRIVATE
         "-Wl,--subsystem,console"
@@ -1098,7 +1087,7 @@ target_include_directories(test_hasher_threadpool PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_hasher_threadpool PRIVATE
         "-Wl,--subsystem,console"
@@ -1152,7 +1141,7 @@ target_include_directories(test_stop_non_blocking PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_stop_non_blocking PRIVATE
         "-Wl,--subsystem,console"
@@ -1199,7 +1188,7 @@ target_include_directories(test_truncated_response PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_truncated_response PRIVATE
         "-Wl,--subsystem,console"
@@ -1246,7 +1235,7 @@ target_include_directories(test_api_optimization PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_api_optimization PRIVATE
         "-Wl,--subsystem,console"
@@ -1306,7 +1295,7 @@ target_include_directories(test_mylistcardmanager PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_mylistcardmanager PRIVATE
         "-Wl,--subsystem,console"
@@ -1330,7 +1319,7 @@ target_link_libraries(test_background_loading PRIVATE
     Qt6::Sql
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_background_loading PRIVATE
         "-Wl,--subsystem,console"
@@ -1366,7 +1355,7 @@ target_include_directories(test_watchchunkmanager PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
 )
 
-# Force console subsystem for LLVM MinGW on Windows
+# Windows console subsystem
 if(WIN32)
     target_link_options(test_watchchunkmanager PRIVATE
         "-Wl,--subsystem,console"

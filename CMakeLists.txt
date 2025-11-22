@@ -2,15 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Usagi-dono VERSION 1.0.0 LANGUAGES CXX)
 
-# Note: Removed -UQT_NO_DEBUG to prevent aggressive Qt assertions
-# that cause crashes instead of warnings on signal/slot connection failures
-
-set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
-set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
-
-set(CMAKE_CXX_LINK_EXECUTABLE
-    "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
-
 # ==========================================================
 # 🧠 COMPILER CONFIGURATION
 # ==========================================================
@@ -93,20 +84,6 @@ if(WIN32)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
     set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
     
-    # Dynamic build - no static linking of libstdc++ and libgcc
-    
-    # Clean up any MSVC-style linker flags if CMake incorrectly detected compiler mode
-    # This should not normally happen with proper LLVM MinGW, but we handle it defensively
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
-    
-    # Remove problematic MSVC-style flags if present
-    string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    
     # Override link rule templates to ensure GNU-style linking for LLVM MinGW
     set(CMAKE_CXX_LINK_EXECUTABLE
         "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
@@ -123,15 +100,11 @@ endif()
 # Disable Crypto++ debug traps (we handle crashes ourselves)
 add_compile_definitions(CRYPTOPP_DEBUG=0)
 
-# add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0) # we are not making it compatible with older MinGW runtime libraries, therefore this line is not permitted
-
 # ==========================================================
 # ⚙️ QT SETUP
 # ==========================================================
 
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
-
-# Dynamic Qt build - no static-specific definitions needed
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -143,16 +116,6 @@ set(CMAKE_AUTORCC ON)
 # Qt's CMake configuration may add unexpected flags. Clean them up to ensure
 # we maintain GNU-style linking for LLVM MinGW.
 if(WIN32)
-    # Remove MSVC-style flags if Qt's CMake config added them
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
-    
-    string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    
     # Clean up Qt target interface options
     # Qt6 imported targets might have MSVC-style flags in their INTERFACE_LINK_OPTIONS and INTERFACE_COMPILE_OPTIONS
     foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
@@ -169,13 +132,13 @@ if(WIN32)
             # Clean up link options (removes -fuse-ld=lld-link and MSVC-style subsystem flags)
             get_target_property(qt_link_options ${qt_target} INTERFACE_LINK_OPTIONS)
             if(qt_link_options)
-                # Remove -fuse-ld=lld-link and MSVC-style subsystem flags from Qt's interface link options
-                list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld-link$")
-                list(FILTER qt_link_options EXCLUDE REGEX "^/subsystem:")
                 list(FILTER qt_link_options EXCLUDE REGEX "lld-link")
+                list(FILTER qt_link_options EXCLUDE REGEX "^/subsystem:")
                 list(FILTER qt_link_options EXCLUDE REGEX "^-Xlinker$")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/INCREMENTAL")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/DEBUG")
+                list(FILTER qt_link_options EXCLUDE REGEX "-nostartfiles")
+                list(FILTER qt_link_options EXCLUDE REGEX "-nostdlib")
                 set_target_properties(${qt_target} PROPERTIES INTERFACE_LINK_OPTIONS "${qt_link_options}")
             endif()
         endif()
