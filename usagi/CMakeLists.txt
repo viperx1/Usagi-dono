@@ -74,14 +74,12 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds, ensure all compile units see QT_STATIC
+# For static Qt builds, import platform plugins
 if(WIN32)
     get_target_property(qt_core_type Qt6::Core TYPE)
     if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Explicitly set QT_STATIC for this target
-        target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-        
         # Import platform plugins for static Qt on Windows
+        # Note: QT_STATIC and QT_STATICPLUGIN are already defined globally in root CMakeLists.txt
         qt_import_plugins(usagi
             INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
         )
