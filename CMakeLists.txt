@@ -140,8 +140,11 @@ endif()
 # Qt is static if either method detects it
 if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT)
     # Define QT_STATIC globally for static Qt builds
-    # This must be set as compile definitions AND in MOC options
+    # This must be set as compile definitions AND in MOC options AND in CXX flags
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+    
+    # Also add to CMAKE_CXX_FLAGS to ensure it's set for all compilation units
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DQT_STATIC -DQT_STATICPLUGIN")
     
     # Set MOC options for static Qt builds
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
@@ -175,9 +178,12 @@ if(WIN32)
             endif()
             
             # Clean up link options (removes -fuse-ld=lld-link and MSVC-style subsystem flags)
+            # Also remove duplicate GNU-style flags that we already set in CMAKE_EXE_LINKER_FLAGS
             get_target_property(qt_link_options ${qt_target} INTERFACE_LINK_OPTIONS)
             if(qt_link_options)
                 list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld-link$")
+                list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld$")
+                list(FILTER qt_link_options EXCLUDE REGEX "^--target=")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/subsystem:")
                 list(FILTER qt_link_options EXCLUDE REGEX "^-Xlinker$")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/INCREMENTAL")
