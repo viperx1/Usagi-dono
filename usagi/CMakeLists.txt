@@ -74,12 +74,18 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
+# For static Qt builds, ensure QT_STATIC is defined for this target
+# This is required for MOC to generate correct linkage declarations
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
+endif()
+
 # For static Qt builds, import platform plugins
 if(WIN32)
     get_target_property(qt_core_type Qt6::Core TYPE)
     if(qt_core_type STREQUAL "STATIC_LIBRARY")
         # Import platform plugins for static Qt on Windows
-        # Note: QT_STATIC and QT_STATICPLUGIN are already defined globally in root CMakeLists.txt
         qt_import_plugins(usagi
             INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
         )
