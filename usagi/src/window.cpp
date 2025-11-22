@@ -1671,21 +1671,23 @@ void Window::startBackgroundLoading()
         }
     }
     
-    // Load mylist anime IDs in background thread
+    // Load mylist anime IDs in background thread (if not already running)
     // The database query is done in background, but card creation happens in UI thread
-    mylistLoadingThread = new QThread(this);
-    MylistLoaderWorker *mylistWorker = new MylistLoaderWorker(dbName);
-    mylistWorker->moveToThread(mylistLoadingThread);
-    
-    connect(mylistLoadingThread, &QThread::started, mylistWorker, &MylistLoaderWorker::doWork);
-    connect(mylistWorker, &MylistLoaderWorker::finished, this, &Window::onMylistLoadingFinished);
-    connect(mylistWorker, &MylistLoaderWorker::finished, mylistLoadingThread, &QThread::quit);
-    connect(mylistLoadingThread, &QThread::finished, mylistWorker, &QObject::deleteLater);
-    
-    mylistLoadingThread->start();
+    if (!mylistLoadingThread || !mylistLoadingThread->isRunning()) {
+        mylistLoadingThread = new QThread(this);
+        MylistLoaderWorker *mylistWorker = new MylistLoaderWorker(dbName);
+        mylistWorker->moveToThread(mylistLoadingThread);
+        
+        connect(mylistLoadingThread, &QThread::started, mylistWorker, &MylistLoaderWorker::doWork);
+        connect(mylistWorker, &MylistLoaderWorker::finished, this, &Window::onMylistLoadingFinished);
+        connect(mylistWorker, &MylistLoaderWorker::finished, mylistLoadingThread, &QThread::quit);
+        connect(mylistLoadingThread, &QThread::finished, mylistWorker, &QObject::deleteLater);
+        
+        mylistLoadingThread->start();
+    }
     
     // Start anime titles cache loading in background thread (if not already loaded)
-    if (!animeTitlesCacheLoaded) {
+    if (!animeTitlesCacheLoaded && (!animeTitlesLoadingThread || !animeTitlesLoadingThread->isRunning())) {
         animeTitlesLoadingThread = new QThread(this);
         AnimeTitlesLoaderWorker *titlesWorker = new AnimeTitlesLoaderWorker(dbName);
         titlesWorker->moveToThread(animeTitlesLoadingThread);
@@ -1698,17 +1700,19 @@ void Window::startBackgroundLoading()
         animeTitlesLoadingThread->start();
     }
     
-    // Start unbound files loading in background thread
-    unboundFilesLoadingThread = new QThread(this);
-    UnboundFilesLoaderWorker *unboundWorker = new UnboundFilesLoaderWorker(dbName);
-    unboundWorker->moveToThread(unboundFilesLoadingThread);
-    
-    connect(unboundFilesLoadingThread, &QThread::started, unboundWorker, &UnboundFilesLoaderWorker::doWork);
-    connect(unboundWorker, &UnboundFilesLoaderWorker::finished, this, &Window::onUnboundFilesLoadingFinished);
-    connect(unboundWorker, &UnboundFilesLoaderWorker::finished, unboundFilesLoadingThread, &QThread::quit);
-    connect(unboundFilesLoadingThread, &QThread::finished, unboundWorker, &QObject::deleteLater);
-    
-    unboundFilesLoadingThread->start();
+    // Start unbound files loading in background thread (if not already running)
+    if (!unboundFilesLoadingThread || !unboundFilesLoadingThread->isRunning()) {
+        unboundFilesLoadingThread = new QThread(this);
+        UnboundFilesLoaderWorker *unboundWorker = new UnboundFilesLoaderWorker(dbName);
+        unboundWorker->moveToThread(unboundFilesLoadingThread);
+        
+        connect(unboundFilesLoadingThread, &QThread::started, unboundWorker, &UnboundFilesLoaderWorker::doWork);
+        connect(unboundWorker, &UnboundFilesLoaderWorker::finished, this, &Window::onUnboundFilesLoadingFinished);
+        connect(unboundWorker, &UnboundFilesLoaderWorker::finished, unboundFilesLoadingThread, &QThread::quit);
+        connect(unboundFilesLoadingThread, &QThread::finished, unboundWorker, &QObject::deleteLater);
+        
+        unboundFilesLoadingThread->start();
+    }
 }
 
 // Called when mylist loading finishes (in UI thread)
