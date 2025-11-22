@@ -140,24 +140,17 @@ get_target_property(qt_core_type Qt6::Core TYPE)
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
     message(STATUS "Detected static Qt6 libraries - configuring for static build")
     
-    # Force QT_STATIC in compiler flags to ensure it's seen by all compilation units
-    # Using add_compile_options instead of add_compile_definitions ensures the flag is
-    # passed to the compiler for ALL sources, including generated MOC files
-    add_compile_options(-DQT_STATIC -DQT_STATICPLUGIN)
+    # CRITICAL: Define QT_STATIC globally BEFORE CMAKE_AUTOMOC is enabled
+    # This ensures MOC sees QT_STATIC when processing headers to generate correct
+    # linkage declarations for static Qt builds. Without this, MOC generates
+    # dllimport declarations causing linker errors like:
+    # "undefined symbol: __declspec(dllimport) QMetaType::registerConverterFunction"
+    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     
-    # CRITICAL: Set MOC options before CMAKE_AUTOMOC is enabled below (line 163)
+    # CRITICAL: Set MOC options before CMAKE_AUTOMOC is enabled below
     # MOC must see QT_STATIC when processing headers to generate correct linkage declarations
     # for static Qt builds. Without this, MOC generates dllimport declarations causing linker errors.
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
-    
-    # Also add to Qt targets' interface to ensure MOC sees it
-    # Note: For IMPORTED targets (like Qt6::Core), setting INTERFACE properties
-    # ensures downstream targets that link against these targets will inherit the definitions.
-    foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Sql Qt6::Test)
-        if(TARGET ${qt_target})
-            target_compile_definitions(${qt_target} INTERFACE QT_STATIC QT_STATICPLUGIN)
-        endif()
-    endforeach()
 endif()
 
 set(CMAKE_AUTOMOC ON)
@@ -179,13 +172,6 @@ if(WIN32)
     string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
     string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    
-    # Check if Qt is statically linked and ensure definitions are set
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Already added above, but ensure it's set
-        message(STATUS "Verifying static Qt6 configuration")
-    endif()
     
     # Clean up Qt target interface options
     # Qt6 imported targets might have MSVC-style flags in their INTERFACE_LINK_OPTIONS and INTERFACE_COMPILE_OPTIONS
