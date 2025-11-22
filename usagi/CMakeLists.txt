@@ -66,9 +66,6 @@ add_executable(usagi ${SOURCES} ${HEADERS})
 
 # For static Qt builds, import required plugins
 if(IS_STATIC_QT)
-    # Ensure QT_STATIC is defined for this target
-    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-    
     # Import platform plugins for static Qt on Windows
     if(WIN32)
         qt_import_plugins(usagi
