@@ -60,6 +60,9 @@ add_executable(usagi ${SOURCES} ${HEADERS})
 # For static Qt builds, import required plugins and set compile definitions
 if(QT_IS_STATIC)
     # Explicitly set QT_STATIC for this target to ensure MOC and compilation units have it
+    # While add_compile_definitions() in root CMakeLists.txt sets this globally,
+    # we set it explicitly here as defense-in-depth to guarantee it's defined
+    # (the original build failure was due to missing QT_STATIC)
     target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
     
     # Import platform plugins for static Qt on Windows
