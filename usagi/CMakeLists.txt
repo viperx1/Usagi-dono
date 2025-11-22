@@ -74,21 +74,6 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
-    # Ensure QT_STATIC is defined for this target
-    # This is required for MOC to generate correct linkage declarations
-    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-    
-    # Import platform plugins for static Qt on Windows
-    if(WIN32)
-        qt_import_plugins(usagi
-            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
-        )
-    endif()
-endif()
-
 # Link Qt libraries
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
@@ -99,41 +84,9 @@ target_link_libraries(usagi PRIVATE
     z
 )
 
-# For static Qt builds on Windows, we need additional system libraries
-if(WIN32)
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Static Qt6 on Windows requires these additional libraries
-        target_link_libraries(usagi PRIVATE
-            winmm        # Windows multimedia
-            version      # Version information
-            netapi32     # Network API
-            ws2_32       # Windows Sockets (already may be linked by Qt but explicit doesn't hurt)
-            iphlpapi     # IP Helper API
-            crypt32      # Cryptography API
-            ole32        # OLE32
-            oleaut32     # OLE Automation
-            uuid         # UUID functions
-        )
-        # Note: Qt6::Core is linked again at the end of the Windows section (line 157)
-        # This additional link is required for both static and shared builds to resolve 
-        # QMetaType circular dependencies. The implementation at line 157 is outside
-        # this static-build-only block so it applies to all Windows builds.
-    endif()
-endif()
-
 # Link platform-specific libraries
 if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
-    
-    # For static Qt builds, link Qt6::EntryPoint which contains WinMain
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Qt6::EntryPoint provides WinMain/main entry point for static builds
-        if(TARGET Qt6::EntryPoint)
-            target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
-        endif()
-    endif()
     
     # Force console subsystem for LLVM MinGW
     # Note: -fuse-ld=lld is already set globally in root CMakeLists.txt
@@ -142,7 +95,7 @@ if(WIN32)
     )
     
     # Link Qt6::Core again at the end to resolve circular dependencies
-    # This is necessary for both static and shared Qt builds on Windows
+    # This is necessary for dynamic Qt builds on Windows
     # to resolve QMetaType symbol dependencies (e.g., registerConverterFunction, registerMutableViewFunction)
     # Note: Project requires LLVM MinGW on Windows (enforced in root CMakeLists.txt)
     target_link_libraries(usagi PRIVATE Qt6::Core)

@@ -93,11 +93,7 @@ if(WIN32)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
     set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
     
-    # Static link libstdc++ and libgcc to avoid runtime DLL dependencies
-    # This prevents "procedure entry point not found" errors on systems without matching MinGW runtime
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+    # Dynamic build - no static linking of libstdc++ and libgcc
     
     # Clean up any MSVC-style linker flags if CMake incorrectly detected compiler mode
     # This should not normally happen with proper LLVM MinGW, but we handle it defensively
@@ -135,23 +131,7 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 
-# Check if Qt is statically linked and add necessary definitions BEFORE any compilation
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
-    message(STATUS "Detected static Qt6 libraries - configuring for static build")
-    
-    # CRITICAL: Define QT_STATIC globally BEFORE CMAKE_AUTOMOC is enabled
-    # This ensures MOC sees QT_STATIC when processing headers to generate correct
-    # linkage declarations for static Qt builds. Without this, MOC generates
-    # dllimport declarations causing linker errors like:
-    # "undefined symbol: __declspec(dllimport) QMetaType::registerConverterFunction"
-    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
-    
-    # CRITICAL: Set MOC options before CMAKE_AUTOMOC is enabled below
-    # MOC must see QT_STATIC when processing headers to generate correct linkage declarations
-    # for static Qt builds. Without this, MOC generates dllimport declarations causing linker errors.
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
-endif()
+# Dynamic Qt build - no static-specific definitions needed
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
