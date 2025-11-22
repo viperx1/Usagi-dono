@@ -114,15 +114,20 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     set(QT_IS_STATIC_BY_TYPE TRUE)
 endif()
 
-# Method 2: Check if library file has static extension (.a for MinGW/Unix, .lib for MSVC)
+# Method 2: Check if library file has static extension
+# .a files are static libraries (MinGW, GCC, Clang on Windows/Unix/macOS)
 set(QT_IS_STATIC_BY_EXT FALSE)
-# Try IMPORTED_LOCATION first, fall back to LOCATION
+# Try IMPORTED_LOCATION first, then IMPORTED_LOCATION_RELEASE, then fall back to LOCATION
 get_target_property(qt_core_location Qt6::Core IMPORTED_LOCATION)
+if(NOT qt_core_location)
+    get_target_property(qt_core_location Qt6::Core IMPORTED_LOCATION_RELEASE)
+endif()
 if(NOT qt_core_location)
     get_target_property(qt_core_location Qt6::Core LOCATION)
 endif()
 if(qt_core_location)
-    if(qt_core_location MATCHES "\\.(a|lib)$")
+    # Check for .a extension (static library for MinGW/GCC/Clang)
+    if(qt_core_location MATCHES "\\.a$")
         set(QT_IS_STATIC_BY_EXT TRUE)
     endif()
 endif()
