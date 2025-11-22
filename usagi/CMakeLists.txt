@@ -60,6 +60,8 @@ add_executable(usagi ${SOURCES} ${HEADERS})
 # For static Qt builds, import required plugins
 if(QT_IS_STATIC)
     # Import platform plugins for static Qt on Windows
+    # QWindowsIntegrationPlugin: Required for Windows GUI (QPlatformIntegration)
+    # QWindowsVistaStylePlugin: Required for native Windows UI styling
     if(WIN32)
         qt_import_plugins(usagi
             INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
@@ -82,6 +84,7 @@ if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
     
     # For static Qt builds on Windows, add additional system libraries
+    # These are dependencies of Qt's static libraries that must be manually linked
     if(QT_IS_STATIC)
         target_link_libraries(usagi PRIVATE
             winmm        # Windows multimedia

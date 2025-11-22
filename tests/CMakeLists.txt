@@ -20,7 +20,6 @@ set(HASH_TEST_HEADERS
 
 add_executable(test_hash ${HASH_TEST_SOURCES} ${HASH_TEST_HEADERS})
 
-
 target_link_libraries(test_hash PRIVATE
     Qt6::Core
     Qt6::Test
@@ -51,7 +50,6 @@ set(MASK_TEST_HEADERS
 )
 
 add_executable(test_mask ${MASK_TEST_SOURCES} ${MASK_TEST_HEADERS})
-
 
 target_link_libraries(test_mask PRIVATE
     Qt6::Core
@@ -94,7 +92,6 @@ set(ANIME_MASK_PARSING_TEST_HEADERS
 
 add_executable(test_anime_mask_parsing ${ANIME_MASK_PARSING_TEST_SOURCES} ${ANIME_MASK_PARSING_TEST_HEADERS})
 
-
 target_compile_definitions(test_anime_mask_parsing PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_anime_mask_parsing PRIVATE
@@ -130,7 +127,6 @@ set(CRASHLOG_TEST_HEADERS
 )
 
 add_executable(test_crashlog ${CRASHLOG_TEST_SOURCES} ${CRASHLOG_TEST_HEADERS})
-
 
 target_link_libraries(test_crashlog PRIVATE
     Qt6::Core
@@ -177,7 +173,6 @@ set(ANIDBAPI_TEST_HEADERS
 
 add_executable(test_anidbapi ${ANIDBAPI_TEST_SOURCES} ${ANIDBAPI_TEST_HEADERS})
 
-
 target_compile_definitions(test_anidbapi PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_anidbapi PRIVATE
@@ -223,7 +218,6 @@ set(COMPRESSION_TEST_HEADERS
 )
 
 add_executable(test_compression ${COMPRESSION_TEST_SOURCES} ${COMPRESSION_TEST_HEADERS})
-
 
 target_compile_definitions(test_compression PRIVATE CRYPTOPP_DEBUG=0)
 
@@ -272,7 +266,6 @@ set(TIMEOUT_RETRY_TEST_HEADERS
 
 add_executable(test_anidb_timeout_retry ${TIMEOUT_RETRY_TEST_SOURCES} ${TIMEOUT_RETRY_TEST_HEADERS})
 
-
 target_compile_definitions(test_anidb_timeout_retry PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_anidb_timeout_retry PRIVATE
@@ -319,7 +312,6 @@ set(ANIME_TITLES_TEST_HEADERS
 
 add_executable(test_anime_titles ${ANIME_TITLES_TEST_SOURCES} ${ANIME_TITLES_TEST_HEADERS})
 
-
 target_compile_definitions(test_anime_titles PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_anime_titles PRIVATE
@@ -347,7 +339,6 @@ add_test(NAME test_anime_titles COMMAND test_anime_titles -v2)
 # Test 5: URL extraction from notifications
 add_executable(test_url_extraction test_url_extraction.cpp)
 
-
 target_link_libraries(test_url_extraction PRIVATE
     Qt6::Core
     Qt6::Test
@@ -364,7 +355,6 @@ add_test(NAME test_url_extraction COMMAND test_url_extraction -v2)
 
 # Test 6: MyList XML Parser
 add_executable(test_mylist_xml_parser test_mylist_xml_parser.cpp)
-
 
 target_link_libraries(test_mylist_xml_parser PRIVATE
     Qt6::Core
@@ -384,7 +374,6 @@ add_test(NAME test_mylist_xml_parser COMMAND test_mylist_xml_parser -v2)
 # Test 7: Export template verification in notifications
 add_executable(test_export_template_verification test_export_template_verification.cpp)
 
-
 target_link_libraries(test_export_template_verification PRIVATE
     Qt6::Core
     Qt6::Test
@@ -401,7 +390,6 @@ add_test(NAME test_export_template_verification COMMAND test_export_template_ver
 
 # Test 8: Episode number type (epno)
 add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp ../usagi/src/logger.cpp)
-
 
 target_link_libraries(test_epno PRIVATE
     Qt6::Core
@@ -424,7 +412,6 @@ add_test(NAME test_epno COMMAND test_epno -v2)
 # Test 9: Episode column format verification
 add_executable(test_episode_column_format test_episode_column_format.cpp)
 
-
 target_link_libraries(test_episode_column_format PRIVATE
     Qt6::Core
     Qt6::Test
@@ -441,7 +428,6 @@ add_test(NAME test_episode_column_format COMMAND test_episode_column_format -v2)
 
 # Test 10: MyList 221 response fix verification
 add_executable(test_mylist_221_fix test_mylist_221_fix.cpp)
-
 
 target_link_libraries(test_mylist_221_fix PRIVATE
     Qt6::Core
@@ -461,7 +447,6 @@ add_test(NAME test_mylist_221_fix COMMAND test_mylist_221_fix -v2)
 # Test 11: Evangelion Ha fix - episode column display for movies with specials
 add_executable(test_evangelion_ha_fix test_evangelion_ha_fix.cpp)
 
-
 target_link_libraries(test_evangelion_ha_fix PRIVATE
     Qt6::Core
     Qt6::Test
@@ -479,7 +464,6 @@ add_test(NAME test_evangelion_ha_fix COMMAND test_evangelion_ha_fix -v2)
 
 # Test 12: Aired date type
 add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
-
 
 target_link_libraries(test_aired PRIVATE
     Qt6::Core
@@ -501,7 +485,6 @@ add_test(NAME test_aired COMMAND test_aired -v2)
 
 # Test 13: MyList Type and Aired columns integration
 add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
-
 
 target_link_libraries(test_mylist_type_aired PRIVATE
     Qt6::Core
@@ -525,7 +508,6 @@ add_test(NAME test_mylist_type_aired COMMAND test_mylist_type_aired -v2)
 # Test 14: Mylist columns fix test (Type and Aired columns)
 add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
-
 target_link_libraries(test_mylist_columns_fix PRIVATE
     Qt6::Core
     Qt6::Sql
@@ -548,7 +530,6 @@ add_test(NAME test_mylist_columns_fix COMMAND test_mylist_columns_fix -v2)
 # Test 15: MyList aired sorting
 add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
 
-
 target_link_libraries(test_mylist_aired_sorting PRIVATE
     Qt6::Core
     Qt6::Widgets
@@ -569,7 +550,6 @@ add_test(NAME test_mylist_aired_sorting COMMAND test_mylist_aired_sorting -v2)
 
 # Test 16: Directory watcher
 add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp ../usagi/src/logger.cpp)
-
 
 # Link Qt libraries
 target_link_libraries(test_directorywatcher PRIVATE
@@ -612,7 +592,6 @@ set(HASH_STORAGE_TEST_HEADERS
 
 add_executable(test_hash_storage ${HASH_STORAGE_TEST_SOURCES} ${HASH_STORAGE_TEST_HEADERS})
 
-
 target_compile_definitions(test_hash_storage PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_hash_storage PRIVATE
@@ -649,7 +628,6 @@ set(LOGGER_TEST_HEADERS
 )
 
 add_executable(test_logger ${LOGGER_TEST_SOURCES} ${LOGGER_TEST_HEADERS})
-
 
 target_compile_definitions(test_logger PRIVATE CRYPTOPP_DEBUG=0)
 
@@ -693,7 +671,6 @@ set(HASH_REUSE_TEST_HEADERS
 )
 
 add_executable(test_hash_reuse ${HASH_REUSE_TEST_SOURCES} ${HASH_REUSE_TEST_HEADERS})
-
 
 target_compile_definitions(test_hash_reuse PRIVATE CRYPTOPP_DEBUG=0)
 
@@ -741,7 +718,6 @@ set(BATCH_LOCALIDENTIFY_TEST_HEADERS
 
 add_executable(test_batch_localidentify ${BATCH_LOCALIDENTIFY_TEST_SOURCES} ${BATCH_LOCALIDENTIFY_TEST_HEADERS})
 
-
 target_compile_definitions(test_batch_localidentify PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_batch_localidentify PRIVATE
@@ -788,7 +764,6 @@ set(HASH_DUPLICATE_REUSE_TEST_HEADERS
 
 add_executable(test_hash_duplicate_reuse ${HASH_DUPLICATE_REUSE_TEST_SOURCES} ${HASH_DUPLICATE_REUSE_TEST_HEADERS})
 
-
 target_compile_definitions(test_hash_duplicate_reuse PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_hash_duplicate_reuse PRIVATE
@@ -814,7 +789,6 @@ add_test(NAME test_hash_duplicate_reuse COMMAND test_hash_duplicate_reuse -v2)
 
 # Test 22: Database connection validation
 add_executable(test_database_validation test_database_validation.cpp)
-
 
 target_link_libraries(test_database_validation PRIVATE
     Qt6::Core
@@ -852,7 +826,6 @@ set(THREAD_SAFETY_TEST_HEADERS
 )
 
 add_executable(test_thread_safety ${THREAD_SAFETY_TEST_SOURCES} ${THREAD_SAFETY_TEST_HEADERS})
-
 
 target_compile_definitions(test_thread_safety PRIVATE CRYPTOPP_DEBUG=0)
 
@@ -900,7 +873,6 @@ set(IMMEDIATE_IDENTIFICATION_TEST_HEADERS
 
 add_executable(test_immediate_identification ${IMMEDIATE_IDENTIFICATION_TEST_SOURCES} ${IMMEDIATE_IDENTIFICATION_TEST_HEADERS})
 
-
 target_compile_definitions(test_immediate_identification PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_immediate_identification PRIVATE
@@ -947,7 +919,6 @@ set(BATCH_HASH_RETRIEVAL_TEST_HEADERS
 
 add_executable(test_batch_hash_retrieval ${BATCH_HASH_RETRIEVAL_TEST_SOURCES} ${BATCH_HASH_RETRIEVAL_TEST_HEADERS})
 
-
 target_compile_definitions(test_batch_hash_retrieval PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_batch_hash_retrieval PRIVATE
@@ -993,7 +964,6 @@ set(UI_FREEZE_FIX_TEST_HEADERS
 )
 
 add_executable(test_ui_freeze_fix ${UI_FREEZE_FIX_TEST_SOURCES} ${UI_FREEZE_FIX_TEST_HEADERS})
-
 
 target_compile_definitions(test_ui_freeze_fix PRIVATE CRYPTOPP_DEBUG=0)
 
@@ -1044,7 +1014,6 @@ set(HASHER_THREAD_TEST_HEADERS
 )
 
 add_executable(test_hasher_thread ${HASHER_THREAD_TEST_SOURCES} ${HASHER_THREAD_TEST_HEADERS})
-
 
 target_compile_definitions(test_hasher_thread PRIVATE CRYPTOPP_DEBUG=0)
 
@@ -1102,7 +1071,6 @@ set(HASHER_THREADPOOL_TEST_HEADERS
 
 add_executable(test_hasher_threadpool ${HASHER_THREADPOOL_TEST_SOURCES} ${HASHER_THREADPOOL_TEST_HEADERS})
 
-
 target_compile_definitions(test_hasher_threadpool PRIVATE CRYPTOPP_DEBUG=0)
 
 # Link Qt libraries
@@ -1157,7 +1125,6 @@ set(STOP_NON_BLOCKING_TEST_HEADERS
 
 add_executable(test_stop_non_blocking ${STOP_NON_BLOCKING_TEST_SOURCES} ${STOP_NON_BLOCKING_TEST_HEADERS})
 
-
 target_compile_definitions(test_stop_non_blocking PRIVATE CRYPTOPP_DEBUG=0)
 
 # Link Qt libraries
@@ -1206,7 +1173,6 @@ set(TRUNCATED_RESPONSE_TEST_HEADERS
 
 add_executable(test_truncated_response ${TRUNCATED_RESPONSE_TEST_SOURCES} ${TRUNCATED_RESPONSE_TEST_HEADERS})
 
-
 target_compile_definitions(test_truncated_response PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_truncated_response PRIVATE
@@ -1253,7 +1219,6 @@ set(API_OPTIMIZATION_TEST_HEADERS
 )
 
 add_executable(test_api_optimization ${API_OPTIMIZATION_TEST_SOURCES} ${API_OPTIMIZATION_TEST_HEADERS})
-
 
 target_compile_definitions(test_api_optimization PRIVATE CRYPTOPP_DEBUG=0)
 
@@ -1315,7 +1280,6 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
 
 add_executable(test_mylistcardmanager ${MYLISTCARDMANAGER_TEST_SOURCES} ${MYLISTCARDMANAGER_TEST_HEADERS})
 
-
 target_compile_definitions(test_mylistcardmanager PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_mylistcardmanager PRIVATE
@@ -1347,7 +1311,6 @@ set(BACKGROUND_LOADING_TEST_SOURCES
 
 add_executable(test_background_loading ${BACKGROUND_LOADING_TEST_SOURCES})
 
-
 target_compile_definitions(test_background_loading PRIVATE CRYPTOPP_DEBUG=0)
 
 target_link_libraries(test_background_loading PRIVATE
@@ -1378,7 +1341,6 @@ set(WATCHCHUNKMANAGER_TEST_HEADERS
 )
 
 add_executable(test_watchchunkmanager ${WATCHCHUNKMANAGER_TEST_SOURCES} ${WATCHCHUNKMANAGER_TEST_HEADERS})
-
 
 target_compile_definitions(test_watchchunkmanager PRIVATE CRYPTOPP_DEBUG=0)
 
