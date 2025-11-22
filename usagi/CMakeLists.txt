@@ -71,7 +71,10 @@ target_link_libraries(usagi PRIVATE
 if(WIN32)
     target_link_libraries(usagi PRIVATE dbghelp)
     
-    target_link_options(usagi PRIVATE "-Wl,--subsystem,console")
+    # Force console subsystem for LLVM MinGW
+    target_link_options(usagi PRIVATE
+        "-Wl,--subsystem,console"
+    )
     
     # Link Qt6::Core again at the end to resolve circular dependencies
     target_link_libraries(usagi PRIVATE Qt6::Core)
