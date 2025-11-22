@@ -18,6 +18,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QFile>
+#include <QStandardPaths>
 
 // Simple worker for testing
 class TestWorker : public QObject
@@ -128,13 +129,20 @@ class TestBackgroundLoading : public QObject
 {
     Q_OBJECT
 
+private:
+    QString m_testDbPath;
+
 private slots:
     void initTestCase()
     {
         // Initialize test database with temporary file
         // Use file-based database so worker threads can access the same data
+        // Use platform-agnostic temporary directory
+        QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+        m_testDbPath = tempDir + "/test_background_loading.db";
+        
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-        db.setDatabaseName("/tmp/test_background_loading.db");
+        db.setDatabaseName(m_testDbPath);
         QVERIFY(db.open());
         
         // Create test tables
@@ -333,8 +341,8 @@ private slots:
     {
         QSqlDatabase::database().close();
         QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
-        // Clean up temporary database file
-        QFile::remove("/tmp/test_background_loading.db");
+        // Clean up temporary database file using stored path
+        QFile::remove(m_testDbPath);
     }
 };
 

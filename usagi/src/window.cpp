@@ -1684,17 +1684,19 @@ void Window::startBackgroundLoading()
     
     mylistLoadingThread->start();
     
-    // Start anime titles cache loading in background thread
-    animeTitlesLoadingThread = new QThread(this);
-    AnimeTitlesLoaderWorker *titlesWorker = new AnimeTitlesLoaderWorker(dbName);
-    titlesWorker->moveToThread(animeTitlesLoadingThread);
-    
-    connect(animeTitlesLoadingThread, &QThread::started, titlesWorker, &AnimeTitlesLoaderWorker::doWork);
-    connect(titlesWorker, &AnimeTitlesLoaderWorker::finished, this, &Window::onAnimeTitlesLoadingFinished);
-    connect(titlesWorker, &AnimeTitlesLoaderWorker::finished, animeTitlesLoadingThread, &QThread::quit);
-    connect(animeTitlesLoadingThread, &QThread::finished, titlesWorker, &QObject::deleteLater);
-    
-    animeTitlesLoadingThread->start();
+    // Start anime titles cache loading in background thread (if not already loaded)
+    if (!animeTitlesCacheLoaded) {
+        animeTitlesLoadingThread = new QThread(this);
+        AnimeTitlesLoaderWorker *titlesWorker = new AnimeTitlesLoaderWorker(dbName);
+        titlesWorker->moveToThread(animeTitlesLoadingThread);
+        
+        connect(animeTitlesLoadingThread, &QThread::started, titlesWorker, &AnimeTitlesLoaderWorker::doWork);
+        connect(titlesWorker, &AnimeTitlesLoaderWorker::finished, this, &Window::onAnimeTitlesLoadingFinished);
+        connect(titlesWorker, &AnimeTitlesLoaderWorker::finished, animeTitlesLoadingThread, &QThread::quit);
+        connect(animeTitlesLoadingThread, &QThread::finished, titlesWorker, &QObject::deleteLater);
+        
+        animeTitlesLoadingThread->start();
+    }
     
     // Start unbound files loading in background thread
     unboundFilesLoadingThread = new QThread(this);
