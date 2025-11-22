@@ -145,7 +145,7 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     # passed to the compiler for ALL sources, including generated MOC files
     add_compile_options(-DQT_STATIC -DQT_STATICPLUGIN)
     
-    # CRITICAL: Set MOC options before CMAKE_AUTOMOC is enabled below (line 162)
+    # CRITICAL: Set MOC options before CMAKE_AUTOMOC is enabled below (line 163)
     # MOC must see QT_STATIC when processing headers to generate correct linkage declarations
     # for static Qt builds. Without this, MOC generates dllimport declarations causing linker errors.
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
