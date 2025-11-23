@@ -10,12 +10,8 @@ else()
     set(QT_IS_STATIC FALSE)
 endif()
 
-# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
-# This is necessary so that Qt headers are processed with correct linkage declarations
-if(QT_IS_STATIC)
-    # Make sure MOC-generated files also see QT_STATIC
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
-endif()
+# Note: CMAKE_AUTOMOC_MOC_OPTIONS is set in root CMakeLists.txt for static Qt builds
+# to ensure MOC sees QT_STATIC before any Qt headers are processed
 
 # Source files
 set(SOURCES

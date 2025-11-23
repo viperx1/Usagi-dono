@@ -148,6 +148,10 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
             target_compile_definitions(${qt_target} INTERFACE QT_STATIC QT_STATICPLUGIN)
         endif()
     endforeach()
+    
+    # Ensure MOC sees QT_STATIC for static Qt builds
+    # This must be set BEFORE CMAKE_AUTOMOC is turned ON
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
 endif()
 
 set(CMAKE_AUTOMOC ON)
