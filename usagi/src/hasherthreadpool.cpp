@@ -30,7 +30,7 @@ HasherThreadPool::HasherThreadPool(int numThreads, QObject *parent)
                 this, &HasherThreadPool::onThreadRequestNextFile, Qt::QueuedConnection);
         connect(worker, &HasherThread::sendHash, 
                 this, &HasherThreadPool::onThreadSendHash, Qt::QueuedConnection);
-        connect(worker, &HasherThread::finished, 
+        connect(worker, &QThread::finished, 
                 this, &HasherThreadPool::onThreadFinished, Qt::QueuedConnection);
         connect(worker, &HasherThread::threadStarted,
                 this, &HasherThreadPool::onThreadStarted, Qt::QueuedConnection);
