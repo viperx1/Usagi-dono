@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(usagi LANGUAGES CXX)
 
 # For Windows LLVM MinGW builds, always ensure MOC and compilation see QT_STATIC
-# Qt 6.8 with LLVM MinGW uses static libraries but CMake detects them as SHARED_LIBRARY type
+# Qt 6.8 with LLVM MinGW uses static libraries but CMake detects them as SHARED_LIBRARY type instead of STATIC_LIBRARY type
 # This project specifically targets LLVM MinGW static Qt builds
 # IMPORTANT: Use add_compile_definitions to affect ALL compilation including MOC
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
