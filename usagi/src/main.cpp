@@ -4,8 +4,12 @@
 #include "logger.h"
 //#include "main.h"
 
-// Plugin imports removed - trying dynamic linking approach
-// Qt 6.8 LLVM MinGW reports as SHARED_LIBRARY, not STATIC_LIBRARY
+// Import static plugins for Qt 6.8 LLVM MinGW static builds
+#ifdef QT_STATIC
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+Q_IMPORT_PLUGIN(QSQLiteDriverPlugin)
+#endif
 
 //myAniDBApi *adbapi;
 Window *window;
