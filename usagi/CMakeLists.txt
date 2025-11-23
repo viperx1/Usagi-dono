@@ -2,6 +2,21 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
+# Check if Qt is statically linked once and reuse the result
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    set(QT_IS_STATIC TRUE)
+else()
+    set(QT_IS_STATIC FALSE)
+endif()
+
+# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
+# This is necessary so that Qt headers are processed with correct linkage declarations
+if(QT_IS_STATIC)
+    # Make sure MOC-generated files also see QT_STATIC
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
+endif()
+
 # Source files
 set(SOURCES
     src/anidbapi.cpp
@@ -57,16 +72,15 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds, import required plugins
-if(QT_IS_STATIC)
+# For static Qt builds, ensure all compile units see QT_STATIC
+if(WIN32 AND QT_IS_STATIC)
+    # Explicitly set QT_STATIC for this target
+    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
+    
     # Import platform plugins for static Qt on Windows
-    # QWindowsIntegrationPlugin: Required for Windows GUI (QPlatformIntegration)
-    # QWindowsVistaStylePlugin: Required for native Windows UI styling
-    if(WIN32)
-        qt_import_plugins(usagi
-            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
-        )
-    endif()
+    qt_import_plugins(usagi
+        INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+    )
 endif()
 
 # Link Qt libraries
