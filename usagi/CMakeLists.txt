@@ -2,10 +2,17 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
-# This is necessary so that Qt headers are processed with correct linkage declarations
+# Check if Qt is statically linked once and reuse the result
 get_target_property(qt_core_type Qt6::Core TYPE)
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    set(QT_IS_STATIC TRUE)
+else()
+    set(QT_IS_STATIC FALSE)
+endif()
+
+# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
+# This is necessary so that Qt headers are processed with correct linkage declarations
+if(QT_IS_STATIC)
     # Make sure MOC-generated files also see QT_STATIC
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
 endif()
@@ -66,17 +73,14 @@ set(HEADERS
 add_executable(usagi ${SOURCES} ${HEADERS})
 
 # For static Qt builds, ensure all compile units see QT_STATIC
-if(WIN32)
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        # Explicitly set QT_STATIC for this target
-        target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-        
-        # Import platform plugins for static Qt on Windows
-        qt_import_plugins(usagi
-            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
-        )
-    endif()
+if(WIN32 AND QT_IS_STATIC)
+    # Explicitly set QT_STATIC for this target
+    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
+    
+    # Import platform plugins for static Qt on Windows
+    qt_import_plugins(usagi
+        INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+    )
 endif()
 
 # Link Qt libraries
@@ -95,8 +99,7 @@ if(WIN32)
     
     # For static Qt builds on Windows, add additional system libraries
     # These are dependencies of Qt's static libraries that must be manually linked
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    if(QT_IS_STATIC)
         target_link_libraries(usagi PRIVATE
             winmm        # Windows multimedia
             version      # Version information
@@ -119,8 +122,7 @@ if(WIN32)
     target_link_libraries(usagi PRIVATE Qt6::Core)
     
     # For static Qt builds, link Qt6::EntryPoint which contains WinMain
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    if(QT_IS_STATIC)
         if(TARGET Qt6::EntryPoint)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
         endif()
