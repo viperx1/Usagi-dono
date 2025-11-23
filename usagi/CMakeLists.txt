@@ -86,7 +86,9 @@ if(WIN32 AND QT_IS_STATIC)
     # Import platform plugins for static Qt on Windows
     # Note: QT_STATIC and QT_STATICPLUGIN are already defined via add_compile_definitions above
     qt_import_plugins(usagi
-        INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+        INCLUDE 
+            Qt::QWindowsIntegrationPlugin
+            Qt::QSQLiteDriverPlugin
     )
 endif()
 

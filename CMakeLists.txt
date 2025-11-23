@@ -135,6 +135,13 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Concurrent Test REQUIRED)
 
+# For Windows LLVM MinGW builds, always define QT_STATIC at root level too
+# Qt 6.8 with LLVM MinGW uses static libraries but CMake detects them as SHARED_LIBRARY
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(STATUS "Setting QT_STATIC defines at root level for Windows LLVM MinGW build")
+    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+endif()
+
 # Check if Qt is statically linked and add necessary definitions BEFORE any compilation
 get_target_property(qt_core_type Qt6::Core TYPE)
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
