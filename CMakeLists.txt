@@ -150,7 +150,7 @@ if(qt_core_type STREQUAL "STATIC_LIBRARY")
     endforeach()
 endif()
 
-set(CMAKE_AUTOMOC ON)
+# Note: CMAKE_AUTOMOC is enabled in subdirectories where needed, after setting MOC options
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
