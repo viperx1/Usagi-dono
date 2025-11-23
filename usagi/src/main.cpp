@@ -8,7 +8,7 @@
 #ifdef QT_STATIC
 #include <QtPlugin>
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
-Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
+// Note: QWindowsVistaStylePlugin removed - not available in Qt 6.8 LLVM MinGW
 Q_IMPORT_PLUGIN(QSQLiteDriverPlugin)
 #endif
 
