@@ -2,27 +2,28 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# Check if Qt is statically linked once and reuse the result
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
-    set(QT_IS_STATIC TRUE)
-    message(STATUS "Detected static Qt6 for usagi target")
-else()
-    set(QT_IS_STATIC FALSE)
-    message(STATUS "Qt6 type for usagi: ${qt_core_type}")
-endif()
-
-# For Windows LLVM MinGW builds, always ensure MOC sees QT_STATIC
-# Qt 6.8 with LLVM MinGW uses static libraries but CMake may not detect them as STATIC_LIBRARY type
+# For Windows LLVM MinGW builds, always ensure MOC and compilation see QT_STATIC
+# Qt 6.8 with LLVM MinGW uses static libraries but CMake detects them as SHARED_LIBRARY type
 # This project specifically targets LLVM MinGW static Qt builds
-# IMPORTANT: Set MOC options BEFORE enabling CMAKE_AUTOMOC
+# IMPORTANT: Use add_compile_definitions to affect ALL compilation including MOC
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    message(STATUS "Setting CMAKE_AUTOMOC_MOC_OPTIONS for Windows LLVM MinGW build")
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
+    message(STATUS "Setting QT_STATIC defines for Windows LLVM MinGW build")
+    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     set(QT_IS_STATIC TRUE)
+else()
+    # Check if Qt is statically linked
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        set(QT_IS_STATIC TRUE)
+        message(STATUS "Detected static Qt6 for usagi target")
+        add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+    else()
+        set(QT_IS_STATIC FALSE)
+        message(STATUS "Qt6 type for usagi: ${qt_core_type}")
+    endif()
 endif()
 
-# Enable automatic MOC - now with options already set
+# Enable automatic MOC
 set(CMAKE_AUTOMOC ON)
 
 # Source files
@@ -80,12 +81,10 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds, ensure all compile units see QT_STATIC
+# For static Qt builds, import platform plugins
 if(WIN32 AND QT_IS_STATIC)
-    # Explicitly set QT_STATIC for this target
-    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-    
     # Import platform plugins for static Qt on Windows
+    # Note: QT_STATIC and QT_STATICPLUGIN are already defined via add_compile_definitions above
     qt_import_plugins(usagi
         INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
     )
