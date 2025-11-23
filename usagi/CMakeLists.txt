@@ -2,16 +2,27 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# Check if Qt is statically linked once and reuse the result
-get_target_property(qt_core_type Qt6::Core TYPE)
-if(qt_core_type STREQUAL "STATIC_LIBRARY")
+# Qt 6.8 MinGW provides static libraries
+# Force static configuration for Windows MinGW builds
+if(WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
+    message(STATUS "Configuring usagi for Qt 6.8 MinGW static build")
+    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     set(QT_IS_STATIC TRUE)
 else()
-    set(QT_IS_STATIC FALSE)
+    # Check if Qt is statically linked
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        set(QT_IS_STATIC TRUE)
+        message(STATUS "Detected static Qt6 for usagi target")
+        add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+    else()
+        set(QT_IS_STATIC FALSE)
+        message(STATUS "Qt6 type for usagi: ${qt_core_type} - using dynamic linking")
+    endif()
 endif()
 
-# Note: CMAKE_AUTOMOC_MOC_OPTIONS is set in root CMakeLists.txt for static Qt builds
-# to ensure MOC sees QT_STATIC before any Qt headers are processed
+# Enable automatic MOC
+set(CMAKE_AUTOMOC ON)
 
 # Source files
 set(SOURCES
@@ -68,14 +79,14 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds, ensure all compile units see QT_STATIC
+# For static Qt builds, import platform plugins
 if(WIN32 AND QT_IS_STATIC)
-    # Explicitly set QT_STATIC for this target
-    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-    
     # Import platform plugins for static Qt on Windows
+    # Note: QT_STATIC and QT_STATICPLUGIN are already defined via add_compile_definitions above
     qt_import_plugins(usagi
-        INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
+        INCLUDE 
+            Qt::QWindowsIntegrationPlugin
+            Qt::QSQLiteDriverPlugin
     )
 endif()
 
