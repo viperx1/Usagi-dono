@@ -2,16 +2,19 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
+# Enable automatic MOC (inherited from root, but we set options here)
+set(CMAKE_AUTOMOC ON)
+
 # Check if Qt is statically linked once and reuse the result
 get_target_property(qt_core_type Qt6::Core TYPE)
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
     set(QT_IS_STATIC TRUE)
+    # Ensure MOC sees QT_STATIC for static Qt builds
+    # This is necessary so that Qt headers are processed with correct linkage declarations
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
 else()
     set(QT_IS_STATIC FALSE)
 endif()
-
-# Note: CMAKE_AUTOMOC_MOC_OPTIONS is set in root CMakeLists.txt for static Qt builds
-# to ensure MOC sees QT_STATIC before any Qt headers are processed
 
 # Source files
 set(SOURCES
