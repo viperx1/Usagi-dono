@@ -2,25 +2,18 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# For Windows LLVM MinGW builds, always ensure MOC and compilation see QT_STATIC
-# Qt 6.8 with LLVM MinGW uses static libraries but CMake detects them as SHARED_LIBRARY type instead of STATIC_LIBRARY type
-# This project specifically targets LLVM MinGW static Qt builds
-# IMPORTANT: Use add_compile_definitions to affect ALL compilation including MOC
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    message(STATUS "Setting QT_STATIC defines for Windows LLVM MinGW build")
-    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
+# Trying dynamic linking approach - Qt 6.8 LLVM MinGW reports as SHARED_LIBRARY
+# Removed forced QT_STATIC definitions to allow dynamic linking
+
+# Check if Qt is statically linked
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
     set(QT_IS_STATIC TRUE)
+    message(STATUS "Detected static Qt6 for usagi target")
+    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
 else()
-    # Check if Qt is statically linked
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        set(QT_IS_STATIC TRUE)
-        message(STATUS "Detected static Qt6 for usagi target")
-        add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
-    else()
-        set(QT_IS_STATIC FALSE)
-        message(STATUS "Qt6 type for usagi: ${qt_core_type}")
-    endif()
+    set(QT_IS_STATIC FALSE)
+    message(STATUS "Qt6 type for usagi: ${qt_core_type} - using dynamic linking")
 endif()
 
 # Enable automatic MOC

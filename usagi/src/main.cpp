@@ -4,13 +4,8 @@
 #include "logger.h"
 //#include "main.h"
 
-// Import static plugins for Qt static builds
-#ifdef QT_STATIC
-#include <QtPlugin>
-Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
-// Note: QWindowsVistaStylePlugin removed - not available in Qt 6.8 LLVM MinGW
-Q_IMPORT_PLUGIN(QSQLiteDriverPlugin)
-#endif
+// Plugin imports removed - trying dynamic linking approach
+// Qt 6.8 LLVM MinGW reports as SHARED_LIBRARY, not STATIC_LIBRARY
 
 //myAniDBApi *adbapi;
 Window *window;
