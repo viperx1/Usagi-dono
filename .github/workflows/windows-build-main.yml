@@ -30,6 +30,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_llvm_mingw'
+          modules: qtbase qttools qtsvg
           cache: true
 
       - name: Cache LLVM-MinGW
