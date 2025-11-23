@@ -80,11 +80,15 @@ if(WIN32 AND QT_IS_STATIC)
 endif()
 
 # Link Qt libraries
+# For static Qt builds, link order matters to resolve circular dependencies
+# Qt6::Concurrent is included even if not directly used, as it may be required
+# for proper static linking with Qt6::Core
 target_link_libraries(usagi PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
     Qt6::Gui
+    Qt6::Concurrent
     Qt6::Core
     z
 )
