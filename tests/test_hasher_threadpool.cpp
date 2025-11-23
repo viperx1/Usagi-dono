@@ -10,15 +10,6 @@
 #include "../usagi/src/anidbapi.h"
 #include "../usagi/src/main.h"
 
-// Import static plugins for Qt static builds
-// Required for: QUdpSocket, QNetworkAccessManager (via adbapi), and QSqlDatabase (QSQLITE)
-#ifdef QT_STATIC
-#include <QtPlugin>
-Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
-Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
-Q_IMPORT_PLUGIN(QSQLiteDriverPlugin)
-#endif
-
 // Global adbapi used by HasherThread
 myAniDBApi *adbapi = nullptr;
 
