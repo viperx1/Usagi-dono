@@ -1,4 +1,4 @@
-name: Windows Build Main (Qt 6.8 LTS LLVM MinGW)
+name: Windows Build Main (Qt 6.8 LTS MinGW)
 
 on:
   workflow_dispatch:
@@ -15,40 +15,22 @@ permissions:
   issues: write
 
 jobs:
-  build-llvm-mingw:
+  build-mingw:
     runs-on: windows-latest
-    name: Build Main Executable with LLVM/Clang (Qt 6.8 MinGW)
+    name: Build Main Executable with MinGW (Qt 6.8)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Qt 6.8 (LLVM MinGW)
+      - name: Install Qt 6.8 (MinGW)
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8'
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_llvm_mingw'
+          arch: 'win64_mingw'
           cache: true
-
-      - name: Cache LLVM-MinGW
-        id: cache-llvm
-        uses: actions/cache@v4
-        with:
-          path: C:\llvm-mingw
-          key: llvm-mingw-20251007
-
-      - name: Download LLVM-MinGW
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20251007/llvm-mingw-20251007-ucrt-x86_64.zip" -OutFile "C:\llvm-mingw.zip"
-          Expand-Archive -Path "C:\llvm-mingw.zip" -DestinationPath "C:\llvm-mingw"
-
-      - name: Add LLVM-MinGW to PATH
-        run: |
-          echo "C:\llvm-mingw\bin" >> $GITHUB_PATH
-        shell: powershell
 
       - name: Create build directory
         shell: bash
@@ -59,15 +41,7 @@ jobs:
         run: |
           cmake -S . -B build -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER="clang.exe" \
-            -DCMAKE_CXX_COMPILER="clang++.exe" \
-            -DCMAKE_C_COMPILER_TARGET=x86_64-w64-mingw32 \
-            -DCMAKE_CXX_COMPILER_TARGET=x86_64-w64-mingw32 \
-            -DCMAKE_C_COMPILER_FRONTEND_VARIANT=GNU \
-            -DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=GNU \
-            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
-            -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.8.3/llvm-mingw_64/lib/cmake" \
+            -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/lib/cmake" \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             2>&1 | tee build/configure_log.txt
 
@@ -75,11 +49,11 @@ jobs:
         run: cmake --build build --config Release --target usagi 2>&1 | tee build/build_log.txt
         shell: bash
 
-      - name: Upload build artifact (Alpha, LLVM)
+      - name: Upload build artifact (Alpha, MinGW)
         if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
         uses: actions/upload-artifact@v4
         with:
-          name: Usagi-dono-alpha-llvm
+          name: Usagi-dono-alpha-mingw
           path: |
             build/usagi/*.exe
 
@@ -93,7 +67,7 @@ jobs:
             build/build_log.txt
           if-no-files-found: ignore
 
-      - name: Create Release & Upload (Stable/Beta, LLVM)
+      - name: Create Release & Upload (Stable/Beta, MinGW)
         if: success() && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:

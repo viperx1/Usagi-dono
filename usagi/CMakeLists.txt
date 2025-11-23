@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
-# Qt 6.8 LLVM MinGW provides static libraries
-# Force static configuration for Windows LLVM MinGW builds
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    message(STATUS "Configuring usagi for Qt 6.8 LLVM MinGW static build")
+# Qt 6.8 MinGW provides static libraries
+# Force static configuration for Windows MinGW builds
+if(WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
+    message(STATUS "Configuring usagi for Qt 6.8 MinGW static build")
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     set(QT_IS_STATIC TRUE)
 else()

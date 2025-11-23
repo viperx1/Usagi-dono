@@ -4,7 +4,7 @@
 #include "logger.h"
 //#include "main.h"
 
-// Import static plugins for Qt 6.8 LLVM MinGW static builds
+// Import static plugins for Qt 6.8 MinGW static builds
 #ifdef QT_STATIC
 #include <QtPlugin>
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)

@@ -57,67 +57,80 @@ if(WIN32)
     endif()
 
     # Verify this is LLVM MinGW (not MSVC-compatible clang-cl)
-    # LLVM MinGW Clang accepts --target=x86_64-w64-mingw32 flag
-    execute_process(
-        COMMAND ${CMAKE_CXX_COMPILER} --target=x86_64-w64-mingw32 --version
-        RESULT_VARIABLE MINGW_CHECK_RESULT
-        OUTPUT_QUIET
-        ERROR_QUIET
-    )
-    
-    if(NOT MINGW_CHECK_RESULT EQUAL 0)
-        message(FATAL_ERROR
-            "This project requires LLVM MinGW Clang (not clang-cl or MSVC-compatible Clang).\n"
-            "The detected Clang compiler does not support MinGW target.\n"
-            "Compiler: ${CMAKE_CXX_COMPILER}\n"
-            "Please install Qt with LLVM MinGW toolchain.\n"
-            "See BUILD.md for instructions.")
+    # Detect if using LLVM MinGW (Clang) or standard MinGW (GCC)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # LLVM MinGW Clang accepts --target=x86_64-w64-mingw32 flag
+        execute_process(
+            COMMAND ${CMAKE_CXX_COMPILER} --target=x86_64-w64-mingw32 --version
+            RESULT_VARIABLE MINGW_CHECK_RESULT
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
+        
+        if(NOT MINGW_CHECK_RESULT EQUAL 0)
+            message(FATAL_ERROR
+                "This project requires LLVM MinGW Clang (not clang-cl or MSVC-compatible Clang).\n"
+                "The detected Clang compiler does not support MinGW target.\n"
+                "Compiler: ${CMAKE_CXX_COMPILER}\n"
+                "Please install Qt with LLVM MinGW toolchain.\n"
+                "See BUILD.md for instructions.")
+        endif()
+        
+        message(STATUS "Configuring for LLVM MinGW Clang on Windows")
+
+        # Force CMake to treat Clang as GNU-compatible, not MSVC-compatible
+        # This prevents CMake from using MSVC-style flags like -fuse-ld=lld-link
+        set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
+        set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
+
+        # Ensure debug info isn't stripped
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
+
+        # Force target to MinGW ABI (required to link against Qt MinGW libraries)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
+
+        # Use the LLD linker with GNU-style interface (not lld-link)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+        
+        # Static link libstdc++ and libgcc to avoid runtime DLL dependencies
+        # This prevents "procedure entry point not found" errors on systems without matching MinGW runtime
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+        
+        # Clean up any MSVC-style linker flags if CMake incorrectly detected compiler mode
+        # This should not normally happen with proper LLVM MinGW, but we handle it defensively
+        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+        string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+        
+        # Remove problematic MSVC-style flags if present
+        string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+        string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+        string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+        string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+        
+        # Override link rule templates to ensure GNU-style linking for LLVM MinGW
+        set(CMAKE_CXX_LINK_EXECUTABLE
+            "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+        set(CMAKE_CXX_CREATE_SHARED_LIBRARY
+            "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
+        
+        message(STATUS "CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # Standard MinGW (GCC)
+        message(STATUS "Configuring for standard MinGW (GCC) on Windows")
+        
+        # Static link libstdc++ and libgcc to avoid runtime DLL dependencies
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+        
+        message(STATUS "CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
     endif()
-    
-    message(STATUS "Configuring for LLVM MinGW Clang on Windows")
-
-    # Force CMake to treat Clang as GNU-compatible, not MSVC-compatible
-    # This prevents CMake from using MSVC-style flags like -fuse-ld=lld-link
-    set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
-    set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
-
-    # Ensure debug info isn't stripped
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
-
-    # Force target to MinGW ABI (required to link against Qt MinGW libraries)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
-
-    # Use the LLD linker with GNU-style interface (not lld-link)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
-    
-    # Static link libstdc++ and libgcc to avoid runtime DLL dependencies
-    # This prevents "procedure entry point not found" errors on systems without matching MinGW runtime
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-    
-    # Clean up any MSVC-style linker flags if CMake incorrectly detected compiler mode
-    # This should not normally happen with proper LLVM MinGW, but we handle it defensively
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REPLACE "-fuse-ld=lld-link" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
-    
-    # Remove problematic MSVC-style flags if present
-    string(REGEX REPLACE "-nostartfiles" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostdlib" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostartfiles" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    string(REGEX REPLACE "-nostdlib" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-    
-    # Override link rule templates to ensure GNU-style linking for LLVM MinGW
-    set(CMAKE_CXX_LINK_EXECUTABLE
-        "<CMAKE_CXX_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
-    set(CMAKE_CXX_CREATE_SHARED_LIBRARY
-        "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
-    
-    message(STATUS "CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
 endif()
 
 # ==========================================================
@@ -135,14 +148,14 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Concurrent Test REQUIRED)
 
-# Qt 6.8 LLVM MinGW provides static libraries but CMake detects as SHARED_LIBRARY
-# Force static configuration for Windows LLVM MinGW builds
+# Qt 6.8 MinGW provides static libraries but CMake may detect as SHARED_LIBRARY
+# Force static configuration for Windows MinGW builds
 get_target_property(qt_core_type Qt6::Core TYPE)
 message(STATUS "Qt6::Core TYPE detected: ${qt_core_type}")
 
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Qt 6.8 LLVM MinGW is statically built despite CMake detection
-    message(STATUS "Configuring for Qt 6.8 LLVM MinGW static build")
+if(WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
+    # Qt 6.8 MinGW/LLVM MinGW is statically built
+    message(STATUS "Configuring for Qt 6.8 MinGW static build")
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
     set(QT_IS_STATIC_BUILD TRUE)
 elseif(qt_core_type STREQUAL "STATIC_LIBRARY")
