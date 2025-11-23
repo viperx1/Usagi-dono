@@ -57,21 +57,14 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds, import required plugins and set compile definitions
+# For static Qt builds, import required plugins
 if(QT_IS_STATIC)
-    # Explicitly set QT_STATIC for this target to ensure MOC and compilation units have it
-    # While add_compile_definitions() in root CMakeLists.txt sets this globally,
-    # we set it explicitly here as defense-in-depth to guarantee it's defined
-    # (the original build failure was due to missing QT_STATIC)
-    target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
-    
     # Import platform plugins for static Qt on Windows
     # QWindowsIntegrationPlugin: Required for Windows GUI (QPlatformIntegration)
+    # QWindowsVistaStylePlugin: Required for native Windows UI styling
     if(WIN32)
-        # Only import QWindowsIntegrationPlugin - it's essential for Windows GUI
-        # QWindowsVistaStylePlugin is optional and may not exist in all Qt builds
         qt_import_plugins(usagi
-            INCLUDE Qt::QWindowsIntegrationPlugin
+            INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
         )
     endif()
 endif()
@@ -111,32 +104,14 @@ if(WIN32)
         "-Wl,--subsystem,console"
     )
     
-    # For static Qt builds on Windows, handle circular dependencies
-    # Static Qt libraries have circular dependencies that require special linking
+    # Link Qt6::Core again at the end to resolve circular dependencies
+    target_link_libraries(usagi PRIVATE Qt6::Core)
+    
+    # For static Qt builds, link Qt6::EntryPoint which contains WinMain
     if(QT_IS_STATIC)
-        # Link Qt libraries again at the end to resolve circular dependencies
-        # Use --start-group and --end-group to handle circular references
-        target_link_options(usagi PRIVATE
-            "-Wl,--start-group"
-        )
-        target_link_libraries(usagi PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Widgets
-            Qt6::Network
-            Qt6::Sql
-        )
-        target_link_options(usagi PRIVATE
-            "-Wl,--end-group"
-        )
-        
-        # Link Qt6::EntryPoint which contains WinMain for static builds
         if(TARGET Qt6::EntryPoint)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
         endif()
-    else()
-        # For dynamic Qt, just link Qt6::Core again to resolve any remaining dependencies
-        target_link_libraries(usagi PRIVATE Qt6::Core)
     endif()
 endif()
 

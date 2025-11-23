@@ -23,9 +23,9 @@ endif()
 # Generate full DWARF debug symbols with macros
 # -g3         : full debug info (includes macros)
 # -gdwarf-4   : DWARF v4 for Windows compatibility
+# -O0         : disable optimizations for accurate stack traces
 # -fno-omit-frame-pointer : keep frame pointers for reliable call stacks
-# Note: Optimization level is controlled by CMAKE_BUILD_TYPE, not forced here
-set(DEBUG_FLAGS "-g3 -gdwarf-4 -fno-omit-frame-pointer")
+set(DEBUG_FLAGS "-g3 -gdwarf-4 -O0 -fno-omit-frame-pointer")
 
 # Apply globally
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DEBUG_FLAGS}")
@@ -72,37 +72,17 @@ if(WIN32)
     set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")
     set(CMAKE_C_COMPILER_FRONTEND_VARIANT "GNU")
 
+    # Ensure debug info isn't stripped
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
+
     # Force target to MinGW ABI (required to link against Qt MinGW libraries)
-    set(MINGW_TARGET_FLAG "--target=x86_64-w64-mingw32")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MINGW_TARGET_FLAG}")
-    
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=x86_64-w64-mingw32")
+
     # Use the LLD linker with GNU-style interface (not lld-link)
-    # Check if flags are already set to avoid duplication
-    string(FIND "${CMAKE_EXE_LINKER_FLAGS}" "-fuse-ld=lld" LLD_FOUND)
-    if(LLD_FOUND EQUAL -1)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
-    endif()
-    
-    string(FIND "${CMAKE_EXE_LINKER_FLAGS}" "-g" DEBUG_FOUND)
-    if(DEBUG_FOUND EQUAL -1)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
-    endif()
-    
-    string(FIND "${CMAKE_EXE_LINKER_FLAGS}" "${MINGW_TARGET_FLAG}" TARGET_FOUND)
-    if(TARGET_FOUND EQUAL -1)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MINGW_TARGET_FLAG}")
-    endif()
-    
-    # Also set for shared and module linkers
-    string(FIND "${CMAKE_SHARED_LINKER_FLAGS}" "-fuse-ld=lld" LLD_SHARED_FOUND)
-    if(LLD_SHARED_FOUND EQUAL -1)
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
-    endif()
-    
-    string(FIND "${CMAKE_MODULE_LINKER_FLAGS}" "-fuse-ld=lld" LLD_MODULE_FOUND)
-    if(LLD_MODULE_FOUND EQUAL -1)
-        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
-    endif()
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
     
     # Override link rule templates to ensure GNU-style linking for LLVM MinGW
     set(CMAKE_CXX_LINK_EXECUTABLE
@@ -124,50 +104,29 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 # ⚙️ QT SETUP
 # ==========================================================
 
-# Enable Qt's automatic MOC, UIC, and RCC before finding Qt
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTORCC ON)
-
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Test REQUIRED)
 
 # Check if Qt is statically linked
 # Method 1: Check target type
 get_target_property(qt_core_type Qt6::Core TYPE)
 set(QT_IS_STATIC_BY_TYPE FALSE)
-message(STATUS "Qt6::Core TYPE: ${qt_core_type}")
 if(qt_core_type STREQUAL "STATIC_LIBRARY")
     set(QT_IS_STATIC_BY_TYPE TRUE)
 endif()
 
-# Method 2: Check the actual library file being linked
-# For Windows MinGW, we need to check IMPORTED_IMPLIB (what's actually linked)
-# not just LOCATION (which may point to the DLL)
-set(QT_IS_STATIC_BY_LINK_LIB FALSE)
-get_target_property(qt_core_implib Qt6::Core IMPORTED_IMPLIB_RELEASE)
-if(NOT qt_core_implib)
-    get_target_property(qt_core_implib Qt6::Core IMPORTED_IMPLIB)
-endif()
-if(NOT qt_core_implib)
-    get_target_property(qt_core_implib Qt6::Core IMPORTED_LOCATION_RELEASE)
-endif()
-if(NOT qt_core_implib)
-    get_target_property(qt_core_implib Qt6::Core IMPORTED_LOCATION)
-endif()
-message(STATUS "Qt6::Core link library: ${qt_core_implib}")
-# If the link library is a .a file and TYPE is SHARED_LIBRARY, 
-# this is actually a static library masquerading as dynamic
-if(qt_core_implib AND qt_core_type STREQUAL "SHARED_LIBRARY")
-    if(qt_core_implib MATCHES "\\.a$")
-        set(QT_IS_STATIC_BY_LINK_LIB TRUE)
-        message(STATUS "Qt6::Core: TYPE says SHARED but linking .a file - treating as STATIC")
-    endif()
-endif()
-
-# Method 3: Check if library file has static extension (old method, kept for non-Windows)
+# Method 2: Check if library file has static extension
+# .a files are static libraries (MinGW, GCC, Clang on Windows/Unix/macOS)
+# Note: .lib files are NOT checked - on Windows with MSVC, .lib are import libraries
+# for DLLs (dynamic), not static libraries. This project uses MinGW, not MSVC.
 set(QT_IS_STATIC_BY_EXT FALSE)
-get_target_property(qt_core_location Qt6::Core LOCATION)
-message(STATUS "Qt6::Core location: ${qt_core_location}")
+# Try IMPORTED_LOCATION first, then IMPORTED_LOCATION_RELEASE, then fall back to LOCATION
+get_target_property(qt_core_location Qt6::Core IMPORTED_LOCATION)
+if(NOT qt_core_location)
+    get_target_property(qt_core_location Qt6::Core IMPORTED_LOCATION_RELEASE)
+endif()
+if(NOT qt_core_location)
+    get_target_property(qt_core_location Qt6::Core LOCATION)
+endif()
 if(qt_core_location)
     # Check for .a extension (static library for MinGW/GCC/Clang)
     if(qt_core_location MATCHES "\\.a$")
@@ -175,26 +134,23 @@ if(qt_core_location)
     endif()
 endif()
 
-# Qt is static if any method detects it
-if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT OR QT_IS_STATIC_BY_LINK_LIB)
+# Qt is static if either method detects it
+if(QT_IS_STATIC_BY_TYPE OR QT_IS_STATIC_BY_EXT)
     # Define QT_STATIC globally for static Qt builds
-    # This must be set as compile definitions AND in MOC options AND in CXX flags
     add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
-    
-    # Also add to CMAKE_CXX_FLAGS to ensure it's set for all compilation units
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DQT_STATIC -DQT_STATICPLUGIN")
     
     # Set MOC options for static Qt builds
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
     
     # Set variable for use in subdirectories
     set(QT_IS_STATIC TRUE CACHE BOOL "Qt is statically linked" FORCE)
-    
-    message(STATUS "Qt is STATIC - QT_STATIC and QT_STATICPLUGIN defined")
 else()
     set(QT_IS_STATIC FALSE CACHE BOOL "Qt is statically linked" FORCE)
-    message(STATUS "Qt is DYNAMIC")
 endif()
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
 # ==========================================================
 # 🔧 POST-QT LINKER FLAGS CLEANUP (LLVM MinGW only)
@@ -216,12 +172,9 @@ if(WIN32)
             endif()
             
             # Clean up link options (removes -fuse-ld=lld-link and MSVC-style subsystem flags)
-            # Also remove duplicate GNU-style flags that we already set in CMAKE_EXE_LINKER_FLAGS
             get_target_property(qt_link_options ${qt_target} INTERFACE_LINK_OPTIONS)
             if(qt_link_options)
                 list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld-link$")
-                list(FILTER qt_link_options EXCLUDE REGEX "^-fuse-ld=lld$")
-                list(FILTER qt_link_options EXCLUDE REGEX "^--target=")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/subsystem:")
                 list(FILTER qt_link_options EXCLUDE REGEX "^-Xlinker$")
                 list(FILTER qt_link_options EXCLUDE REGEX "^/INCREMENTAL")

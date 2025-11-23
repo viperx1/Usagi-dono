@@ -50,6 +50,10 @@ jobs:
           echo "C:\llvm-mingw\bin" >> $GITHUB_PATH
         shell: powershell
 
+      - name: Print Qt directory
+        run: echo "Qt6_DIR=$Qt6_DIR"
+        shell: bash
+
       - name: Create build directory
         shell: bash
         run: mkdir -p build
@@ -67,7 +71,7 @@ jobs:
             -DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=GNU \
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
-            -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.9.2/llvm-mingw_64/lib/cmake" \
+            -DCMAKE_PREFIX_PATH="$Qt6_DIR" \
             2>&1 | tee build/configure_log.txt
 
       - name: Build Main Executable
