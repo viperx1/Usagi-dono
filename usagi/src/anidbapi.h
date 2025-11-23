@@ -104,7 +104,6 @@ private:
 	
 	void saveExportQueueState();
 	void loadExportQueueState();
-	void checkForExistingExport();
 
 //    QTextCodec *codec;
 	enum progress
@@ -445,6 +444,7 @@ public slots:
 	void checkForNotifications();
 private slots:
 	void onAnimeTitlesDownloaded(QNetworkReply *reply);
+	void checkForExistingExport();
 signals:
 	void notifyMylistAdd(QString, int);
     void notifyLoggedIn(QString, int);
