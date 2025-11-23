@@ -14,8 +14,9 @@ endif()
 
 # For Windows LLVM MinGW builds, always ensure MOC sees QT_STATIC
 # Qt 6.8 with LLVM MinGW uses static libraries but CMake may not detect them as STATIC_LIBRARY type
-if(WIN32)
-    message(STATUS "Setting CMAKE_AUTOMOC_MOC_OPTIONS for Windows build")
+# This project specifically targets LLVM MinGW static Qt builds
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(STATUS "Setting CMAKE_AUTOMOC_MOC_OPTIONS for Windows LLVM MinGW build")
     set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
     set(QT_IS_STATIC TRUE)
 endif()
