@@ -45,18 +45,25 @@ set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${DEBUG_FLAGS}")
 # ==========================================================
 
 if(WIN32)
-    # This project is designed for Windows with LLVM MinGW only
-    # We do not support MSVC, GCC, or MSVC-compatible clang-cl
+    # This project supports Windows with MinGW (GCC) or LLVM MinGW (Clang)
+    # We do not support MSVC or MSVC-compatible clang-cl
     
-    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
         message(FATAL_ERROR 
-            "This project requires LLVM MinGW Clang compiler on Windows.\n"
+            "This project requires MinGW (GCC) or LLVM MinGW (Clang) compiler on Windows.\n"
             "Current compiler: ${CMAKE_CXX_COMPILER_ID}\n"
-            "Please install Qt with LLVM MinGW toolchain and configure CMake to use it.\n"
+            "Please install Qt with MinGW or LLVM MinGW toolchain and configure CMake to use it.\n"
             "See BUILD.md for instructions.")
     endif()
 
-    # Verify this is LLVM MinGW (not MSVC-compatible clang-cl)
+    # Verify if using MSVC-compatible clang-cl (not supported)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MSVC)
+        message(FATAL_ERROR
+            "This project does not support clang-cl (MSVC-compatible Clang).\n"
+            "Please use LLVM MinGW Clang instead.\n"
+            "See BUILD.md for instructions.")
+    endif()
+
     # Detect if using LLVM MinGW (Clang) or standard MinGW (GCC)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         # LLVM MinGW Clang accepts --target=x86_64-w64-mingw32 flag
