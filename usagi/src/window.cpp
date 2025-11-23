@@ -179,6 +179,7 @@ void UnboundFilesLoaderWorker::doWork()
 Window::Window()
 {
 	qRegisterMetaType<ed2k::ed2kfilestruct>("ed2k::ed2kfilestruct");
+	qRegisterMetaType<Qt::HANDLE>("Qt::HANDLE");
 	
 	// Initialize global hasher thread pool
 	hasherThreadPool = new HasherThreadPool();
