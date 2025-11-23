@@ -1097,7 +1097,7 @@ if(WIN32)
     get_target_property(qt_core_type Qt6::Core TYPE)
     if(qt_core_type STREQUAL "STATIC_LIBRARY")
         qt_import_plugins(test_hasher_threadpool
-            INCLUDE 
+            INCLUDE
                 Qt::QWindowsIntegrationPlugin
                 Qt::QWindowsVistaStylePlugin
                 Qt::QSQLiteDriverPlugin
@@ -1316,7 +1316,7 @@ if(WIN32)
     get_target_property(qt_core_type Qt6::Core TYPE)
     if(qt_core_type STREQUAL "STATIC_LIBRARY")
         qt_import_plugins(test_mylistcardmanager
-            INCLUDE 
+            INCLUDE
                 Qt::QWindowsIntegrationPlugin
                 Qt::QWindowsVistaStylePlugin
                 Qt::QSQLiteDriverPlugin
