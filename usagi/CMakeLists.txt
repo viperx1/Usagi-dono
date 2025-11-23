@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.16)
 
 project(usagi LANGUAGES CXX)
 
+# Ensure MOC sees QT_STATIC for static Qt builds (inherited from parent CMakeLists.txt)
+# This is necessary so that Qt headers are processed with correct linkage declarations
+get_target_property(qt_core_type Qt6::Core TYPE)
+if(qt_core_type STREQUAL "STATIC_LIBRARY")
+    # Make sure MOC-generated files also see QT_STATIC
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-DQT_STATIC" "-DQT_STATICPLUGIN")
+endif()
+
 # Source files
 set(SOURCES
     src/anidbapi.cpp
@@ -57,12 +65,14 @@ set(HEADERS
 # Create executable
 add_executable(usagi ${SOURCES} ${HEADERS})
 
-# For static Qt builds, import required plugins
-if(QT_IS_STATIC)
-    # Import platform plugins for static Qt on Windows
-    # QWindowsIntegrationPlugin: Required for Windows GUI (QPlatformIntegration)
-    # QWindowsVistaStylePlugin: Required for native Windows UI styling
-    if(WIN32)
+# For static Qt builds, ensure all compile units see QT_STATIC
+if(WIN32)
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        # Explicitly set QT_STATIC for this target
+        target_compile_definitions(usagi PRIVATE QT_STATIC QT_STATICPLUGIN)
+        
+        # Import platform plugins for static Qt on Windows
         qt_import_plugins(usagi
             INCLUDE Qt::QWindowsIntegrationPlugin Qt::QWindowsVistaStylePlugin
         )
@@ -85,7 +95,8 @@ if(WIN32)
     
     # For static Qt builds on Windows, add additional system libraries
     # These are dependencies of Qt's static libraries that must be manually linked
-    if(QT_IS_STATIC)
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
         target_link_libraries(usagi PRIVATE
             winmm        # Windows multimedia
             version      # Version information
@@ -108,7 +119,8 @@ if(WIN32)
     target_link_libraries(usagi PRIVATE Qt6::Core)
     
     # For static Qt builds, link Qt6::EntryPoint which contains WinMain
-    if(QT_IS_STATIC)
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
         if(TARGET Qt6::EntryPoint)
             target_link_libraries(usagi PRIVATE Qt6::EntryPoint)
         endif()
