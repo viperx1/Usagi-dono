@@ -16,10 +16,13 @@ add_compile_definitions(QT_SHARED)
 # Enable automatic MOC
 set(CMAKE_AUTOMOC ON)
 
-# Core library source files (excluding main.cpp, window.cpp, and myanidbapi.cpp which are app-specific)
-set(CORE_SOURCES
+# Source files
+set(SOURCES
     src/anidbapi.cpp
     src/mask.cpp
+    src/myanidbapi.cpp
+    src/main.cpp
+    src/window.cpp
     src/hasherthread.cpp
     src/hasherthreadpool.cpp
     src/hash/md4.cpp
@@ -39,10 +42,12 @@ set(CORE_SOURCES
     src/watchchunkmanager.cpp
 )
 
-# Core library header files
-set(CORE_HEADERS
+# Header files
+set(HEADERS
     src/anidbapi.h
     src/mask.h
+    src/main.h
+    src/window.h
     src/hasherthread.h
     src/hasherthreadpool.h
     src/hash/md4.h
@@ -63,15 +68,12 @@ set(CORE_HEADERS
     src/uicolors.h
 )
 
-# Create a static library with core functionality
-# This library will be used by both the main executable and tests
-# Create an OBJECT library with core functionality
-# OBJECT libraries compile sources once and link them directly into targets
-# This avoids MOC duplication issues that occur with STATIC libraries
-add_library(usagi_core OBJECT ${CORE_SOURCES} ${CORE_HEADERS})
+# Create executable
+add_executable(usagi ${SOURCES} ${HEADERS})
 
-# Link Qt libraries to the core library
-target_link_libraries(usagi_core PUBLIC
+# Link Qt libraries - DYNAMIC LINKING ONLY
+# Simplified linking for dynamic Qt builds
+target_link_libraries(usagi PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
@@ -82,46 +84,16 @@ target_link_libraries(usagi_core PUBLIC
 
 # Link platform-specific libraries
 if(WIN32)
-    target_link_libraries(usagi_core PUBLIC dbghelp)
-endif()
-
-# Set include directories for the core library
-target_include_directories(usagi_core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
-# Application-specific source files
-set(APP_SOURCES
-    src/main.cpp
-    src/window.cpp
-    src/myanidbapi.cpp
-)
-
-set(APP_HEADERS
-    src/window.h
-    src/main.h
-)
-
-# Create executable - link against OBJECT library using $<TARGET_OBJECTS:>
-add_executable(usagi ${APP_SOURCES} ${APP_HEADERS} $<TARGET_OBJECTS:usagi_core>)
-
-# Link Qt libraries since OBJECT libraries don't transitively link
-target_link_libraries(usagi PRIVATE
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Sql
-    Qt6::Gui
-    Qt6::Core
-    z
-)
-
-if(WIN32)
+    # Only dbghelp for crash logging
     target_link_libraries(usagi PRIVATE dbghelp)
-endif()
-
-# Force console subsystem for Windows
-if(WIN32)
+    
+    # Force console subsystem
     target_link_options(usagi PRIVATE
         "-Wl,--subsystem,console"
     )
 endif()
+
+# Include directories
+target_include_directories(usagi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
