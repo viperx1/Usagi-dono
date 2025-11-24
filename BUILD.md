@@ -28,10 +28,12 @@ This document describes the build process for Usagi-dono, including local develo
   - Qt6::Concurrent (for tests)
   - Qt6::Test (for tests)
 - **Compiler**:
-  - Windows: MinGW 64-bit (GCC) or LLVM MinGW (Clang)
+  - Windows: MinGW 64-bit (GCC)
   - Linux: GCC or Clang with C++17 support
 - **Ninja** (optional but recommended for faster builds)
 - **zlib** development libraries
+  - Windows: Install using MSYS2 package manager (`pacman -S mingw-w64-x86_64-zlib`)
+  - Linux: See distribution-specific instructions below
 
 ### Qt Installation
 
@@ -241,21 +243,20 @@ The project uses GitHub Actions for continuous integration with two workflows:
 ### Windows Build Tests (`windows-build-tests.yml`)
 
 **Triggers:**
-- Push to `main` branch
+- Push to `main`, `master`, or `dev` branches
 - Manual workflow dispatch
 
 **What it does:**
-1. Installs Qt 6.8 LLVM MinGW (dynamic libraries)
-2. Sets up LLVM MinGW toolchain
-3. Configures build with CMake and Clang
-4. Builds all targets (including tests)
-5. Runs test suite with CTest
-6. Uploads test artifacts on success
-7. On failure: Creates issue with test logs
+1. Installs Qt 6.8 MinGW (dynamic libraries)
+2. Configures build with CMake (same as main workflow)
+3. Builds all targets (including tests)
+4. Runs test suite with CTest
+5. Uploads test artifacts on success
+6. On failure: Creates issue with test logs
 
 **Compiler:**
-- Uses LLVM MinGW Clang for better standards compliance
-- Configured with GNU frontend variant for Qt compatibility
+- Uses MinGW GCC (same as main build)
+- Ensures test environment matches production build
 
 ## Troubleshooting
 
@@ -312,15 +313,15 @@ cmake -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/mingw_64/lib/cmake ..
   sudo apt-get install zlib1g-dev
   ```
 
-### LLVM MinGW Not Found (Tests)
+### Test Build Failures
 
-**Error:** Tests workflow can't find LLVM MinGW.
+**Error:** Tests fail to build or run in CI.
 
 **Solution:**
-The workflow automatically downloads LLVM MinGW. If it fails:
-1. Check internet connectivity
-2. Verify the download URL in `.github/workflows/windows-build-tests.yml`
-3. Clear workflow cache and retry
+The tests workflow uses the same build configuration as the main workflow. If tests fail:
+1. Check that the code builds locally with tests enabled
+2. Review test logs in the workflow artifacts
+3. Ensure all test dependencies are properly linked
 
 ## Build System Architecture
 
@@ -338,7 +339,7 @@ CMakeLists.txt          # Root CMake configuration
 
 1. **Automatic MOC/UIC/RCC**: Qt's meta-object compiler runs automatically
 2. **Platform Detection**: Automatically adapts to Windows, Linux, or macOS
-3. **Compiler Detection**: Supports MinGW (GCC), LLVM MinGW (Clang), and GCC on Linux
+3. **Compiler Detection**: Supports MinGW (GCC) on Windows and GCC on Linux
 4. **Dynamic Linking Enforcement**: Forces use of Qt DLLs for proper signal/slot behavior
 5. **Debug Symbol Generation**: Full DWARF-4 symbols for crash analysis
 6. **Static Runtime Linking**: libstdc++ and libgcc are statically linked to avoid runtime dependencies
