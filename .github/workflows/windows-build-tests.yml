@@ -2,6 +2,11 @@ name: Windows Build Tests (Qt 6.8 LTS LLVM MinGW)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+      - dev
 
 permissions:
   contents: read
