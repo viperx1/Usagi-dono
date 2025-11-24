@@ -4,6 +4,25 @@ project(usagi_tests LANGUAGES CXX)
 
 enable_testing()
 
+# ==========================================================
+# FORCE DYNAMIC Qt LINKING - Be aggressive!
+# ==========================================================
+message(STATUS "Configuring tests for DYNAMIC Qt linking")
+
+# Explicitly disable static Qt
+set(QT_IS_STATIC FALSE)
+set(QT_IS_STATIC_BUILD FALSE)
+
+# Remove any QT_STATIC definitions that may have been inherited
+remove_definitions(-DQT_STATIC)
+remove_definitions(-DQT_STATICPLUGIN)
+
+# Force QT_SHARED definition to ensure dynamic linking
+add_compile_definitions(QT_SHARED)
+
+# Additional guards against static linking
+add_compile_definitions(QT_NO_STATIC_PLUGIN_LOADER)
+
 # Enable automatic MOC for test files that include .moc files
 set(CMAKE_AUTOMOC ON)
 
@@ -106,17 +125,6 @@ if(WIN32)
     target_link_options(test_hasher_threadpool PRIVATE
         "-Wl,--subsystem,console"
     )
-    
-    # For static Qt builds on Windows, import platform plugins
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        qt_import_plugins(test_hasher_threadpool
-            INCLUDE
-                Qt::QWindowsIntegrationPlugin
-                Qt::QWindowsVistaStylePlugin
-                Qt::QSQLiteDriverPlugin
-        )
-    endif()
 endif()
 
 add_test(NAME test_hasher_threadpool COMMAND test_hasher_threadpool -v2)
@@ -165,17 +173,6 @@ if(WIN32)
     target_link_options(test_mylistcardmanager PRIVATE
         "-Wl,--subsystem,console"
     )
-    
-    # For static Qt builds on Windows, import platform plugins
-    get_target_property(qt_core_type Qt6::Core TYPE)
-    if(qt_core_type STREQUAL "STATIC_LIBRARY")
-        qt_import_plugins(test_mylistcardmanager
-            INCLUDE
-                Qt::QWindowsIntegrationPlugin
-                Qt::QWindowsVistaStylePlugin
-                Qt::QSQLiteDriverPlugin
-        )
-    endif()
 endif()
 
 add_test(NAME test_mylistcardmanager COMMAND test_mylistcardmanager -v2)
