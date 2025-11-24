@@ -44,7 +44,6 @@ set(CORE_SOURCES
 set(CORE_HEADERS
     src/anidbapi.h
     src/mask.h
-    src/main.h
     src/hasherthread.h
     src/hasherthreadpool.h
     src/hash/md4.h
