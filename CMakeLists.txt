@@ -155,24 +155,22 @@ add_compile_definitions(CRYPTOPP_DEBUG=0)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets Network Sql Concurrent Test REQUIRED)
 
-# Qt 6.8 MinGW provides static libraries but CMake may detect as SHARED_LIBRARY
-# Force static configuration for Windows MinGW builds
+# FORCE DYNAMIC LINKING - Remove all static Qt configurations
 get_target_property(qt_core_type Qt6::Core TYPE)
 message(STATUS "Qt6::Core TYPE detected: ${qt_core_type}")
 
-if(WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-    # Qt 6.8 MinGW/LLVM MinGW is statically built
-    message(STATUS "Configuring for Qt 6.8 MinGW static build")
-    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
-    set(QT_IS_STATIC_BUILD TRUE)
-elseif(qt_core_type STREQUAL "STATIC_LIBRARY")
-    message(STATUS "Detected static Qt6 libraries - configuring for static build")
-    add_compile_definitions(QT_STATIC QT_STATICPLUGIN)
-    set(QT_IS_STATIC_BUILD TRUE)
-else()
-    message(STATUS "Qt6 detected as ${qt_core_type} - using dynamic linking")
-    set(QT_IS_STATIC_BUILD FALSE)
-endif()
+# Always use dynamic linking, even if Qt is detected as static
+message(STATUS "FORCING dynamic Qt linking - QT_STATIC disabled")
+set(QT_IS_STATIC_BUILD FALSE)
+
+# Remove any QT_STATIC definitions that may have been set
+remove_definitions(-DQT_STATIC)
+remove_definitions(-DQT_STATICPLUGIN)
+
+# Explicitly undefine QT_STATIC to ensure dynamic linking
+add_compile_definitions(QT_SHARED)
+
+message(STATUS "Qt6 configured for DYNAMIC linking")
 
 # Note: CMAKE_AUTOMOC is enabled in subdirectories where needed, after setting MOC options
 set(CMAKE_AUTOUIC ON)
