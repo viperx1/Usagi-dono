@@ -10,7 +10,6 @@
 #include "../usagi/src/main.h"
 
 // Global adbapi used by HasherThread
-myAniDBApi *adbapi = nullptr;
 
 /**
  * Test to verify that stopping the hasher thread pool does not block indefinitely.

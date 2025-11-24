@@ -19,7 +19,7 @@
 #include <QDirIterator>
 
 HasherThreadPool *hasherThreadPool = nullptr;
-myAniDBApi *adbapi;
+// adbapi is now defined in anidbapi.cpp (core library)
 extern Window *window;
 settings_struct settings;
 

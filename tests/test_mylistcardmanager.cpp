@@ -10,7 +10,6 @@
 
 
 // Global adbapi used by MyListCardManager
-myAniDBApi *adbapi = nullptr;
 
 /**
  * Test suite for MyListCardManager

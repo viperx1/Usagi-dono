@@ -11,7 +11,6 @@
 #include "../usagi/src/main.h"
 
 // Global adbapi used by HasherThread
-myAniDBApi *adbapi = nullptr;
 
 /**
  * Test to verify that HasherThreadPool properly distributes work across multiple threads.
