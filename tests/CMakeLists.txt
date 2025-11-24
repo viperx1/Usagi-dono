@@ -11,6 +11,8 @@ set(CMAKE_AUTOMOC ON)
 
 # Mark all source files from usagi/src to skip AUTOMOC
 # These files are already compiled with their own MOC in the main usagi target
+# Note: We use an explicit list rather than GLOB to ensure we only skip files
+# that are actually used in tests, and to make dependencies explicit for CMake
 set_source_files_properties(
     ../usagi/src/anidbapi.cpp
     ../usagi/src/mask.cpp
