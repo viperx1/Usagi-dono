@@ -26,14 +26,19 @@ set(CMAKE_AUTOMOC ON)
 # Helper function to mark usagi source files with SKIP_AUTOMOC
 # This prevents duplicate MOC processing (main executable already processes these with AUTOMOC)
 function(skip_automoc_for_usagi_sources target_name)
+    # First, ensure AUTOMOC is enabled for this target
+    set_target_properties(${target_name} PROPERTIES AUTOMOC ON)
+    
     get_target_property(sources ${target_name} SOURCES)
     foreach(source ${sources})
         # Get the absolute path to properly check the source
         get_filename_component(abs_source "${source}" ABSOLUTE)
         get_filename_component(source_dir "${abs_source}" DIRECTORY)
+        get_filename_component(source_name "${abs_source}" NAME)
         
-        # Skip AUTOMOC only for files from usagi/src/ directory, not test files
-        if(source_dir MATCHES ".*/usagi/src.*")
+        # Skip AUTOMOC only for files from usagi/src/ directory, NOT for test files
+        # Test files start with "test_" prefix
+        if(source_dir MATCHES ".*/usagi/src.*" AND NOT source_name MATCHES "^test_.*")
             message(STATUS "Skipping AUTOMOC for usagi source: ${source}")
             set_source_files_properties(${source} PROPERTIES SKIP_AUTOMOC ON)
         endif()
