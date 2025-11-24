@@ -4,6 +4,9 @@ project(usagi_tests LANGUAGES CXX)
 
 enable_testing()
 
+# Enable automatic MOC for test files that include .moc files
+set(CMAKE_AUTOMOC ON)
+
 # Test 1: Hash functions test
 set(HASH_TEST_SOURCES
     test_hash.cpp
