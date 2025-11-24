@@ -547,21 +547,16 @@ private:
 	};
 	QList<HashedFileInfo> pendingHashedFilesQueue;
 	QTimer *hashedFilesProcessingTimer;
-	void processPendingHashedFiles();
 	
 	// Background loading support to prevent UI freeze
 	QThread *mylistLoadingThread;
 	QThread *animeTitlesLoadingThread;
 	QThread *unboundFilesLoadingThread;
 	void startBackgroundLoading();
-	void onMylistLoadingFinished(const QList<int> &aids);
-	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
-	void onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files);
 	
 	// Progressive card loading to keep UI responsive
 	QTimer *progressiveCardLoadingTimer;
 	QList<int> pendingCardsToLoad;
-	void loadNextCardBatch();
 	static const int CARD_LOADING_BATCH_SIZE = 10; // Load 10 cards per timer tick
 	static const int CARD_LOADING_TIMER_INTERVAL = 10; // Process every 10ms
 	
@@ -651,6 +646,17 @@ public slots:
 
 signals:
 	void notifyStopHasher();
+
+private slots:
+	// Background loading completion handlers
+	void onMylistLoadingFinished(const QList<int> &aids);
+	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
+	void onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files);
+	
+	// Timer-based processing handlers
+	void processPendingHashedFiles();
+	void loadNextCardBatch();
+
 public:
 	// page hasher
     hashes_ *hashes;
