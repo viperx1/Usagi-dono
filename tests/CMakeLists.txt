@@ -24,7 +24,7 @@ add_compile_definitions(QT_SHARED)
 set(CMAKE_AUTOMOC ON)
 
 # Helper function to mark usagi .cpp source files with SKIP_AUTOMOC
-# This prevents duplicate MOC processing for .cpp files while still allowing
+# This prevents duplicate MOC processing for .cpp files while allowing
 # AUTOMOC to process .h files that contain Q_OBJECT macros
 function(skip_automoc_for_usagi_sources target_name)
     # First, ensure AUTOMOC is enabled for this target
@@ -40,11 +40,19 @@ function(skip_automoc_for_usagi_sources target_name)
         
         # Skip AUTOMOC only for .cpp files from usagi/src/ directory, NOT for:
         # - test files (start with "test_" prefix)
-        # - header files (.h) - these need AUTOMOC for Q_OBJECT classes
+        # - header files (.h) which need AUTOMOC for Q_OBJECT classes
         if(source_dir MATCHES ".*/usagi/src.*" AND NOT source_name MATCHES "^test_.*" AND source_ext STREQUAL ".cpp")
             message(STATUS "Skipping AUTOMOC for usagi source: ${source}")
             set_source_files_properties(${source} PROPERTIES SKIP_AUTOMOC ON)
         endif()
+    endforeach()
+endfunction()
+
+# Helper function to re-enable AUTOMOC for specific Q_OBJECT headers
+# Call this AFTER skip_automoc_for_usagi_sources to enable MOC generation for headers that need it
+function(enable_automoc_for_headers)
+    foreach(header ${ARGN})
+        set_source_files_properties(${header} PROPERTIES SKIP_AUTOMOC OFF)
     endforeach()
 endfunction()
 
