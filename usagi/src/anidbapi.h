@@ -20,6 +20,11 @@
 #include "Qt-AES-master/qaesencryption.h"
 #include "mask.h"
 
+// Forward declaration for myAniDBApi (defined in main.h)
+// and extern declaration for the global adbapi pointer
+class myAniDBApi;
+extern myAniDBApi *adbapi;
+
 
 /*struct status_codes_
 {

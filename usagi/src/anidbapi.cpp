@@ -10,6 +10,11 @@
 #include <QStandardPaths>
 #include <QDir>
 
+// Global pointer to the AniDB API instance
+// This is initialized by the application (window.cpp) or tests
+// Core library files can use this via extern declaration in anidbapi.h
+myAniDBApi *adbapi = nullptr;
+
 AniDBApi::AniDBApi(QString client_, int clientver_)
 {
 	Logger::log("[AniDB Init] Constructor started", __FILE__, __LINE__);
