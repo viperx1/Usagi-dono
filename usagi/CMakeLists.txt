@@ -65,7 +65,10 @@ set(CORE_HEADERS
 
 # Create a static library with core functionality
 # This library will be used by both the main executable and tests
-add_library(usagi_core STATIC ${CORE_SOURCES} ${CORE_HEADERS})
+# Create an OBJECT library with core functionality
+# OBJECT libraries compile sources once and link them directly into targets
+# This avoids MOC duplication issues that occur with STATIC libraries
+add_library(usagi_core OBJECT ${CORE_SOURCES} ${CORE_HEADERS})
 
 # Link Qt libraries to the core library
 target_link_libraries(usagi_core PUBLIC
@@ -99,11 +102,22 @@ set(APP_HEADERS
     src/main.h
 )
 
-# Create executable
-add_executable(usagi ${APP_SOURCES} ${APP_HEADERS})
+# Create executable - link against OBJECT library using $<TARGET_OBJECTS:>
+add_executable(usagi ${APP_SOURCES} ${APP_HEADERS} $<TARGET_OBJECTS:usagi_core>)
 
-# Link the core library to the main executable
-target_link_libraries(usagi PRIVATE usagi_core)
+# Link Qt libraries since OBJECT libraries don't transitively link
+target_link_libraries(usagi PRIVATE
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Gui
+    Qt6::Core
+    z
+)
+
+if(WIN32)
+    target_link_libraries(usagi PRIVATE dbghelp)
+endif()
 
 # Force console subsystem for Windows
 if(WIN32)

@@ -7,19 +7,25 @@ enable_testing()
 # Enable automatic MOC for test files that include .moc files
 set(CMAKE_AUTOMOC ON)
 
-# Macro to add a test with usagi_core library
+# Macro to add a test with usagi_core OBJECT library
 # Usage: add_usagi_test(test_name [EXTRA_QT_LIBS...])
 macro(add_usagi_test TEST_NAME)
-    add_executable(${TEST_NAME} ${TEST_NAME}.cpp)
+    add_executable(${TEST_NAME} ${TEST_NAME}.cpp $<TARGET_OBJECTS:usagi_core>)
     
+    # OBJECT libraries don't transitively link, so we need to link Qt explicitly
     target_link_libraries(${TEST_NAME} PRIVATE
-        usagi_core
         Qt6::Core
         Qt6::Test
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Sql
+        Qt6::Gui
+        z
         ${ARGN}  # Additional Qt libraries if needed
     )
     
     if(WIN32)
+        target_link_libraries(${TEST_NAME} PRIVATE dbghelp)
         target_link_options(${TEST_NAME} PRIVATE
             "-Wl,--subsystem,console"
         )
@@ -61,18 +67,20 @@ add_usagi_test(test_batch_hash_retrieval Qt6::Network Qt6::Sql Qt6::Widgets)
 add_usagi_test(test_ui_freeze_fix Qt6::Network Qt6::Sql Qt6::Widgets)
 
 # test_hasher_thread needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_hasher_thread test_hasher_thread.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
+add_executable(test_hasher_thread test_hasher_thread.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h $<TARGET_OBJECTS:usagi_core>)
 
 target_link_libraries(test_hasher_thread PRIVATE
-    usagi_core
     Qt6::Test
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
+    Qt6::Gui
     Qt6::Core
+    z
 )
 
 if(WIN32)
+    target_link_libraries(test_hasher_thread PRIVATE dbghelp)
     target_link_options(test_hasher_thread PRIVATE
         "-Wl,--subsystem,console"
     )
@@ -81,18 +89,20 @@ endif()
 add_test(NAME test_hasher_thread COMMAND test_hasher_thread -v2)
 
 # test_hasher_threadpool needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_hasher_threadpool test_hasher_threadpool.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
+add_executable(test_hasher_threadpool test_hasher_threadpool.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h $<TARGET_OBJECTS:usagi_core>)
 
 target_link_libraries(test_hasher_threadpool PRIVATE
-    usagi_core
     Qt6::Test
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
+    Qt6::Gui
     Qt6::Core
+    z
 )
 
 if(WIN32)
+    target_link_libraries(test_hasher_threadpool PRIVATE dbghelp)
     target_link_options(test_hasher_threadpool PRIVATE
         "-Wl,--subsystem,console"
     )
@@ -113,18 +123,20 @@ add_test(NAME test_hasher_threadpool COMMAND test_hasher_threadpool -v2)
 
 # Continue with remaining tests
 # test_stop_non_blocking needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_stop_non_blocking test_stop_non_blocking.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
+add_executable(test_stop_non_blocking test_stop_non_blocking.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h $<TARGET_OBJECTS:usagi_core>)
 
 target_link_libraries(test_stop_non_blocking PRIVATE
-    usagi_core
     Qt6::Core
     Qt6::Test
     Qt6::Network
     Qt6::Sql
     Qt6::Widgets
+    Qt6::Gui
+    z
 )
 
 if(WIN32)
+    target_link_libraries(test_stop_non_blocking PRIVATE dbghelp)
     target_link_options(test_stop_non_blocking PRIVATE
         "-Wl,--subsystem,console"
     )
@@ -136,18 +148,20 @@ add_usagi_test(test_truncated_response Qt6::Network Qt6::Sql Qt6::Widgets)
 add_usagi_test(test_api_optimization Qt6::Network Qt6::Sql Qt6::Widgets)
 
 # test_mylistcardmanager needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_mylistcardmanager test_mylistcardmanager.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
+add_executable(test_mylistcardmanager test_mylistcardmanager.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h $<TARGET_OBJECTS:usagi_core>)
 
 target_link_libraries(test_mylistcardmanager PRIVATE
-    usagi_core
     Qt6::Core
     Qt6::Test
     Qt6::Network
     Qt6::Sql
     Qt6::Widgets
+    Qt6::Gui
+    z
 )
 
 if(WIN32)
+    target_link_libraries(test_mylistcardmanager PRIVATE dbghelp)
     target_link_options(test_mylistcardmanager PRIVATE
         "-Wl,--subsystem,console"
     )
