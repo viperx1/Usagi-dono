@@ -2801,9 +2801,10 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 				{
 					LOG(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 					
-					// Update status in local_files table to 2 (in anidb)
+					// Update status and binding_status in local_files table
+					// status: 2 = in anidb, binding_status: 1 = bound_to_anime
 					QSqlQuery statusQuery(db);
-					statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
+					statusQuery.prepare("UPDATE `local_files` SET `status` = 2, `binding_status` = 1 WHERE `id` = ?");
 					statusQuery.addBindValue(localFileId);
 					statusQuery.exec();
 					
@@ -2874,9 +2875,10 @@ int AniDBApi::LinkLocalFileToMylist(qint64 size, QString ed2kHash, QString local
 			{
 				LOG(QString("Linked local_file for lid=%1 to local_file_id=%2 (path: %3)").arg(lid).arg(localFileId).arg(localPath));
 				
-				// Update status in local_files table to 2 (in anidb)
+				// Update status and binding_status in local_files table
+				// status: 2 = in anidb, binding_status: 1 = bound_to_anime
 				QSqlQuery statusQuery(db);
-				statusQuery.prepare("UPDATE `local_files` SET `status` = 2 WHERE `id` = ?");
+				statusQuery.prepare("UPDATE `local_files` SET `status` = 2, `binding_status` = 1 WHERE `id` = ?");
 				statusQuery.addBindValue(localFileId);
 				statusQuery.exec();
 				
