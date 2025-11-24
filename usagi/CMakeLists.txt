@@ -16,11 +16,10 @@ add_compile_definitions(QT_SHARED)
 # Enable automatic MOC
 set(CMAKE_AUTOMOC ON)
 
-# Core library source files (excluding main.cpp and window.cpp which are app-specific)
+# Core library source files (excluding main.cpp, window.cpp, and myanidbapi.cpp which are app-specific)
 set(CORE_SOURCES
     src/anidbapi.cpp
     src/mask.cpp
-    src/myanidbapi.cpp
     src/hasherthread.cpp
     src/hasherthreadpool.cpp
     src/hash/md4.cpp
@@ -92,10 +91,12 @@ target_include_directories(usagi_core PUBLIC
 set(APP_SOURCES
     src/main.cpp
     src/window.cpp
+    src/myanidbapi.cpp
 )
 
 set(APP_HEADERS
     src/window.h
+    src/main.h
 )
 
 # Create executable
