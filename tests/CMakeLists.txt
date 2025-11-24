@@ -13,6 +13,8 @@ set(CMAKE_AUTOMOC ON)
 # These files are already compiled with their own MOC in the main usagi target
 # Note: We use an explicit list rather than GLOB to ensure we only skip files
 # that are actually used in tests, and to make dependencies explicit for CMake
+# Exception: watchchunkmanager.cpp is NOT in this list because it includes
+# "moc_watchchunkmanager.cpp" and needs AUTOMOC to generate it
 set_source_files_properties(
     ../usagi/src/anidbapi.cpp
     ../usagi/src/mask.cpp
@@ -33,7 +35,6 @@ set_source_files_properties(
     ../usagi/src/animecard.cpp
     ../usagi/src/flowlayout.cpp
     ../usagi/src/mylistcardmanager.cpp
-    ../usagi/src/watchchunkmanager.cpp
     PROPERTIES SKIP_AUTOMOC ON
 )
 
