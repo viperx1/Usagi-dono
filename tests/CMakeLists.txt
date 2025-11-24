@@ -5,7 +5,35 @@ project(usagi_tests LANGUAGES CXX)
 enable_testing()
 
 # Enable automatic MOC for test files that include .moc files
+# Note: We need to skip AUTOMOC on source files from ../usagi/src/ to avoid
+# duplicate MOC processing and potential ABI issues
 set(CMAKE_AUTOMOC ON)
+
+# Mark all source files from usagi/src to skip AUTOMOC
+# These files are already compiled with their own MOC in the main usagi target
+set_source_files_properties(
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/myanidbapi.cpp
+    ../usagi/src/hasherthread.cpp
+    ../usagi/src/hasherthreadpool.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+    ../usagi/src/crashlog.cpp
+    ../usagi/src/epno.cpp
+    ../usagi/src/aired.cpp
+    ../usagi/src/directorywatcher.cpp
+    ../usagi/src/playbackmanager.cpp
+    ../usagi/src/playbuttondelegate.cpp
+    ../usagi/src/animecard.cpp
+    ../usagi/src/flowlayout.cpp
+    ../usagi/src/mylistcardmanager.cpp
+    ../usagi/src/watchchunkmanager.cpp
+    PROPERTIES SKIP_AUTOMOC ON
+)
 
 # Test 1: Hash functions test
 set(HASH_TEST_SOURCES
