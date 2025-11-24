@@ -61,7 +61,7 @@ add_usagi_test(test_batch_hash_retrieval Qt6::Network Qt6::Sql Qt6::Widgets)
 add_usagi_test(test_ui_freeze_fix Qt6::Network Qt6::Sql Qt6::Widgets)
 
 # test_hasher_thread needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_hasher_thread test_hasher_thread.cpp ../usagi/src/myanidbapi.cpp)
+add_executable(test_hasher_thread test_hasher_thread.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
 
 target_link_libraries(test_hasher_thread PRIVATE
     usagi_core
@@ -81,7 +81,7 @@ endif()
 add_test(NAME test_hasher_thread COMMAND test_hasher_thread -v2)
 
 # test_hasher_threadpool needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_hasher_threadpool test_hasher_threadpool.cpp ../usagi/src/myanidbapi.cpp)
+add_executable(test_hasher_threadpool test_hasher_threadpool.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
 
 target_link_libraries(test_hasher_threadpool PRIVATE
     usagi_core
@@ -113,7 +113,7 @@ add_test(NAME test_hasher_threadpool COMMAND test_hasher_threadpool -v2)
 
 # Continue with remaining tests
 # test_stop_non_blocking needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_stop_non_blocking test_stop_non_blocking.cpp ../usagi/src/myanidbapi.cpp)
+add_executable(test_stop_non_blocking test_stop_non_blocking.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
 
 target_link_libraries(test_stop_non_blocking PRIVATE
     usagi_core
@@ -136,7 +136,7 @@ add_usagi_test(test_truncated_response Qt6::Network Qt6::Sql Qt6::Widgets)
 add_usagi_test(test_api_optimization Qt6::Network Qt6::Sql Qt6::Widgets)
 
 # test_mylistcardmanager needs myanidbapi.cpp and main.h (uses myAniDBApi class)
-add_executable(test_mylistcardmanager test_mylistcardmanager.cpp ../usagi/src/myanidbapi.cpp)
+add_executable(test_mylistcardmanager test_mylistcardmanager.cpp ../usagi/src/myanidbapi.cpp ../usagi/src/main.h)
 
 target_link_libraries(test_mylistcardmanager PRIVATE
     usagi_core
