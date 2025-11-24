@@ -444,7 +444,7 @@ endif()
 add_test(NAME test_export_template_verification COMMAND test_export_template_verification -v2)
 
 # Test 8: Episode number type (epno)
-add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp ../usagi/src/logger.cpp)
+add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_epno)
 
 target_link_libraries(test_epno PRIVATE
@@ -522,7 +522,7 @@ endif()
 add_test(NAME test_evangelion_ha_fix COMMAND test_evangelion_ha_fix -v2)
 
 # Test 12: Aired date type
-add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_aired)
 
 target_link_libraries(test_aired PRIVATE
@@ -544,7 +544,7 @@ endif()
 add_test(NAME test_aired COMMAND test_aired -v2)
 
 # Test 13: MyList Type and Aired columns integration
-add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_mylist_type_aired)
 
 target_link_libraries(test_mylist_type_aired PRIVATE
@@ -567,7 +567,7 @@ endif()
 add_test(NAME test_mylist_type_aired COMMAND test_mylist_type_aired -v2)
 
 # Test 14: Mylist columns fix test (Type and Aired columns)
-add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_mylist_columns_fix)
 
 target_link_libraries(test_mylist_columns_fix PRIVATE
@@ -590,7 +590,7 @@ endif()
 add_test(NAME test_mylist_columns_fix COMMAND test_mylist_columns_fix -v2)
 
 # Test 15: MyList aired sorting
-add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_mylist_aired_sorting)
 
 target_link_libraries(test_mylist_aired_sorting PRIVATE
@@ -612,7 +612,7 @@ endif()
 add_test(NAME test_mylist_aired_sorting COMMAND test_mylist_aired_sorting -v2)
 
 # Test 16: Directory watcher
-add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp ../usagi/src/logger.cpp)
+add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp ../usagi/src/directorywatcher.h ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_directorywatcher)
 
 # Link Qt libraries
