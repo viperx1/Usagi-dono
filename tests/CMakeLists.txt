@@ -28,8 +28,13 @@ set(CMAKE_AUTOMOC ON)
 function(skip_automoc_for_usagi_sources target_name)
     get_target_property(sources ${target_name} SOURCES)
     foreach(source ${sources})
-        # Skip AUTOMOC for any file from ../usagi/src/ directory
-        if(source MATCHES "^\\.\\./usagi/src/.*\\.(cpp|h)$")
+        # Get the absolute path to properly check the source
+        get_filename_component(abs_source "${source}" ABSOLUTE)
+        get_filename_component(source_dir "${abs_source}" DIRECTORY)
+        
+        # Skip AUTOMOC only for files from usagi/src/ directory, not test files
+        if(source_dir MATCHES ".*/usagi/src.*")
+            message(STATUS "Skipping AUTOMOC for usagi source: ${source}")
             set_source_files_properties(${source} PROPERTIES SKIP_AUTOMOC ON)
         endif()
     endforeach()
