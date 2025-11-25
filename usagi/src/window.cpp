@@ -3856,10 +3856,25 @@ void Window::applyMylistFilters()
 			
 			if (completionFilter == "completed") {
 				// Completed: all normal episodes viewed
-				visible = visible && (totalEpisodes > 0 && normalViewed >= totalEpisodes);
+				// For anime with known total episodes, check if all are viewed
+				// For anime with unknown total (totalEpisodes == 0), check if all episodes in mylist are viewed
+				if (totalEpisodes > 0) {
+					visible = visible && (normalViewed >= totalEpisodes);
+				} else {
+					// Unknown total episodes: consider completed if user has episodes and all are viewed
+					visible = visible && (normalEpisodes > 0 && normalViewed >= normalEpisodes);
+				}
 			} else if (completionFilter == "watching") {
 				// Watching: some episodes viewed but not all
-				visible = visible && (normalViewed > 0 && (totalEpisodes == 0 || normalViewed < totalEpisodes));
+				// Must have at least one viewed episode
+				// And either: total is unknown (totalEpisodes == 0) with more episodes available,
+				//         or: total is known and not all are viewed
+				if (totalEpisodes > 0) {
+					visible = visible && (normalViewed > 0 && normalViewed < totalEpisodes);
+				} else {
+					// Unknown total episodes: watching if some viewed and not all in mylist are viewed
+					visible = visible && (normalViewed > 0 && normalViewed < normalEpisodes);
+				}
 			} else if (completionFilter == "notstarted") {
 				// Not started: no episodes viewed
 				visible = visible && (normalViewed == 0);

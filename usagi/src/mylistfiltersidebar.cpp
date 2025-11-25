@@ -14,26 +14,26 @@ MyListFilterSidebar::~MyListFilterSidebar()
 
 void MyListFilterSidebar::setupUI()
 {
-    auto *mainLayout = new QVBoxLayout(this);
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
     mainLayout->setSpacing(10);
     
     // Title
-    auto *titleLabel = new QLabel("<b>Search & Filter</b>");
+    QLabel *titleLabel = new QLabel("<b>Search & Filter</b>");
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
     
     // Search group
-    auto *searchGroup = new QGroupBox("Search");
-    auto *searchLayout = new QVBoxLayout(searchGroup);
+    QGroupBox *searchGroup = new QGroupBox("Search");
+    QVBoxLayout *searchLayout = new QVBoxLayout(searchGroup);
     
-    auto *searchLabel = new QLabel("Anime Title:");
+    QLabel *searchLabel = new QLabel("Anime Title:");
     m_searchField = new QLineEdit();
     m_searchField->setPlaceholderText("Search by title or alternative title...");
     m_searchField->setClearButtonEnabled(true);
     
     // Use a timer to debounce search input (avoid filtering on every keystroke)
-    auto *searchDebounceTimer = new QTimer(this);
+    QTimer *searchDebounceTimer = new QTimer(this);
     searchDebounceTimer->setSingleShot(true);
     searchDebounceTimer->setInterval(300); // 300ms delay
     
@@ -47,10 +47,10 @@ void MyListFilterSidebar::setupUI()
     mainLayout->addWidget(searchGroup);
     
     // Filter by type group
-    auto *typeGroup = new QGroupBox("Type");
-    auto *typeLayout = new QVBoxLayout(typeGroup);
+    QGroupBox *typeGroup = new QGroupBox("Type");
+    QVBoxLayout *typeLayout = new QVBoxLayout(typeGroup);
     
-    auto *typeLabel = new QLabel("Anime Type:");
+    QLabel *typeLabel = new QLabel("Anime Type:");
     m_typeFilter = new QComboBox();
     m_typeFilter->addItem("All Types", "");
     m_typeFilter->addItem("TV Series", "TV Series");
@@ -70,10 +70,10 @@ void MyListFilterSidebar::setupUI()
     mainLayout->addWidget(typeGroup);
     
     // Filter by completion status group
-    auto *completionGroup = new QGroupBox("Completion");
-    auto *completionLayout = new QVBoxLayout(completionGroup);
+    QGroupBox *completionGroup = new QGroupBox("Completion");
+    QVBoxLayout *completionLayout = new QVBoxLayout(completionGroup);
     
-    auto *completionLabel = new QLabel("Status:");
+    QLabel *completionLabel = new QLabel("Status:");
     m_completionFilter = new QComboBox();
     m_completionFilter->addItem("All", "");
     m_completionFilter->addItem("Completed", "completed");
@@ -88,8 +88,8 @@ void MyListFilterSidebar::setupUI()
     mainLayout->addWidget(completionGroup);
     
     // Show only unwatched checkbox
-    auto *viewedGroup = new QGroupBox("Viewed Status");
-    auto *viewedLayout = new QVBoxLayout(viewedGroup);
+    QGroupBox *viewedGroup = new QGroupBox("Viewed Status");
+    QVBoxLayout *viewedLayout = new QVBoxLayout(viewedGroup);
     
     m_showOnlyUnwatchedCheckbox = new QCheckBox("Show only with unwatched episodes");
     connect(m_showOnlyUnwatchedCheckbox, &QCheckBox::stateChanged,
