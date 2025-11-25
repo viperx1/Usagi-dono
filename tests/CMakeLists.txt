@@ -23,6 +23,18 @@ endif()
 message(STATUS "========================================")
 
 # ==========================================================
+# STATIC LINKING FIX FOR WINDOWS MINGW
+# ==========================================================
+# Fix for Windows CI crashes: Multiple conflicting libstdc++-6.dll
+# versions in PATH cause segfaults and heap corruption.
+# Static linking embeds C++ runtime into executables.
+if(WIN32 AND MINGW)
+    message(STATUS "Enabling static C++ runtime linking for MinGW to avoid DLL conflicts")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+endif()
+
+# ==========================================================
 # FORCE DYNAMIC Qt LINKING - Ensure consistency with main build
 # ==========================================================
 message(STATUS "Configuring tests for DYNAMIC Qt linking")
