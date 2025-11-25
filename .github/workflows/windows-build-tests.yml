@@ -28,26 +28,49 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_mingw'
+          tools: 'tools_mingw1310'
           cache: true
-
-      - name: Cache MinGW
-        id: cache-mingw
-        uses: actions/cache@v4
-        with:
-          path: D:/a/Usagi-dono/Qt/Tools/mingw1310_64
-          key: mingw-1310-64-${{ runner.os }}
-          restore-keys: |
-            mingw-1310-64-
 
       - name: Create build directory
         shell: bash
         run: mkdir -p build
 
+      - name: Setup Clean MinGW PATH
+        shell: bash
+        run: |
+          # Create a clean PATH with Qt's MinGW at the front, removing other MinGW installations
+          # This is critical to avoid DLL conflicts that cause segfaults
+          
+          QT_MINGW_BIN="D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin"
+          QT_BIN="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin"
+          
+          # Build clean PATH: Qt MinGW first, then essential system paths only
+          CLEAN_PATH="$QT_MINGW_BIN:$QT_BIN"
+          
+          # Add essential Windows paths but EXCLUDE all other mingw installations
+          for p in $(echo $PATH | tr ':' '\n'); do
+            case "$p" in
+              *mingw*|*MinGW*|*Strawberry*) 
+                echo "EXCLUDING from PATH: $p"
+                ;;
+              *)
+                CLEAN_PATH="$CLEAN_PATH:$p"
+                ;;
+            esac
+          done
+          
+          echo "Clean PATH set. Qt MinGW compiler will be used."
+          echo "CLEAN_PATH=$CLEAN_PATH" >> $GITHUB_ENV
+          
       - name: Debug - Print environment info
         shell: bash
         run: |
-          echo "=== Compiler version ==="
+          # Use clean PATH
+          export PATH="$CLEAN_PATH"
+          
+          echo "=== Compiler version (should be Qt's MinGW 13.x) ==="
           g++ --version
+          which g++
           echo ""
           echo "=== CMake version ==="
           cmake --version
@@ -56,31 +79,40 @@ jobs:
           ls -la "$Qt6_DIR" || echo "Qt6_DIR not set"
           ls -la "D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin/" | head -20 || echo "Qt bin dir not found"
           echo ""
-          echo "=== PATH ==="
-          echo $PATH | tr ':' '\n' | head -20
+          echo "=== Clean PATH (first 10 entries) ==="
+          echo $PATH | tr ':' '\n' | head -10
           echo ""
-          echo "=== MinGW bin contents ==="
-          ls -la /c/mingw64/bin/*.dll 2>/dev/null | head -20 || echo "No system mingw64"
+          echo "=== Verify NO conflicting MinGW in PATH ==="
+          echo $PATH | tr ':' '\n' | grep -i mingw || echo "Good: Only Qt MinGW in PATH"
 
       - name: Configure (CMake)
         shell: bash
         run: |
+          # Use clean PATH to ensure Qt's MinGW compiler is used
+          export PATH="$CLEAN_PATH"
+          
           cmake -S . -B build -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/lib/cmake" \
+            -DCMAKE_C_COMPILER="D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin/gcc.exe" \
+            -DCMAKE_CXX_COMPILER="D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin/g++.exe" \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             2>&1 | tee build/configure_log.txt
 
       - name: Build Tests
-        run: cmake --build build --config Release 2>&1 | tee build/build_log.txt
         shell: bash
+        run: |
+          # Use clean PATH  
+          export PATH="$CLEAN_PATH"
+          cmake --build build --config Release 2>&1 | tee build/build_log.txt
 
       - name: Deploy Qt DLLs to test directory
         shell: bash
         run: |
+          # Use clean PATH
+          export PATH="$CLEAN_PATH"
+          
           echo "=== Deploying Qt DLLs to test directory ==="
-          # Add Qt bin directory to PATH for windeployqt and runtime
-          export PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin:$PATH"
           
           # Copy Qt DLLs to each test executable location
           for exe in build/tests/*.exe; do
@@ -95,24 +127,30 @@ jobs:
           ls -la build/tests/ | head -40
 
       - name: Debug - Check test executable dependencies
-        shell: cmd
+        shell: bash
         run: |
-          echo === Checking DLL dependencies for test_hash.exe ===
-          dumpbin /dependents build\tests\test_hash.exe 2>nul || echo dumpbin not available
-          echo.
-          echo === Checking where DLLs are loaded from ===
-          where Qt6Core.dll 2>nul || echo Qt6Core.dll not in PATH
-          where libstdc++-6.dll 2>nul || echo libstdc++-6.dll not in PATH
+          # Use clean PATH
+          export PATH="$CLEAN_PATH"
+          
+          echo "=== Checking DLL dependencies for test_hash.exe ==="
+          objdump -p build/tests/test_hash.exe 2>/dev/null | grep "DLL Name" || echo "objdump check skipped"
+          echo ""
+          echo "=== Which libstdc++ will be loaded ==="
+          which libstdc++-6.dll 2>/dev/null || echo "libstdc++-6.dll location: (using embedded/static)"
+          echo ""
+          echo "=== Verify PATH is clean ==="
+          echo $PATH | tr ':' '\n' | grep -i mingw | head -5
 
       - name: Run tests with debug output
         shell: bash
         run: |
-          # Add Qt bin directory to PATH for runtime DLLs
-          export PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin:$PATH"
+          # Use clean PATH - critical for avoiding DLL conflicts
+          export PATH="$CLEAN_PATH"
           export QT_DEBUG_PLUGINS=1
           
-          echo "=== Running tests with QT_DEBUG_PLUGINS=1 ==="
-          echo "PATH: $PATH"
+          echo "=== Running tests with clean PATH ==="
+          echo "First 5 PATH entries:"
+          echo $PATH | tr ':' '\n' | head -5
           echo ""
           
           # Run a single test first to see detailed output
