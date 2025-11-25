@@ -630,6 +630,8 @@ Window::Window()
             this, &Window::onPlaybackStopped);
     connect(playbackManager, &PlaybackManager::playbackStateChanged,
             this, &Window::onPlaybackStateChanged);
+    connect(playbackManager, &PlaybackManager::fileMarkedAsLocallyWatched,
+            this, &Window::onFileMarkedAsLocallyWatched);
     
     // Initialize play button delegate for mylist tree
     playButtonDelegate = new PlayButtonDelegate(this);
@@ -4871,6 +4873,11 @@ void Window::onPlaybackCompleted(int lid)
 		}
 		++it;
 	}
+	
+	// Update anime card if in card view mode
+	if (mylistUseCardView && cardManager) {
+		cardManager->updateOrAddMylistEntry(lid);
+	}
 }
 
 void Window::onPlaybackStopped(int lid, int position)
@@ -4881,6 +4888,40 @@ void Window::onPlaybackStopped(int lid, int position)
 	m_playingItems.remove(lid);
 	if (m_playingItems.isEmpty()) {
 		m_animationTimer->stop();
+	}
+}
+
+void Window::onFileMarkedAsLocallyWatched(int lid)
+{
+	LOG(QString("File marked as locally watched via chunk tracking: LID %1 - Updating UI").arg(lid));
+	
+	// Update tree view play buttons
+	QTreeWidgetItemIterator it(mylistTreeWidget);
+	while (*it) {
+		QTreeWidgetItem *item = *it;
+		if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
+			// Found the file - update it and its parents
+			updatePlayButtonForItem(item);
+			
+			// Update episode parent if exists
+			QTreeWidgetItem *episodeItem = item->parent();
+			if (episodeItem) {
+				updatePlayButtonForItem(episodeItem);
+				
+				// Update anime parent if exists
+				QTreeWidgetItem *animeItem = episodeItem->parent();
+				if (animeItem) {
+					updatePlayButtonForItem(animeItem);
+				}
+			}
+			break;
+		}
+		++it;
+	}
+	
+	// Update anime card if in card view mode
+	if (mylistUseCardView && cardManager) {
+		cardManager->updateOrAddMylistEntry(lid);
 	}
 }
 

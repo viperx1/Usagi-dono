@@ -632,6 +632,7 @@ public slots:
     void onPlaybackCompleted(int lid);
     void onPlaybackStopped(int lid, int position);
     void onPlaybackStateChanged(int lid, bool isPlaying);
+    void onFileMarkedAsLocallyWatched(int lid);
     void onAnimationTimerTimeout();
     
     // Hasher slots
