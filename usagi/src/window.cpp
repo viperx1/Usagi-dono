@@ -3680,8 +3680,9 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 		return;
 	}
 	
-	// Query all alternative titles for anime in mylist
-	QString query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish "
+	// Query all alternative titles for anime in mylist, including all name fields from anime table
+	QString query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish, "
+	                "a.nameother, a.nameshort, a.synonyms "
 	                "FROM anime_titles at "
 	                "LEFT JOIN anime a ON at.aid = a.aid "
 	                "WHERE at.aid IN (SELECT DISTINCT aid FROM mylist) "
@@ -3701,6 +3702,9 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 		QString title = q.value(1).toString();
 		QString romaji = q.value(2).toString();
 		QString english = q.value(3).toString();
+		QString other = q.value(4).toString();
+		QString shortNames = q.value(5).toString();
+		QString synonyms = q.value(6).toString();
 		
 		if (aid != currentAid) {
 			// Save previous anime's titles if any
@@ -3712,16 +3716,49 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 			currentAid = aid;
 			currentTitles.titles.clear();
 			
-			// Add romaji and english names
+			// Add romaji and english names from anime table
 			if (!romaji.isEmpty()) {
 				currentTitles.titles.append(romaji);
 			}
 			if (!english.isEmpty() && english != romaji) {
 				currentTitles.titles.append(english);
 			}
+			
+			// Add other name from anime table
+			if (!other.isEmpty()) {
+				QStringList otherList = other.split("'", Qt::SkipEmptyParts);
+				for (const QString &otherName : otherList) {
+					QString trimmed = otherName.trimmed();
+					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.titles.append(trimmed);
+					}
+				}
+			}
+			
+			// Add short names from anime table
+			if (!shortNames.isEmpty()) {
+				QStringList shortList = shortNames.split("'", Qt::SkipEmptyParts);
+				for (const QString &shortName : shortList) {
+					QString trimmed = shortName.trimmed();
+					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.titles.append(trimmed);
+					}
+				}
+			}
+			
+			// Add synonyms from anime table
+			if (!synonyms.isEmpty()) {
+				QStringList synonymList = synonyms.split("'", Qt::SkipEmptyParts);
+				for (const QString &synonym : synonymList) {
+					QString trimmed = synonym.trimmed();
+					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.titles.append(trimmed);
+					}
+				}
+			}
 		}
 		
-		// Add alternative title if not already in list
+		// Add alternative title from anime_titles table if not already in list
 		if (!title.isEmpty() && !currentTitles.titles.contains(title, Qt::CaseInsensitive)) {
 			currentTitles.titles.append(title);
 		}

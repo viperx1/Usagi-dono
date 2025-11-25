@@ -121,7 +121,7 @@ void MyListFilterSidebar::setupUI()
     QVBoxLayout *viewedLayout = new QVBoxLayout(viewedGroup);
     
     m_showOnlyUnwatchedCheckbox = new QCheckBox("Show only with unwatched episodes");
-    connect(m_showOnlyUnwatchedCheckbox, &QCheckBox::stateChanged,
+    connect(m_showOnlyUnwatchedCheckbox, &QCheckBox::clicked,
             this, &MyListFilterSidebar::onFilterChanged);
     
     viewedLayout->addWidget(m_showOnlyUnwatchedCheckbox);
