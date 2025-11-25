@@ -39,6 +39,7 @@ set(SOURCES
     src/animecard.cpp
     src/flowlayout.cpp
     src/mylistcardmanager.cpp
+    src/mylistfiltersidebar.cpp
     src/watchchunkmanager.cpp
 )
 
@@ -63,6 +64,7 @@ set(HEADERS
     src/animecard.h
     src/flowlayout.h
     src/mylistcardmanager.h
+    src/mylistfiltersidebar.h
     src/watchchunkmanager.h
     src/animeutils.h
     src/uicolors.h

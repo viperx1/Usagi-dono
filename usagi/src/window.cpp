@@ -392,6 +392,14 @@ Window::Window()
     mylistToolbar->addStretch();
     pageMylist->addLayout(mylistToolbar);
     
+    // Create horizontal layout for sidebar and card view
+    QHBoxLayout *mylistContentLayout = new QHBoxLayout();
+    
+    // Create and add filter sidebar
+    filterSidebar = new MyListFilterSidebar(this);
+    connect(filterSidebar, &MyListFilterSidebar::filterChanged, this, &Window::applyMylistFilters);
+    mylistContentLayout->addWidget(filterSidebar);
+    
     // Card view (only view mode available)
     mylistCardScrollArea = new QScrollArea(this);
     mylistCardScrollArea->setWidgetResizable(true);
@@ -403,7 +411,9 @@ Window::Window()
     mylistCardContainer->setLayout(mylistCardLayout);
     mylistCardScrollArea->setWidget(mylistCardContainer);
     
-    pageMylist->addWidget(mylistCardScrollArea);
+    mylistContentLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
+    
+    pageMylist->addLayout(mylistContentLayout);
     
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
@@ -3711,6 +3721,171 @@ void Window::loadMylistAsCards()
 	
 	qint64 totalElapsed = timer.elapsed();
 	LOG(QString("[Timing] Total loadMylistAsCards took %1 ms").arg(totalElapsed));
+	
+	// Load alternative titles for filtering
+	loadAnimeAlternativeTitlesForFiltering();
+}
+
+// Load alternative titles from anime_titles table for filtering
+void Window::loadAnimeAlternativeTitlesForFiltering()
+{
+	animeAlternativeTitlesCache.clear();
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("[Window] Database not open for loading alternative titles");
+		return;
+	}
+	
+	// Query all alternative titles for anime in mylist
+	QString query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish "
+	                "FROM anime_titles at "
+	                "LEFT JOIN anime a ON at.aid = a.aid "
+	                "WHERE at.aid IN (SELECT DISTINCT aid FROM mylist) "
+	                "ORDER BY at.aid";
+	
+	QSqlQuery q(db);
+	if (!q.exec(query)) {
+		LOG("[Window] Error loading alternative titles: " + q.lastError().text());
+		return;
+	}
+	
+	int currentAid = -1;
+	AnimeAlternativeTitles currentTitles;
+	
+	while (q.next()) {
+		int aid = q.value(0).toInt();
+		QString title = q.value(1).toString();
+		QString romaji = q.value(2).toString();
+		QString english = q.value(3).toString();
+		
+		if (aid != currentAid) {
+			// Save previous anime's titles if any
+			if (currentAid != -1) {
+				animeAlternativeTitlesCache[currentAid] = currentTitles;
+			}
+			
+			// Start new anime
+			currentAid = aid;
+			currentTitles.titles.clear();
+			
+			// Add romaji and english names
+			if (!romaji.isEmpty()) {
+				currentTitles.titles.append(romaji);
+			}
+			if (!english.isEmpty() && english != romaji) {
+				currentTitles.titles.append(english);
+			}
+		}
+		
+		// Add alternative title if not already in list
+		if (!title.isEmpty() && !currentTitles.titles.contains(title, Qt::CaseInsensitive)) {
+			currentTitles.titles.append(title);
+		}
+	}
+	
+	// Save last anime's titles
+	if (currentAid != -1) {
+		animeAlternativeTitlesCache[currentAid] = currentTitles;
+	}
+	
+	LOG(QString("[Window] Loaded alternative titles for %1 anime").arg(animeAlternativeTitlesCache.size()));
+}
+
+// Check if a card matches the search filter
+bool Window::matchesSearchFilter(AnimeCard *card, const QString &searchText)
+{
+	if (searchText.isEmpty()) {
+		return true;
+	}
+	
+	int aid = card->getAnimeId();
+	QString cardTitle = card->getAnimeTitle();
+	
+	// Check main title first
+	if (cardTitle.contains(searchText, Qt::CaseInsensitive)) {
+		return true;
+	}
+	
+	// Check alternative titles from cache
+	if (animeAlternativeTitlesCache.contains(aid)) {
+		const AnimeAlternativeTitles &titles = animeAlternativeTitlesCache[aid];
+		for (const QString &title : titles.titles) {
+			if (title.contains(searchText, Qt::CaseInsensitive)) {
+				return true;
+			}
+		}
+	}
+	
+	return false;
+}
+
+// Apply filters to mylist cards
+void Window::applyMylistFilters()
+{
+	if (animeCards.isEmpty()) {
+		return;
+	}
+	
+	QString searchText = filterSidebar->getSearchText();
+	QString typeFilter = filterSidebar->getTypeFilter();
+	QString completionFilter = filterSidebar->getCompletionFilter();
+	bool showOnlyUnwatched = filterSidebar->getShowOnlyUnwatched();
+	
+	int visibleCount = 0;
+	
+	// Apply filters to each card
+	for (AnimeCard *card : std::as_const(animeCards)) {
+		bool visible = true;
+		
+		// Apply search filter
+		if (!searchText.isEmpty()) {
+			visible = visible && matchesSearchFilter(card, searchText);
+		}
+		
+		// Apply type filter
+		if (!typeFilter.isEmpty()) {
+			visible = visible && (card->getAnimeType() == typeFilter);
+		}
+		
+		// Apply completion filter
+		if (!completionFilter.isEmpty()) {
+			int normalEpisodes = card->getNormalEpisodes();
+			int normalViewed = card->getNormalViewed();
+			int totalEpisodes = card->getTotalNormalEpisodes();
+			
+			if (completionFilter == "completed") {
+				// Completed: all normal episodes viewed
+				visible = visible && (totalEpisodes > 0 && normalViewed >= totalEpisodes);
+			} else if (completionFilter == "watching") {
+				// Watching: some episodes viewed but not all
+				visible = visible && (normalViewed > 0 && (totalEpisodes == 0 || normalViewed < totalEpisodes));
+			} else if (completionFilter == "notstarted") {
+				// Not started: no episodes viewed
+				visible = visible && (normalViewed == 0);
+			}
+		}
+		
+		// Apply unwatched filter
+		if (showOnlyUnwatched) {
+			int normalEpisodes = card->getNormalEpisodes();
+			int normalViewed = card->getNormalViewed();
+			int otherEpisodes = card->getOtherEpisodes();
+			int otherViewed = card->getOtherViewed();
+			
+			// Show only if there are unwatched episodes
+			visible = visible && ((normalEpisodes > normalViewed) || (otherEpisodes > otherViewed));
+		}
+		
+		// Show or hide the card based on filter result
+		card->setVisible(visible);
+		if (visible) {
+			visibleCount++;
+		}
+	}
+	
+	// Update status label
+	mylistStatusLabel->setText(QString("MyList Status: Showing %1 of %2 anime").arg(visibleCount).arg(animeCards.size()));
 }
 
 // Download poster image for an anime

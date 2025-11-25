@@ -42,6 +42,7 @@
 #include "animecard.h"
 #include "flowlayout.h"
 #include "mylistcardmanager.h"
+#include "mylistfiltersidebar.h"
 #include "uicolors.h"
 //#include "hasherthread.h"
 
@@ -470,6 +471,7 @@ private:
     QLabel *mylistStatusLabel;
     bool mylistSortAscending;  // true for ascending, false for descending
     MyListCardManager *cardManager;  // Manages card lifecycle and updates
+    MyListFilterSidebar *filterSidebar;  // Filter sidebar widget
     QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead
 	QSet<int> episodesNeedingData;  // Deprecated: moved to MyListCardManager
 	QSet<int> animeNeedingMetadata;  // Deprecated: moved to MyListCardManager
@@ -611,6 +613,7 @@ public slots:
     void onCardEpisodeClicked(int lid);
     void onPlayAnimeFromCard(int aid);
     void onResetWatchSession(int aid);
+    void applyMylistFilters();
     
     // Poster download slots
     void onPosterDownloadFinished(QNetworkReply *reply);
@@ -681,6 +684,14 @@ private:
     QMap<QString, int> cachedTitleToAid;
     bool animeTitlesCacheLoaded;
     void loadAnimeTitlesCache();
+    
+    // Helper structure for mylist filtering
+    struct AnimeAlternativeTitles {
+        QStringList titles;  // All titles including romaji, english, and alternative titles
+    };
+    QMap<int, AnimeAlternativeTitles> animeAlternativeTitlesCache;  // aid -> alternative titles
+    void loadAnimeAlternativeTitlesForFiltering();
+    bool matchesSearchFilter(AnimeCard *card, const QString &searchText);
     
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
