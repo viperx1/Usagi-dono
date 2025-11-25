@@ -35,14 +35,60 @@ jobs:
         shell: bash
         run: mkdir -p build
 
+      - name: Verify Qt MinGW Tools Installation
+        shell: bash
+        run: |
+          echo "=== Checking Qt installation paths ==="
+          echo "IQTA_TOOLS: ${IQTA_TOOLS:-not set}"
+          echo "QT_ROOT_DIR: ${QT_ROOT_DIR:-not set}"
+          
+          echo ""
+          echo "=== Listing Qt Tools directory ==="
+          ls -la "D:/a/Usagi-dono/Qt/Tools/" 2>/dev/null || echo "Qt Tools directory not found"
+          
+          echo ""
+          echo "=== Looking for MinGW installations in Qt/Tools ==="
+          find "D:/a/Usagi-dono/Qt/Tools/" -name "g++.exe" 2>/dev/null || echo "No g++.exe found in Qt Tools"
+          find "D:/a/Usagi-dono/Qt/Tools/" -name "gcc.exe" 2>/dev/null || echo "No gcc.exe found in Qt Tools"
+          
+          echo ""
+          echo "=== Checking system MinGW at C:/mingw64 ==="
+          ls -la "/c/mingw64/bin/g++.exe" 2>/dev/null || echo "System MinGW not at C:/mingw64"
+          
+          echo ""
+          echo "=== Checking installed Qt content ==="
+          ls -la "D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin/" | head -20 || echo "Qt bin dir not found"
+
       - name: Setup Clean MinGW PATH
         shell: bash
         run: |
           # Create a clean PATH with Qt's MinGW at the front, removing other MinGW installations
           # This is critical to avoid DLL conflicts that cause segfaults
           
-          # Define Qt paths as variables for consistency
-          QT_MINGW_BIN="D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin"
+          # Find the Qt MinGW tools directory (it might be named differently)
+          QT_MINGW_BIN=""
+          for dir in "D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin" \
+                     "D:/a/Usagi-dono/Qt/Tools/mingw_64/bin" \
+                     "D:/a/Usagi-dono/Qt/Tools/mingw1120_64/bin" \
+                     "D:/a/Usagi-dono/Qt/Tools/mingw1210_64/bin"; do
+            if [ -f "$dir/g++.exe" ]; then
+              QT_MINGW_BIN="$dir"
+              echo "Found Qt MinGW at: $QT_MINGW_BIN"
+              break
+            fi
+          done
+          
+          # Fall back to system MinGW if Qt's isn't available
+          if [ -z "$QT_MINGW_BIN" ]; then
+            if [ -f "/c/mingw64/bin/g++.exe" ]; then
+              QT_MINGW_BIN="/c/mingw64/bin"
+              echo "WARNING: Using system MinGW at $QT_MINGW_BIN (Qt MinGW not found)"
+            else
+              echo "ERROR: No MinGW found!"
+              exit 1
+            fi
+          fi
+          
           QT_BIN="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin"
           
           # Export these for use in later steps
@@ -53,9 +99,12 @@ jobs:
           # Note: In Git Bash on Windows, PATH uses ':' separator (bash translates)
           CLEAN_PATH="$QT_MINGW_BIN:$QT_BIN"
           
-          # Add essential Windows paths but EXCLUDE all other mingw installations
+          # Add essential Windows paths but EXCLUDE all other mingw installations (except the one we chose)
           for p in $(echo $PATH | tr ':' '\n'); do
             case "$p" in
+              "$QT_MINGW_BIN") 
+                # Already added above
+                ;;
               *mingw*|*MinGW*|*Strawberry*) 
                 echo "EXCLUDING from PATH: $p"
                 ;;
@@ -65,7 +114,7 @@ jobs:
             esac
           done
           
-          echo "Clean PATH set. Qt MinGW compiler will be used."
+          echo "Clean PATH set. MinGW compiler from: $QT_MINGW_BIN"
           echo "CLEAN_PATH=$CLEAN_PATH" >> $GITHUB_ENV
           
       - name: Debug - Print environment info
@@ -196,6 +245,23 @@ jobs:
           echo "" >> issue_body.md
           echo "**Branch/Tag:** ${{ github.ref }}" >> issue_body.md
           echo "**Commit:** ${{ github.sha }}" >> issue_body.md
+          echo "" >> issue_body.md
+          
+          # Add environment debug info
+          echo "### Environment Info" >> issue_body.md
+          echo '```' >> issue_body.md
+          echo "QT_MINGW_BIN: ${QT_MINGW_BIN:-not set}" >> issue_body.md
+          echo "QT_BIN: ${QT_BIN:-not set}" >> issue_body.md
+          echo "IQTA_TOOLS: ${IQTA_TOOLS:-not set}" >> issue_body.md
+          echo "QT_ROOT_DIR: ${QT_ROOT_DIR:-not set}" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "PATH (first 10 entries):" >> issue_body.md
+          export PATH="$CLEAN_PATH"
+          echo $PATH | tr ':' '\n' | head -10 >> issue_body.md
+          echo "" >> issue_body.md
+          echo "MinGW in PATH:" >> issue_body.md
+          echo $PATH | tr ':' '\n' | grep -i mingw >> issue_body.md 2>/dev/null || echo "(none)" >> issue_body.md
+          echo '```' >> issue_body.md
           echo "" >> issue_body.md
 
           # Add test summary first if tests were run
