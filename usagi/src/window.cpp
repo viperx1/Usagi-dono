@@ -3517,6 +3517,11 @@ void Window::sortMylistCards(int sortIndex)
 	switch (sortIndex) {
 		case 0: // Anime Title
 			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				if (sortAscending) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				} else {
@@ -3526,6 +3531,11 @@ void Window::sortMylistCards(int sortIndex)
 			break;
 		case 1: // Type
 			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				if (a->getAnimeType() == b->getAnimeType()) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
@@ -3538,6 +3548,11 @@ void Window::sortMylistCards(int sortIndex)
 			break;
 		case 2: // Aired Date
 			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				aired airedA = a->getAired();
 				aired airedB = b->getAired();
 				
@@ -3565,6 +3580,11 @@ void Window::sortMylistCards(int sortIndex)
 			break;
 		case 3: // Episodes (Count)
 			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				int episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
 				int episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
 				if (episodesA == episodesB) {
@@ -3579,6 +3599,11 @@ void Window::sortMylistCards(int sortIndex)
 			break;
 		case 4: // Completion %
 			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				int totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
 				int totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
 				int viewedA = a->getNormalViewed() + a->getOtherViewed();
@@ -3597,6 +3622,11 @@ void Window::sortMylistCards(int sortIndex)
 			break;
 		case 5: // Last Played
 			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				qint64 lastPlayedA = a->getLastPlayed();
 				qint64 lastPlayedB = b->getLastPlayed();
 				
