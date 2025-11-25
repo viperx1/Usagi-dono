@@ -248,15 +248,55 @@ The project uses GitHub Actions for continuous integration with two workflows:
 
 **What it does:**
 1. Installs Qt 6.8 MinGW (dynamic libraries)
-2. Configures build with CMake (same as main workflow)
-3. Builds all targets (including tests)
-4. Runs test suite with CTest
-5. Uploads test artifacts on success
-6. On failure: Creates issue with test logs
+2. Installs Qt's MinGW 13.x toolchain (`tools_mingw1310`)
+3. Sets up clean PATH with Qt's MinGW at the front
+4. Configures build with CMake using Ninja generator
+5. Builds all targets (including tests)
+6. Deploys Qt DLLs to test executables using `windeployqt`
+7. Runs test suite with CTest
+8. Uploads test artifacts on success
+9. On failure: Creates issue with test logs
 
-**Compiler:**
-- Uses MinGW GCC (same as main build)
-- Ensures test environment matches production build
+**Critical Build Steps:**
+
+The workflow must use a consistent MinGW toolchain for both compilation and runtime. The key steps are:
+
+1. **Install Qt's MinGW Tools:**
+   ```yaml
+   - uses: jurplel/install-qt-action@v4
+     with:
+       tools: 'tools_mingw1310'
+   ```
+
+2. **Setup MinGW PATH using GITHUB_PATH:**
+   ```bash
+   # Add to GITHUB_PATH (persists across all steps)
+   echo "$QT_BIN" >> $GITHUB_PATH
+   echo "$QT_MINGW_BIN" >> $GITHUB_PATH
+   ```
+   
+   **Important:** Using `GITHUB_PATH` is required because `export PATH=...` does not persist between workflow steps.
+
+3. **Explicitly set compiler paths in CMake:**
+   ```bash
+   cmake -DCMAKE_C_COMPILER="$QT_MINGW_BIN/gcc.exe" \
+         -DCMAKE_CXX_COMPILER="$QT_MINGW_BIN/g++.exe" ...
+   ```
+
+4. **Deploy Qt DLLs before running tests:**
+   ```bash
+   windeployqt --no-translations --no-system-d3d-compiler "$exe"
+   ```
+
+**Why This Flow Matters:**
+
+The Windows CI runner has multiple MinGW installations:
+- `D:\a\Usagi-dono\Qt\Tools\mingw1310_64` (Qt's MinGW)
+- `C:\mingw64` (system MinGW)
+- `C:\Strawberry\c` (Strawberry Perl)
+- `C:\Program Files\Git\mingw64` (Git for Windows)
+
+If the build uses one MinGW compiler but runtime loads DLLs from another, the test executables crash with segfaults or heap corruption. The workflow ensures a single, consistent toolchain throughout.
 
 ## Troubleshooting
 
@@ -322,6 +362,20 @@ The tests workflow uses the same build configuration as the main workflow. If te
 1. Check that the code builds locally with tests enabled
 2. Review test logs in the workflow artifacts
 3. Ensure all test dependencies are properly linked
+
+### CI Test Crashes (Windows Segfault/Heap Corruption)
+
+**Error:** Tests crash immediately on CI with segfault or `0xc0000374` (heap corruption), but work locally.
+
+**Root Cause:** Multiple conflicting MinGW installations in CI runner's PATH cause DLL conflicts.
+
+**Solution:**
+The CI workflow must:
+1. Use `GITHUB_PATH` (not `export PATH=...`) to set PATH persistently across steps
+2. Explicitly specify `CMAKE_C_COMPILER` and `CMAKE_CXX_COMPILER` from Qt's MinGW
+3. Deploy Qt DLLs using `windeployqt` before running tests
+
+See the Windows Build Tests workflow section above for the correct approach.
 
 ## Build System Architecture
 

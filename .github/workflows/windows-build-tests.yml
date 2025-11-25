@@ -35,37 +35,10 @@ jobs:
         shell: bash
         run: mkdir -p build
 
-      - name: Verify Qt MinGW Tools Installation
+      - name: Setup MinGW PATH
         shell: bash
         run: |
-          echo "=== Checking Qt installation paths ==="
-          echo "IQTA_TOOLS: ${IQTA_TOOLS:-not set}"
-          echo "QT_ROOT_DIR: ${QT_ROOT_DIR:-not set}"
-          
-          echo ""
-          echo "=== Listing Qt Tools directory ==="
-          ls -la "D:/a/Usagi-dono/Qt/Tools/" 2>/dev/null || echo "Qt Tools directory not found"
-          
-          echo ""
-          echo "=== Looking for MinGW installations in Qt/Tools ==="
-          find "D:/a/Usagi-dono/Qt/Tools/" -name "g++.exe" 2>/dev/null || echo "No g++.exe found in Qt Tools"
-          find "D:/a/Usagi-dono/Qt/Tools/" -name "gcc.exe" 2>/dev/null || echo "No gcc.exe found in Qt Tools"
-          
-          echo ""
-          echo "=== Checking system MinGW at C:/mingw64 ==="
-          ls -la "/c/mingw64/bin/g++.exe" 2>/dev/null || echo "System MinGW not at C:/mingw64"
-          
-          echo ""
-          echo "=== Checking installed Qt content ==="
-          ls -la "D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin/" | head -20 || echo "Qt bin dir not found"
-
-      - name: Setup Clean MinGW PATH
-        shell: bash
-        run: |
-          # Create a clean PATH with Qt's MinGW at the front
-          # This is critical to avoid DLL conflicts that cause segfaults
-          
-          # Find the Qt MinGW tools directory (it might be named differently)
+          # Find Qt's MinGW installation (may vary by Qt version)
           QT_MINGW_BIN=""
           for dir in "D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin" \
                      "D:/a/Usagi-dono/Qt/Tools/mingw_64/bin" \
@@ -73,7 +46,6 @@ jobs:
                      "D:/a/Usagi-dono/Qt/Tools/mingw1210_64/bin"; do
             if [ -f "$dir/g++.exe" ]; then
               QT_MINGW_BIN="$dir"
-              echo "Found Qt MinGW at: $QT_MINGW_BIN"
               break
             fi
           done
@@ -82,7 +54,6 @@ jobs:
           if [ -z "$QT_MINGW_BIN" ]; then
             if [ -f "/c/mingw64/bin/g++.exe" ]; then
               QT_MINGW_BIN="/c/mingw64/bin"
-              echo "WARNING: Using system MinGW at $QT_MINGW_BIN (Qt MinGW not found)"
             else
               echo "ERROR: No MinGW found!"
               exit 1
@@ -91,42 +62,19 @@ jobs:
           
           QT_BIN="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin"
           
-          # Export these for use in later steps as environment variables
+          # Export for use in later steps
           echo "QT_MINGW_BIN=$QT_MINGW_BIN" >> $GITHUB_ENV
           echo "QT_BIN=$QT_BIN" >> $GITHUB_ENV
           
-          # Add paths to GITHUB_PATH so they persist across all subsequent steps
-          # GITHUB_PATH prepends to PATH, so add Qt bin first, then MinGW
+          # Add to GITHUB_PATH (persists across all steps)
           echo "$QT_BIN" >> $GITHUB_PATH
           echo "$QT_MINGW_BIN" >> $GITHUB_PATH
           
-          echo "Qt MinGW paths added to GITHUB_PATH"
-          echo "MinGW compiler from: $QT_MINGW_BIN"
-          
-      - name: Debug - Print environment info
-        shell: bash
-        run: |
-          echo "=== Compiler version (should be Qt's MinGW 13.x) ==="
-          g++ --version
-          which g++
-          echo ""
-          echo "=== CMake version ==="
-          cmake --version
-          echo ""
-          echo "=== Qt installation path ==="
-          ls -la "$Qt6_DIR" || echo "Qt6_DIR not set"
-          ls -la "D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin/" | head -20 || echo "Qt bin dir not found"
-          echo ""
-          echo "=== PATH (first 10 entries) ==="
-          echo $PATH | tr ':' '\n' | head -10
-          echo ""
-          echo "=== MinGW entries in PATH ==="
-          echo $PATH | tr ':' '\n' | grep -i mingw || echo "No mingw in PATH"
+          echo "Using MinGW from: $QT_MINGW_BIN"
 
       - name: Configure (CMake)
         shell: bash
         run: |
-          # PATH already has Qt MinGW prepended via GITHUB_PATH
           cmake -S . -B build -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/lib/cmake" \
@@ -135,58 +83,24 @@ jobs:
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             2>&1 | tee build/configure_log.txt
 
-      - name: Build Tests
+      - name: Build
         shell: bash
         run: |
           cmake --build build --config Release 2>&1 | tee build/build_log.txt
 
-      - name: Deploy Qt DLLs to test directory
+      - name: Deploy Qt DLLs
         shell: bash
         run: |
-          echo "=== Deploying Qt DLLs to test directory ==="
-          
-          # Copy Qt DLLs to each test executable location
           for exe in build/tests/*.exe; do
             if [ -f "$exe" ]; then
-              echo "Deploying DLLs for: $exe"
-              windeployqt --no-translations --no-system-d3d-compiler "$exe" 2>&1 || echo "windeployqt failed for $exe"
+              windeployqt --no-translations --no-system-d3d-compiler "$exe" 2>&1 || true
             fi
           done
-          
-          echo ""
-          echo "=== Contents of test directory after deployment ==="
-          ls -la build/tests/ | head -40
 
-      - name: Debug - Check test executable dependencies
+      - name: Run Tests
         shell: bash
         run: |
-          echo "=== Checking DLL dependencies for test_hash.exe ==="
-          objdump -p build/tests/test_hash.exe 2>/dev/null | grep "DLL Name" || echo "objdump check skipped"
-          echo ""
-          echo "=== Which libstdc++ will be loaded ==="
-          which libstdc++-6.dll 2>/dev/null || echo "libstdc++-6.dll location: (using embedded/static)"
-          echo ""
-          echo "=== Verify PATH has Qt MinGW ==="
-          echo $PATH | tr ':' '\n' | grep -i mingw | head -5
-
-      - name: Run tests with debug output
-        shell: bash
-        run: |
-          export QT_DEBUG_PLUGINS=1
-          
-          echo "=== Running tests ==="
-          echo "First 5 PATH entries:"
-          echo $PATH | tr ':' '\n' | head -5
-          echo ""
-          
-          # Run a single test first to see detailed output
-          echo "=== Running test_hash with verbose output ==="
-          ./build/tests/test_hash.exe -v2 2>&1 || echo "test_hash failed with exit code: $?"
-          echo ""
-          
-          # Then run all tests
-          echo "=== Running all tests ==="
-          ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
+          ctest --output-on-failure --test-dir build 2>&1 | tee build/test_log.txt
           exit ${PIPESTATUS[0]}
 
       - name: Upload test artifacts
@@ -194,8 +108,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-executables
-          path: |
-            build/tests/**/*.exe
+          path: build/tests/**/*.exe
 
       - name: Upload logs on failure
         if: failure()
@@ -208,7 +121,7 @@ jobs:
             build/test_log.txt
           if-no-files-found: ignore
 
-      - name: Create issue with logs on failure
+      - name: Create issue on failure
         if: failure()
         shell: bash
         run: |
@@ -217,32 +130,6 @@ jobs:
           echo "**Branch/Tag:** ${{ github.ref }}" >> issue_body.md
           echo "**Commit:** ${{ github.sha }}" >> issue_body.md
           echo "" >> issue_body.md
-          
-          # Add environment debug info
-          echo "### Environment Info" >> issue_body.md
-          echo '```' >> issue_body.md
-          echo "QT_MINGW_BIN: ${QT_MINGW_BIN:-not set}" >> issue_body.md
-          echo "QT_BIN: ${QT_BIN:-not set}" >> issue_body.md
-          echo "IQTA_TOOLS: ${IQTA_TOOLS:-not set}" >> issue_body.md
-          echo "QT_ROOT_DIR: ${QT_ROOT_DIR:-not set}" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "PATH (first 10 entries):" >> issue_body.md
-          echo $PATH | tr ':' '\n' | head -10 >> issue_body.md
-          echo "" >> issue_body.md
-          echo "MinGW in PATH:" >> issue_body.md
-          echo $PATH | tr ':' '\n' | grep -i mingw >> issue_body.md 2>/dev/null || echo "(none)" >> issue_body.md
-          echo '```' >> issue_body.md
-          echo "" >> issue_body.md
-
-          # Add test summary first if tests were run
-          if [ -f build/test_log.txt ]; then
-            echo "### Test Summary" >> issue_body.md
-            echo '```' >> issue_body.md
-            # Extract test results and summary lines
-            grep -E "^[[:space:]]*[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#|tests passed|tests failed out of|% tests" build/test_log.txt | tail -n 50 >> issue_body.md 2>/dev/null || echo "Could not extract test summary" >> issue_body.md
-            echo '```' >> issue_body.md
-            echo "" >> issue_body.md
-          fi
 
           echo "### Configure log" >> issue_body.md
           echo '```' >> issue_body.md
@@ -252,6 +139,7 @@ jobs:
             echo "Log file not available" >> issue_body.md
           fi
           echo '```' >> issue_body.md
+          
           echo "### Build log" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/build_log.txt ]; then
@@ -260,6 +148,7 @@ jobs:
             echo "Log file not available" >> issue_body.md
           fi
           echo '```' >> issue_body.md
+          
           echo "### Test log (last 500 lines)" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/test_log.txt ]; then
