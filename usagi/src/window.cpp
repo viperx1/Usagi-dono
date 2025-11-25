@@ -310,7 +310,7 @@ Window::Window()
     pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
 
     // page mylist (card view only)
-    mylistSortAscending = true;
+    mylistSortAscending = false;  // Default to descending (newest first for aired date)
     
     // Initialize network manager for poster downloads (deprecated, kept for backward compatibility)
     posterNetworkManager = new QNetworkAccessManager(this);
@@ -335,7 +335,7 @@ Window::Window()
     
     connect(cardManager, &MyListCardManager::cardUpdated, this, [this](int /* aid */) {
         // Card was updated, may need to resort
-        sortMylistCards(mylistSortComboBox->currentIndex());
+        sortMylistCards(filterSidebar->getSortIndex());
     });
     
     // Connect episode data request signal to fetch missing episode data
@@ -368,29 +368,16 @@ Window::Window()
         }
     });
     
-    // Add toolbar for sorting (card view only - no toggle button)
-    QHBoxLayout *mylistToolbar = new QHBoxLayout();
+    // Create horizontal layout for sidebar and card view
+    QHBoxLayout *mylistContentLayout = new QHBoxLayout();
     
-    mylistToolbar->addWidget(new QLabel("Sort by:"));
-    mylistSortComboBox = new QComboBox();
-    mylistSortComboBox->addItem("Anime Title");
-    mylistSortComboBox->addItem("Type");
-    mylistSortComboBox->addItem("Aired Date");
-    mylistSortComboBox->addItem("Episodes (Count)");
-    mylistSortComboBox->addItem("Completion %");
-    mylistSortComboBox->addItem("Last Played");
-    mylistSortComboBox->setCurrentIndex(0);
-    connect(mylistSortComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(sortMylistCards(int)));
-    mylistToolbar->addWidget(mylistSortComboBox);
-    
-    mylistSortOrderButton = new QPushButton("↑ Asc");
-    mylistSortOrderButton->setMaximumWidth(80);
-    mylistSortOrderButton->setToolTip("Toggle sort order (ascending/descending)");
-    connect(mylistSortOrderButton, SIGNAL(clicked()), this, SLOT(toggleSortOrder()));
-    mylistToolbar->addWidget(mylistSortOrderButton);
-    
-    mylistToolbar->addStretch();
-    pageMylist->addLayout(mylistToolbar);
+    // Create and add filter sidebar (now includes sorting controls)
+    filterSidebar = new MyListFilterSidebar(this);
+    connect(filterSidebar, &MyListFilterSidebar::filterChanged, this, &Window::applyMylistFilters);
+    connect(filterSidebar, &MyListFilterSidebar::sortChanged, this, [this]() {
+        sortMylistCards(filterSidebar->getSortIndex());
+    });
+    mylistContentLayout->addWidget(filterSidebar);
     
     // Card view (only view mode available)
     mylistCardScrollArea = new QScrollArea(this);
@@ -403,7 +390,9 @@ Window::Window()
     mylistCardContainer->setLayout(mylistCardLayout);
     mylistCardScrollArea->setWidget(mylistCardContainer);
     
-    pageMylist->addWidget(mylistCardScrollArea);
+    mylistContentLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
+    
+    pageMylist->addLayout(mylistContentLayout);
     
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
@@ -1638,7 +1627,7 @@ void Window::loadNextCardBatch()
         
         // Apply sorting
         restoreMylistSorting();
-        sortMylistCards(mylistSortComboBox->currentIndex());
+        sortMylistCards(filterSidebar->getSortIndex());
         
         mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
         LOG(QString("[Progressive Loading] All cards loaded: %1 anime").arg(animeCards.size()));
@@ -1715,14 +1704,14 @@ void Window::onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files)
 
 void Window::saveMylistSorting()
 {
-    // Card view sorting is handled by mylistSortComboBox and mylistSortAscending
+    // Card view sorting is handled by filterSidebar
     // Save the current sort settings
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         return;
     }
     
-    int sortIndex = mylistSortComboBox->currentIndex();
+    int sortIndex = filterSidebar->getSortIndex();
     
     QSqlQuery q(db);
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_card_sort_index', ?)");
@@ -1730,47 +1719,18 @@ void Window::saveMylistSorting()
     q.exec();
     
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_card_sort_ascending', ?)");
-    q.addBindValue(mylistSortAscending ? 1 : 0);
+    q.addBindValue(filterSidebar->getSortAscending() ? 1 : 0);
     q.exec();
     
-    LOG(QString("Saved mylist card sorting: index=%1, ascending=%2").arg(sortIndex).arg(mylistSortAscending));
+    LOG(QString("Saved mylist card sorting: index=%1, ascending=%2").arg(sortIndex).arg(filterSidebar->getSortAscending()));
 }
 
 void Window::restoreMylistSorting()
 {
-    // Card view sorting is handled by mylistSortComboBox and mylistSortAscending
-    // Restore saved sort settings
-    QSqlDatabase db = QSqlDatabase::database();
-    if (!db.isOpen()) {
-        // Use default sorting if database is not available
-        mylistSortComboBox->setCurrentIndex(0);
-        mylistSortAscending = true;
-        mylistSortOrderButton->setText("↑ Asc");
-        return;
-    }
-    
-    // Try to load saved sorting preferences
-    QSqlQuery q(db);
-    
-    int sortIndex = 0; // Default to Anime Title
-    bool ascending = true; // Default to ascending
-    
-    q.prepare("SELECT value FROM settings WHERE name = 'mylist_card_sort_index'");
-    if (q.exec() && q.next()) {
-        sortIndex = q.value(0).toInt();
-    }
-    
-    q.prepare("SELECT value FROM settings WHERE name = 'mylist_card_sort_ascending'");
-    if (q.exec() && q.next()) {
-        ascending = (q.value(0).toInt() == 1);
-    }
-    
-    // Apply the sorting
-    mylistSortAscending = ascending;
-    mylistSortOrderButton->setText(ascending ? "↑ Asc" : "↓ Desc");
-    mylistSortComboBox->setCurrentIndex(sortIndex);
-    
-    LOG(QString("Restored mylist card sorting: index=%1, ascending=%2").arg(sortIndex).arg(ascending));
+    // Sorting is now handled by the filter sidebar
+    // This function is kept for backward compatibility but does nothing
+    // as the sidebar initializes with default values
+    LOG(QString("restoreMylistSorting: Sorting is now managed by filter sidebar"));
 }
 
 void Window::onMylistSortChanged(int column, Qt::SortOrder order)
@@ -2570,7 +2530,7 @@ void Window::getNotifyAnimeUpdated(int aid)
 		
 		// If not just triggering poster download, may need to resort
 		if (!needsPosterDownload) {
-			sortMylistCards(mylistSortComboBox->currentIndex());
+			sortMylistCards(filterSidebar->getSortIndex());
 		}
 	}
 	
@@ -3546,6 +3506,8 @@ void Window::sortMylistCards(int sortIndex)
 		return;
 	}
 	
+	bool sortAscending = filterSidebar->getSortAscending();
+	
 	// Remove all cards from layout
 	for (AnimeCard* const card : std::as_const(animeCards)) {
 		mylistCardLayout->removeWidget(card);
@@ -3554,8 +3516,13 @@ void Window::sortMylistCards(int sortIndex)
 	// Sort based on criterion
 	switch (sortIndex) {
 		case 0: // Anime Title
-			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
-				if (mylistSortAscending) {
+			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
+				if (sortAscending) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				} else {
 					return a->getAnimeTitle() > b->getAnimeTitle();
@@ -3563,11 +3530,16 @@ void Window::sortMylistCards(int sortIndex)
 			});
 			break;
 		case 1: // Type
-			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				if (a->getAnimeType() == b->getAnimeType()) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				if (mylistSortAscending) {
+				if (sortAscending) {
 					return a->getAnimeType() < b->getAnimeType();
 				} else {
 					return a->getAnimeType() > b->getAnimeType();
@@ -3575,7 +3547,12 @@ void Window::sortMylistCards(int sortIndex)
 			});
 			break;
 		case 2: // Aired Date
-			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				aired airedA = a->getAired();
 				aired airedB = b->getAired();
 				
@@ -3594,7 +3571,7 @@ void Window::sortMylistCards(int sortIndex)
 				if (airedA == airedB) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				if (mylistSortAscending) {
+				if (sortAscending) {
 					return airedA < airedB;
 				} else {
 					return airedA > airedB;
@@ -3602,13 +3579,18 @@ void Window::sortMylistCards(int sortIndex)
 			});
 			break;
 		case 3: // Episodes (Count)
-			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				int episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
 				int episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
 				if (episodesA == episodesB) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				if (mylistSortAscending) {
+				if (sortAscending) {
 					return episodesA < episodesB;
 				} else {
 					return episodesA > episodesB;
@@ -3616,7 +3598,12 @@ void Window::sortMylistCards(int sortIndex)
 			});
 			break;
 		case 4: // Completion %
-			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				int totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
 				int totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
 				int viewedA = a->getNormalViewed() + a->getOtherViewed();
@@ -3626,7 +3613,7 @@ void Window::sortMylistCards(int sortIndex)
 				if (completionA == completionB) {
 					return a->getAnimeTitle() < b->getAnimeTitle();
 				}
-				if (mylistSortAscending) {
+				if (sortAscending) {
 					return completionA < completionB;
 				} else {
 					return completionA > completionB;
@@ -3634,7 +3621,12 @@ void Window::sortMylistCards(int sortIndex)
 			});
 			break;
 		case 5: // Last Played
-			std::sort(animeCards.begin(), animeCards.end(), [this](const AnimeCard *a, const AnimeCard *b) {
+			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
+				// Hidden cards always go to the bottom
+				if (a->isHidden() != b->isHidden()) {
+					return b->isHidden();  // non-hidden comes before hidden
+				}
+				
 				qint64 lastPlayedA = a->getLastPlayed();
 				qint64 lastPlayedB = b->getLastPlayed();
 				
@@ -3649,7 +3641,7 @@ void Window::sortMylistCards(int sortIndex)
 					return true;   // a goes before b
 				}
 				
-				if (mylistSortAscending) {
+				if (sortAscending) {
 					return lastPlayedA < lastPlayedB;
 				} else {
 					return lastPlayedA > lastPlayedB;
@@ -3664,20 +3656,11 @@ void Window::sortMylistCards(int sortIndex)
 	}
 }
 
-// Toggle sort order between ascending and descending
+// Toggle sort order between ascending and descending (deprecated - now handled by sidebar)
 void Window::toggleSortOrder()
 {
-	mylistSortAscending = !mylistSortAscending;
-	
-	// Update button text
-	if (mylistSortAscending) {
-		mylistSortOrderButton->setText("↑ Asc");
-	} else {
-		mylistSortOrderButton->setText("↓ Desc");
-	}
-	
-	// Re-sort with current criterion
-	sortMylistCards(mylistSortComboBox->currentIndex());
+	// This function is no longer used as sorting is handled by the sidebar
+	// Kept for backward compatibility
 }
 
 // Load mylist data as cards
@@ -3703,14 +3686,250 @@ void Window::loadMylistAsCards()
 	// Get cards for backward compatibility with sorting code
 	animeCards = cardManager->getAllCards();
 	
-	// Apply current sort
+	// Apply current sort (default is Aired Date descending)
 	qint64 startSort = timer.elapsed();
-	sortMylistCards(mylistSortComboBox->currentIndex());
+	sortMylistCards(filterSidebar->getSortIndex());
 	qint64 sortElapsed = timer.elapsed() - startSort;
 	LOG(QString("[Timing] Sorting cards took %1 ms").arg(sortElapsed));
 	
 	qint64 totalElapsed = timer.elapsed();
 	LOG(QString("[Timing] Total loadMylistAsCards took %1 ms").arg(totalElapsed));
+	
+	// Load alternative titles for filtering
+	loadAnimeAlternativeTitlesForFiltering();
+}
+
+// Load alternative titles from anime_titles table for filtering
+void Window::loadAnimeAlternativeTitlesForFiltering()
+{
+	animeAlternativeTitlesCache.clear();
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("[Window] Database not open for loading alternative titles");
+		return;
+	}
+	
+	// Query all alternative titles for anime in mylist, including all name fields from anime table
+	QString query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish, "
+	                "a.nameother, a.nameshort, a.synonyms "
+	                "FROM anime_titles at "
+	                "LEFT JOIN anime a ON at.aid = a.aid "
+	                "WHERE at.aid IN (SELECT DISTINCT aid FROM mylist) "
+	                "ORDER BY at.aid";
+	
+	QSqlQuery q(db);
+	if (!q.exec(query)) {
+		LOG("[Window] Error loading alternative titles: " + q.lastError().text());
+		return;
+	}
+	
+	int currentAid = -1;
+	AnimeAlternativeTitles currentTitles;
+	
+	while (q.next()) {
+		int aid = q.value(0).toInt();
+		QString title = q.value(1).toString();
+		QString romaji = q.value(2).toString();
+		QString english = q.value(3).toString();
+		QString other = q.value(4).toString();
+		QString shortNames = q.value(5).toString();
+		QString synonyms = q.value(6).toString();
+		
+		if (aid != currentAid) {
+			// Save previous anime's titles if any
+			if (currentAid != -1) {
+				animeAlternativeTitlesCache[currentAid] = currentTitles;
+			}
+			
+			// Start new anime
+			currentAid = aid;
+			currentTitles.titles.clear();
+			
+			// Add romaji and english names from anime table
+			if (!romaji.isEmpty()) {
+				currentTitles.titles.append(romaji);
+			}
+			if (!english.isEmpty() && english != romaji) {
+				currentTitles.titles.append(english);
+			}
+			
+			// Add other name from anime table
+			if (!other.isEmpty()) {
+				QStringList otherList = other.split("'", Qt::SkipEmptyParts);
+				for (const QString &otherName : otherList) {
+					QString trimmed = otherName.trimmed();
+					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.titles.append(trimmed);
+					}
+				}
+			}
+			
+			// Add short names from anime table
+			if (!shortNames.isEmpty()) {
+				QStringList shortList = shortNames.split("'", Qt::SkipEmptyParts);
+				for (const QString &shortName : shortList) {
+					QString trimmed = shortName.trimmed();
+					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.titles.append(trimmed);
+					}
+				}
+			}
+			
+			// Add synonyms from anime table
+			if (!synonyms.isEmpty()) {
+				QStringList synonymList = synonyms.split("'", Qt::SkipEmptyParts);
+				for (const QString &synonym : synonymList) {
+					QString trimmed = synonym.trimmed();
+					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.titles.append(trimmed);
+					}
+				}
+			}
+		}
+		
+		// Add alternative title from anime_titles table if not already in list
+		if (!title.isEmpty() && !currentTitles.titles.contains(title, Qt::CaseInsensitive)) {
+			currentTitles.titles.append(title);
+		}
+	}
+	
+	// Save last anime's titles
+	if (currentAid != -1) {
+		animeAlternativeTitlesCache[currentAid] = currentTitles;
+	}
+	
+	LOG(QString("[Window] Loaded alternative titles for %1 anime").arg(animeAlternativeTitlesCache.size()));
+}
+
+// Check if a card matches the search filter
+bool Window::matchesSearchFilter(AnimeCard *card, const QString &searchText)
+{
+	if (searchText.isEmpty()) {
+		return true;
+	}
+	
+	int aid = card->getAnimeId();
+	QString cardTitle = card->getAnimeTitle();
+	
+	// Check main title first
+	if (cardTitle.contains(searchText, Qt::CaseInsensitive)) {
+		return true;
+	}
+	
+	// Check alternative titles from cache
+	if (animeAlternativeTitlesCache.contains(aid)) {
+		const AnimeAlternativeTitles &titles = animeAlternativeTitlesCache[aid];
+		for (const QString &title : titles.titles) {
+			if (title.contains(searchText, Qt::CaseInsensitive)) {
+				return true;
+			}
+		}
+	}
+	
+	return false;
+}
+
+// Apply filters to mylist cards
+void Window::applyMylistFilters()
+{
+	if (animeCards.isEmpty()) {
+		return;
+	}
+	
+	QString searchText = filterSidebar->getSearchText();
+	QString typeFilter = filterSidebar->getTypeFilter();
+	QString completionFilter = filterSidebar->getCompletionFilter();
+	bool showOnlyUnwatched = filterSidebar->getShowOnlyUnwatched();
+	QString adultContentFilter = filterSidebar->getAdultContentFilter();
+	
+	int visibleCount = 0;
+	
+	// Remove all cards from layout first
+	for (AnimeCard *card : std::as_const(animeCards)) {
+		mylistCardLayout->removeWidget(card);
+	}
+	
+	// Apply filters to each card
+	for (AnimeCard *card : std::as_const(animeCards)) {
+		bool visible = true;
+		
+		// Apply search filter
+		if (!searchText.isEmpty()) {
+			visible = visible && matchesSearchFilter(card, searchText);
+		}
+		
+		// Apply type filter
+		if (!typeFilter.isEmpty()) {
+			visible = visible && (card->getAnimeType() == typeFilter);
+		}
+		
+		// Apply completion filter
+		if (!completionFilter.isEmpty()) {
+			int normalEpisodes = card->getNormalEpisodes();
+			int normalViewed = card->getNormalViewed();
+			int totalEpisodes = card->getTotalNormalEpisodes();
+			
+			if (completionFilter == "completed") {
+				// Completed: all normal episodes viewed
+				// For anime with known total episodes, check if all are viewed
+				// For anime with unknown total (totalEpisodes == 0), check if all episodes in mylist are viewed
+				if (totalEpisodes > 0) {
+					visible = visible && (normalViewed >= totalEpisodes);
+				} else {
+					// Unknown total episodes: consider completed if user has episodes and all are viewed
+					visible = visible && (normalEpisodes > 0 && normalViewed >= normalEpisodes);
+				}
+			} else if (completionFilter == "watching") {
+				// Watching: some episodes viewed but not all
+				// Must have at least one viewed episode
+				// And either: total is unknown (totalEpisodes == 0) with more episodes available,
+				//         or: total is known and not all are viewed
+				if (totalEpisodes > 0) {
+					visible = visible && (normalViewed > 0 && normalViewed < totalEpisodes);
+				} else {
+					// Unknown total episodes: watching if some viewed and not all in mylist are viewed
+					visible = visible && (normalViewed > 0 && normalViewed < normalEpisodes);
+				}
+			} else if (completionFilter == "notstarted") {
+				// Not started: no episodes viewed
+				visible = visible && (normalViewed == 0);
+			}
+		}
+		
+		// Apply unwatched filter
+		if (showOnlyUnwatched) {
+			int normalEpisodes = card->getNormalEpisodes();
+			int normalViewed = card->getNormalViewed();
+			int otherEpisodes = card->getOtherEpisodes();
+			int otherViewed = card->getOtherViewed();
+			
+			// Show only if there are unwatched episodes
+			visible = visible && ((normalEpisodes > normalViewed) || (otherEpisodes > otherViewed));
+		}
+		
+		// Apply adult content filter
+		if (adultContentFilter == "hide") {
+			// Hide 18+ content (default)
+			visible = visible && !card->is18Restricted();
+		} else if (adultContentFilter == "showonly") {
+			// Show only 18+ content
+			visible = visible && card->is18Restricted();
+		}
+		// "ignore" means no filtering based on 18+ status
+		
+		// Only add visible cards back to layout
+		if (visible) {
+			mylistCardLayout->addWidget(card);
+			card->setVisible(true);
+			visibleCount++;
+		} else {
+			card->setVisible(false);
+		}
+	}
+	
+	// Update status label
+	mylistStatusLabel->setText(QString("MyList Status: Showing %1 of %2 anime").arg(visibleCount).arg(animeCards.size()));
 }
 
 // Download poster image for an anime

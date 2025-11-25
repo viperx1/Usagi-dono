@@ -86,6 +86,7 @@ public:
     int getOtherViewed() const { return m_otherViewed; }
     qint64 getLastPlayed() const { return m_lastPlayed; }
     bool isHidden() const { return m_isHidden; }
+    bool is18Restricted() const { return m_is18Restricted; }
     
     // Sorting support
     bool operator<(const AnimeCard& other) const;
@@ -111,6 +112,7 @@ public slots:
     void clearEpisodes();
     void updateNextEpisodeIndicator();  // Update which episode will play next
     void setHidden(bool hidden);  // Set card hidden state
+    void setIs18Restricted(bool restricted);  // Set 18+ restriction status
     
 signals:
     void episodeClicked(int lid);
@@ -152,6 +154,7 @@ private:
     qint64 m_lastPlayed;  // Most recent last_played timestamp from episodes
     bool m_isHidden;  // Hidden state of card
     bool m_needsFetch;  // Whether card needs data fetching
+    bool m_is18Restricted;  // Whether anime is 18+ restricted
     QPixmap m_originalPoster;  // Store original poster for overlay
     
     // UI elements

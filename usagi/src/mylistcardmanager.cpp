@@ -64,7 +64,7 @@ void MyListCardManager::loadAllCards()
                     "a.nameromaji, a.nameenglish, a.eptotal, "
                     "at.title as anime_title, "
                     "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
-                    "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list "
+                    "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.is_18_restricted "
                     "FROM mylist m "
                     "LEFT JOIN anime a ON m.aid = a.aid "
                     "LEFT JOIN anime_titles at ON m.aid = at.aid AND at.type = 1 "
@@ -529,7 +529,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     q.prepare("SELECT a.nameromaji, a.nameenglish, a.eptotal, "
               "at.title as anime_title, "
               "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
-              "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden "
+              "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted "
               "FROM anime a "
               "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
               "WHERE a.aid = ?");
@@ -555,6 +555,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QString tagIdList = q.value(13).toString();
     QString tagWeightList = q.value(14).toString();
     bool isHidden = q.value(15).toInt() == 1;
+    bool is18Restricted = q.value(16).toInt() == 1;
     
     // Determine anime name using helper
     animeName = determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
@@ -564,6 +565,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     card->setAnimeId(aid);
     card->setAnimeTitle(animeName);
     card->setHidden(isHidden);
+    card->setIs18Restricted(is18Restricted);
     
     // Set type
     if (!typeName.isEmpty()) {
