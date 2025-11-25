@@ -1022,18 +1022,138 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 	}
 	else if(ReplyID == "310"){ // 310 FILE ALREADY IN MYLIST
-		// resend with tag and &edit=1
-		QString q;
-		q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
-		QSqlQuery query(db);
-		query.exec(q);
-		if(query.isSelect())
+		// Parse mylist entry data from 310 response
+		// Format: 310 FILE ALREADY IN MYLIST\nlid|fid|eid|aid|gid|date|state|viewdate|storage|source|other|filestate
+		QStringList token2 = Message.split("\n");
+		token2.pop_front(); // Remove the status line "310 FILE ALREADY IN MYLIST"
+		if(!token2.isEmpty())
 		{
-			if(query.next())
+			QStringList fields = token2.first().split("|");
+			if(fields.size() >= 12)
 			{
-                q = QString("UPDATE `packets` SET `processed` = 0, `str` = '%1' WHERE `tag` = '%2'").arg( QString("%1&edit=1").arg(query.value(0).toString()) ).arg(Tag);
-				query.exec(q);
+				QString lid = fields.at(0);
+				QString fid = fields.at(1);
+				QString eid = fields.at(2);
+				QString aid = fields.at(3);
+				QString gid = fields.at(4);
+				QString date = fields.at(5);
+				QString state = fields.at(6);
+				QString viewdate = fields.at(7);
+				QString storage = fields.at(8);
+				QString source = fields.at(9);
+				QString other = fields.at(10);
+				QString filestate = fields.at(11);
+				
+				// Get ed2k and size from the original MYLISTADD command to create file entry
+				QString mylistCmd;
+				QSqlQuery packetQuery(db);
+				packetQuery.prepare("SELECT `str` FROM `packets` WHERE `tag` = ?");
+				packetQuery.addBindValue(Tag);
+				if(packetQuery.exec() && packetQuery.next())
+				{
+					mylistCmd = packetQuery.value(0).toString();
+				}
+				
+				QString ed2k, sizeStr;
+				if(!mylistCmd.isEmpty())
+				{
+					QStringList params = mylistCmd.split("&");
+					for(const QString& param : std::as_const(params))
+					{
+						if(param.contains("size="))
+							sizeStr = param.mid(param.indexOf("size=") + 5).split("&").first();
+						else if(param.contains("ed2k="))
+							ed2k = param.mid(param.indexOf("ed2k=") + 5).split("&").first();
+					}
+				}
+				
+				// Insert or update file entry (so we can look up by ed2k later)
+				if(!fid.isEmpty() && !ed2k.isEmpty() && !sizeStr.isEmpty())
+				{
+					QSqlQuery fileQuery(db);
+					fileQuery.prepare("INSERT OR REPLACE INTO `file` (`fid`, `aid`, `eid`, `gid`, `size`, `ed2k`) VALUES (?, ?, ?, ?, ?, ?)");
+					fileQuery.addBindValue(fid);
+					fileQuery.addBindValue(aid);
+					fileQuery.addBindValue(eid);
+					fileQuery.addBindValue(gid);
+					fileQuery.addBindValue(sizeStr);
+					fileQuery.addBindValue(ed2k);
+					
+					if(fileQuery.exec())
+					{
+						LOG(QString("Stored file entry from 310 response - fid=%1, ed2k=%2").arg(fid).arg(ed2k));
+					}
+					else
+					{
+						LOG("Failed to store file entry from 310 response: " + fileQuery.lastError().text());
+					}
+				}
+				
+				// First, get existing values for local_file, playback_position, playback_duration, last_played
+				int existingLocalFile = 0;
+				int existingPlaybackPosition = 0;
+				int existingPlaybackDuration = 0;
+				int existingLastPlayed = 0;
+				
+				QSqlQuery existingQuery(db);
+				existingQuery.prepare("SELECT `local_file`, `playback_position`, `playback_duration`, `last_played` FROM `mylist` WHERE `lid` = ?");
+				existingQuery.addBindValue(lid);
+				if(existingQuery.exec() && existingQuery.next())
+				{
+					existingLocalFile = existingQuery.value(0).toInt();
+					existingPlaybackPosition = existingQuery.value(1).toInt();
+					existingPlaybackDuration = existingQuery.value(2).toInt();
+					existingLastPlayed = existingQuery.value(3).toInt();
+				}
+				
+				// Insert or replace the mylist entry using prepared statement
+				QSqlQuery insertQuery(db);
+				insertQuery.prepare("INSERT OR REPLACE INTO `mylist` (`lid`, `fid`, `eid`, `aid`, `gid`, `date`, `state`, `viewed`, `viewdate`, `storage`, `source`, `other`, `filestate`, `local_file`, `playback_position`, `playback_duration`, `last_played`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+				insertQuery.addBindValue(lid);
+				insertQuery.addBindValue(fid);
+				insertQuery.addBindValue(eid);
+				insertQuery.addBindValue(aid);
+				insertQuery.addBindValue(gid);
+				insertQuery.addBindValue(date);
+				insertQuery.addBindValue(state);
+				insertQuery.addBindValue(viewdate); // viewed - derived from viewdate (non-zero = viewed)
+				insertQuery.addBindValue(viewdate);
+				insertQuery.addBindValue(storage);
+				insertQuery.addBindValue(source);
+				insertQuery.addBindValue(other);
+				insertQuery.addBindValue(filestate);
+				insertQuery.addBindValue(existingLocalFile);
+				insertQuery.addBindValue(existingPlaybackPosition);
+				insertQuery.addBindValue(existingPlaybackDuration);
+				insertQuery.addBindValue(existingLastPlayed);
+				
+				if(!insertQuery.exec())
+				{
+					LOG("Database insert error for 310 response: " + insertQuery.lastError().text());
+				}
+				else
+				{
+					LOG(QString("Stored mylist entry from 310 response - lid=%1, fid=%2, aid=%3").arg(lid).arg(fid).arg(aid));
+				}
 			}
+			else
+			{
+				LOG(QString("310 response has unexpected field count: %1 (expected 12)").arg(fields.size()));
+			}
+		}
+		
+		// resend with tag and &edit=1 (to apply any changes from MYLISTADD command)
+		QSqlQuery query(db);
+		query.prepare("SELECT `str` FROM `packets` WHERE `tag` = ?");
+		query.addBindValue(Tag);
+		if(query.exec() && query.next())
+		{
+			QString originalStr = query.value(0).toString();
+			QSqlQuery updateQuery(db);
+			updateQuery.prepare("UPDATE `packets` SET `processed` = 0, `str` = ? WHERE `tag` = ?");
+			updateQuery.addBindValue(originalStr + "&edit=1");
+			updateQuery.addBindValue(Tag);
+			updateQuery.exec();
 		}
 		emit notifyMylistAdd(Tag, 310);
 	}
@@ -2823,7 +2943,47 @@ int AniDBApi::UpdateLocalPath(QString tag, QString localPath)
 		}
 		else
 		{
-			LOG("Could not find mylist entry for tag=" + tag);
+			LOG("Could not find mylist entry for tag=" + tag + " via file table join");
+			
+			// Fallback: try to find lid directly from mylist table by ed2k hash
+			// This handles the case where the file was just stored from 310 response
+			QSqlQuery recentQuery(db);
+			recentQuery.prepare("SELECT m.lid FROM mylist m WHERE m.fid = (SELECT fid FROM file WHERE ed2k = ? LIMIT 1)");
+			recentQuery.addBindValue(ed2k);
+			if(recentQuery.exec() && recentQuery.next())
+			{
+				int lid = recentQuery.value(0).toInt();
+				LOG(QString("Found lid=%1 via fallback query by ed2k").arg(lid));
+				
+				// Get the local_file id from local_files table
+				QSqlQuery localFileQuery(db);
+				localFileQuery.prepare("SELECT id FROM local_files WHERE path = ?");
+				localFileQuery.addBindValue(localPath);
+				
+				if(localFileQuery.exec() && localFileQuery.next())
+				{
+					int localFileId = localFileQuery.value(0).toInt();
+					
+					// Update the local_file reference in mylist table
+					QSqlQuery updateQuery(db);
+					updateQuery.prepare("UPDATE `mylist` SET `local_file` = ? WHERE `lid` = ?");
+					updateQuery.addBindValue(localFileId);
+					updateQuery.addBindValue(lid);
+					
+					if(updateQuery.exec())
+					{
+						LOG(QString("Updated local_file for lid=%1 to local_file_id=%2 (path: %3) via fallback").arg(lid).arg(localFileId).arg(localPath));
+						
+						// Update status and binding_status in local_files table
+						QSqlQuery statusQuery(db);
+						statusQuery.prepare("UPDATE `local_files` SET `status` = 2, `binding_status` = 1 WHERE `id` = ?");
+						statusQuery.addBindValue(localFileId);
+						statusQuery.exec();
+						
+						return lid;
+					}
+				}
+			}
 		}
 	}
 	else
