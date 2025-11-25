@@ -672,10 +672,25 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 		
 		// Check if episode data is missing (no epno) and queue EPISODE API request
-		if(!fileData.eid.isEmpty() && fileData.eid != "0" && episodeData.epno.isEmpty())
+		if(!fileData.eid.isEmpty() && fileData.eid != QLatin1String("0") && episodeData.epno.isEmpty())
 		{
 			LOG(QString("Episode data incomplete for EID %1, queuing EPISODE API request").arg(fileData.eid));
 			Episode(fileData.eid.toInt());
+		}
+		
+		// Check if anime data is incomplete and queue ANIME API request
+		// FILE command returns limited anime data via amask, so we request full anime data
+		if(!fileData.aid.isEmpty() && fileData.aid != QLatin1String("0"))
+		{
+			// Check if important anime fields are missing (year, type, or episode count)
+			bool animeDataIncomplete = animeData.year.isEmpty() || 
+			                           animeData.type.isEmpty() || 
+			                           animeData.eptotal.isEmpty();
+			if(animeDataIncomplete)
+			{
+				LOG(QString("Anime data incomplete for AID %1, queuing ANIME API request").arg(fileData.aid));
+				Anime(fileData.aid.toInt());
+			}
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
