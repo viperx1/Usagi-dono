@@ -461,16 +461,13 @@ private:
 
 	QString lastDir;
 
-    // page mylist
-    QTreeWidget *mylistTreeWidget;
+    // page mylist (card view only - tree view removed)
     QScrollArea *mylistCardScrollArea;
     QWidget *mylistCardContainer;
     FlowLayout *mylistCardLayout;
     QComboBox *mylistSortComboBox;
-    QPushButton *mylistViewToggleButton;
     QPushButton *mylistSortOrderButton;
     QLabel *mylistStatusLabel;
-    bool mylistUseCardView;
     bool mylistSortAscending;  // true for ascending, false for descending
     MyListCardManager *cardManager;  // Manages card lifecycle and updates
     QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead
@@ -607,7 +604,6 @@ public slots:
     void onMylistSortChanged(int column, Qt::SortOrder order);
     
     // MyList card view slots
-    void toggleMylistView();
     void sortMylistCards(int sortIndex);
     void toggleSortOrder();
     void loadMylistAsCards();
@@ -688,7 +684,6 @@ private:
     
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
-    void insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeItem, const QMap<QPair<int, int>, QTreeWidgetItem*>& episodeItems);
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();
@@ -701,17 +696,6 @@ private:
     void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
     bool isItemPlaying(QTreeWidgetItem *item) const;
     void updateUIForWatchedFile(int lid);  // Update tree view and anime card for a watched file
-    
-    // Helper method to determine file type from filetype string
-    FileTreeWidgetItem::FileType determineFileType(const QString& filetype);
-    
-    // File selection for playback (stub for future implementation)
-    struct FilePreference {
-        QString preferredResolution; // e.g., "1920x1080", "1280x720"
-        QString preferredGroup;      // e.g., "Baka-Anime", "HorribleSubs"
-        bool preferHigherQuality;    // true = prefer higher quality
-    };
-    FileTreeWidgetItem* selectPreferredFile(const QList<FileTreeWidgetItem*>& files, const FilePreference& pref);
 };
 
 #endif // WINDOW_H
