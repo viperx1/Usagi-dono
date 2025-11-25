@@ -48,14 +48,6 @@ function(skip_automoc_for_usagi_sources target_name)
     endforeach()
 endfunction()
 
-# Helper function to re-enable AUTOMOC for specific Q_OBJECT headers
-# Call this AFTER skip_automoc_for_usagi_sources to enable MOC generation for headers that need it
-function(enable_automoc_for_headers)
-    foreach(header ${ARGN})
-        set_source_files_properties(${header} PROPERTIES SKIP_AUTOMOC OFF)
-    endforeach()
-endfunction()
-
 # Test 1: Hash functions test
 set(HASH_TEST_SOURCES
     test_hash.cpp
