@@ -684,7 +684,6 @@ private:
     
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
-    void insertMissingEpisodePlaceholders(int aid, QTreeWidgetItem* animeItem, const QMap<QPair<int, int>, QTreeWidgetItem*>& episodeItems);
     int calculateTotalHashParts(const QStringList &files);
     void setupHashingProgress(const QStringList &files);
     QStringList getFilesNeedingHash();
@@ -697,17 +696,6 @@ private:
     void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
     bool isItemPlaying(QTreeWidgetItem *item) const;
     void updateUIForWatchedFile(int lid);  // Update tree view and anime card for a watched file
-    
-    // Helper method to determine file type from filetype string
-    FileTreeWidgetItem::FileType determineFileType(const QString& filetype);
-    
-    // File selection for playback (stub for future implementation)
-    struct FilePreference {
-        QString preferredResolution; // e.g., "1920x1080", "1280x720"
-        QString preferredGroup;      // e.g., "Baka-Anime", "HorribleSubs"
-        bool preferHigherQuality;    // true = prefer higher quality
-    };
-    FileTreeWidgetItem* selectPreferredFile(const QList<FileTreeWidgetItem*>& files, const FilePreference& pref);
 };
 
 #endif // WINDOW_H
