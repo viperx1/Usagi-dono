@@ -461,16 +461,13 @@ private:
 
 	QString lastDir;
 
-    // page mylist
-    QTreeWidget *mylistTreeWidget;
+    // page mylist (card view only - tree view removed)
     QScrollArea *mylistCardScrollArea;
     QWidget *mylistCardContainer;
     FlowLayout *mylistCardLayout;
     QComboBox *mylistSortComboBox;
-    QPushButton *mylistViewToggleButton;
     QPushButton *mylistSortOrderButton;
     QLabel *mylistStatusLabel;
-    bool mylistUseCardView;
     bool mylistSortAscending;  // true for ascending, false for descending
     MyListCardManager *cardManager;  // Manages card lifecycle and updates
     QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead
@@ -607,7 +604,6 @@ public slots:
     void onMylistSortChanged(int column, Qt::SortOrder order);
     
     // MyList card view slots
-    void toggleMylistView();
     void sortMylistCards(int sortIndex);
     void toggleSortOrder();
     void loadMylistAsCards();
