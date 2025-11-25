@@ -113,7 +113,12 @@ void TestMyListCardManager::createTestDatabase()
            "enddate TEXT, "
            "picname TEXT, "
            "poster_image BLOB, "
-           "category TEXT)");
+           "category TEXT, "
+           "rating TEXT, "
+           "tag_name_list TEXT, "
+           "tag_id_list TEXT, "
+           "tag_weight_list TEXT, "
+           "hidden INTEGER DEFAULT 0)");
     
     // Create episode table
     q.exec("CREATE TABLE episode ("
