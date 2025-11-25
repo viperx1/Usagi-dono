@@ -1497,3 +1497,38 @@ if(WIN32)
 endif()
 
 add_test(NAME test_watchchunkmanager COMMAND test_watchchunkmanager -v2)
+
+# Test: Unknown files persistence test
+set(UNKNOWN_FILES_PERSISTENCE_TEST_SOURCES
+    test_unknown_files_persistence.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(UNKNOWN_FILES_PERSISTENCE_TEST_HEADERS
+    ../usagi/src/logger.h
+)
+
+add_executable(test_unknown_files_persistence ${UNKNOWN_FILES_PERSISTENCE_TEST_SOURCES} ${UNKNOWN_FILES_PERSISTENCE_TEST_HEADERS})
+
+set_target_properties(test_unknown_files_persistence PROPERTIES AUTOMOC ON)
+
+target_compile_definitions(test_unknown_files_persistence PRIVATE CRYPTOPP_DEBUG=0 USAGI_TEST_MODE=1)
+
+target_link_libraries(test_unknown_files_persistence PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+target_include_directories(test_unknown_files_persistence PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_unknown_files_persistence PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_unknown_files_persistence COMMAND test_unknown_files_persistence -v2)

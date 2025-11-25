@@ -2173,6 +2173,15 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 {
                     updateOrAddMylistEntry(lid);
                 }
+                else
+                {
+                    // Even if we couldn't find the mylist entry in the local database,
+                    // we know the file is in AniDB's mylist (310 response), so update binding_status
+                    // to prevent the file from reappearing in unknown files list on restart
+                    adbapi->UpdateLocalFileBindingStatus(localPath, 1); // 1 = bound_to_anime
+                    adbapi->UpdateLocalFileStatus(localPath, 2); // 2 = in anidb
+                    LOG(QString("Updated binding_status directly for path=%1 (mylist entry not found locally)").arg(localPath));
+                }
                 
                 // Remove from unknown files widget if present (re-check succeeded)
                 for(int row = 0; row < unknownFiles->rowCount(); ++row)
