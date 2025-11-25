@@ -5,6 +5,24 @@ project(usagi_tests LANGUAGES CXX)
 enable_testing()
 
 # ==========================================================
+# DEBUG INFO - Print environment details for CI debugging
+# ==========================================================
+message(STATUS "========================================")
+message(STATUS "Test Build Configuration Debug Info")
+message(STATUS "========================================")
+message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
+message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+if(WIN32)
+    message(STATUS "Platform: Windows")
+    message(STATUS "MINGW: ${MINGW}")
+endif()
+message(STATUS "========================================")
+
+# ==========================================================
 # FORCE DYNAMIC Qt LINKING - Ensure consistency with main build
 # ==========================================================
 message(STATUS "Configuring tests for DYNAMIC Qt linking")

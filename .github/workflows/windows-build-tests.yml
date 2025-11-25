@@ -43,6 +43,25 @@ jobs:
         shell: bash
         run: mkdir -p build
 
+      - name: Debug - Print environment info
+        shell: bash
+        run: |
+          echo "=== Compiler version ==="
+          g++ --version
+          echo ""
+          echo "=== CMake version ==="
+          cmake --version
+          echo ""
+          echo "=== Qt installation path ==="
+          ls -la "$Qt6_DIR" || echo "Qt6_DIR not set"
+          ls -la "D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin/" | head -20 || echo "Qt bin dir not found"
+          echo ""
+          echo "=== PATH ==="
+          echo $PATH | tr ':' '\n' | head -20
+          echo ""
+          echo "=== MinGW bin contents ==="
+          ls -la /c/mingw64/bin/*.dll 2>/dev/null | head -20 || echo "No system mingw64"
+
       - name: Configure (CMake)
         shell: bash
         run: |
@@ -56,11 +75,55 @@ jobs:
         run: cmake --build build --config Release 2>&1 | tee build/build_log.txt
         shell: bash
 
-      - name: Run tests
+      - name: Deploy Qt DLLs to test directory
+        shell: bash
         run: |
+          echo "=== Deploying Qt DLLs to test directory ==="
+          # Add Qt bin directory to PATH for windeployqt and runtime
+          export PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin:$PATH"
+          
+          # Copy Qt DLLs to each test executable location
+          for exe in build/tests/*.exe; do
+            if [ -f "$exe" ]; then
+              echo "Deploying DLLs for: $exe"
+              windeployqt --no-translations --no-system-d3d-compiler "$exe" 2>&1 || echo "windeployqt failed for $exe"
+            fi
+          done
+          
+          echo ""
+          echo "=== Contents of test directory after deployment ==="
+          ls -la build/tests/ | head -40
+
+      - name: Debug - Check test executable dependencies
+        shell: cmd
+        run: |
+          echo === Checking DLL dependencies for test_hash.exe ===
+          dumpbin /dependents build\tests\test_hash.exe 2>nul || echo dumpbin not available
+          echo.
+          echo === Checking where DLLs are loaded from ===
+          where Qt6Core.dll 2>nul || echo Qt6Core.dll not in PATH
+          where libstdc++-6.dll 2>nul || echo libstdc++-6.dll not in PATH
+
+      - name: Run tests with debug output
+        shell: bash
+        run: |
+          # Add Qt bin directory to PATH for runtime DLLs
+          export PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin:$PATH"
+          export QT_DEBUG_PLUGINS=1
+          
+          echo "=== Running tests with QT_DEBUG_PLUGINS=1 ==="
+          echo "PATH: $PATH"
+          echo ""
+          
+          # Run a single test first to see detailed output
+          echo "=== Running test_hash with verbose output ==="
+          ./build/tests/test_hash.exe -v2 2>&1 || echo "test_hash failed with exit code: $?"
+          echo ""
+          
+          # Then run all tests
+          echo "=== Running all tests ==="
           ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
           exit ${PIPESTATUS[0]}
-        shell: bash
 
       - name: Upload test artifacts
         if: success()
