@@ -113,6 +113,36 @@ void AnimeCard::setupUI()
     m_playButton->setStyleSheet("font-size: 9pt; padding: 4px 8px;");
     m_playButton->setToolTip("Play the next unwatched episode");
     connect(m_playButton, &QPushButton::clicked, this, [this]() {
+        // Find first unwatched episode using same logic as updateNextEpisodeIndicator()
+        int topLevelCount = m_episodeTree->topLevelItemCount();
+        
+        for (int i = 0; i < topLevelCount; i++) {
+            QTreeWidgetItem *episodeItem = m_episodeTree->topLevelItem(i);
+            
+            // Check if this episode has an unwatched file
+            bool episodeWatched = true;
+            int childCount = episodeItem->childCount();
+            
+            for (int j = 0; j < childCount; j++) {
+                QTreeWidgetItem *fileItem = episodeItem->child(j);
+                QString playText = fileItem->text(1);
+                if (playText != "✓" && playText == "▶") {
+                    episodeWatched = false;
+                    break;
+                }
+            }
+            
+            if (!episodeWatched) {
+                // Found first unwatched episode - get its lid and emit episodeClicked
+                int lid = episodeItem->data(2, Qt::UserRole).toInt();
+                if (lid > 0) {
+                    emit episodeClicked(lid);
+                    return;
+                }
+            }
+        }
+        
+        // Fallback: emit playAnimeRequested if no unwatched episode found (plays first episode)
         emit playAnimeRequested(m_animeId);
     });
     buttonLayout->addWidget(m_playButton);

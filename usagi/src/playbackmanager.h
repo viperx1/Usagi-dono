@@ -89,6 +89,12 @@ signals:
      */
     void playbackStopped(int lid, int position);
     
+    /**
+     * @brief Emitted when a file is marked as locally watched via chunk-based tracking
+     * @param lid MyList ID
+     */
+    void fileMarkedAsLocallyWatched(int lid);
+    
 private slots:
     void checkPlaybackStatus();
     void handleStatusReply();

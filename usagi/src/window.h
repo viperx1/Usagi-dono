@@ -632,6 +632,7 @@ public slots:
     void onPlaybackCompleted(int lid);
     void onPlaybackStopped(int lid, int position);
     void onPlaybackStateChanged(int lid, bool isPlaying);
+    void onFileMarkedAsLocallyWatched(int lid);
     void onAnimationTimerTimeout();
     
     // Hasher slots
@@ -699,6 +700,7 @@ private:
     void updatePlayButtonForItem(QTreeWidgetItem *item);
     void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
     bool isItemPlaying(QTreeWidgetItem *item) const;
+    void updateUIForWatchedFile(int lid);  // Update tree view and anime card for a watched file
     
     // Helper method to determine file type from filetype string
     FileTreeWidgetItem::FileType determineFileType(const QString& filetype);

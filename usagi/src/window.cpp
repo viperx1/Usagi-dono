@@ -630,6 +630,8 @@ Window::Window()
             this, &Window::onPlaybackStopped);
     connect(playbackManager, &PlaybackManager::playbackStateChanged,
             this, &Window::onPlaybackStateChanged);
+    connect(playbackManager, &PlaybackManager::fileMarkedAsLocallyWatched,
+            this, &Window::onFileMarkedAsLocallyWatched);
     
     // Initialize play button delegate for mylist tree
     playButtonDelegate = new PlayButtonDelegate(this);
@@ -4848,7 +4850,32 @@ void Window::onPlaybackCompleted(int lid)
 		m_animationTimer->stop();
 	}
 	
-	// Find the file item with this LID and update its play button and parents
+	// Update tree view and anime card
+	updateUIForWatchedFile(lid);
+}
+
+void Window::onPlaybackStopped(int lid, int position)
+{
+	LOG(QString("Playback stopped: LID %1 at position %2s").arg(lid).arg(position));
+	
+	// Remove from playing items
+	m_playingItems.remove(lid);
+	if (m_playingItems.isEmpty()) {
+		m_animationTimer->stop();
+	}
+}
+
+void Window::onFileMarkedAsLocallyWatched(int lid)
+{
+	LOG(QString("File marked as locally watched via chunk tracking: LID %1 - Updating UI").arg(lid));
+	
+	// Update tree view and anime card
+	updateUIForWatchedFile(lid);
+}
+
+void Window::updateUIForWatchedFile(int lid)
+{
+	// Update tree view play buttons
 	QTreeWidgetItemIterator it(mylistTreeWidget);
 	while (*it) {
 		QTreeWidgetItem *item = *it;
@@ -4871,16 +4898,10 @@ void Window::onPlaybackCompleted(int lid)
 		}
 		++it;
 	}
-}
-
-void Window::onPlaybackStopped(int lid, int position)
-{
-	LOG(QString("Playback stopped: LID %1 at position %2s").arg(lid).arg(position));
 	
-	// Remove from playing items
-	m_playingItems.remove(lid);
-	if (m_playingItems.isEmpty()) {
-		m_animationTimer->stop();
+	// Update anime card if in card view mode
+	if (mylistUseCardView && cardManager) {
+		cardManager->updateOrAddMylistEntry(lid);
 	}
 }
 

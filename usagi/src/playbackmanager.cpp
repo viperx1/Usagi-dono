@@ -26,6 +26,10 @@ PlaybackManager::PlaybackManager(QObject *parent)
     
     // Initialize watch chunk manager
     m_watchChunkManager = new WatchChunkManager(this);
+    
+    // Forward fileMarkedAsWatched signal from chunk manager
+    connect(m_watchChunkManager, &WatchChunkManager::fileMarkedAsWatched,
+            this, &PlaybackManager::fileMarkedAsLocallyWatched);
 }
 
 PlaybackManager::~PlaybackManager()
@@ -249,11 +253,11 @@ void PlaybackManager::handleStatusReply()
             m_completionSaved = true;  // Mark that we've saved completion position
             emit playbackCompleted(m_currentLid);
             
-            // Update viewed status in mylist
+            // Update viewed and local_watched status in mylist
             QSqlDatabase db = QSqlDatabase::database();
             if (db.isOpen()) {
                 QSqlQuery q(db);
-                q.prepare("UPDATE mylist SET viewed = 1, viewdate = ? WHERE lid = ?");
+                q.prepare("UPDATE mylist SET viewed = 1, local_watched = 1, viewdate = ? WHERE lid = ?");
                 q.addBindValue(QDateTime::currentSecsSinceEpoch());
                 q.addBindValue(m_currentLid);
                 q.exec();
