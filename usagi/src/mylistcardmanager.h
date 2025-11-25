@@ -102,10 +102,10 @@ public slots:
     // Slot to handle hide card request
     void onHideCardRequested(int aid);
     
-    // Slot to handle mark episode watched request
+    // Slot to handle mark episode watched request (sets both AniDB and local status)
     void onMarkEpisodeWatchedRequested(int eid);
     
-    // Slot to handle mark file watched request
+    // Slot to handle mark file watched request (sets both AniDB and local status)
     void onMarkFileWatchedRequested(int lid);
     
 private slots:
