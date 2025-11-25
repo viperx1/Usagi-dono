@@ -700,6 +700,7 @@ private:
     void updatePlayButtonForItem(QTreeWidgetItem *item);
     void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
     bool isItemPlaying(QTreeWidgetItem *item) const;
+    void updateUIForWatchedFile(int lid);  // Update tree view and anime card for a watched file
     
     // Helper method to determine file type from filetype string
     FileTreeWidgetItem::FileType determineFileType(const QString& filetype);

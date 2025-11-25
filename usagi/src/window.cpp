@@ -4850,34 +4850,8 @@ void Window::onPlaybackCompleted(int lid)
 		m_animationTimer->stop();
 	}
 	
-	// Find the file item with this LID and update its play button and parents
-	QTreeWidgetItemIterator it(mylistTreeWidget);
-	while (*it) {
-		QTreeWidgetItem *item = *it;
-		if (item->text(MYLIST_ID_COLUMN).toInt() == lid) {
-			// Found the file - update it and its parents
-			updatePlayButtonForItem(item);
-			
-			// Update episode parent if exists
-			QTreeWidgetItem *episodeItem = item->parent();
-			if (episodeItem) {
-				updatePlayButtonForItem(episodeItem);
-				
-				// Update anime parent if exists
-				QTreeWidgetItem *animeItem = episodeItem->parent();
-				if (animeItem) {
-					updatePlayButtonForItem(animeItem);
-				}
-			}
-			break;
-		}
-		++it;
-	}
-	
-	// Update anime card if in card view mode
-	if (mylistUseCardView && cardManager) {
-		cardManager->updateOrAddMylistEntry(lid);
-	}
+	// Update tree view and anime card
+	updateUIForWatchedFile(lid);
 }
 
 void Window::onPlaybackStopped(int lid, int position)
@@ -4895,6 +4869,12 @@ void Window::onFileMarkedAsLocallyWatched(int lid)
 {
 	LOG(QString("File marked as locally watched via chunk tracking: LID %1 - Updating UI").arg(lid));
 	
+	// Update tree view and anime card
+	updateUIForWatchedFile(lid);
+}
+
+void Window::updateUIForWatchedFile(int lid)
+{
 	// Update tree view play buttons
 	QTreeWidgetItemIterator it(mylistTreeWidget);
 	while (*it) {
