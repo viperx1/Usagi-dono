@@ -41,10 +41,16 @@ jobs:
           # Create a clean PATH with Qt's MinGW at the front, removing other MinGW installations
           # This is critical to avoid DLL conflicts that cause segfaults
           
+          # Define Qt paths as variables for consistency
           QT_MINGW_BIN="D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin"
           QT_BIN="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin"
           
+          # Export these for use in later steps
+          echo "QT_MINGW_BIN=$QT_MINGW_BIN" >> $GITHUB_ENV
+          echo "QT_BIN=$QT_BIN" >> $GITHUB_ENV
+          
           # Build clean PATH: Qt MinGW first, then essential system paths only
+          # Note: In Git Bash on Windows, PATH uses ':' separator (bash translates)
           CLEAN_PATH="$QT_MINGW_BIN:$QT_BIN"
           
           # Add essential Windows paths but EXCLUDE all other mingw installations
@@ -94,8 +100,8 @@ jobs:
           cmake -S . -B build -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/lib/cmake" \
-            -DCMAKE_C_COMPILER="D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin/gcc.exe" \
-            -DCMAKE_CXX_COMPILER="D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin/g++.exe" \
+            -DCMAKE_C_COMPILER="$QT_MINGW_BIN/gcc.exe" \
+            -DCMAKE_CXX_COMPILER="$QT_MINGW_BIN/g++.exe" \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             2>&1 | tee build/configure_log.txt
 
