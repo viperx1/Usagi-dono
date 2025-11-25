@@ -683,9 +683,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		if(!fileData.aid.isEmpty() && fileData.aid != QLatin1String("0"))
 		{
 			// Check if important anime fields are missing (year, type, or episode count)
-			bool animeDataIncomplete = animeData.year.isEmpty() || 
-			                           animeData.type.isEmpty() || 
-			                           animeData.eptotal.isEmpty();
+			bool hasYear = !animeData.year.isEmpty();
+			bool hasType = !animeData.type.isEmpty();
+			bool hasEptotal = !animeData.eptotal.isEmpty();
+			bool animeDataIncomplete = !hasYear || !hasType || !hasEptotal;
 			if(animeDataIncomplete)
 			{
 				LOG(QString("Anime data incomplete for AID %1, queuing ANIME API request").arg(fileData.aid));
