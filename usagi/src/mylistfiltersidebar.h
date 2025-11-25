@@ -33,6 +33,9 @@ public:
     QString getTypeFilter() const;
     QString getCompletionFilter() const;
     bool getShowOnlyUnwatched() const;
+    int getSortIndex() const;
+    bool getSortAscending() const;
+    QString getAdultContentFilter() const;
     
     // Reset all filters
     void resetFilters();
@@ -41,9 +44,14 @@ signals:
     // Emitted when any filter changes
     void filterChanged();
     
+    // Emitted when sort options change
+    void sortChanged();
+    
 private slots:
     void onSearchTextChanged();
     void onFilterChanged();
+    void onSortChanged();
+    void onSortOrderToggled();
     
 private:
     void setupUI();
@@ -53,7 +61,12 @@ private:
     QComboBox *m_typeFilter;
     QComboBox *m_completionFilter;
     QCheckBox *m_showOnlyUnwatchedCheckbox;
+    QComboBox *m_sortComboBox;
+    QPushButton *m_sortOrderButton;
+    QComboBox *m_adultContentFilter;
     QPushButton *m_resetButton;
+    
+    bool m_sortAscending;
 };
 
 #endif // MYLISTFILTERSIDEBAR_H

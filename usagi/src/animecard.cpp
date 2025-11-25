@@ -29,6 +29,7 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_lastPlayed(0)
     , m_isHidden(false)
     , m_needsFetch(false)
+    , m_is18Restricted(false)
     , m_posterOverlay(nullptr)
 {
     setupUI();
@@ -884,4 +885,9 @@ void AnimeCard::updateCardBackgroundForUnwatchedEpisodes()
     } else {
         setStyleSheet("");  // Reset to default
     }
+}
+
+void AnimeCard::setIs18Restricted(bool restricted)
+{
+    m_is18Restricted = restricted;
 }

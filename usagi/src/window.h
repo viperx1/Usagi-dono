@@ -466,10 +466,8 @@ private:
     QScrollArea *mylistCardScrollArea;
     QWidget *mylistCardContainer;
     FlowLayout *mylistCardLayout;
-    QComboBox *mylistSortComboBox;
-    QPushButton *mylistSortOrderButton;
     QLabel *mylistStatusLabel;
-    bool mylistSortAscending;  // true for ascending, false for descending
+    bool mylistSortAscending;  // Deprecated: moved to MyListFilterSidebar
     MyListCardManager *cardManager;  // Manages card lifecycle and updates
     MyListFilterSidebar *filterSidebar;  // Filter sidebar widget
     QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead

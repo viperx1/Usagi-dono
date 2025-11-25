@@ -4,6 +4,7 @@
 
 MyListFilterSidebar::MyListFilterSidebar(QWidget *parent)
     : QWidget(parent)
+    , m_sortAscending(false)  // Default to descending (newest first for aired date)
 {
     setupUI();
 }
@@ -46,6 +47,35 @@ void MyListFilterSidebar::setupUI()
     searchLayout->addWidget(m_searchField);
     mainLayout->addWidget(searchGroup);
     
+    // Sorting group
+    QGroupBox *sortGroup = new QGroupBox("Sort");
+    QVBoxLayout *sortLayout = new QVBoxLayout(sortGroup);
+    
+    QLabel *sortLabel = new QLabel("Sort by:");
+    m_sortComboBox = new QComboBox();
+    m_sortComboBox->addItem("Anime Title");
+    m_sortComboBox->addItem("Type");
+    m_sortComboBox->addItem("Aired Date");
+    m_sortComboBox->addItem("Episodes (Count)");
+    m_sortComboBox->addItem("Completion %");
+    m_sortComboBox->addItem("Last Played");
+    m_sortComboBox->setCurrentIndex(2);  // Default to Aired Date
+    connect(m_sortComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MyListFilterSidebar::onSortChanged);
+    
+    m_sortOrderButton = new QPushButton("↓ Desc");
+    m_sortOrderButton->setMaximumWidth(80);
+    m_sortOrderButton->setToolTip("Toggle sort order (ascending/descending)");
+    connect(m_sortOrderButton, &QPushButton::clicked, this, &MyListFilterSidebar::onSortOrderToggled);
+    
+    QHBoxLayout *sortOrderLayout = new QHBoxLayout();
+    sortOrderLayout->addWidget(m_sortComboBox, 1);
+    sortOrderLayout->addWidget(m_sortOrderButton);
+    
+    sortLayout->addWidget(sortLabel);
+    sortLayout->addLayout(sortOrderLayout);
+    mainLayout->addWidget(sortGroup);
+    
     // Filter by type group
     QGroupBox *typeGroup = new QGroupBox("Type");
     QVBoxLayout *typeLayout = new QVBoxLayout(typeGroup);
@@ -56,7 +86,6 @@ void MyListFilterSidebar::setupUI()
     m_typeFilter->addItem("TV Series", "TV Series");
     m_typeFilter->addItem("Movie", "Movie");
     m_typeFilter->addItem("OVA", "OVA");
-    m_typeFilter->addItem("ONA", "ONA");
     m_typeFilter->addItem("TV Special", "TV Special");
     m_typeFilter->addItem("Web", "Web");
     m_typeFilter->addItem("Music Video", "Music Video");
@@ -98,6 +127,24 @@ void MyListFilterSidebar::setupUI()
     viewedLayout->addWidget(m_showOnlyUnwatchedCheckbox);
     mainLayout->addWidget(viewedGroup);
     
+    // Adult content filter group
+    QGroupBox *adultContentGroup = new QGroupBox("Adult Content");
+    QVBoxLayout *adultContentLayout = new QVBoxLayout(adultContentGroup);
+    
+    QLabel *adultContentLabel = new QLabel("Filter:");
+    m_adultContentFilter = new QComboBox();
+    m_adultContentFilter->addItem("Ignore", "ignore");
+    m_adultContentFilter->addItem("Hide 18+", "hide");
+    m_adultContentFilter->addItem("Show only 18+", "showonly");
+    m_adultContentFilter->setCurrentIndex(1);  // Default to "Hide 18+"
+    
+    connect(m_adultContentFilter, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MyListFilterSidebar::onFilterChanged);
+    
+    adultContentLayout->addWidget(adultContentLabel);
+    adultContentLayout->addWidget(m_adultContentFilter);
+    mainLayout->addWidget(adultContentGroup);
+    
     // Reset button
     m_resetButton = new QPushButton("Reset All Filters");
     connect(m_resetButton, &QPushButton::clicked, this, &MyListFilterSidebar::resetFilters);
@@ -131,13 +178,33 @@ bool MyListFilterSidebar::getShowOnlyUnwatched() const
     return m_showOnlyUnwatchedCheckbox->isChecked();
 }
 
+int MyListFilterSidebar::getSortIndex() const
+{
+    return m_sortComboBox->currentIndex();
+}
+
+bool MyListFilterSidebar::getSortAscending() const
+{
+    return m_sortAscending;
+}
+
+QString MyListFilterSidebar::getAdultContentFilter() const
+{
+    return m_adultContentFilter->currentData().toString();
+}
+
 void MyListFilterSidebar::resetFilters()
 {
     m_searchField->clear();
+    m_sortComboBox->setCurrentIndex(2);  // Reset to Aired Date
+    m_sortAscending = false;
+    m_sortOrderButton->setText("↓ Desc");
     m_typeFilter->setCurrentIndex(0);
     m_completionFilter->setCurrentIndex(0);
     m_showOnlyUnwatchedCheckbox->setChecked(false);
+    m_adultContentFilter->setCurrentIndex(1);  // Reset to "Hide 18+"
     
+    emit sortChanged();
     emit filterChanged();
 }
 
@@ -149,4 +216,23 @@ void MyListFilterSidebar::onSearchTextChanged()
 void MyListFilterSidebar::onFilterChanged()
 {
     emit filterChanged();
+}
+
+void MyListFilterSidebar::onSortChanged()
+{
+    emit sortChanged();
+}
+
+void MyListFilterSidebar::onSortOrderToggled()
+{
+    m_sortAscending = !m_sortAscending;
+    
+    // Update button text
+    if (m_sortAscending) {
+        m_sortOrderButton->setText("↑ Asc");
+    } else {
+        m_sortOrderButton->setText("↓ Desc");
+    }
+    
+    emit sortChanged();
 }
