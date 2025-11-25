@@ -5,6 +5,36 @@ project(usagi_tests LANGUAGES CXX)
 enable_testing()
 
 # ==========================================================
+# DEBUG INFO - Print environment details for CI debugging
+# ==========================================================
+message(STATUS "========================================")
+message(STATUS "Test Build Configuration Debug Info")
+message(STATUS "========================================")
+message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
+message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+if(WIN32)
+    message(STATUS "Platform: Windows")
+    message(STATUS "MINGW: ${MINGW}")
+endif()
+message(STATUS "========================================")
+
+# ==========================================================
+# STATIC LINKING FIX FOR WINDOWS MINGW
+# ==========================================================
+# Fix for Windows CI crashes: Multiple conflicting libstdc++-6.dll
+# versions in PATH cause segfaults and heap corruption.
+# Static linking embeds C++ runtime into executables.
+if(WIN32 AND MINGW)
+    message(STATUS "Enabling static C++ runtime linking for MinGW to avoid DLL conflicts")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+endif()
+
+# ==========================================================
 # FORCE DYNAMIC Qt LINKING - Ensure consistency with main build
 # ==========================================================
 message(STATUS "Configuring tests for DYNAMIC Qt linking")
@@ -23,8 +53,9 @@ add_compile_definitions(QT_SHARED)
 # Enable automatic MOC for test files that include .moc files
 set(CMAKE_AUTOMOC ON)
 
-# Helper function to mark usagi source files with SKIP_AUTOMOC
-# This prevents duplicate MOC processing (main executable already processes these with AUTOMOC)
+# Helper function to mark usagi .cpp source files with SKIP_AUTOMOC
+# This prevents duplicate MOC processing for .cpp files while allowing
+# AUTOMOC to process .h files that contain Q_OBJECT macros
 function(skip_automoc_for_usagi_sources target_name)
     # First, ensure AUTOMOC is enabled for this target
     set_target_properties(${target_name} PROPERTIES AUTOMOC ON)
@@ -35,10 +66,12 @@ function(skip_automoc_for_usagi_sources target_name)
         get_filename_component(abs_source "${source}" ABSOLUTE)
         get_filename_component(source_dir "${abs_source}" DIRECTORY)
         get_filename_component(source_name "${abs_source}" NAME)
+        get_filename_component(source_ext "${abs_source}" LAST_EXT)
         
-        # Skip AUTOMOC only for files from usagi/src/ directory, NOT for test files
-        # Test files start with "test_" prefix
-        if(source_dir MATCHES ".*/usagi/src.*" AND NOT source_name MATCHES "^test_.*")
+        # Skip AUTOMOC only for .cpp files from usagi/src/ directory, NOT for:
+        # - test files (start with "test_" prefix)
+        # - header files (.h) which need AUTOMOC for Q_OBJECT classes
+        if(source_dir MATCHES ".*/usagi/src.*" AND NOT source_name MATCHES "^test_.*" AND source_ext STREQUAL ".cpp")
             message(STATUS "Skipping AUTOMOC for usagi source: ${source}")
             set_source_files_properties(${source} PROPERTIES SKIP_AUTOMOC ON)
         endif()
@@ -441,7 +474,7 @@ endif()
 add_test(NAME test_export_template_verification COMMAND test_export_template_verification -v2)
 
 # Test 8: Episode number type (epno)
-add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp ../usagi/src/logger.cpp)
+add_executable(test_epno test_epno.cpp ../usagi/src/epno.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_epno)
 
 target_link_libraries(test_epno PRIVATE
@@ -519,7 +552,7 @@ endif()
 add_test(NAME test_evangelion_ha_fix COMMAND test_evangelion_ha_fix -v2)
 
 # Test 12: Aired date type
-add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_aired test_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_aired)
 
 target_link_libraries(test_aired PRIVATE
@@ -541,7 +574,7 @@ endif()
 add_test(NAME test_aired COMMAND test_aired -v2)
 
 # Test 13: MyList Type and Aired columns integration
-add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_mylist_type_aired test_mylist_type_aired.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_mylist_type_aired)
 
 target_link_libraries(test_mylist_type_aired PRIVATE
@@ -564,7 +597,7 @@ endif()
 add_test(NAME test_mylist_type_aired COMMAND test_mylist_type_aired -v2)
 
 # Test 14: Mylist columns fix test (Type and Aired columns)
-add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_mylist_columns_fix test_mylist_columns_fix.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_mylist_columns_fix)
 
 target_link_libraries(test_mylist_columns_fix PRIVATE
@@ -587,7 +620,7 @@ endif()
 add_test(NAME test_mylist_columns_fix COMMAND test_mylist_columns_fix -v2)
 
 # Test 15: MyList aired sorting
-add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp)
+add_executable(test_mylist_aired_sorting test_mylist_aired_sorting.cpp ../usagi/src/aired.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_mylist_aired_sorting)
 
 target_link_libraries(test_mylist_aired_sorting PRIVATE
@@ -609,7 +642,7 @@ endif()
 add_test(NAME test_mylist_aired_sorting COMMAND test_mylist_aired_sorting -v2)
 
 # Test 16: Directory watcher
-add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp ../usagi/src/logger.cpp)
+add_executable(test_directorywatcher test_directorywatcher.cpp ../usagi/src/directorywatcher.cpp ../usagi/src/directorywatcher.h ../usagi/src/logger.cpp ../usagi/src/logger.h)
 skip_automoc_for_usagi_sources(test_directorywatcher)
 
 # Link Qt libraries

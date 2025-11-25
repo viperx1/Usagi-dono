@@ -28,20 +28,49 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_mingw'
+          tools: 'tools_mingw1310'
           cache: true
-
-      - name: Cache MinGW
-        id: cache-mingw
-        uses: actions/cache@v4
-        with:
-          path: D:/a/Usagi-dono/Qt/Tools/mingw1310_64
-          key: mingw-1310-64-${{ runner.os }}
-          restore-keys: |
-            mingw-1310-64-
 
       - name: Create build directory
         shell: bash
         run: mkdir -p build
+
+      - name: Setup MinGW PATH
+        shell: bash
+        run: |
+          # Find Qt's MinGW installation (may vary by Qt version)
+          QT_MINGW_BIN=""
+          for dir in "D:/a/Usagi-dono/Qt/Tools/mingw1310_64/bin" \
+                     "D:/a/Usagi-dono/Qt/Tools/mingw_64/bin" \
+                     "D:/a/Usagi-dono/Qt/Tools/mingw1120_64/bin" \
+                     "D:/a/Usagi-dono/Qt/Tools/mingw1210_64/bin"; do
+            if [ -f "$dir/g++.exe" ]; then
+              QT_MINGW_BIN="$dir"
+              break
+            fi
+          done
+          
+          # Fall back to system MinGW if Qt's isn't available
+          if [ -z "$QT_MINGW_BIN" ]; then
+            if [ -f "/c/mingw64/bin/g++.exe" ]; then
+              QT_MINGW_BIN="/c/mingw64/bin"
+            else
+              echo "ERROR: No MinGW found!"
+              exit 1
+            fi
+          fi
+          
+          QT_BIN="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/bin"
+          
+          # Export for use in later steps
+          echo "QT_MINGW_BIN=$QT_MINGW_BIN" >> $GITHUB_ENV
+          echo "QT_BIN=$QT_BIN" >> $GITHUB_ENV
+          
+          # Add to GITHUB_PATH (persists across all steps)
+          echo "$QT_BIN" >> $GITHUB_PATH
+          echo "$QT_MINGW_BIN" >> $GITHUB_PATH
+          
+          echo "Using MinGW from: $QT_MINGW_BIN"
 
       - name: Configure (CMake)
         shell: bash
@@ -49,26 +78,37 @@ jobs:
           cmake -S . -B build -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="D:/a/Usagi-dono/Qt/6.8.3/mingw_64/lib/cmake" \
+            -DCMAKE_C_COMPILER="$QT_MINGW_BIN/gcc.exe" \
+            -DCMAKE_CXX_COMPILER="$QT_MINGW_BIN/g++.exe" \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             2>&1 | tee build/configure_log.txt
 
-      - name: Build Tests
-        run: cmake --build build --config Release 2>&1 | tee build/build_log.txt
+      - name: Build
         shell: bash
-
-      - name: Run tests
         run: |
-          ctest --output-on-failure -V --test-dir build 2>&1 | tee build/test_log.txt
-          exit ${PIPESTATUS[0]}
+          cmake --build build --config Release 2>&1 | tee build/build_log.txt
+
+      - name: Deploy Qt DLLs
         shell: bash
+        run: |
+          for exe in build/tests/*.exe; do
+            if [ -f "$exe" ]; then
+              windeployqt --no-translations --no-system-d3d-compiler "$exe" 2>&1 || true
+            fi
+          done
+
+      - name: Run Tests
+        shell: bash
+        run: |
+          ctest --output-on-failure --test-dir build 2>&1 | tee build/test_log.txt
+          exit ${PIPESTATUS[0]}
 
       - name: Upload test artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: test-executables
-          path: |
-            build/tests/**/*.exe
+          path: build/tests/**/*.exe
 
       - name: Upload logs on failure
         if: failure()
@@ -81,7 +121,7 @@ jobs:
             build/test_log.txt
           if-no-files-found: ignore
 
-      - name: Create issue with logs on failure
+      - name: Create issue on failure
         if: failure()
         shell: bash
         run: |
@@ -91,16 +131,6 @@ jobs:
           echo "**Commit:** ${{ github.sha }}" >> issue_body.md
           echo "" >> issue_body.md
 
-          # Add test summary first if tests were run
-          if [ -f build/test_log.txt ]; then
-            echo "### Test Summary" >> issue_body.md
-            echo '```' >> issue_body.md
-            # Extract test results and summary lines
-            grep -E "^[[:space:]]*[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#|tests passed|tests failed out of|% tests" build/test_log.txt | tail -n 50 >> issue_body.md 2>/dev/null || echo "Could not extract test summary" >> issue_body.md
-            echo '```' >> issue_body.md
-            echo "" >> issue_body.md
-          fi
-
           echo "### Configure log" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/configure_log.txt ]; then
@@ -109,6 +139,7 @@ jobs:
             echo "Log file not available" >> issue_body.md
           fi
           echo '```' >> issue_body.md
+          
           echo "### Build log" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/build_log.txt ]; then
@@ -117,6 +148,7 @@ jobs:
             echo "Log file not available" >> issue_body.md
           fi
           echo '```' >> issue_body.md
+          
           echo "### Test log (last 500 lines)" >> issue_body.md
           echo '```' >> issue_body.md
           if [ -f build/test_log.txt ]; then
