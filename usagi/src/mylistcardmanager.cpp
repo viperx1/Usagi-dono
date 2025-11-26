@@ -810,7 +810,11 @@ AnimeCard* MyListCardManager::createCard(int aid)
     
     // Load episodes (skip for anime not in mylist - they have no episodes anyway)
     // If we have stats in cache, it means the anime is in mylist, so load episodes
-    if (m_statsCache.contains(aid)) {
+    bool inStatsCache = m_statsCache.contains(aid);
+    LOG(QString("[MyListCardManager] aid=%1: inStatsCache=%2, calling loadEpisodesForCard=%3")
+        .arg(aid).arg(inStatsCache ? "YES" : "NO").arg(inStatsCache ? "YES" : "NO"));
+    
+    if (inStatsCache) {
         loadEpisodesForCard(card, aid);
     }
     
@@ -1289,6 +1293,22 @@ void MyListCardManager::preloadAnimeDataCache(const QList<int>& aids)
     
     LOG(QString("[MyListCardManager] Preloaded %1 anime data and %2 stats into cache")
         .arg(m_animeDataCache.size()).arg(m_statsCache.size()));
+    
+    // Debug: Log which AIDs are in stats cache
+    if (!m_statsCache.isEmpty()) {
+        QList<int> statsCacheAids = m_statsCache.keys();
+        QStringList aidList;
+        int count = 0;
+        for (int aid : statsCacheAids) {
+            if (count < 10) {  // Log first 10 for debugging
+                aidList.append(QString::number(aid));
+                count++;
+            }
+        }
+        LOG(QString("[MyListCardManager] Stats cache contains anime: %1%2")
+            .arg(aidList.join(", "))
+            .arg(statsCacheAids.size() > 10 ? QString(" and %1 more...").arg(statsCacheAids.size() - 10) : ""));
+    }
 }
 
 void MyListCardManager::onHideCardRequested(int aid)
