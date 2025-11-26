@@ -13,6 +13,7 @@
 #include <QSqlError>
 #include <QFile>
 #include <QSet>
+#include <QApplication>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -1607,12 +1608,12 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Clear existing cards
     cardManager->clearAllCards();
     
-    // Preload anime data and statistics cache for better performance
-    // This eliminates individual database queries during card creation
+    // Comprehensive preload of ALL data needed for card creation
+    // This eliminates ALL SQL queries from createCard()
     if (!aids.isEmpty()) {
-        LOG(QString("[Progressive Loading] Preloading anime data cache for %1 anime...").arg(aids.size()));
-        cardManager->preloadAnimeDataCache(aids);
-        LOG("[Progressive Loading] Cache preload complete");
+        LOG(QString("[Progressive Loading] Preloading comprehensive card data for %1 anime...").arg(aids.size()));
+        cardManager->preloadCardCreationData(aids);
+        LOG("[Progressive Loading] Comprehensive card data preload complete");
     }
     
     // Start progressive loading timer
@@ -1624,12 +1625,18 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     }
 }
 
-// Load cards progressively in small batches to keep UI responsive
+// Load cards progressively in batches to keep UI responsive
 void Window::loadNextCardBatch()
 {
     if (pendingCardsToLoad.isEmpty()) {
         // All cards loaded
         progressiveCardLoadingTimer->stop();
+        
+        // Re-enable layout updates after loading is complete
+        if (mylistCardLayout && mylistCardLayout->parentWidget()) {
+            mylistCardLayout->parentWidget()->setUpdatesEnabled(true);
+            mylistCardLayout->parentWidget()->update();
+        }
         
         // Get all cards for backward compatibility
         animeCards = cardManager->getAllCards();
@@ -1638,9 +1645,20 @@ void Window::loadNextCardBatch()
         restoreMylistSorting();
         sortMylistCards(filterSidebar->getSortIndex());
         
+        // Reload alternative titles for filtering
+        loadAnimeAlternativeTitlesForFiltering();
+        
+        // Apply current filters
+        applyMylistFilters();
+        
         mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
         LOG(QString("[Progressive Loading] All cards loaded: %1 anime").arg(animeCards.size()));
         return;
+    }
+    
+    // Disable layout updates during batch creation for performance
+    if (mylistCardLayout && mylistCardLayout->parentWidget()) {
+        mylistCardLayout->parentWidget()->setUpdatesEnabled(false);
     }
     
     // Load next batch of cards
@@ -1649,30 +1667,153 @@ void Window::loadNextCardBatch()
     for (int i = 0; i < cardsToLoad; ++i) {
         int aid = pendingCardsToLoad.takeFirst();
         
-        // Create card using the card manager
-        // This calls createCard() which does the database query for this specific anime
-        AnimeCard *card = cardManager->getCard(aid);
+        // Create card directly since we've already preloaded all data
+        AnimeCard *card = cardManager->createCard(aid);
         if (!card) {
-            // Card doesn't exist, create it
-            // We need to trigger card creation through updateOrAddMylistEntry
-            // but we need a lid. Since we only have aid, let's query for one lid
-            QSqlDatabase db = QSqlDatabase::database();
-            if (db.isOpen()) {
-                QSqlQuery q(db);
-                q.prepare("SELECT lid FROM mylist WHERE aid = ? LIMIT 1");
-                q.addBindValue(aid);
-                if (q.exec() && q.next()) {
-                    int lid = q.value(0).toInt();
-                    cardManager->updateOrAddMylistEntry(lid);
-                }
-            }
+            LOG(QString("[Progressive Loading] WARNING: Failed to create card for aid=%1").arg(aid));
         }
     }
     
+    // Re-enable layout temporarily to show progress and process events
+    if (mylistCardLayout && mylistCardLayout->parentWidget()) {
+        mylistCardLayout->parentWidget()->setUpdatesEnabled(true);
+        mylistCardLayout->parentWidget()->update();
+    }
+    
+    // Process events to keep UI responsive
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    
     // Update status
     int remaining = pendingCardsToLoad.size();
-    int loaded = animeCards.size();
+    int loaded = cardManager->getAllCards().size();
     mylistStatusLabel->setText(QString("MyList Status: Loading... %1 of %2").arg(loaded).arg(loaded + remaining));
+}
+
+// Load mylist anime progressively (called when checking "in mylist only")
+void Window::loadMylistProgressively()
+{
+	LOG("[Window] Starting progressive mylist loading...");
+	
+	// Stop any ongoing progressive loading
+	if (progressiveCardLoadingTimer && progressiveCardLoadingTimer->isActive()) {
+		progressiveCardLoadingTimer->stop();
+	}
+	
+	// Clear existing cards
+	cardManager->clearAllCards();
+	pendingCardsToLoad.clear();
+	
+	// Show status
+	mylistStatusLabel->setText("MyList Status: Loading mylist anime...");
+	
+	// Query mylist anime IDs
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("[Window] Database not open");
+		mylistStatusLabel->setText("MyList Status: Error - database not open");
+		return;
+	}
+	
+	QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY m.aid";
+	QSqlQuery q(db);
+	
+	if (!q.exec(query)) {
+		LOG(QString("[Window] Error loading mylist: %1").arg(q.lastError().text()));
+		mylistStatusLabel->setText("MyList Status: Error loading mylist");
+		return;
+	}
+	
+	QList<int> aids;
+	while (q.next()) {
+		int aid = q.value(0).toInt();
+		aids.append(aid);
+	}
+	
+	LOG(QString("[Window] Found %1 mylist anime, starting progressive card creation...").arg(aids.size()));
+	
+	// Preload all data
+	if (!aids.isEmpty()) {
+		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
+		cardManager->preloadCardCreationData(aids);
+		LOG("[Window] Card data preload complete");
+	}
+	
+	// Store AIDs for progressive loading
+	pendingCardsToLoad = aids;
+	
+	// Start progressive loading timer
+	if (!pendingCardsToLoad.isEmpty()) {
+		progressiveCardLoadingTimer->start();
+		mylistStatusLabel->setText(QString("MyList Status: Loading %1 anime...").arg(pendingCardsToLoad.size()));
+	} else {
+		mylistStatusLabel->setText("MyList Status: No anime in mylist");
+	}
+}
+
+// Load all anime titles progressively (called when unchecking "in mylist only")
+void Window::loadAllAnimeTitlesProgressively()
+{
+	LOG("[Window] Starting progressive anime titles loading...");
+	
+	// Stop any ongoing progressive loading
+	if (progressiveCardLoadingTimer && progressiveCardLoadingTimer->isActive()) {
+		progressiveCardLoadingTimer->stop();
+	}
+	
+	// Clear existing cards
+	cardManager->clearAllCards();
+	pendingCardsToLoad.clear();
+	
+	// Show status
+	mylistStatusLabel->setText("MyList Status: Loading all anime titles...");
+	
+	// Query all anime from anime_titles table
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("[Window] Database not open");
+		mylistStatusLabel->setText("MyList Status: Error - database not open");
+		return;
+	}
+	
+	QString query = "SELECT DISTINCT at.aid FROM anime_titles at "
+	                "WHERE at.type = 1 AND at.language = 'x-jat' "
+	                "ORDER BY at.aid";
+	QSqlQuery q(db);
+	
+	if (!q.exec(query)) {
+		LOG(QString("[Window] Error loading anime_titles: %1").arg(q.lastError().text()));
+		mylistStatusLabel->setText("MyList Status: Error loading anime titles");
+		return;
+	}
+	
+	QList<int> aids;
+	while (q.next()) {
+		int aid = q.value(0).toInt();
+		aids.append(aid);
+	}
+	
+	LOG(QString("[Window] Found %1 anime titles, starting progressive card creation...").arg(aids.size()));
+	
+	// Preload all data - this may take some time but is necessary
+	if (!aids.isEmpty()) {
+		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
+		// Process events to keep UI responsive during preload
+		QApplication::processEvents();
+		
+		cardManager->preloadCardCreationData(aids);
+		LOG("[Window] Card data preload complete");
+	}
+	
+	// Store AIDs for progressive loading
+	pendingCardsToLoad = aids;
+	
+	// Start progressive loading timer
+	if (!pendingCardsToLoad.isEmpty()) {
+		progressiveCardLoadingTimer->start();
+		mylistStatusLabel->setText(QString("MyList Status: Loading %1 anime...").arg(pendingCardsToLoad.size()));
+	} else {
+		mylistStatusLabel->setText("MyList Status: No anime titles found");
+	}
 }
 
 // Called when anime titles loading finishes (in UI thread)
@@ -3672,13 +3813,10 @@ void Window::toggleSortOrder()
 	// Kept for backward compatibility
 }
 
-// Load mylist data as cards
+// Load mylist data as cards - now uses progressive loading to avoid UI freeze
 void Window::loadMylistAsCards()
 {
-	QElapsedTimer timer;
-	timer.start();
-	
-	LOG(QString("[Timing] Starting loadMylistAsCards with MyListCardManager"));
+	LOG(QString("[Window] loadMylistAsCards - using progressive loading"));
 	
 	// Set the layout for the card manager
 	cardManager->setCardLayout(mylistCardLayout);
@@ -3689,23 +3827,8 @@ void Window::loadMylistAsCards()
 	connect(adbapi, &myAniDBApi::notifyAnimeUpdated,
 	        cardManager, &MyListCardManager::onAnimeUpdated, Qt::UniqueConnection);
 	
-	// Load all cards through the manager
-	cardManager->loadAllCards();
-	
-	// Get cards for backward compatibility with sorting code
-	animeCards = cardManager->getAllCards();
-	
-	// Apply current sort (default is Aired Date descending)
-	qint64 startSort = timer.elapsed();
-	sortMylistCards(filterSidebar->getSortIndex());
-	qint64 sortElapsed = timer.elapsed() - startSort;
-	LOG(QString("[Timing] Sorting cards took %1 ms").arg(sortElapsed));
-	
-	qint64 totalElapsed = timer.elapsed();
-	LOG(QString("[Timing] Total loadMylistAsCards took %1 ms").arg(totalElapsed));
-	
-	// Load alternative titles for filtering
-	loadAnimeAlternativeTitlesForFiltering();
+	// Use progressive loading instead of synchronous loadAllCards()
+	loadMylistProgressively();
 }
 
 // Load alternative titles from anime_titles table for filtering
@@ -3875,23 +3998,15 @@ void Window::applyMylistFilters()
 		LOG(QString("[Window] Reloading cards due to MyList filter change: inMyListOnly=%1").arg(inMyListOnly));
 		
 		if (inMyListOnly) {
-			// Load only mylist anime
-			cardManager->loadAllCards();
+			// Load only mylist anime - use progressive loading to avoid UI freeze
+			loadMylistProgressively();
 		} else {
-			// Load all anime from anime_titles
-			cardManager->loadAllAnimeTitles();
+			// Load all anime from anime_titles - use progressive loading to avoid UI freeze
+			loadAllAnimeTitlesProgressively();
 		}
 		
-		// Get updated cards list
-		animeCards = cardManager->getAllCards();
-		
-		// Re-apply sorting
-		sortMylistCards(filterSidebar->getSortIndex());
-		
-		// Reload alternative titles for filtering
-		loadAnimeAlternativeTitlesForFiltering();
-		
-		// After reloading, continue with normal filtering
+		// Don't continue with filtering yet - wait for progressive loading to complete
+		return;
 	}
 	
 	int visibleCount = 0;
