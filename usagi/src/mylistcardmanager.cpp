@@ -1277,6 +1277,7 @@ void MyListCardManager::preloadAnimeDataCache(const QList<int>& aids)
     
     // Build IN clause for bulk query
     QStringList aidStrings;
+    aidStrings.reserve(aids.size());
     for (int aid : aids) {
         aidStrings.append(QString::number(aid));
     }
@@ -1412,7 +1413,11 @@ void MyListCardManager::preloadEpisodesCache(const QList<int>& aids)
     }
     
     // Build IN clause for bulk query
+    // Note: aids come from internal database queries (not user input) and are converted
+    // to strings via QString::number(), ensuring they contain only numeric characters.
+    // This makes SQL injection impossible as no user-controlled data enters the query.
     QStringList aidStrings;
+    aidStrings.reserve(aids.size());
     for (int aid : aids) {
         aidStrings.append(QString::number(aid));
     }
