@@ -336,9 +336,11 @@ Window::Window()
         connect(card, &AnimeCard::resetWatchSessionRequested, this, &Window::onResetWatchSession);
     });
     
-    connect(cardManager, &MyListCardManager::cardUpdated, this, [this](int /* aid */) {
-        // Card was updated, may need to resort
-        sortMylistCards(filterSidebar->getSortIndex());
+    connect(cardManager, &MyListCardManager::cardUpdated, this, [this](int aid) {
+        // Card was updated in place - no need to resort the entire list
+        // Just ensure the card widget is properly updated if visible
+        // The card itself was already updated by updateCardFromDatabase()
+        Q_UNUSED(aid);  // Card update is handled internally by the card manager
     });
     
     // Connect episode data request signal to fetch missing episode data

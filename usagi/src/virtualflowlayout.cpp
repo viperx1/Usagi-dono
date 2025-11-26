@@ -31,11 +31,22 @@ VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     m_deferredUpdateTimer->setInterval(100);  // 100ms delay
     connect(m_deferredUpdateTimer, &QTimer::timeout, this, [this]() {
         LOG("[VirtualFlowLayout] Deferred update triggered");
+        // Save scroll position before update to prevent unwanted scrolling
+        int savedScrollY = 0;
+        if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+            savedScrollY = m_scrollArea->verticalScrollBar()->value();
+        }
+        
         m_cachedFirstVisible = -1;
         m_cachedLastVisible = -1;
         calculateLayout();
         updateVisibleItems();
         update();
+        
+        // Restore scroll position after update
+        if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+            m_scrollArea->verticalScrollBar()->setValue(savedScrollY);
+        }
     });
 }
 
@@ -55,6 +66,12 @@ void VirtualFlowLayout::setItemCount(int count)
     
     if (m_itemCount == count) {
         return;
+    }
+    
+    // Save scroll position before changes to prevent unwanted scrolling
+    int savedScrollY = 0;
+    if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+        savedScrollY = m_scrollArea->verticalScrollBar()->value();
     }
     
     // Clear existing widgets if count decreased
@@ -80,6 +97,11 @@ void VirtualFlowLayout::setItemCount(int count)
     calculateLayout();
     updateVisibleItems();
     update();
+    
+    // Restore scroll position after changes
+    if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+        m_scrollArea->verticalScrollBar()->setValue(savedScrollY);
+    }
     
     // Also schedule a deferred update to catch any timing issues
     if (count > 0 && m_deferredUpdateTimer) {
@@ -144,6 +166,12 @@ void VirtualFlowLayout::ensureVisible(int index)
 
 void VirtualFlowLayout::refresh()
 {
+    // Save scroll position before refresh to prevent unwanted scrolling
+    int savedScrollY = 0;
+    if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+        savedScrollY = m_scrollArea->verticalScrollBar()->value();
+    }
+    
     // Force recalculation and update of all visible items
     // We need to hide and clear all visible widgets first because after
     // sorting/filtering, the same index may now represent a different item
@@ -159,6 +187,11 @@ void VirtualFlowLayout::refresh()
     calculateLayout();
     updateVisibleItems();
     update();
+    
+    // Restore scroll position after refresh
+    if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+        m_scrollArea->verticalScrollBar()->setValue(savedScrollY);
+    }
 }
 
 void VirtualFlowLayout::clear()
