@@ -1607,17 +1607,12 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Clear existing cards
     cardManager->clearAllCards();
     
-    // Preload anime data and statistics cache for better performance
-    // This eliminates individual database queries during card creation
+    // Comprehensive preload of ALL data needed for card creation
+    // This eliminates ALL SQL queries from createCard()
     if (!aids.isEmpty()) {
-        LOG(QString("[Progressive Loading] Preloading anime data cache for %1 anime...").arg(aids.size()));
-        cardManager->preloadAnimeDataCache(aids);
-        LOG("[Progressive Loading] Anime data cache preload complete");
-        
-        // Preload episode data to eliminate individual queries during card creation
-        LOG(QString("[Progressive Loading] Preloading episode data cache for %1 anime...").arg(aids.size()));
-        cardManager->preloadEpisodesCache(aids);
-        LOG("[Progressive Loading] Episode data cache preload complete");
+        LOG(QString("[Progressive Loading] Preloading comprehensive card data for %1 anime...").arg(aids.size()));
+        cardManager->preloadCardCreationData(aids);
+        LOG("[Progressive Loading] Comprehensive card data preload complete");
     }
     
     // Start progressive loading timer

@@ -73,6 +73,10 @@ public:
     // Preload episode data cache for better performance (call before creating many cards)
     void preloadEpisodesCache(const QList<int>& aids);
     
+    // Comprehensive preload function that loads ALL data needed for card creation
+    // This should be called BEFORE any cards are created to eliminate all SQL queries from createCard()
+    void preloadCardCreationData(const QList<int>& aids);
+    
 signals:
     // Emitted when a card is created
     void cardCreated(int aid, AnimeCard *card);
@@ -122,21 +126,6 @@ private slots:
     void processBatchedUpdates();
     
 private:
-    // Create a single card for an anime
-    AnimeCard* createCard(int aid);
-    
-    // Update card data from database
-    void updateCardFromDatabase(int aid);
-    
-    // Load episode data for a card
-    void loadEpisodesForCard(AnimeCard *card, int aid);
-    
-    // Request missing anime metadata
-    void requestAnimeMetadata(int aid);
-    
-    // Download poster for anime
-    void downloadPoster(int aid, const QString &picname);
-    
     // Helper to calculate statistics for an anime
     struct AnimeStats {
         int normalEpisodes;
@@ -144,36 +133,6 @@ private:
         int normalViewed;
         int otherEpisodes;
         int otherViewed;
-    };
-    AnimeStats calculateStatistics(int aid);
-    
-    // Helper functions for common operations
-    QString determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid);
-    QList<AnimeCard::TagInfo> getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category);
-    void updateCardAiredDates(AnimeCard* card, const QString& startDate, const QString& endDate);
-    
-    // Cache anime titles for bulk loading (aid -> title)
-    void preloadAnimeTitlesCache(const QList<int>& aids);
-    void clearAnimeTitlesCache();
-    
-    // Bulk preload all data needed for card creation
-    struct AnimeData {
-        QString nameRomaji;
-        QString nameEnglish;
-        QString animeTitle;
-        QString typeName;
-        QString startDate;
-        QString endDate;
-        QString picname;
-        QByteArray posterData;
-        QString category;
-        QString rating;
-        QString tagNameList;
-        QString tagIdList;
-        QString tagWeightList;
-        bool isHidden;
-        bool is18Restricted;
-        int eptotal;
     };
     
     // Structure to cache episode data for an anime
@@ -195,20 +154,74 @@ private:
         int localWatched;
     };
     
+    // Comprehensive data structure containing ALL data needed for card creation
+    // This eliminates the need for any SQL queries during card creation
+    struct CardCreationData {
+        // Anime basic info
+        QString nameRomaji;
+        QString nameEnglish;
+        QString animeTitle;
+        QString typeName;
+        QString startDate;
+        QString endDate;
+        QString picname;
+        QByteArray posterData;
+        QString category;
+        QString rating;
+        QString tagNameList;
+        QString tagIdList;
+        QString tagWeightList;
+        bool isHidden;
+        bool is18Restricted;
+        int eptotal;
+        
+        // Statistics
+        AnimeStats stats;
+        
+        // Episodes
+        QList<EpisodeCacheEntry> episodes;
+        
+        // Flag to indicate if this anime has full data
+        bool hasData;
+        
+        CardCreationData() : isHidden(false), is18Restricted(false), eptotal(0), hasData(false) {}
+    };
+    
+    // Create a single card for an anime
+    AnimeCard* createCard(int aid);
+    
+    // Update card data from database
+    void updateCardFromDatabase(int aid);
+    
+    // Load episode data for a card
+    void loadEpisodesForCard(AnimeCard *card, int aid);
+    
+    // Load episode data for a card from cache (no SQL queries)
+    void loadEpisodesForCardFromCache(AnimeCard *card, int aid, const QList<EpisodeCacheEntry>& episodes);
+    
+    // Request missing anime metadata
+    void requestAnimeMetadata(int aid);
+    
+    // Download poster for anime
+    void downloadPoster(int aid, const QString &picname);
+    
+    AnimeStats calculateStatistics(int aid);
+    
+    // Helper functions for common operations
+    QString determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid);
+    QList<AnimeCard::TagInfo> getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category);
+    void updateCardAiredDates(AnimeCard* card, const QString& startDate, const QString& endDate);
+    
+    // Cache anime titles for bulk loading (aid -> title)
+    void preloadAnimeTitlesCache(const QList<int>& aids);
+    void clearAnimeTitlesCache();
+    
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;
     
-    // Anime titles cache for efficient bulk loading
-    QMap<int, QString> m_animeTitlesCache;
-    
-    // Anime data cache for efficient bulk loading
-    QMap<int, AnimeData> m_animeDataCache;
-    
-    // Statistics cache for efficient bulk loading  
-    QMap<int, AnimeStats> m_statsCache;
-    
-    // Episodes cache for efficient bulk loading (aid -> list of episodes)
-    QMap<int, QList<EpisodeCacheEntry>> m_episodesCache;
+    // Comprehensive card creation data cache - contains ALL data needed for card creation
+    // This is populated once before any cards are created
+    QMap<int, CardCreationData> m_cardCreationDataCache;
     
     // Layout where cards are displayed
     FlowLayout *m_layout;
