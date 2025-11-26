@@ -173,6 +173,28 @@ private:
         int eptotal;
     };
     
+    // Structure to cache episode data for an anime
+    struct EpisodeCacheEntry {
+        int lid;
+        int eid;
+        int fid;
+        int state;
+        int viewed;
+        QString storage;
+        QString episodeName;
+        QString epno;
+        QString filename;
+        qint64 lastPlayed;
+        QString localFilePath;
+        QString resolution;
+        QString quality;
+        QString groupName;
+        int localWatched;
+    };
+    
+    // Bulk preload episode data for card creation
+    void preloadEpisodesCache(const QList<int>& aids);
+    
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;
     
@@ -184,6 +206,9 @@ private:
     
     // Statistics cache for efficient bulk loading  
     QMap<int, AnimeStats> m_statsCache;
+    
+    // Episodes cache for efficient bulk loading (aid -> list of episodes)
+    QMap<int, QList<EpisodeCacheEntry>> m_episodesCache;
     
     // Layout where cards are displayed
     FlowLayout *m_layout;
