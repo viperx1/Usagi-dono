@@ -20,9 +20,23 @@ VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     , m_scrollArea(nullptr)
     , m_cachedFirstVisible(-1)
     , m_cachedLastVisible(-1)
+    , m_deferredUpdateTimer(nullptr)
 {
     setMinimumSize(m_itemSize);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    
+    // Create deferred update timer for handling initialization timing issues
+    m_deferredUpdateTimer = new QTimer(this);
+    m_deferredUpdateTimer->setSingleShot(true);
+    m_deferredUpdateTimer->setInterval(100);  // 100ms delay
+    connect(m_deferredUpdateTimer, &QTimer::timeout, this, [this]() {
+        LOG("[VirtualFlowLayout] Deferred update triggered");
+        m_cachedFirstVisible = -1;
+        m_cachedLastVisible = -1;
+        calculateLayout();
+        updateVisibleItems();
+        update();
+    });
 }
 
 VirtualFlowLayout::~VirtualFlowLayout()
@@ -37,6 +51,8 @@ void VirtualFlowLayout::setItemFactory(const ItemFactory &factory)
 
 void VirtualFlowLayout::setItemCount(int count)
 {
+    LOG(QString("[VirtualFlowLayout] setItemCount: changing from %1 to %2").arg(m_itemCount).arg(count));
+    
     if (m_itemCount == count) {
         return;
     }
@@ -56,9 +72,19 @@ void VirtualFlowLayout::setItemCount(int count)
     }
     
     m_itemCount = count;
+    
+    // Reset cached visible range to force recalculation
+    m_cachedFirstVisible = -1;
+    m_cachedLastVisible = -1;
+    
     calculateLayout();
     updateVisibleItems();
     update();
+    
+    // Also schedule a deferred update to catch any timing issues
+    if (count > 0 && m_deferredUpdateTimer) {
+        m_deferredUpdateTimer->start();
+    }
 }
 
 void VirtualFlowLayout::setItemSize(const QSize &size)

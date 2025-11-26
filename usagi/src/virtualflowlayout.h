@@ -6,6 +6,7 @@
 #include <QRect>
 #include <QMap>
 #include <QList>
+#include <QTimer>
 #include <functional>
 
 /**
@@ -140,6 +141,9 @@ private:
     // Visible range caching
     int m_cachedFirstVisible;
     int m_cachedLastVisible;
+    
+    // Deferred update timer to handle initialization timing
+    QTimer *m_deferredUpdateTimer;
     
     // Constants
     static constexpr int BUFFER_ROWS = 2;  // Extra rows to render above/below viewport
