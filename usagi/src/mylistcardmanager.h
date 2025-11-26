@@ -34,6 +34,34 @@ class MyListCardManager : public QObject
     Q_OBJECT
     
 public:
+    // Helper to store statistics for an anime
+    struct AnimeStats {
+        int normalEpisodes;
+        int totalNormalEpisodes;
+        int normalViewed;
+        int otherEpisodes;
+        int otherViewed;
+        
+        AnimeStats() : normalEpisodes(0), totalNormalEpisodes(0), normalViewed(0), otherEpisodes(0), otherViewed(0) {}
+    };
+    
+    // Data structure for filtering and sorting without card widgets
+    // This mirrors the CardCreationData but is publicly accessible
+    struct CachedAnimeData {
+        QString animeName;      // The resolved display name
+        QString typeName;
+        QString startDate;
+        QString endDate;
+        bool isHidden;
+        bool is18Restricted;
+        int eptotal;
+        AnimeStats stats;
+        qint64 lastPlayed;      // Most recent play timestamp from episodes
+        bool hasData;
+        
+        CachedAnimeData() : isHidden(false), is18Restricted(false), eptotal(0), lastPlayed(0), hasData(false) {}
+    };
+    
     explicit MyListCardManager(QObject *parent = nullptr);
     virtual ~MyListCardManager();
     
@@ -95,6 +123,13 @@ public:
     // Create a card for an anime (data must be preloaded first via preloadCardCreationData)
     AnimeCard* createCard(int aid);
     
+    // Get cached anime data for filtering/sorting without needing card widgets
+    // This is essential for virtual scrolling where cards don't exist until visible
+    CachedAnimeData getCachedAnimeData(int aid) const;
+    
+    // Check if cached data exists for an anime
+    bool hasCachedData(int aid) const;
+    
 signals:
     // Emitted when a card is created
     void cardCreated(int aid, AnimeCard *card);
@@ -144,15 +179,6 @@ private slots:
     void processBatchedUpdates();
     
 private:
-    // Helper to calculate statistics for an anime
-    struct AnimeStats {
-        int normalEpisodes;
-        int totalNormalEpisodes;
-        int normalViewed;
-        int otherEpisodes;
-        int otherViewed;
-    };
-    
     // Structure to cache episode data for an anime
     struct EpisodeCacheEntry {
         int lid;
