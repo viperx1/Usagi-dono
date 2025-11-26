@@ -1546,6 +1546,58 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Logger::log("[AniDB Response] 293 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()), __FILE__, __LINE__);
 		}
 	}
+	else if(ReplyID == "297"){ // 297 CALENDAR
+		// CALENDAR response: list of anime with episodes airing soon
+		// Format: 297 CALENDAR
+		// {int4 aid}|{int4 start time}|{str dateflags}
+		// ... (multiple entries, one per line)
+		Logger::log("[AniDB Response] 297 CALENDAR - Received calendar data", __FILE__, __LINE__);
+		
+		QStringList lines = Message.split("\n");
+		lines.pop_front(); // Remove first line (status code line)
+		
+		int newAnimeCount = 0;
+		QSqlDatabase db = QSqlDatabase::database();
+		
+		// Process each anime entry in the calendar
+		for(const QString& line : lines)
+		{
+			if(line.trimmed().isEmpty())
+				continue;
+				
+			QStringList parts = line.split("|");
+			if(parts.size() >= 2)
+			{
+				int aid = parts[0].toInt();
+				// int startTime = parts[1].toInt();  // Unix timestamp when episode airs
+				// QString dateflags = parts.size() >= 3 ? parts[2] : "";
+				
+				// Check if this anime is already in anime_titles table
+				QSqlQuery checkQuery(db);
+				checkQuery.prepare("SELECT COUNT(*) FROM anime_titles WHERE aid = ?");
+				checkQuery.bindValue(0, aid);
+				
+				if(checkQuery.exec() && checkQuery.next())
+				{
+					int count = checkQuery.value(0).toInt();
+					if(count == 0)
+					{
+						// New anime not in our database - we should fetch it
+						Logger::log(QString("[AniDB Calendar] New anime detected: aid=%1").arg(aid), __FILE__, __LINE__);
+						newAnimeCount++;
+						
+						// Could trigger an ANIME command here to fetch details
+						// For now, just log it
+					}
+				}
+			}
+		}
+		
+		if(newAnimeCount > 0)
+		{
+			Logger::log(QString("[AniDB Calendar] Found %1 new anime in calendar").arg(newAnimeCount), __FILE__, __LINE__);
+		}
+	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
 		loggedin = 0;
 		if(ReplyTo != "LOGOUT"){
@@ -2330,6 +2382,27 @@ QString AniDBApi::Anime(int aid)
 	return GetTag(msg);
 }
 
+QString AniDBApi::Calendar()
+{
+	// Check if logged in first
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+		return "0";
+	}
+	
+	QString msg = buildCalendarCommand();
+	QString q;
+	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		Logger::log("[AniDB Calendar] Database insert error: " + query.lastError().text(), __FILE__, __LINE__);
+		return "0";
+	}
+	return GetTag(msg);
+}
+
 /* === Command Builders === */
 // These methods build formatted command strings for testing and reuse
 
@@ -2482,6 +2555,13 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	Mask mask(amask);
 	
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
+}
+
+QString AniDBApi::buildCalendarCommand()
+{
+	// CALENDAR command - returns list of anime that have episodes airing soon
+	// No parameters required
+	return QString("CALENDAR");
 }
 
 /* === End Command Builders === */

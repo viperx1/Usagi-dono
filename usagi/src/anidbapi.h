@@ -345,6 +345,7 @@ public:
 	QString MylistExport(QString template_name = "xml-plain-cs");
 	QString Episode(int eid);
 	QString Anime(int aid);
+	QString Calendar();
 	
 	// Command builders - return formatted command strings for testing
 	QString buildAuthCommand(QString username, QString password, int protover, QString client, int clientver, QString enc);
@@ -360,6 +361,7 @@ public:
 	QString buildMylistExportCommand(QString template_name);
 	QString buildEpisodeCommand(int eid);
 	QString buildAnimeCommand(int aid);
+	QString buildCalendarCommand();
 	/* Api End === */
 
 	/**
