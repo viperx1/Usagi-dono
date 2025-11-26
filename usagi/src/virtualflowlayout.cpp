@@ -145,6 +145,15 @@ void VirtualFlowLayout::ensureVisible(int index)
 void VirtualFlowLayout::refresh()
 {
     // Force recalculation and update of all visible items
+    // We need to hide and clear all visible widgets first because after
+    // sorting/filtering, the same index may now represent a different item
+    for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
+        if (it.value()) {
+            it.value()->hide();
+        }
+    }
+    m_visibleWidgets.clear();
+    
     m_cachedFirstVisible = -1;
     m_cachedLastVisible = -1;
     calculateLayout();

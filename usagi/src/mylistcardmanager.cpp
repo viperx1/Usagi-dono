@@ -155,6 +155,58 @@ QList<AnimeCard*> MyListCardManager::getAllCards() const
     return m_cards.values();
 }
 
+MyListCardManager::CachedAnimeData MyListCardManager::getCachedAnimeData(int aid) const
+{
+    QMutexLocker locker(&m_mutex);
+    CachedAnimeData result;
+    
+    if (!m_cardCreationDataCache.contains(aid)) {
+        return result;  // Return empty data with hasData = false
+    }
+    
+    const CardCreationData& data = m_cardCreationDataCache[aid];
+    
+    // Determine the anime name using the same logic as createCard()
+    QString animeName;
+    if (!data.nameRomaji.isEmpty()) {
+        animeName = data.nameRomaji;
+    } else if (!data.nameEnglish.isEmpty()) {
+        animeName = data.nameEnglish;
+    } else if (!data.animeTitle.isEmpty()) {
+        animeName = data.animeTitle;
+    } else {
+        animeName = QString("Anime %1").arg(aid);
+    }
+    
+    result.animeName = animeName;
+    result.typeName = data.typeName;
+    result.startDate = data.startDate;
+    result.endDate = data.endDate;
+    result.isHidden = data.isHidden;
+    result.is18Restricted = data.is18Restricted;
+    result.eptotal = data.eptotal;
+    result.stats = data.stats;
+    
+    // Calculate lastPlayed from episodes
+    qint64 maxLastPlayed = 0;
+    for (const EpisodeCacheEntry& episode : data.episodes) {
+        if (episode.lastPlayed > maxLastPlayed) {
+            maxLastPlayed = episode.lastPlayed;
+        }
+    }
+    result.lastPlayed = maxLastPlayed;
+    
+    result.hasData = data.hasData;
+    
+    return result;
+}
+
+bool MyListCardManager::hasCachedData(int aid) const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_cardCreationDataCache.contains(aid) && m_cardCreationDataCache[aid].hasData;
+}
+
 void MyListCardManager::updateCardAnimeInfo(int aid)
 {
     QMutexLocker locker(&m_mutex);
@@ -874,7 +926,7 @@ void MyListCardManager::downloadPoster(int aid, const QString &picname)
 
 MyListCardManager::AnimeStats MyListCardManager::calculateStatistics(int aid)
 {
-    AnimeStats stats = {0, 0, 0, 0, 0};
+    AnimeStats stats{};  // Explicit value initialization
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {

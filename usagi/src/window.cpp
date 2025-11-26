@@ -6,6 +6,7 @@
 #include "crashlog.h"
 #include "logger.h"
 #include "playbuttondelegate.h"
+#include "aired.h"
 #include <QElapsedTimer>
 #include <QThread>
 #include <QSqlDatabase>
@@ -3709,168 +3710,242 @@ void Window::sortMylistCards(int sortIndex)
 		}
 	}
 	
-	// Only sort if we have card data to sort by
-	if (!cardsMap.isEmpty()) {
-		// Sort based on criterion
-		switch (sortIndex) {
-			case 0: // Anime Title
-				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
-					AnimeCard* a = cardsMap.value(aidA);
-					AnimeCard* b = cardsMap.value(aidB);
-					if (!a || !b) return aidA < aidB;
-					
-					// Hidden cards always go to the bottom
-					if (a->isHidden() != b->isHidden()) {
-						return b->isHidden();  // non-hidden comes before hidden
-					}
-					
-					if (sortAscending) {
-						return a->getAnimeTitle() < b->getAnimeTitle();
-					} else {
-						return a->getAnimeTitle() > b->getAnimeTitle();
-					}
-				});
-				break;
-			case 1: // Type
-				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
-					AnimeCard* a = cardsMap.value(aidA);
-					AnimeCard* b = cardsMap.value(aidB);
-					if (!a || !b) return aidA < aidB;
-					
-					// Hidden cards always go to the bottom
-					if (a->isHidden() != b->isHidden()) {
-						return b->isHidden();  // non-hidden comes before hidden
-					}
-					
-					if (a->getAnimeType() == b->getAnimeType()) {
-						return a->getAnimeTitle() < b->getAnimeTitle();
-					}
-					if (sortAscending) {
-						return a->getAnimeType() < b->getAnimeType();
-					} else {
-						return a->getAnimeType() > b->getAnimeType();
-					}
-				});
-				break;
-			case 2: // Aired Date
-				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
-					AnimeCard* a = cardsMap.value(aidA);
-					AnimeCard* b = cardsMap.value(aidB);
-					if (!a || !b) return aidA < aidB;
-					
-					// Hidden cards always go to the bottom
-					if (a->isHidden() != b->isHidden()) {
-						return b->isHidden();  // non-hidden comes before hidden
-					}
-					
-					aired airedA = a->getAired();
-					aired airedB = b->getAired();
-					
-					// Handle invalid dates (put at end)
-					if (!airedA.isValid() && !airedB.isValid()) {
-						return a->getAnimeTitle() < b->getAnimeTitle();
-					}
-					if (!airedA.isValid()) {
-						return false;  // a goes after b
-					}
-					if (!airedB.isValid()) {
-						return true;   // a goes before b
-					}
-					
-					// Use aired class comparison operators
-					if (airedA == airedB) {
-						return a->getAnimeTitle() < b->getAnimeTitle();
-					}
-					if (sortAscending) {
-						return airedA < airedB;
-					} else {
-						return airedA > airedB;
-					}
-				});
-				break;
-			case 3: // Episodes (Count)
-				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
-					AnimeCard* a = cardsMap.value(aidA);
-					AnimeCard* b = cardsMap.value(aidB);
-					if (!a || !b) return aidA < aidB;
-					
-					// Hidden cards always go to the bottom
-					if (a->isHidden() != b->isHidden()) {
-						return b->isHidden();  // non-hidden comes before hidden
-					}
-					
-					int episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
-					int episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
-					if (episodesA == episodesB) {
-						return a->getAnimeTitle() < b->getAnimeTitle();
-					}
-					if (sortAscending) {
-						return episodesA < episodesB;
-					} else {
-						return episodesA > episodesB;
-					}
-				});
-				break;
-			case 4: // Completion %
-				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
-					AnimeCard* a = cardsMap.value(aidA);
-					AnimeCard* b = cardsMap.value(aidB);
-					if (!a || !b) return aidA < aidB;
-					
-					// Hidden cards always go to the bottom
-					if (a->isHidden() != b->isHidden()) {
-						return b->isHidden();  // non-hidden comes before hidden
-					}
-					
-					int totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
-					int totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
-					int viewedA = a->getNormalViewed() + a->getOtherViewed();
-					int viewedB = b->getNormalViewed() + b->getOtherViewed();
-					double completionA = (totalEpisodesA > 0) ? (double)viewedA / totalEpisodesA : 0.0;
-					double completionB = (totalEpisodesB > 0) ? (double)viewedB / totalEpisodesB : 0.0;
-					if (completionA == completionB) {
-						return a->getAnimeTitle() < b->getAnimeTitle();
-					}
-					if (sortAscending) {
-						return completionA < completionB;
-					} else {
-						return completionA > completionB;
-					}
-				});
-				break;
-			case 5: // Last Played
-				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
-					AnimeCard* a = cardsMap.value(aidA);
-					AnimeCard* b = cardsMap.value(aidB);
-					if (!a || !b) return aidA < aidB;
-					
-					// Hidden cards always go to the bottom
-					if (a->isHidden() != b->isHidden()) {
-						return b->isHidden();  // non-hidden comes before hidden
-					}
-					
-					qint64 lastPlayedA = a->getLastPlayed();
-					qint64 lastPlayedB = b->getLastPlayed();
-					
-					// Never played items (0) go to the end regardless of sort order
-					if (lastPlayedA == 0 && lastPlayedB == 0) {
-						return a->getAnimeTitle() < b->getAnimeTitle();
-					}
-					if (lastPlayedA == 0) {
-						return false;  // a goes after b
-					}
-					if (lastPlayedB == 0) {
-						return true;   // a goes before b
-					}
-					
-					if (sortAscending) {
-						return lastPlayedA < lastPlayedB;
-					} else {
-						return lastPlayedA > lastPlayedB;
-					}
-				});
-				break;
-		}
+	// Helper lambda to get cached data for an anime
+	// This allows sorting to work with virtual scrolling where cards may not exist
+	auto getCachedData = [this](int aid) -> MyListCardManager::CachedAnimeData {
+		return cardManager->getCachedAnimeData(aid);
+	};
+	
+	// Sort based on criterion
+	// Use cached data when card widgets don't exist (virtual scrolling)
+	switch (sortIndex) {
+		case 0: // Anime Title
+			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
+				AnimeCard* a = cardsMap.value(aidA);
+				AnimeCard* b = cardsMap.value(aidB);
+				
+				// Get data from cards or cache
+				bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+				bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+				QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+				QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+				
+				// Hidden cards always go to the bottom
+				if (hiddenA != hiddenB) {
+					return hiddenB;  // non-hidden comes before hidden
+				}
+				
+				if (sortAscending) {
+					return titleA < titleB;
+				} else {
+					return titleA > titleB;
+				}
+			});
+			break;
+		case 1: // Type
+			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
+				AnimeCard* a = cardsMap.value(aidA);
+				AnimeCard* b = cardsMap.value(aidB);
+				
+				// Get data from cards or cache
+				bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+				bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+				QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+				QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+				QString typeA = a ? a->getAnimeType() : getCachedData(aidA).typeName;
+				QString typeB = b ? b->getAnimeType() : getCachedData(aidB).typeName;
+				
+				// Hidden cards always go to the bottom
+				if (hiddenA != hiddenB) {
+					return hiddenB;  // non-hidden comes before hidden
+				}
+				
+				if (typeA == typeB) {
+					return titleA < titleB;
+				}
+				if (sortAscending) {
+					return typeA < typeB;
+				} else {
+					return typeA > typeB;
+				}
+			});
+			break;
+		case 2: // Aired Date
+			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
+				AnimeCard* a = cardsMap.value(aidA);
+				AnimeCard* b = cardsMap.value(aidB);
+				
+				// Get data from cards or cache
+				bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+				bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+				QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+				QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+				
+				// Hidden cards always go to the bottom
+				if (hiddenA != hiddenB) {
+					return hiddenB;  // non-hidden comes before hidden
+				}
+				
+				// Get aired dates
+				aired airedA, airedB;
+				if (a) {
+					airedA = a->getAired();
+				} else {
+					MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+					airedA = aired(cachedA.startDate, cachedA.endDate);
+				}
+				if (b) {
+					airedB = b->getAired();
+				} else {
+					MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+					airedB = aired(cachedB.startDate, cachedB.endDate);
+				}
+				
+				// Handle invalid dates (put at end)
+				if (!airedA.isValid() && !airedB.isValid()) {
+					return titleA < titleB;
+				}
+				if (!airedA.isValid()) {
+					return false;  // a goes after b
+				}
+				if (!airedB.isValid()) {
+					return true;   // a goes before b
+				}
+				
+				// Use aired class comparison operators
+				if (airedA == airedB) {
+					return titleA < titleB;
+				}
+				if (sortAscending) {
+					return airedA < airedB;
+				} else {
+					return airedA > airedB;
+				}
+			});
+			break;
+		case 3: // Episodes (Count)
+			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
+				AnimeCard* a = cardsMap.value(aidA);
+				AnimeCard* b = cardsMap.value(aidB);
+				
+				// Get data from cards or cache
+				bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+				bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+				QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+				QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+				
+				// Hidden cards always go to the bottom
+				if (hiddenA != hiddenB) {
+					return hiddenB;  // non-hidden comes before hidden
+				}
+				
+				int episodesA, episodesB;
+				if (a) {
+					episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+				} else {
+					MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+					episodesA = cachedA.stats.normalEpisodes + cachedA.stats.otherEpisodes;
+				}
+				if (b) {
+					episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+				} else {
+					MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+					episodesB = cachedB.stats.normalEpisodes + cachedB.stats.otherEpisodes;
+				}
+				
+				if (episodesA == episodesB) {
+					return titleA < titleB;
+				}
+				if (sortAscending) {
+					return episodesA < episodesB;
+				} else {
+					return episodesA > episodesB;
+				}
+			});
+			break;
+		case 4: // Completion %
+			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
+				AnimeCard* a = cardsMap.value(aidA);
+				AnimeCard* b = cardsMap.value(aidB);
+				
+				// Get data from cards or cache
+				bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+				bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+				QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+				QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+				
+				// Hidden cards always go to the bottom
+				if (hiddenA != hiddenB) {
+					return hiddenB;  // non-hidden comes before hidden
+				}
+				
+				int totalEpisodesA, totalEpisodesB, viewedA, viewedB;
+				if (a) {
+					totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+					viewedA = a->getNormalViewed() + a->getOtherViewed();
+				} else {
+					MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+					totalEpisodesA = cachedA.stats.normalEpisodes + cachedA.stats.otherEpisodes;
+					viewedA = cachedA.stats.normalViewed + cachedA.stats.otherViewed;
+				}
+				if (b) {
+					totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+					viewedB = b->getNormalViewed() + b->getOtherViewed();
+				} else {
+					MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+					totalEpisodesB = cachedB.stats.normalEpisodes + cachedB.stats.otherEpisodes;
+					viewedB = cachedB.stats.normalViewed + cachedB.stats.otherViewed;
+				}
+				
+				double completionA = (totalEpisodesA > 0) ? static_cast<double>(viewedA) / totalEpisodesA : 0.0;
+				double completionB = (totalEpisodesB > 0) ? static_cast<double>(viewedB) / totalEpisodesB : 0.0;
+				if (completionA == completionB) {
+					return titleA < titleB;
+				}
+				if (sortAscending) {
+					return completionA < completionB;
+				} else {
+					return completionA > completionB;
+				}
+			});
+			break;
+		case 5: // Last Played
+			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
+				AnimeCard* a = cardsMap.value(aidA);
+				AnimeCard* b = cardsMap.value(aidB);
+				
+				// Get data from cards or cache
+				bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+				bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+				QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+				QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+				
+				// Hidden cards always go to the bottom
+				if (hiddenA != hiddenB) {
+					return hiddenB;  // non-hidden comes before hidden
+				}
+				
+				qint64 lastPlayedA = a ? a->getLastPlayed() : getCachedData(aidA).lastPlayed;
+				qint64 lastPlayedB = b ? b->getLastPlayed() : getCachedData(aidB).lastPlayed;
+				
+				// Never played items (0) go to the end regardless of sort order
+				if (lastPlayedA == 0 && lastPlayedB == 0) {
+					return titleA < titleB;
+				}
+				if (lastPlayedA == 0) {
+					return false;  // a goes after b
+				}
+				if (lastPlayedB == 0) {
+					return true;   // a goes before b
+				}
+				
+				if (sortAscending) {
+					return lastPlayedA < lastPlayedB;
+				} else {
+					return lastPlayedA > lastPlayedB;
+				}
+			});
+			break;
 	}
 	
 	// Update the card manager with the new order
@@ -4051,15 +4126,18 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 // Check if a card matches the search filter
 bool Window::matchesSearchFilter(AnimeCard *card, const QString &searchText)
 {
+	return matchesSearchFilter(card->getAnimeId(), card->getAnimeTitle(), searchText);
+}
+
+// Check if an anime matches the search filter (using aid and title)
+bool Window::matchesSearchFilter(int aid, const QString &animeName, const QString &searchText)
+{
 	if (searchText.isEmpty()) {
 		return true;
 	}
 	
-	int aid = card->getAnimeId();
-	QString cardTitle = card->getAnimeTitle();
-	
 	// Check main title first
-	if (cardTitle.contains(searchText, Qt::CaseInsensitive)) {
+	if (animeName.contains(searchText, Qt::CaseInsensitive)) {
 		return true;
 	}
 	
@@ -4120,7 +4198,7 @@ void Window::applyMylistFilters()
 		return;
 	}
 	
-	// Build a map of existing cards for quick lookup
+	// Build a map of existing cards for quick lookup (for backward compatibility)
 	QMap<int, AnimeCard*> cardsMap;
 	for (AnimeCard* card : cardManager->getAllCards()) {
 		cardsMap[card->getAnimeId()] = card;
@@ -4137,33 +4215,51 @@ void Window::applyMylistFilters()
 	int totalCount = allAnimeIds.size();
 	
 	// Apply filters to determine which anime to show
+	// Use cached data when card widgets don't exist (virtual scrolling)
 	for (int aid : allAnimeIds) {
-		AnimeCard* card = cardsMap.value(aid);
 		bool visible = true;
 		
-		// If the card doesn't exist yet (virtual scrolling), include it anyway
-		// Virtual scrolling creates cards on-demand, so we can't filter without card data
-		// The card will be created when scrolled into view
+		// Try to get data from existing card first, then fall back to cached data
+		AnimeCard* card = cardsMap.value(aid);
+		MyListCardManager::CachedAnimeData cachedData;
+		
+		// Get cached data for filtering - essential for virtual scrolling
 		if (!card) {
-			filteredAnimeIds.append(aid);
-			continue;
+			cachedData = cardManager->getCachedAnimeData(aid);
+			if (!cachedData.hasData) {
+				// No card and no cached data - include it anyway (can't filter)
+				filteredAnimeIds.append(aid);
+				continue;
+			}
 		}
+		
+		// Get anime name for search filter
+		QString animeName = card ? card->getAnimeTitle() : cachedData.animeName;
 		
 		// Apply search filter
 		if (!searchText.isEmpty()) {
-			visible = visible && matchesSearchFilter(card, searchText);
+			visible = visible && matchesSearchFilter(aid, animeName, searchText);
 		}
 		
 		// Apply type filter
 		if (!typeFilter.isEmpty()) {
-			visible = visible && (card->getAnimeType() == typeFilter);
+			QString animeType = card ? card->getAnimeType() : cachedData.typeName;
+			visible = visible && (animeType == typeFilter);
 		}
 		
 		// Apply completion filter
 		if (!completionFilter.isEmpty()) {
-			int normalEpisodes = card->getNormalEpisodes();
-			int normalViewed = card->getNormalViewed();
-			int totalEpisodes = card->getTotalNormalEpisodes();
+			int normalEpisodes, normalViewed, totalEpisodes;
+			
+			if (card) {
+				normalEpisodes = card->getNormalEpisodes();
+				normalViewed = card->getNormalViewed();
+				totalEpisodes = card->getTotalNormalEpisodes();
+			} else {
+				normalEpisodes = cachedData.stats.normalEpisodes;
+				normalViewed = cachedData.stats.normalViewed;
+				totalEpisodes = cachedData.eptotal > 0 ? cachedData.eptotal : cachedData.stats.totalNormalEpisodes;
+			}
 			
 			if (completionFilter == "completed") {
 				// Completed: all normal episodes viewed
@@ -4194,10 +4290,19 @@ void Window::applyMylistFilters()
 		
 		// Apply unwatched filter
 		if (showOnlyUnwatched) {
-			int normalEpisodes = card->getNormalEpisodes();
-			int normalViewed = card->getNormalViewed();
-			int otherEpisodes = card->getOtherEpisodes();
-			int otherViewed = card->getOtherViewed();
+			int normalEpisodes, normalViewed, otherEpisodes, otherViewed;
+			
+			if (card) {
+				normalEpisodes = card->getNormalEpisodes();
+				normalViewed = card->getNormalViewed();
+				otherEpisodes = card->getOtherEpisodes();
+				otherViewed = card->getOtherViewed();
+			} else {
+				normalEpisodes = cachedData.stats.normalEpisodes;
+				normalViewed = cachedData.stats.normalViewed;
+				otherEpisodes = cachedData.stats.otherEpisodes;
+				otherViewed = cachedData.stats.otherViewed;
+			}
 			
 			// Show only if there are unwatched episodes
 			visible = visible && ((normalEpisodes > normalViewed) || (otherEpisodes > otherViewed));
@@ -4205,11 +4310,13 @@ void Window::applyMylistFilters()
 		
 		// Apply adult content filter
 		if (adultContentFilter == "hide") {
+			bool is18Restricted = card ? card->is18Restricted() : cachedData.is18Restricted;
 			// Hide 18+ content (default)
-			visible = visible && !card->is18Restricted();
+			visible = visible && !is18Restricted;
 		} else if (adultContentFilter == "showonly") {
+			bool is18Restricted = card ? card->is18Restricted() : cachedData.is18Restricted;
 			// Show only 18+ content
-			visible = visible && card->is18Restricted();
+			visible = visible && is18Restricted;
 		}
 		// "ignore" means no filtering based on 18+ status
 		

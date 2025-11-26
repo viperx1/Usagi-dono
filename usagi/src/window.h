@@ -698,6 +698,7 @@ private:
     QMap<int, AnimeAlternativeTitles> animeAlternativeTitlesCache;  // aid -> alternative titles
     void loadAnimeAlternativeTitlesForFiltering();
     bool matchesSearchFilter(AnimeCard *card, const QString &searchText);
+    bool matchesSearchFilter(int aid, const QString &animeName, const QString &searchText);
     
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
