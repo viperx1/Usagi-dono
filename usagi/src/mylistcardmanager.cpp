@@ -926,7 +926,7 @@ void MyListCardManager::downloadPoster(int aid, const QString &picname)
 
 MyListCardManager::AnimeStats MyListCardManager::calculateStatistics(int aid)
 {
-    AnimeStats stats;
+    AnimeStats stats{};  // Explicit value initialization
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
