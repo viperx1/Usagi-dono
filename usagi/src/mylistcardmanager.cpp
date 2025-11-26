@@ -73,6 +73,8 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids)
     QMutexLocker locker(&m_mutex);
     m_orderedAnimeIds = aids;
     
+    LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs").arg(aids.size()));
+    
     if (m_virtualLayout) {
         m_virtualLayout->setItemCount(aids.size());
     }
@@ -83,14 +85,22 @@ AnimeCard* MyListCardManager::createCardForIndex(int index)
     QMutexLocker locker(&m_mutex);
     
     if (index < 0 || index >= m_orderedAnimeIds.size()) {
+        LOG(QString("[MyListCardManager] createCardForIndex: index %1 out of range (size=%2)")
+            .arg(index).arg(m_orderedAnimeIds.size()));
         return nullptr;
     }
     
     int aid = m_orderedAnimeIds[index];
     locker.unlock();
     
+    LOG(QString("[MyListCardManager] createCardForIndex: creating card for index=%1, aid=%2").arg(index).arg(aid));
+    
     // Create the card using the existing createCard method
-    return createCard(aid);
+    AnimeCard* card = createCard(aid);
+    if (!card) {
+        LOG(QString("[MyListCardManager] createCardForIndex: createCard returned null for aid=%1").arg(aid));
+    }
+    return card;
 }
 
 // loadAllCards() has been removed - use progressive loading via Window::loadMylistProgressively() instead

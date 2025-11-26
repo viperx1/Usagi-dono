@@ -176,6 +176,10 @@ void VirtualFlowLayout::setScrollArea(QScrollArea *scrollArea)
             disconnect(m_scrollArea->horizontalScrollBar(), &QScrollBar::valueChanged,
                       this, &VirtualFlowLayout::onScrollChanged);
         }
+        // Remove event filter from old viewport
+        if (m_scrollArea->viewport()) {
+            m_scrollArea->viewport()->removeEventFilter(this);
+        }
     }
     
     m_scrollArea = scrollArea;
@@ -189,6 +193,10 @@ void VirtualFlowLayout::setScrollArea(QScrollArea *scrollArea)
         if (m_scrollArea->horizontalScrollBar()) {
             connect(m_scrollArea->horizontalScrollBar(), &QScrollBar::valueChanged,
                    this, &VirtualFlowLayout::onScrollChanged);
+        }
+        // Install event filter on viewport to catch resize events
+        if (m_scrollArea->viewport()) {
+            m_scrollArea->viewport()->installEventFilter(this);
         }
         
         calculateLayout();
@@ -224,6 +232,17 @@ bool VirtualFlowLayout::event(QEvent *event)
     return QWidget::event(event);
 }
 
+bool VirtualFlowLayout::eventFilter(QObject *watched, QEvent *event)
+{
+    // Handle viewport resize events
+    if (m_scrollArea && watched == m_scrollArea->viewport() && event->type() == QEvent::Resize) {
+        LOG("[VirtualFlowLayout] Viewport resized, recalculating layout");
+        calculateLayout();
+        updateVisibleItems();
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
 void VirtualFlowLayout::onScrollChanged()
 {
     updateVisibleItems();
@@ -236,6 +255,9 @@ void VirtualFlowLayout::calculateLayout()
     if (m_scrollArea) {
         availableWidth = m_scrollArea->viewport()->width();
     }
+    
+    LOG(QString("[VirtualFlowLayout] calculateLayout: availableWidth=%1, itemSize=(%2,%3), itemCount=%4")
+        .arg(availableWidth).arg(m_itemSize.width()).arg(m_itemSize.height()).arg(m_itemCount));
     
     if (availableWidth <= 0 || m_itemSize.width() <= 0) {
         m_columnsPerRow = 1;
@@ -254,6 +276,9 @@ void VirtualFlowLayout::calculateLayout()
         m_contentHeight -= m_vSpacing;  // No spacing after last row
     }
     m_contentHeight += 10;  // Small padding at bottom
+    
+    LOG(QString("[VirtualFlowLayout] calculateLayout: columnsPerRow=%1, totalRows=%2, contentHeight=%3")
+        .arg(m_columnsPerRow).arg(m_totalRows).arg(m_contentHeight));
     
     // Update our minimum height to match content
     setMinimumHeight(m_contentHeight);
@@ -275,11 +300,16 @@ void VirtualFlowLayout::calculateLayout()
 void VirtualFlowLayout::updateVisibleItems()
 {
     if (!m_itemFactory || m_itemCount == 0) {
+        LOG(QString("[VirtualFlowLayout] updateVisibleItems skipped: factory=%1, itemCount=%2")
+            .arg(m_itemFactory ? "yes" : "no").arg(m_itemCount));
         return;
     }
     
     int firstVisible, lastVisible;
     getVisibleRange(firstVisible, lastVisible);
+    
+    LOG(QString("[VirtualFlowLayout] updateVisibleItems: range=%1-%2, cachedRange=%3-%4")
+        .arg(firstVisible).arg(lastVisible).arg(m_cachedFirstVisible).arg(m_cachedLastVisible));
     
     // Check if the range has changed
     if (firstVisible == m_cachedFirstVisible && lastVisible == m_cachedLastVisible) {
@@ -325,6 +355,15 @@ QRect VirtualFlowLayout::visibleRect() const
     
     QSize viewportSize = m_scrollArea->viewport()->size();
     
+    // If viewport size is not yet valid, use a reasonable default
+    // This ensures we show at least some cards on initial load
+    if (viewportSize.width() <= 0) {
+        viewportSize.setWidth(800);  // Default width
+    }
+    if (viewportSize.height() <= 0) {
+        viewportSize.setHeight(600);  // Default height
+    }
+    
     return QRect(scrollX, scrollY, viewportSize.width(), viewportSize.height());
 }
 
@@ -345,6 +384,10 @@ void VirtualFlowLayout::getVisibleRange(int &firstVisible, int &lastVisible) con
     }
     
     QRect visible = visibleRect();
+    
+    LOG(QString("[VirtualFlowLayout] getVisibleRange: visibleRect=(%1,%2,%3,%4), rowHeight=%5, totalRows=%6, columnsPerRow=%7")
+        .arg(visible.x()).arg(visible.y()).arg(visible.width()).arg(visible.height())
+        .arg(m_rowHeight).arg(m_totalRows).arg(m_columnsPerRow));
     
     // Calculate first and last visible row (with buffer)
     int firstRow = qMax(0, rowAtY(visible.top()) - BUFFER_ROWS);
