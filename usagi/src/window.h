@@ -41,7 +41,6 @@
 #include "playbackmanager.h"
 #include "animecard.h"
 #include "flowlayout.h"
-#include "virtualflowlayout.h"
 #include "mylistcardmanager.h"
 #include "mylistfiltersidebar.h"
 #include "uicolors.h"
@@ -50,7 +49,6 @@
 // Forward declarations
 class PlayButtonDelegate;
 class MyListCardManager;
-class VirtualFlowLayout;
 
 // MyList tree widget column indices (using enum for type safety and maintainability)
 // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
@@ -468,7 +466,6 @@ private:
     QScrollArea *mylistCardScrollArea;
     QWidget *mylistCardContainer;
     FlowLayout *mylistCardLayout;
-    VirtualFlowLayout *mylistVirtualLayout;  // Virtual scrolling layout for efficient rendering
     QLabel *mylistStatusLabel;
     bool mylistSortAscending;  // Deprecated: moved to MyListFilterSidebar
     bool lastInMyListState;  // Track previous "In MyList" filter state for reload detection
