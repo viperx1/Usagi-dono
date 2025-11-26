@@ -98,6 +98,7 @@ private:
 	// Anime titles download and management
 	QNetworkAccessManager *networkManager;
 	QDateTime lastAnimeTitlesUpdate;
+	QDateTime lastCalendarCheck;  // Track last CALENDAR check
 	
 	// Export notification checking
 	QTimer *notifyCheckTimer;
@@ -436,6 +437,10 @@ public:
 	void downloadAnimeTitles();
 	bool shouldUpdateAnimeTitles();
 	void parseAndStoreAnimeTitles(const QByteArray &data);
+	
+	// CALENDAR checking for new anime
+	bool shouldCheckCalendar();
+	void checkCalendarIfNeeded();
 	/* Anime Titles End === */
 
 	QString GetSID();

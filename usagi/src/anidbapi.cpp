@@ -276,6 +276,21 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	{
 		Logger::log("[AniDB Init] Anime titles are up to date, skipping download", __FILE__, __LINE__);
 	}
+	
+	// Check if we need to perform a CALENDAR check (on startup)
+	Logger::log("[AniDB Init] Checking if calendar check is needed", __FILE__, __LINE__);
+	// Calendar check will happen after login, we just initialize the last check time here
+	query.exec("SELECT `value` FROM `settings` WHERE `name` = 'last_calendar_check'");
+	if(query.next())
+	{
+		lastCalendarCheck = QDateTime::fromSecsSinceEpoch(query.value(0).toLongLong());
+		Logger::log("[AniDB Init] Last calendar check was: " + lastCalendarCheck.toString(), __FILE__, __LINE__);
+	}
+	else
+	{
+		lastCalendarCheck = QDateTime::fromSecsSinceEpoch(0); // Never checked
+		Logger::log("[AniDB Init] No previous calendar check found", __FILE__, __LINE__);
+	}
 
 	Logger::log("[AniDB Init] Constructor completed successfully", __FILE__, __LINE__);
 
@@ -444,11 +459,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		SID = token.first();
 		loggedin = 1;
 		emit notifyLoggedIn(Tag, 200);
+		
+		// Check if calendar needs updating after successful login
+		checkCalendarIfNeeded();
 	}
 	else if(ReplyID == "201"){ // 201 {str session_key} LOGIN ACCEPTED - NEW VERSION AVAILABLE
 		SID = token.first();
 		loggedin = 1;
 		emit notifyLoggedIn(Tag, 201);
+		
+		// Check if calendar needs updating after successful login
+		checkCalendarIfNeeded();
 	}
     else if(ReplyID == "203"){ // 203 LOGGED OUT
         Logger::log("[AniDB Response] 203 LOGGED OUT - Tag: " + Tag, __FILE__, __LINE__);
@@ -3784,6 +3805,57 @@ void AniDBApi::checkForNotifications()
 	
 	// Save state after each check
 	saveExportQueueState();
+}
+
+bool AniDBApi::shouldCheckCalendar()
+{
+	// Check if we should update the calendar (once per day)
+	if(lastCalendarCheck.isNull() || !lastCalendarCheck.isValid())
+	{
+		return true; // Never checked before
+	}
+	
+	// Check if more than 24 hours have passed since last check
+	qint64 secondsSinceLastCheck = lastCalendarCheck.secsTo(QDateTime::currentDateTime());
+	return secondsSinceLastCheck > (24 * 60 * 60); // 24 hours
+}
+
+void AniDBApi::checkCalendarIfNeeded()
+{
+	// Check if calendar update is needed
+	if(!shouldCheckCalendar())
+	{
+		qint64 secondsSinceLastCheck = lastCalendarCheck.secsTo(QDateTime::currentDateTime());
+		qint64 hoursSinceLastCheck = secondsSinceLastCheck / 3600;
+		Logger::log(QString("[AniDB Calendar] Calendar check not needed yet (last check was %1 hours ago)").arg(hoursSinceLastCheck), __FILE__, __LINE__);
+		return;
+	}
+	
+	// Only check if logged in
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Logger::log("[AniDB Calendar] Not logged in, skipping calendar check", __FILE__, __LINE__);
+		return;
+	}
+	
+	Logger::log("[AniDB Calendar] Performing calendar check for new anime", __FILE__, __LINE__);
+	
+	// Call the Calendar() method which will send the CALENDAR command
+	QString tag = Calendar();
+	
+	if(tag != "0")
+	{
+		Logger::log("[AniDB Calendar] Calendar check requested, tag: " + tag, __FILE__, __LINE__);
+		
+		// Update last check time
+		lastCalendarCheck = QDateTime::currentDateTime();
+		saveSetting("last_calendar_check", QString::number(lastCalendarCheck.toSecsSinceEpoch()));
+		Logger::log("[AniDB Calendar] Updated last calendar check time", __FILE__, __LINE__);
+	}
+	else
+	{
+		Logger::log("[AniDB Calendar] Failed to request calendar check", __FILE__, __LINE__);
+	}
 }
 
 void AniDBApi::saveExportQueueState()
