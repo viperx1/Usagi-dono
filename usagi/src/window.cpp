@@ -382,15 +382,24 @@ Window::Window()
     mylistContentLayout->addWidget(filterSidebar);
     
     // Card view (only view mode available)
+    // Use VirtualFlowLayout for efficient virtual scrolling
     mylistCardScrollArea = new QScrollArea(this);
     mylistCardScrollArea->setWidgetResizable(true);
     mylistCardScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     mylistCardScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
+    // Create virtual flow layout for efficient rendering of many cards
+    mylistVirtualLayout = new VirtualFlowLayout(this);
+    mylistVirtualLayout->setSpacing(10, 10);
+    mylistVirtualLayout->setItemSize(AnimeCard::getCardSize());
+    mylistCardScrollArea->setWidget(mylistVirtualLayout);
+    mylistVirtualLayout->setScrollArea(mylistCardScrollArea);
+    
+    // Keep the old FlowLayout for compatibility (not displayed, but used by card manager)
     mylistCardContainer = new QWidget();
     mylistCardLayout = new FlowLayout(mylistCardContainer, 10, 10, 10);
     mylistCardContainer->setLayout(mylistCardLayout);
-    mylistCardScrollArea->setWidget(mylistCardContainer);
+    // Note: mylistCardContainer is not added to the layout anymore when using virtual scrolling
     
     mylistContentLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
     
@@ -1600,10 +1609,7 @@ void Window::startBackgroundLoading()
 // Called when mylist loading finishes (in UI thread)
 void Window::onMylistLoadingFinished(const QList<int> &aids)
 {
-    LOG(QString("Background loading: Mylist query complete with %1 anime, starting progressive card creation...").arg(aids.size()));
-    
-    // Store AIDs for progressive loading
-    pendingCardsToLoad = aids;
+    LOG(QString("Background loading: Mylist query complete with %1 anime, using virtual scrolling...").arg(aids.size()));
     
     // Clear existing cards
     cardManager->clearAllCards();
@@ -1611,21 +1617,40 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Comprehensive preload of ALL data needed for card creation
     // This eliminates ALL SQL queries from createCard()
     if (!aids.isEmpty()) {
-        LOG(QString("[Progressive Loading] Preloading comprehensive card data for %1 anime...").arg(aids.size()));
+        LOG(QString("[Virtual Scrolling] Preloading comprehensive card data for %1 anime...").arg(aids.size()));
         cardManager->preloadCardCreationData(aids);
-        LOG("[Progressive Loading] Comprehensive card data preload complete");
+        LOG("[Virtual Scrolling] Comprehensive card data preload complete");
     }
     
-    // Start progressive loading timer
-    if (!pendingCardsToLoad.isEmpty()) {
-        progressiveCardLoadingTimer->start();
-        mylistStatusLabel->setText(QString("MyList Status: Loading %1 anime...").arg(pendingCardsToLoad.size()));
-    } else {
-        mylistStatusLabel->setText("MyList Status: No anime in mylist");
+    // Set the ordered anime ID list for virtual scrolling
+    // The VirtualFlowLayout will request cards on-demand as user scrolls
+    cardManager->setAnimeIdList(aids);
+    
+    // Update the virtual layout with the item count
+    if (mylistVirtualLayout) {
+        mylistVirtualLayout->setItemCount(aids.size());
+        mylistVirtualLayout->refresh();
     }
+    
+    // Get all cards for backward compatibility (will be empty initially with virtual scrolling)
+    animeCards = cardManager->getAllCards();
+    
+    // Apply sorting
+    restoreMylistSorting();
+    sortMylistCards(filterSidebar->getSortIndex());
+    
+    // Reload alternative titles for filtering
+    loadAnimeAlternativeTitlesForFiltering();
+    
+    // Apply current filters
+    applyMylistFilters();
+    
+    mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
+    LOG(QString("[Virtual Scrolling] Ready to display %1 anime").arg(aids.size()));
 }
 
 // Load cards progressively in batches to keep UI responsive
+// NOTE: This is now deprecated in favor of virtual scrolling
 void Window::loadNextCardBatch()
 {
     if (pendingCardsToLoad.isEmpty()) {
@@ -3652,157 +3677,229 @@ void Window::startPlaybackForFile(int lid)
 // Sort cards based on selected criterion
 void Window::sortMylistCards(int sortIndex)
 {
-	if (animeCards.isEmpty()) {
-		return;
+	// Get the list of anime IDs from the card manager
+	QList<int> animeIds = cardManager->getAnimeIdList();
+	
+	if (animeIds.isEmpty()) {
+		// Fallback: try to get IDs from animeCards for backward compatibility
+		if (animeCards.isEmpty()) {
+			return;
+		}
+		// Build ID list from existing cards
+		for (AnimeCard* card : std::as_const(animeCards)) {
+			animeIds.append(card->getAnimeId());
+		}
 	}
 	
 	bool sortAscending = filterSidebar->getSortAscending();
 	
-	// Remove all cards from layout
-	for (AnimeCard* const card : std::as_const(animeCards)) {
-		mylistCardLayout->removeWidget(card);
+	// For sorting, we need to access card data. The card manager has preloaded data we can use.
+	// Get all existing cards to access their data for sorting
+	QMap<int, AnimeCard*> cardsMap;
+	for (AnimeCard* card : cardManager->getAllCards()) {
+		cardsMap[card->getAnimeId()] = card;
 	}
 	
-	// Sort based on criterion
-	switch (sortIndex) {
-		case 0: // Anime Title
-			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
-				// Hidden cards always go to the bottom
-				if (a->isHidden() != b->isHidden()) {
-					return b->isHidden();  // non-hidden comes before hidden
-				}
-				
-				if (sortAscending) {
-					return a->getAnimeTitle() < b->getAnimeTitle();
-				} else {
-					return a->getAnimeTitle() > b->getAnimeTitle();
-				}
-			});
-			break;
-		case 1: // Type
-			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
-				// Hidden cards always go to the bottom
-				if (a->isHidden() != b->isHidden()) {
-					return b->isHidden();  // non-hidden comes before hidden
-				}
-				
-				if (a->getAnimeType() == b->getAnimeType()) {
-					return a->getAnimeTitle() < b->getAnimeTitle();
-				}
-				if (sortAscending) {
-					return a->getAnimeType() < b->getAnimeType();
-				} else {
-					return a->getAnimeType() > b->getAnimeType();
-				}
-			});
-			break;
-		case 2: // Aired Date
-			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
-				// Hidden cards always go to the bottom
-				if (a->isHidden() != b->isHidden()) {
-					return b->isHidden();  // non-hidden comes before hidden
-				}
-				
-				aired airedA = a->getAired();
-				aired airedB = b->getAired();
-				
-				// Handle invalid dates (put at end)
-				if (!airedA.isValid() && !airedB.isValid()) {
-					return a->getAnimeTitle() < b->getAnimeTitle();
-				}
-				if (!airedA.isValid()) {
-					return false;  // a goes after b
-				}
-				if (!airedB.isValid()) {
-					return true;   // a goes before b
-				}
-				
-				// Use aired class comparison operators
-				if (airedA == airedB) {
-					return a->getAnimeTitle() < b->getAnimeTitle();
-				}
-				if (sortAscending) {
-					return airedA < airedB;
-				} else {
-					return airedA > airedB;
-				}
-			});
-			break;
-		case 3: // Episodes (Count)
-			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
-				// Hidden cards always go to the bottom
-				if (a->isHidden() != b->isHidden()) {
-					return b->isHidden();  // non-hidden comes before hidden
-				}
-				
-				int episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
-				int episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
-				if (episodesA == episodesB) {
-					return a->getAnimeTitle() < b->getAnimeTitle();
-				}
-				if (sortAscending) {
-					return episodesA < episodesB;
-				} else {
-					return episodesA > episodesB;
-				}
-			});
-			break;
-		case 4: // Completion %
-			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
-				// Hidden cards always go to the bottom
-				if (a->isHidden() != b->isHidden()) {
-					return b->isHidden();  // non-hidden comes before hidden
-				}
-				
-				int totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
-				int totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
-				int viewedA = a->getNormalViewed() + a->getOtherViewed();
-				int viewedB = b->getNormalViewed() + b->getOtherViewed();
-				double completionA = (totalEpisodesA > 0) ? (double)viewedA / totalEpisodesA : 0.0;
-				double completionB = (totalEpisodesB > 0) ? (double)viewedB / totalEpisodesB : 0.0;
-				if (completionA == completionB) {
-					return a->getAnimeTitle() < b->getAnimeTitle();
-				}
-				if (sortAscending) {
-					return completionA < completionB;
-				} else {
-					return completionA > completionB;
-				}
-			});
-			break;
-		case 5: // Last Played
-			std::sort(animeCards.begin(), animeCards.end(), [sortAscending](const AnimeCard *a, const AnimeCard *b) {
-				// Hidden cards always go to the bottom
-				if (a->isHidden() != b->isHidden()) {
-					return b->isHidden();  // non-hidden comes before hidden
-				}
-				
-				qint64 lastPlayedA = a->getLastPlayed();
-				qint64 lastPlayedB = b->getLastPlayed();
-				
-				// Never played items (0) go to the end regardless of sort order
-				if (lastPlayedA == 0 && lastPlayedB == 0) {
-					return a->getAnimeTitle() < b->getAnimeTitle();
-				}
-				if (lastPlayedA == 0) {
-					return false;  // a goes after b
-				}
-				if (lastPlayedB == 0) {
-					return true;   // a goes before b
-				}
-				
-				if (sortAscending) {
-					return lastPlayedA < lastPlayedB;
-				} else {
-					return lastPlayedA > lastPlayedB;
-				}
-			});
-			break;
+	// If using virtual scrolling and cards haven't been created yet, we can't sort by card properties
+	// In that case, we'll just sort by anime ID (or skip sorting until cards are available)
+	if (cardsMap.isEmpty() && !animeCards.isEmpty()) {
+		// Use existing animeCards list
+		for (AnimeCard* card : std::as_const(animeCards)) {
+			cardsMap[card->getAnimeId()] = card;
+		}
 	}
 	
-	// Re-add cards to layout in sorted order
-	for (AnimeCard* const card : std::as_const(animeCards)) {
-		mylistCardLayout->addWidget(card);
+	// Only sort if we have card data to sort by
+	if (!cardsMap.isEmpty()) {
+		// Sort based on criterion
+		switch (sortIndex) {
+			case 0: // Anime Title
+				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
+					AnimeCard* a = cardsMap.value(aidA);
+					AnimeCard* b = cardsMap.value(aidB);
+					if (!a || !b) return aidA < aidB;
+					
+					// Hidden cards always go to the bottom
+					if (a->isHidden() != b->isHidden()) {
+						return b->isHidden();  // non-hidden comes before hidden
+					}
+					
+					if (sortAscending) {
+						return a->getAnimeTitle() < b->getAnimeTitle();
+					} else {
+						return a->getAnimeTitle() > b->getAnimeTitle();
+					}
+				});
+				break;
+			case 1: // Type
+				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
+					AnimeCard* a = cardsMap.value(aidA);
+					AnimeCard* b = cardsMap.value(aidB);
+					if (!a || !b) return aidA < aidB;
+					
+					// Hidden cards always go to the bottom
+					if (a->isHidden() != b->isHidden()) {
+						return b->isHidden();  // non-hidden comes before hidden
+					}
+					
+					if (a->getAnimeType() == b->getAnimeType()) {
+						return a->getAnimeTitle() < b->getAnimeTitle();
+					}
+					if (sortAscending) {
+						return a->getAnimeType() < b->getAnimeType();
+					} else {
+						return a->getAnimeType() > b->getAnimeType();
+					}
+				});
+				break;
+			case 2: // Aired Date
+				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
+					AnimeCard* a = cardsMap.value(aidA);
+					AnimeCard* b = cardsMap.value(aidB);
+					if (!a || !b) return aidA < aidB;
+					
+					// Hidden cards always go to the bottom
+					if (a->isHidden() != b->isHidden()) {
+						return b->isHidden();  // non-hidden comes before hidden
+					}
+					
+					aired airedA = a->getAired();
+					aired airedB = b->getAired();
+					
+					// Handle invalid dates (put at end)
+					if (!airedA.isValid() && !airedB.isValid()) {
+						return a->getAnimeTitle() < b->getAnimeTitle();
+					}
+					if (!airedA.isValid()) {
+						return false;  // a goes after b
+					}
+					if (!airedB.isValid()) {
+						return true;   // a goes before b
+					}
+					
+					// Use aired class comparison operators
+					if (airedA == airedB) {
+						return a->getAnimeTitle() < b->getAnimeTitle();
+					}
+					if (sortAscending) {
+						return airedA < airedB;
+					} else {
+						return airedA > airedB;
+					}
+				});
+				break;
+			case 3: // Episodes (Count)
+				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
+					AnimeCard* a = cardsMap.value(aidA);
+					AnimeCard* b = cardsMap.value(aidB);
+					if (!a || !b) return aidA < aidB;
+					
+					// Hidden cards always go to the bottom
+					if (a->isHidden() != b->isHidden()) {
+						return b->isHidden();  // non-hidden comes before hidden
+					}
+					
+					int episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+					int episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+					if (episodesA == episodesB) {
+						return a->getAnimeTitle() < b->getAnimeTitle();
+					}
+					if (sortAscending) {
+						return episodesA < episodesB;
+					} else {
+						return episodesA > episodesB;
+					}
+				});
+				break;
+			case 4: // Completion %
+				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
+					AnimeCard* a = cardsMap.value(aidA);
+					AnimeCard* b = cardsMap.value(aidB);
+					if (!a || !b) return aidA < aidB;
+					
+					// Hidden cards always go to the bottom
+					if (a->isHidden() != b->isHidden()) {
+						return b->isHidden();  // non-hidden comes before hidden
+					}
+					
+					int totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+					int totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+					int viewedA = a->getNormalViewed() + a->getOtherViewed();
+					int viewedB = b->getNormalViewed() + b->getOtherViewed();
+					double completionA = (totalEpisodesA > 0) ? (double)viewedA / totalEpisodesA : 0.0;
+					double completionB = (totalEpisodesB > 0) ? (double)viewedB / totalEpisodesB : 0.0;
+					if (completionA == completionB) {
+						return a->getAnimeTitle() < b->getAnimeTitle();
+					}
+					if (sortAscending) {
+						return completionA < completionB;
+					} else {
+						return completionA > completionB;
+					}
+				});
+				break;
+			case 5: // Last Played
+				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, sortAscending](int aidA, int aidB) {
+					AnimeCard* a = cardsMap.value(aidA);
+					AnimeCard* b = cardsMap.value(aidB);
+					if (!a || !b) return aidA < aidB;
+					
+					// Hidden cards always go to the bottom
+					if (a->isHidden() != b->isHidden()) {
+						return b->isHidden();  // non-hidden comes before hidden
+					}
+					
+					qint64 lastPlayedA = a->getLastPlayed();
+					qint64 lastPlayedB = b->getLastPlayed();
+					
+					// Never played items (0) go to the end regardless of sort order
+					if (lastPlayedA == 0 && lastPlayedB == 0) {
+						return a->getAnimeTitle() < b->getAnimeTitle();
+					}
+					if (lastPlayedA == 0) {
+						return false;  // a goes after b
+					}
+					if (lastPlayedB == 0) {
+						return true;   // a goes before b
+					}
+					
+					if (sortAscending) {
+						return lastPlayedA < lastPlayedB;
+					} else {
+						return lastPlayedA > lastPlayedB;
+					}
+				});
+				break;
+		}
+	}
+	
+	// Update the card manager with the new order
+	cardManager->setAnimeIdList(animeIds);
+	
+	// If using virtual scrolling, refresh the layout
+	if (mylistVirtualLayout) {
+		mylistVirtualLayout->refresh();
+	}
+	
+	// Also update the legacy animeCards list order for backward compatibility
+	animeCards.clear();
+	for (int aid : animeIds) {
+		AnimeCard* card = cardManager->getCard(aid);
+		if (card) {
+			animeCards.append(card);
+		}
+	}
+	
+	// If not using virtual scrolling (backward compatibility), update the regular flow layout
+	if (!mylistVirtualLayout && mylistCardLayout) {
+		// Remove all cards from layout
+		for (AnimeCard* const card : std::as_const(animeCards)) {
+			mylistCardLayout->removeWidget(card);
+		}
+		// Re-add cards to layout in sorted order
+		for (AnimeCard* const card : std::as_const(animeCards)) {
+			mylistCardLayout->addWidget(card);
+		}
 	}
 }
 
@@ -3820,6 +3917,9 @@ void Window::loadMylistAsCards()
 	
 	// Set the layout for the card manager
 	cardManager->setCardLayout(mylistCardLayout);
+	
+	// Set the virtual layout for virtual scrolling
+	cardManager->setVirtualLayout(mylistVirtualLayout);
 	
 	// Connect card manager to API update signals
 	connect(adbapi, &myAniDBApi::notifyEpisodeUpdated, 
@@ -3979,7 +4079,18 @@ bool Window::matchesSearchFilter(AnimeCard *card, const QString &searchText)
 // Apply filters to mylist cards
 void Window::applyMylistFilters()
 {
-	if (animeCards.isEmpty()) {
+	// Get the full list of anime IDs
+	QList<int> allAnimeIds = cardManager->getAnimeIdList();
+	
+	// If the list is empty, try to build it from animeCards for backward compatibility
+	if (allAnimeIds.isEmpty() && !animeCards.isEmpty()) {
+		for (AnimeCard* card : std::as_const(animeCards)) {
+			allAnimeIds.append(card->getAnimeId());
+		}
+	}
+	
+	if (allAnimeIds.isEmpty()) {
+		mylistStatusLabel->setText("MyList Status: No anime");
 		return;
 	}
 	
@@ -4009,16 +4120,42 @@ void Window::applyMylistFilters()
 		return;
 	}
 	
-	int visibleCount = 0;
-	
-	// Remove all cards from layout first
-	for (AnimeCard *card : std::as_const(animeCards)) {
-		mylistCardLayout->removeWidget(card);
+	// Build a map of existing cards for quick lookup
+	QMap<int, AnimeCard*> cardsMap;
+	for (AnimeCard* card : cardManager->getAllCards()) {
+		cardsMap[card->getAnimeId()] = card;
 	}
 	
-	// Apply filters to each card
-	for (AnimeCard *card : std::as_const(animeCards)) {
+	// Also include animeCards list for backward compatibility
+	for (AnimeCard* card : std::as_const(animeCards)) {
+		if (!cardsMap.contains(card->getAnimeId())) {
+			cardsMap[card->getAnimeId()] = card;
+		}
+	}
+	
+	QList<int> filteredAnimeIds;
+	int totalCount = allAnimeIds.size();
+	
+	// Apply filters to determine which anime to show
+	for (int aid : allAnimeIds) {
+		AnimeCard* card = cardsMap.value(aid);
 		bool visible = true;
+		
+		// If the card doesn't exist yet (virtual scrolling), we can't filter by card properties
+		// In that case, include the anime (it will be filtered when the card is created)
+		if (!card) {
+			// For virtual scrolling, include anime if no filters require card data
+			// Search filter requires card data
+			if (!searchText.isEmpty()) {
+				// Can't filter without card data - skip this anime for now
+				// Or, include it anyway and filter when visible
+				filteredAnimeIds.append(aid);
+				continue;
+			}
+			// For other filters, we can't determine without card data
+			filteredAnimeIds.append(aid);
+			continue;
+		}
 		
 		// Apply search filter
 		if (!searchText.isEmpty()) {
@@ -4084,18 +4221,39 @@ void Window::applyMylistFilters()
 		}
 		// "ignore" means no filtering based on 18+ status
 		
-		// Only add visible cards back to layout
 		if (visible) {
-			mylistCardLayout->addWidget(card);
-			card->setVisible(true);
-			visibleCount++;
-		} else {
+			filteredAnimeIds.append(aid);
+		}
+	}
+	
+	// Update the card manager with the filtered list
+	cardManager->setAnimeIdList(filteredAnimeIds);
+	
+	// If using virtual scrolling, refresh the layout
+	if (mylistVirtualLayout) {
+		mylistVirtualLayout->refresh();
+	}
+	
+	// For backward compatibility with non-virtual scrolling
+	if (!mylistVirtualLayout && mylistCardLayout) {
+		// Remove all cards from layout first
+		for (AnimeCard *card : std::as_const(animeCards)) {
+			mylistCardLayout->removeWidget(card);
 			card->setVisible(false);
+		}
+		
+		// Add only visible cards back to layout
+		for (int aid : filteredAnimeIds) {
+			AnimeCard* card = cardsMap.value(aid);
+			if (card) {
+				mylistCardLayout->addWidget(card);
+				card->setVisible(true);
+			}
 		}
 	}
 	
 	// Update status label
-	mylistStatusLabel->setText(QString("MyList Status: Showing %1 of %2 anime").arg(visibleCount).arg(animeCards.size()));
+	mylistStatusLabel->setText(QString("MyList Status: Showing %1 of %2 anime").arg(filteredAnimeIds.size()).arg(totalCount));
 }
 
 // Download poster image for an anime

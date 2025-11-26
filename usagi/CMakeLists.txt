@@ -41,6 +41,7 @@ set(SOURCES
     src/mylistcardmanager.cpp
     src/mylistfiltersidebar.cpp
     src/watchchunkmanager.cpp
+    src/virtualflowlayout.cpp
 )
 
 # Header files
@@ -68,6 +69,7 @@ set(HEADERS
     src/watchchunkmanager.h
     src/animeutils.h
     src/uicolors.h
+    src/virtualflowlayout.h
 )
 
 # Create executable
