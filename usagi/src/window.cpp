@@ -395,11 +395,9 @@ Window::Window()
     mylistCardScrollArea->setWidget(mylistVirtualLayout);
     mylistVirtualLayout->setScrollArea(mylistCardScrollArea);
     
-    // Keep the old FlowLayout for compatibility (not displayed, but used by card manager)
-    mylistCardContainer = new QWidget();
-    mylistCardLayout = new FlowLayout(mylistCardContainer, 10, 10, 10);
-    mylistCardContainer->setLayout(mylistCardLayout);
-    // Note: mylistCardContainer is not added to the layout anymore when using virtual scrolling
+    // Note: Legacy FlowLayout (mylistCardLayout) is no longer used with virtual scrolling
+    mylistCardContainer = nullptr;
+    mylistCardLayout = nullptr;
     
     mylistContentLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
     
@@ -3693,18 +3691,17 @@ void Window::sortMylistCards(int sortIndex)
 	
 	bool sortAscending = filterSidebar->getSortAscending();
 	
-	// For sorting, we need to access card data. The card manager has preloaded data we can use.
-	// Get all existing cards to access their data for sorting
+	// For sorting, we need to access card data. Build a combined map from all sources.
 	QMap<int, AnimeCard*> cardsMap;
+	
+	// First add cards from the card manager
 	for (AnimeCard* card : cardManager->getAllCards()) {
 		cardsMap[card->getAnimeId()] = card;
 	}
 	
-	// If using virtual scrolling and cards haven't been created yet, we can't sort by card properties
-	// In that case, we'll just sort by anime ID (or skip sorting until cards are available)
-	if (cardsMap.isEmpty() && !animeCards.isEmpty()) {
-		// Use existing animeCards list
-		for (AnimeCard* card : std::as_const(animeCards)) {
+	// Also include cards from the legacy animeCards list (for backward compatibility)
+	for (AnimeCard* card : std::as_const(animeCards)) {
+		if (!cardsMap.contains(card->getAnimeId())) {
 			cardsMap[card->getAnimeId()] = card;
 		}
 	}
@@ -4142,18 +4139,17 @@ void Window::applyMylistFilters()
 		bool visible = true;
 		
 		// If the card doesn't exist yet (virtual scrolling), we can't filter by card properties
-		// In that case, include the anime (it will be filtered when the card is created)
+		// In that case, we need to skip items that require filtering until the card is created
 		if (!card) {
-			// For virtual scrolling, include anime if no filters require card data
-			// Search filter requires card data
-			if (!searchText.isEmpty()) {
-				// Can't filter without card data - skip this anime for now
-				// Or, include it anyway and filter when visible
+			// If there are no filters that require card data, include the anime
+			bool hasCardBasedFilters = !searchText.isEmpty() || !typeFilter.isEmpty() || 
+			                           !completionFilter.isEmpty() || showOnlyUnwatched ||
+			                           adultContentFilter != "ignore";
+			if (!hasCardBasedFilters) {
 				filteredAnimeIds.append(aid);
-				continue;
 			}
-			// For other filters, we can't determine without card data
-			filteredAnimeIds.append(aid);
+			// Otherwise, exclude anime without card data when filters are active
+			// (they will appear when cards are created and pass the filter)
 			continue;
 		}
 		

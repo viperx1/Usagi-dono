@@ -136,10 +136,6 @@ void VirtualFlowLayout::clear()
     }
     m_visibleWidgets.clear();
     
-    // Delete all recycled widgets
-    qDeleteAll(m_recycledWidgets);
-    m_recycledWidgets.clear();
-    
     m_itemCount = 0;
     m_cachedFirstVisible = -1;
     m_cachedLastVisible = -1;
@@ -370,14 +366,8 @@ QWidget* VirtualFlowLayout::createOrReuseWidget(int index)
         return m_visibleWidgets[index];
     }
     
-    QWidget *widget = nullptr;
-    
-    // Try to reuse a recycled widget
-    // Note: For AnimeCards, we can't really reuse them as they contain specific data
-    // So we just create new ones. The factory should handle any recycling logic.
-    
     // Create new widget using factory
-    widget = m_itemFactory(index);
+    QWidget *widget = m_itemFactory(index);
     
     if (widget) {
         widget->setParent(this);
@@ -410,9 +400,6 @@ void VirtualFlowLayout::recycleWidget(int index)
     if (widget) {
         widget->hide();
         widget->setParent(nullptr);
-        
-        // For now, just delete the widget
-        // In the future, could implement a recycle pool for compatible widgets
         delete widget;
     }
 }

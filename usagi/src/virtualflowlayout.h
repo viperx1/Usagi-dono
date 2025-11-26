@@ -128,7 +128,6 @@ private:
     
     // Widget management
     QMap<int, QWidget*> m_visibleWidgets;  // index -> widget for currently visible items
-    QList<QWidget*> m_recycledWidgets;      // Pool of widgets available for reuse
     
     // Callback
     ItemFactory m_itemFactory;
