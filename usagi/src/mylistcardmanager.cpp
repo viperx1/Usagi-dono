@@ -116,6 +116,11 @@ void MyListCardManager::loadAllCards()
     
     // Create cards for each anime
     for (int aid : aids) {
+        // Skip if card already exists
+        if (hasCard(aid)) {
+            continue;
+        }
+        
         // Create the card (this will use the preloaded cache if needed)
         AnimeCard *card = createCard(aid);
         if (card) {
@@ -166,8 +171,12 @@ void MyListCardManager::loadAllAnimeTitles()
     while (q.next()) {
         int aid = q.value(0).toInt();
         QString title = q.value(1).toString();
-        aids.append(aid);
-        m_animeTitlesCache[aid] = title;
+        
+        // Only add if not already in cache (prevents duplicates)
+        if (!m_animeTitlesCache.contains(aid)) {
+            aids.append(aid);
+            m_animeTitlesCache[aid] = title;
+        }
     }
     
     LOG(QString("[MyListCardManager] Preloaded %1 anime titles into cache").arg(m_animeTitlesCache.size()));
@@ -180,12 +189,34 @@ void MyListCardManager::loadAllAnimeTitles()
     
     int cardCount = 0;
     
+    // Disable layout updates during bulk card creation for performance
+    if (m_layout && m_layout->parent()) {
+        QWidget *container = qobject_cast<QWidget*>(m_layout->parent());
+        if (container) {
+            container->setUpdatesEnabled(false);
+        }
+    }
+    
     // Create cards for each anime
     for (int aid : aids) {
+        // Skip if card already exists
+        if (hasCard(aid)) {
+            continue;
+        }
+        
         // Create the card (this will use the preloaded caches)
         AnimeCard *card = createCard(aid);
         if (card) {
             cardCount++;
+        }
+    }
+    
+    // Re-enable layout updates and force a single refresh
+    if (m_layout && m_layout->parent()) {
+        QWidget *container = qobject_cast<QWidget*>(m_layout->parent());
+        if (container) {
+            container->setUpdatesEnabled(true);
+            container->update();
         }
     }
     
@@ -619,6 +650,12 @@ void MyListCardManager::updateCardAiredDates(AnimeCard* card, const QString& sta
 
 AnimeCard* MyListCardManager::createCard(int aid)
 {
+    // Check if card already exists - prevent duplicates
+    if (hasCard(aid)) {
+        LOG(QString("[MyListCardManager] Card already exists for aid=%1, skipping duplicate creation").arg(aid));
+        return m_cards[aid];
+    }
+    
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         LOG("[MyListCardManager] Database not open");
@@ -768,8 +805,11 @@ AnimeCard* MyListCardManager::createCard(int aid)
         m_animeNeedingMetadata.insert(aid);
     }
     
-    // Load episodes
-    loadEpisodesForCard(card, aid);
+    // Load episodes (skip for anime not in mylist - they have no episodes anyway)
+    // This is determined by checking if we have cached stats (which come from mylist table)
+    if (m_statsCache.contains(aid) && (m_statsCache[aid].normalEpisodes > 0 || m_statsCache[aid].otherEpisodes > 0)) {
+        loadEpisodesForCard(card, aid);
+    }
     
     // Calculate and set statistics (use cache if available)
     AnimeStats stats;
@@ -788,12 +828,14 @@ AnimeCard* MyListCardManager::createCard(int aid)
     card->setStatistics(stats.normalEpisodes, totalNormalEpisodes, 
                        stats.normalViewed, stats.otherEpisodes, stats.otherViewed);
     
-    // Add to layout and cache
+    // Add to cache first (before layout to avoid triggering layout updates prematurely)
     QMutexLocker locker(&m_mutex);
+    m_cards[aid] = card;
+    
+    // Add to layout (deferred if in bulk loading mode)
     if (m_layout) {
         m_layout->addWidget(card);
     }
-    m_cards[aid] = card;
     locker.unlock();
     
     // Connect fetch data request signal from card
