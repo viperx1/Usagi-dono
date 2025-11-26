@@ -652,6 +652,10 @@ private slots:
 	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
 	void onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files);
 	
+	// Progressive loading methods for filter changes (to avoid UI freeze)
+	void loadMylistProgressively();
+	void loadAllAnimeTitlesProgressively();
+	
 	// Timer-based processing handlers
 	void processPendingHashedFiles();
 	void loadNextCardBatch();

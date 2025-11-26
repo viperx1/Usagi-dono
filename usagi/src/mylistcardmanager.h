@@ -77,6 +77,9 @@ public:
     // This should be called BEFORE any cards are created to eliminate all SQL queries from createCard()
     void preloadCardCreationData(const QList<int>& aids);
     
+    // Create a card for an anime (data must be preloaded first via preloadCardCreationData)
+    AnimeCard* createCard(int aid);
+    
 signals:
     // Emitted when a card is created
     void cardCreated(int aid, AnimeCard *card);
@@ -186,9 +189,6 @@ private:
         
         CardCreationData() : isHidden(false), is18Restricted(false), eptotal(0), hasData(false) {}
     };
-    
-    // Create a single card for an anime
-    AnimeCard* createCard(int aid);
     
     // Update card data from database
     void updateCardFromDatabase(int aid);
