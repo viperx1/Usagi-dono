@@ -70,6 +70,9 @@ public:
     // Preload anime data and statistics cache for better performance (call before creating many cards)
     void preloadAnimeDataCache(const QList<int>& aids);
     
+    // Preload episode data cache for better performance (call before creating many cards)
+    void preloadEpisodesCache(const QList<int>& aids);
+    
 signals:
     // Emitted when a card is created
     void cardCreated(int aid, AnimeCard *card);
@@ -191,9 +194,6 @@ private:
         QString groupName;
         int localWatched;
     };
-    
-    // Bulk preload episode data for card creation
-    void preloadEpisodesCache(const QList<int>& aids);
     
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;

@@ -1612,7 +1612,12 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     if (!aids.isEmpty()) {
         LOG(QString("[Progressive Loading] Preloading anime data cache for %1 anime...").arg(aids.size()));
         cardManager->preloadAnimeDataCache(aids);
-        LOG("[Progressive Loading] Cache preload complete");
+        LOG("[Progressive Loading] Anime data cache preload complete");
+        
+        // Preload episode data to eliminate individual queries during card creation
+        LOG(QString("[Progressive Loading] Preloading episode data cache for %1 anime...").arg(aids.size()));
+        cardManager->preloadEpisodesCache(aids);
+        LOG("[Progressive Loading] Episode data cache preload complete");
     }
     
     // Start progressive loading timer
