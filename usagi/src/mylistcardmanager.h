@@ -150,11 +150,38 @@ private:
     void preloadAnimeTitlesCache(const QList<int>& aids);
     void clearAnimeTitlesCache();
     
+    // Bulk preload all data needed for card creation
+    struct AnimeData {
+        QString nameRomaji;
+        QString nameEnglish;
+        QString animeTitle;
+        QString typeName;
+        QString startDate;
+        QString endDate;
+        QString picname;
+        QByteArray posterData;
+        QString category;
+        QString rating;
+        QString tagNameList;
+        QString tagIdList;
+        QString tagWeightList;
+        bool isHidden;
+        bool is18Restricted;
+        int eptotal;
+    };
+    void preloadAnimeDataCache(const QList<int>& aids);
+    
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;
     
     // Anime titles cache for efficient bulk loading
     QMap<int, QString> m_animeTitlesCache;
+    
+    // Anime data cache for efficient bulk loading
+    QMap<int, AnimeData> m_animeDataCache;
+    
+    // Statistics cache for efficient bulk loading  
+    QMap<int, AnimeStats> m_statsCache;
     
     // Layout where cards are displayed
     FlowLayout *m_layout;
