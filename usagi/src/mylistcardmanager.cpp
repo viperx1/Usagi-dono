@@ -1394,7 +1394,7 @@ void MyListCardManager::preloadAnimeDataCache(const QList<int>& aids)
         }
         LOG(QString("[MyListCardManager] Stats cache contains anime: %1%2")
             .arg(aidList.join(", "),
-                 statsCacheAids.size() > 10 ? QString(" and %1 more...").arg(statsCacheAids.size() - 10) : QString()));
+                 statsCacheAids.size() > 10 ? QString(" and %1 more...").arg(statsCacheAids.size() - 10) : ""));
     }
 }
 
@@ -1472,7 +1472,7 @@ void MyListCardManager::preloadEpisodesCache(const QList<int>& aids)
     LOG(QString("[MyListCardManager] Preloaded episode data for %1 anime (%2 total episodes) in %3 ms")
         .arg(m_episodesCache.size())
         .arg(std::accumulate(m_episodesCache.begin(), m_episodesCache.end(), 0,
-            [](int sum, const QList<EpisodeCacheEntry>& episodes) { return sum + episodes.size(); }))
+            [](int sum, const QList<EpisodeCacheEntry>& episodes) -> int { return sum + episodes.size(); }))
         .arg(elapsed));
 }
 
