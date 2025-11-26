@@ -146,8 +146,15 @@ private:
     QList<AnimeCard::TagInfo> getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category);
     void updateCardAiredDates(AnimeCard* card, const QString& startDate, const QString& endDate);
     
+    // Cache anime titles for bulk loading (aid -> title)
+    void preloadAnimeTitlesCache(const QList<int>& aids);
+    void clearAnimeTitlesCache();
+    
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;
+    
+    // Anime titles cache for efficient bulk loading
+    QMap<int, QString> m_animeTitlesCache;
     
     // Layout where cards are displayed
     FlowLayout *m_layout;

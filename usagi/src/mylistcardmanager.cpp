@@ -10,6 +10,7 @@
 #include <QDateTime>
 #include <QNetworkRequest>
 #include <algorithm>
+#include <numeric>
 
 // External references
 extern myAniDBApi *adbapi;
@@ -78,13 +79,44 @@ void MyListCardManager::loadAllCards()
         return;
     }
     
+    // Collect all AIDs and preload anime titles for those without anime table data
+    QList<int> aids;
+    QList<int> aidsNeedingTitles;
+    while (q.next()) {
+        int aid = q.value(0).toInt();
+        aids.append(aid);
+        
+        // Check if this anime has data in the anime table (nameromaji is a good indicator)
+        if (q.value(1).isNull() || q.value(1).toString().isEmpty()) {
+            aidsNeedingTitles.append(aid);
+        }
+    }
+    
+    // Preload titles for anime without anime table data
+    if (!aidsNeedingTitles.isEmpty()) {
+        QString aidsList = QStringList(
+            std::accumulate(aidsNeedingTitles.begin(), aidsNeedingTitles.end(), QStringList(),
+                [](QStringList acc, int aid) { acc.append(QString::number(aid)); return acc; })
+        ).join(",");
+        
+        QString titlesQuery = QString("SELECT aid, title FROM anime_titles "
+                                     "WHERE aid IN (%1) AND type = 1 AND language = 'x-jat'").arg(aidsList);
+        QSqlQuery tq(db);
+        if (tq.exec(titlesQuery)) {
+            while (tq.next()) {
+                int aid = tq.value(0).toInt();
+                QString title = tq.value(1).toString();
+                m_animeTitlesCache[aid] = title;
+            }
+            LOG(QString("[MyListCardManager] Preloaded %1 anime titles into cache for mylist").arg(m_animeTitlesCache.size()));
+        }
+    }
+    
     int cardCount = 0;
     
     // Create cards for each anime
-    while (q.next()) {
-        int aid = q.value(0).toInt();
-        
-        // Create the card (this will load all its data)
+    for (int aid : aids) {
+        // Create the card (this will use the preloaded cache if needed)
         AnimeCard *card = createCard(aid);
         if (card) {
             cardCount++;
@@ -128,13 +160,23 @@ void MyListCardManager::loadAllAnimeTitles()
         return;
     }
     
+    // Preload all anime titles into cache for bulk access
+    QList<int> aids;
+    m_animeTitlesCache.clear();
+    while (q.next()) {
+        int aid = q.value(0).toInt();
+        QString title = q.value(1).toString();
+        aids.append(aid);
+        m_animeTitlesCache[aid] = title;
+    }
+    
+    LOG(QString("[MyListCardManager] Preloaded %1 anime titles into cache").arg(m_animeTitlesCache.size()));
+    
     int cardCount = 0;
     
     // Create cards for each anime
-    while (q.next()) {
-        int aid = q.value(0).toInt();
-        
-        // Create the card (this will load all its data)
+    for (int aid : aids) {
+        // Create the card (this will use the preloaded cache)
         AnimeCard *card = createCard(aid);
         if (card) {
             cardCount++;
@@ -161,6 +203,7 @@ void MyListCardManager::clearAllCards()
     }
     
     m_cards.clear();
+    m_animeTitlesCache.clear();  // Clear the titles cache
     m_episodesNeedingData.clear();
     m_animeNeedingMetadata.clear();
     m_animeNeedingPoster.clear();
@@ -621,16 +664,22 @@ AnimeCard* MyListCardManager::createCard(int aid)
         
         animeName = determineAnimeName(animeNameRomaji, animeNameEnglish, animeTitle, aid);
     } else {
-        // No anime table data, try to get basic info from anime_titles
-        QSqlQuery titleQuery(db);
-        titleQuery.prepare("SELECT title FROM anime_titles WHERE aid = ? AND type = 1 AND language = 'x-jat' LIMIT 1");
-        titleQuery.addBindValue(aid);
-        
-        if (titleQuery.exec() && titleQuery.next()) {
-            animeName = titleQuery.value(0).toString();
+        // No anime table data, try to get basic info from cache or anime_titles
+        if (m_animeTitlesCache.contains(aid)) {
+            // Use preloaded cache (bulk loading scenario)
+            animeName = m_animeTitlesCache[aid];
         } else {
-            // Fallback to just showing the AID
-            animeName = QString("Anime %1").arg(aid);
+            // Fallback to individual query (single card creation scenario)
+            QSqlQuery titleQuery(db);
+            titleQuery.prepare("SELECT title FROM anime_titles WHERE aid = ? AND type = 1 AND language = 'x-jat' LIMIT 1");
+            titleQuery.addBindValue(aid);
+            
+            if (titleQuery.exec() && titleQuery.next()) {
+                animeName = titleQuery.value(0).toString();
+            } else {
+                // Fallback to just showing the AID
+                animeName = QString("Anime %1").arg(aid);
+            }
         }
         
         LOG(QString("[MyListCardManager] Creating basic card for aid=%1 (no anime table data)").arg(aid));
