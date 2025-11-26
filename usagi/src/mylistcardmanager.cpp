@@ -1,4 +1,5 @@
 #include "mylistcardmanager.h"
+#include "virtualflowlayout.h"
 #include "animeutils.h"
 #include "logger.h"
 #include "main.h"
@@ -18,6 +19,7 @@ extern myAniDBApi *adbapi;
 MyListCardManager::MyListCardManager(QObject *parent)
     : QObject(parent)
     , m_layout(nullptr)
+    , m_virtualLayout(nullptr)
     , m_networkManager(nullptr)
 {
     // Initialize network manager for poster downloads
@@ -44,12 +46,77 @@ void MyListCardManager::setCardLayout(FlowLayout *layout)
     m_layout = layout;
 }
 
+void MyListCardManager::setVirtualLayout(VirtualFlowLayout *layout)
+{
+    QMutexLocker locker(&m_mutex);
+    m_virtualLayout = layout;
+    
+    if (m_virtualLayout) {
+        // Set the item factory to create cards on demand
+        m_virtualLayout->setItemFactory([this](int index) -> QWidget* {
+            return this->createCardForIndex(index);
+        });
+        
+        // Set the item size to match anime card size
+        m_virtualLayout->setItemSize(AnimeCard::getCardSize());
+    }
+}
+
+QList<int> MyListCardManager::getAnimeIdList() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_orderedAnimeIds;
+}
+
+void MyListCardManager::setAnimeIdList(const QList<int>& aids)
+{
+    {
+        QMutexLocker locker(&m_mutex);
+        m_orderedAnimeIds = aids;
+        LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs").arg(aids.size()));
+    }
+    
+    // Update virtual layout AFTER releasing the mutex to avoid deadlock
+    // (setItemCount -> updateVisibleItems -> createCardForIndex -> needs mutex)
+    if (m_virtualLayout) {
+        m_virtualLayout->setItemCount(aids.size());
+    }
+}
+
+AnimeCard* MyListCardManager::createCardForIndex(int index)
+{
+    QMutexLocker locker(&m_mutex);
+    
+    if (index < 0 || index >= m_orderedAnimeIds.size()) {
+        LOG(QString("[MyListCardManager] createCardForIndex: index %1 out of range (size=%2)")
+            .arg(index).arg(m_orderedAnimeIds.size()));
+        return nullptr;
+    }
+    
+    int aid = m_orderedAnimeIds[index];
+    locker.unlock();
+    
+    LOG(QString("[MyListCardManager] createCardForIndex: creating card for index=%1, aid=%2").arg(index).arg(aid));
+    
+    // Create the card using the existing createCard method
+    AnimeCard* card = createCard(aid);
+    if (!card) {
+        LOG(QString("[MyListCardManager] createCardForIndex: createCard returned null for aid=%1").arg(aid));
+    }
+    return card;
+}
+
 // loadAllCards() has been removed - use progressive loading via Window::loadMylistProgressively() instead
 // loadAllAnimeTitles() has been removed - use progressive loading via Window::loadAllAnimeTitlesProgressively() instead
 
 void MyListCardManager::clearAllCards()
 {
     QMutexLocker locker(&m_mutex);
+    
+    // Clear virtual layout if used
+    if (m_virtualLayout) {
+        m_virtualLayout->clear();
+    }
     
     if (m_layout) {
         // Remove cards from layout and delete them
@@ -61,6 +128,7 @@ void MyListCardManager::clearAllCards()
     }
     
     m_cards.clear();
+    m_orderedAnimeIds.clear();
     m_cardCreationDataCache.clear();  // Clear the comprehensive card creation data cache
     m_episodesNeedingData.clear();
     m_animeNeedingMetadata.clear();
@@ -555,8 +623,9 @@ AnimeCard* MyListCardManager::createCard(int aid)
     QMutexLocker locker(&m_mutex);
     m_cards[aid] = card;
     
-    // Add to layout (deferred if in bulk loading mode)
-    if (m_layout) {
+    // Add to layout only if not using virtual scrolling
+    // In virtual scrolling mode, the VirtualFlowLayout handles widget positioning
+    if (m_layout && !m_virtualLayout) {
         m_layout->addWidget(card);
     }
     locker.unlock();

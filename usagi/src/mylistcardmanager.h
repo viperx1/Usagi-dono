@@ -11,6 +11,9 @@
 #include "animecard.h"
 #include "flowlayout.h"
 
+// Forward declaration
+class VirtualFlowLayout;
+
 /**
  * MyListCardManager - Manages the lifecycle and updates of anime cards
  * 
@@ -36,6 +39,22 @@ public:
     
     // Set the layout where cards will be displayed
     void setCardLayout(FlowLayout *layout);
+    
+    // Set the virtual layout for virtual scrolling (new)
+    void setVirtualLayout(VirtualFlowLayout *layout);
+    
+    // Get the list of anime IDs in the current order (for virtual scrolling)
+    QList<int> getAnimeIdList() const;
+    
+    // Set the ordered list of anime IDs (for virtual scrolling after sorting/filtering)
+    void setAnimeIdList(const QList<int>& aids);
+    
+    // Create a card for a specific index in the ordered list (for virtual scrolling)
+    // This is the factory method called by VirtualFlowLayout
+    AnimeCard* createCardForIndex(int index);
+    
+    // Check if virtual scrolling is enabled
+    bool isVirtualScrollingEnabled() const { return m_virtualLayout != nullptr; }
     
     // loadAllCards() and loadAllAnimeTitles() removed - use progressive loading in Window class
     
@@ -221,6 +240,12 @@ private:
     
     // Layout where cards are displayed
     FlowLayout *m_layout;
+    
+    // Virtual layout for virtual scrolling (optional)
+    VirtualFlowLayout *m_virtualLayout;
+    
+    // Ordered list of anime IDs for virtual scrolling
+    QList<int> m_orderedAnimeIds;
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;
