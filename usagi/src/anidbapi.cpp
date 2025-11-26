@@ -1590,6 +1590,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			if(parts.size() >= 2)
 			{
 				int aid = parts[0].toInt();
+				// Future use: Parse start time and dateflags if needed for calendar display
 				// int startTime = parts[1].toInt();  // Unix timestamp when episode airs
 				// QString dateflags = parts.size() >= 3 ? parts[2] : "";
 				

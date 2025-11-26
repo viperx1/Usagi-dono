@@ -585,30 +585,56 @@ AnimeCard* MyListCardManager::createCard(int aid)
               "WHERE a.aid = ?");
     q.addBindValue(aid);
     
-    if (!q.exec() || !q.next()) {
-        LOG(QString("[MyListCardManager] Failed to query anime aid=%1: %2")
-            .arg(aid).arg(q.lastError().text()));
-        return nullptr;
+    bool hasAnimeData = q.exec() && q.next();
+    
+    QString animeName;
+    QString typeName;
+    QString startDate;
+    QString endDate;
+    QString picname;
+    QByteArray posterData;
+    QString category;
+    QString rating;
+    QString tagNameList;
+    QString tagIdList;
+    QString tagWeightList;
+    bool isHidden = false;
+    bool is18Restricted = false;
+    
+    if (hasAnimeData) {
+        // Have anime table data
+        QString animeNameRomaji = q.value(0).toString();
+        QString animeNameEnglish = q.value(1).toString();
+        QString animeTitle = q.value(3).toString();
+        typeName = q.value(5).toString();
+        startDate = q.value(6).toString();
+        endDate = q.value(7).toString();
+        picname = q.value(8).toString();
+        posterData = q.value(9).toByteArray();
+        category = q.value(10).toString();
+        rating = q.value(11).toString();
+        tagNameList = q.value(12).toString();
+        tagIdList = q.value(13).toString();
+        tagWeightList = q.value(14).toString();
+        isHidden = q.value(15).toInt() == 1;
+        is18Restricted = q.value(16).toInt() == 1;
+        
+        animeName = determineAnimeName(animeNameRomaji, animeNameEnglish, animeTitle, aid);
+    } else {
+        // No anime table data, try to get basic info from anime_titles
+        QSqlQuery titleQuery(db);
+        titleQuery.prepare("SELECT title FROM anime_titles WHERE aid = ? AND type = 1 AND language = 'x-jat' LIMIT 1");
+        titleQuery.addBindValue(aid);
+        
+        if (titleQuery.exec() && titleQuery.next()) {
+            animeName = titleQuery.value(0).toString();
+        } else {
+            // Fallback to just showing the AID
+            animeName = QString("Anime %1").arg(aid);
+        }
+        
+        LOG(QString("[MyListCardManager] Creating basic card for aid=%1 (no anime table data)").arg(aid));
     }
-    
-    QString animeName = q.value(0).toString();
-    QString animeNameEnglish = q.value(1).toString();
-    QString animeTitle = q.value(3).toString();
-    QString typeName = q.value(5).toString();
-    QString startDate = q.value(6).toString();
-    QString endDate = q.value(7).toString();
-    QString picname = q.value(8).toString();
-    QByteArray posterData = q.value(9).toByteArray();
-    QString category = q.value(10).toString();
-    QString rating = q.value(11).toString();
-    QString tagNameList = q.value(12).toString();
-    QString tagIdList = q.value(13).toString();
-    QString tagWeightList = q.value(14).toString();
-    bool isHidden = q.value(15).toInt() == 1;
-    bool is18Restricted = q.value(16).toInt() == 1;
-    
-    // Determine anime name using helper
-    animeName = determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
     
     // Create card
     AnimeCard *card = new AnimeCard(nullptr);

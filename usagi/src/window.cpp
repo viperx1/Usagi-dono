@@ -311,6 +311,7 @@ Window::Window()
 
     // page mylist (card view only)
     mylistSortAscending = false;  // Default to descending (newest first for aired date)
+    lastInMyListState = true;  // Initialize to true (default is "In MyList only")
     
     // Initialize network manager for poster downloads (deprecated, kept for backward compatibility)
     posterNetworkManager = new QNetworkAccessManager(this);
@@ -3859,7 +3860,6 @@ void Window::applyMylistFilters()
 	bool inMyListOnly = filterSidebar->getInMyListOnly();
 	
 	// Check if we need to reload cards due to MyList filter change
-	static bool lastInMyListState = true;  // Track previous state
 	if (inMyListOnly != lastInMyListState) {
 		lastInMyListState = inMyListOnly;
 		
