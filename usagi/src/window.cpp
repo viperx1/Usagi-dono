@@ -1625,12 +1625,18 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     }
 }
 
-// Load cards progressively in small batches to keep UI responsive
+// Load cards progressively in batches to keep UI responsive
 void Window::loadNextCardBatch()
 {
     if (pendingCardsToLoad.isEmpty()) {
         // All cards loaded
         progressiveCardLoadingTimer->stop();
+        
+        // Re-enable layout updates after loading is complete
+        if (mylistCardLayout && mylistCardLayout->parentWidget()) {
+            mylistCardLayout->parentWidget()->setUpdatesEnabled(true);
+            mylistCardLayout->parentWidget()->update();
+        }
         
         // Get all cards for backward compatibility
         animeCards = cardManager->getAllCards();
@@ -1650,6 +1656,11 @@ void Window::loadNextCardBatch()
         return;
     }
     
+    // Disable layout updates during batch creation for performance
+    if (mylistCardLayout && mylistCardLayout->parentWidget()) {
+        mylistCardLayout->parentWidget()->setUpdatesEnabled(false);
+    }
+    
     // Load next batch of cards
     int cardsToLoad = qMin(CARD_LOADING_BATCH_SIZE, pendingCardsToLoad.size());
     
@@ -1658,12 +1669,19 @@ void Window::loadNextCardBatch()
         
         // Create card directly since we've already preloaded all data
         AnimeCard *card = cardManager->createCard(aid);
-        if (card) {
-            // Card created successfully
-        } else {
+        if (!card) {
             LOG(QString("[Progressive Loading] WARNING: Failed to create card for aid=%1").arg(aid));
         }
     }
+    
+    // Re-enable layout temporarily to show progress and process events
+    if (mylistCardLayout && mylistCardLayout->parentWidget()) {
+        mylistCardLayout->parentWidget()->setUpdatesEnabled(true);
+        mylistCardLayout->parentWidget()->update();
+    }
+    
+    // Process events to keep UI responsive
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     
     // Update status
     int remaining = pendingCardsToLoad.size();
@@ -3795,13 +3813,10 @@ void Window::toggleSortOrder()
 	// Kept for backward compatibility
 }
 
-// Load mylist data as cards
+// Load mylist data as cards - now uses progressive loading to avoid UI freeze
 void Window::loadMylistAsCards()
 {
-	QElapsedTimer timer;
-	timer.start();
-	
-	LOG(QString("[Timing] Starting loadMylistAsCards with MyListCardManager"));
+	LOG(QString("[Window] loadMylistAsCards - using progressive loading"));
 	
 	// Set the layout for the card manager
 	cardManager->setCardLayout(mylistCardLayout);
@@ -3812,23 +3827,8 @@ void Window::loadMylistAsCards()
 	connect(adbapi, &myAniDBApi::notifyAnimeUpdated,
 	        cardManager, &MyListCardManager::onAnimeUpdated, Qt::UniqueConnection);
 	
-	// Load all cards through the manager
-	cardManager->loadAllCards();
-	
-	// Get cards for backward compatibility with sorting code
-	animeCards = cardManager->getAllCards();
-	
-	// Apply current sort (default is Aired Date descending)
-	qint64 startSort = timer.elapsed();
-	sortMylistCards(filterSidebar->getSortIndex());
-	qint64 sortElapsed = timer.elapsed() - startSort;
-	LOG(QString("[Timing] Sorting cards took %1 ms").arg(sortElapsed));
-	
-	qint64 totalElapsed = timer.elapsed();
-	LOG(QString("[Timing] Total loadMylistAsCards took %1 ms").arg(totalElapsed));
-	
-	// Load alternative titles for filtering
-	loadAnimeAlternativeTitlesForFiltering();
+	// Use progressive loading instead of synchronous loadAllCards()
+	loadMylistProgressively();
 }
 
 // Load alternative titles from anime_titles table for filtering

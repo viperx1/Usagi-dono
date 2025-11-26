@@ -37,11 +37,7 @@ public:
     // Set the layout where cards will be displayed
     void setCardLayout(FlowLayout *layout);
     
-    // Initialize cards from database (call once on startup or view switch)
-    void loadAllCards();
-    
-    // Initialize cards for all anime from anime_titles table (for discovery mode)
-    void loadAllAnimeTitles();
+    // loadAllCards() and loadAllAnimeTitles() removed - use progressive loading in Window class
     
     // Clear all cards (when switching views or shutting down)
     void clearAllCards();

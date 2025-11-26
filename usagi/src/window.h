@@ -555,8 +555,8 @@ private:
 	// Progressive card loading to keep UI responsive
 	QTimer *progressiveCardLoadingTimer;
 	QList<int> pendingCardsToLoad;
-	static const int CARD_LOADING_BATCH_SIZE = 10; // Load 10 cards per timer tick
-	static const int CARD_LOADING_TIMER_INTERVAL = 10; // Process every 10ms
+	static const int CARD_LOADING_BATCH_SIZE = 100; // Load 100 cards per timer tick for faster loading
+	static const int CARD_LOADING_TIMER_INTERVAL = 1; // Process as fast as possible
 	
 	// Mutex for protecting shared data between threads
 	QMutex backgroundLoadingMutex;
