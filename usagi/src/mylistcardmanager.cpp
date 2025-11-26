@@ -738,7 +738,10 @@ AnimeCard* MyListCardManager::createCard(int aid)
     
     // Calculate and set statistics
     AnimeStats stats = calculateStatistics(aid);
-    int totalNormalEpisodes = q.value(4).toInt();
+    int totalNormalEpisodes = 0;
+    if (hasAnimeData) {
+        totalNormalEpisodes = q.value(4).toInt();
+    }
     if (totalNormalEpisodes <= 0) {
         totalNormalEpisodes = stats.normalEpisodes;
     }
