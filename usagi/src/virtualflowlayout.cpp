@@ -154,12 +154,11 @@ void VirtualFlowLayout::refresh()
 
 void VirtualFlowLayout::clear()
 {
-    // Delete all visible widgets using deleteLater for safety
+    // Just hide all visible widgets - don't delete them
+    // The card manager owns the cards and manages their lifecycle
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
         if (it.value()) {
             it.value()->hide();
-            it.value()->setParent(nullptr);
-            it.value()->deleteLater();
         }
     }
     m_visibleWidgets.clear();
@@ -442,18 +441,22 @@ QWidget* VirtualFlowLayout::createOrReuseWidget(int index)
         return nullptr;
     }
     
-    // Check if already created
+    // Check if already in visible widgets map
     if (m_visibleWidgets.contains(index)) {
         return m_visibleWidgets[index];
     }
     
-    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: creating widget for index=%1").arg(index));
+    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: creating/reusing widget for index=%1").arg(index));
     
-    // Create new widget using factory
+    // Get or create widget using factory
+    // The factory may return an existing cached card from the card manager
     QWidget *widget = m_itemFactory(index);
     
     if (widget) {
-        widget->setParent(this);
+        // Ensure proper parent (may have been unparented if recycled)
+        if (widget->parent() != this) {
+            widget->setParent(this);
+        }
         
         // Position the widget
         int row = index / m_columnsPerRow;
@@ -466,7 +469,7 @@ QWidget* VirtualFlowLayout::createOrReuseWidget(int index)
         
         m_visibleWidgets[index] = widget;
         
-        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: widget created at (%1,%2) size (%3,%4)")
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: widget at (%1,%2) size (%3,%4)")
             .arg(x).arg(y).arg(m_itemSize.width()).arg(m_itemSize.height()));
         
         emit widgetCreated(index, widget);
@@ -486,10 +489,8 @@ void VirtualFlowLayout::recycleWidget(int index)
     QWidget *widget = m_visibleWidgets.take(index);
     
     if (widget) {
+        // Just hide the widget - don't delete it
+        // The card manager keeps it in its cache and we'll reuse it when scrolling back
         widget->hide();
-        widget->setParent(nullptr);
-        // Use deleteLater() to safely delete the widget after Qt finishes processing events
-        // This prevents crashes when deleting widgets that may still have pending events
-        widget->deleteLater();
     }
 }
