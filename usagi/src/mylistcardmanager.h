@@ -67,6 +67,9 @@ public:
     // Add or update a single mylist entry (creates card if needed)
     void updateOrAddMylistEntry(int lid);
     
+    // Preload anime data and statistics cache for better performance (call before creating many cards)
+    void preloadAnimeDataCache(const QList<int>& aids);
+    
 signals:
     // Emitted when a card is created
     void cardCreated(int aid, AnimeCard *card);
@@ -169,7 +172,6 @@ private:
         bool is18Restricted;
         int eptotal;
     };
-    void preloadAnimeDataCache(const QList<int>& aids);
     
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;

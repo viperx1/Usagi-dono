@@ -1607,6 +1607,14 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Clear existing cards
     cardManager->clearAllCards();
     
+    // Preload anime data and statistics cache for better performance
+    // This eliminates individual database queries during card creation
+    if (!aids.isEmpty()) {
+        LOG(QString("[Progressive Loading] Preloading anime data cache for %1 anime...").arg(aids.size()));
+        cardManager->preloadAnimeDataCache(aids);
+        LOG("[Progressive Loading] Cache preload complete");
+    }
+    
     // Start progressive loading timer
     if (!pendingCardsToLoad.isEmpty()) {
         progressiveCardLoadingTimer->start();
