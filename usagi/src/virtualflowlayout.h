@@ -117,6 +117,10 @@ private:
     // Return a widget to the pool
     void recycleWidget(int index);
     
+    // Scroll position preservation helpers
+    int saveScrollPosition() const;
+    void restoreScrollPosition(int savedY);
+    
     // Item data
     int m_itemCount;
     QSize m_itemSize;

@@ -338,9 +338,8 @@ Window::Window()
     
     connect(cardManager, &MyListCardManager::cardUpdated, this, [this](int aid) {
         // Card was updated in place - no need to resort the entire list
-        // Just ensure the card widget is properly updated if visible
-        // The card itself was already updated by updateCardFromDatabase()
-        Q_UNUSED(aid);  // Card update is handled internally by the card manager
+        // The card manager handles the update internally
+        Q_UNUSED(aid);
     });
     
     // Connect episode data request signal to fetch missing episode data
