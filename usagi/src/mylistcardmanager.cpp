@@ -1265,8 +1265,17 @@ void MyListCardManager::preloadAnimeDataCache(const QList<int>& aids)
             }
         }
         
-        // Build stats cache
-        for (int aid : aids) {
+        // Build stats cache - only for anime that actually have mylist entries
+        // Collect all AIDs that appeared in the stats query
+        QSet<int> aidsWithStats;
+        for (int aid : normalEpisodesMap.keys()) {
+            aidsWithStats.insert(aid);
+        }
+        for (int aid : otherEpisodesMap.keys()) {
+            aidsWithStats.insert(aid);
+        }
+        
+        for (int aid : aidsWithStats) {
             AnimeStats stats;
             stats.normalEpisodes = normalEpisodesMap[aid].size();
             stats.normalViewed = viewedNormalEpisodesMap[aid].size();
