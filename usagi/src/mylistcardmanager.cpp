@@ -806,8 +806,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     }
     
     // Load episodes (skip for anime not in mylist - they have no episodes anyway)
-    // This is determined by checking if we have cached stats (which come from mylist table)
-    if (m_statsCache.contains(aid) && (m_statsCache[aid].normalEpisodes > 0 || m_statsCache[aid].otherEpisodes > 0)) {
+    // If we have stats in cache, it means the anime is in mylist, so load episodes
+    if (m_statsCache.contains(aid)) {
         loadEpisodesForCard(card, aid);
     }
     
