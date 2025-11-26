@@ -40,6 +40,9 @@ public:
     // Initialize cards from database (call once on startup or view switch)
     void loadAllCards();
     
+    // Initialize cards for all anime from anime_titles table (for discovery mode)
+    void loadAllAnimeTitles();
+    
     // Clear all cards (when switching views or shutting down)
     void clearAllCards();
     
@@ -63,6 +66,9 @@ public:
     
     // Add or update a single mylist entry (creates card if needed)
     void updateOrAddMylistEntry(int lid);
+    
+    // Preload anime data and statistics cache for better performance (call before creating many cards)
+    void preloadAnimeDataCache(const QList<int>& aids);
     
 signals:
     // Emitted when a card is created
@@ -143,8 +149,41 @@ private:
     QList<AnimeCard::TagInfo> getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category);
     void updateCardAiredDates(AnimeCard* card, const QString& startDate, const QString& endDate);
     
+    // Cache anime titles for bulk loading (aid -> title)
+    void preloadAnimeTitlesCache(const QList<int>& aids);
+    void clearAnimeTitlesCache();
+    
+    // Bulk preload all data needed for card creation
+    struct AnimeData {
+        QString nameRomaji;
+        QString nameEnglish;
+        QString animeTitle;
+        QString typeName;
+        QString startDate;
+        QString endDate;
+        QString picname;
+        QByteArray posterData;
+        QString category;
+        QString rating;
+        QString tagNameList;
+        QString tagIdList;
+        QString tagWeightList;
+        bool isHidden;
+        bool is18Restricted;
+        int eptotal;
+    };
+    
     // Card cache indexed by anime ID
     QMap<int, AnimeCard*> m_cards;
+    
+    // Anime titles cache for efficient bulk loading
+    QMap<int, QString> m_animeTitlesCache;
+    
+    // Anime data cache for efficient bulk loading
+    QMap<int, AnimeData> m_animeDataCache;
+    
+    // Statistics cache for efficient bulk loading  
+    QMap<int, AnimeStats> m_statsCache;
     
     // Layout where cards are displayed
     FlowLayout *m_layout;

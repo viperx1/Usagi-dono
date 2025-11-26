@@ -10,6 +10,7 @@
 #include <QDateTime>
 #include <QNetworkRequest>
 #include <algorithm>
+#include <numeric>
 
 // External references
 extern myAniDBApi *adbapi;
@@ -78,13 +79,52 @@ void MyListCardManager::loadAllCards()
         return;
     }
     
+    // Collect all AIDs and preload anime titles for those without anime table data
+    QList<int> aids;
+    QList<int> aidsNeedingTitles;
+    while (q.next()) {
+        int aid = q.value(0).toInt();
+        aids.append(aid);
+        
+        // Check if this anime has data in the anime table (nameromaji is a good indicator)
+        if (q.value(1).isNull() || q.value(1).toString().isEmpty()) {
+            aidsNeedingTitles.append(aid);
+        }
+    }
+    
+    // Preload titles for anime without anime table data
+    if (!aidsNeedingTitles.isEmpty()) {
+        QString aidsList = QStringList(
+            std::accumulate(aidsNeedingTitles.begin(), aidsNeedingTitles.end(), QStringList(),
+                [](QStringList acc, int aid) { acc.append(QString::number(aid)); return acc; })
+        ).join(",");
+        
+        QString titlesQuery = QString("SELECT aid, title FROM anime_titles "
+                                     "WHERE aid IN (%1) AND type = 1 AND language = 'x-jat'").arg(aidsList);
+        QSqlQuery tq(db);
+        if (tq.exec(titlesQuery)) {
+            while (tq.next()) {
+                int aid = tq.value(0).toInt();
+                QString title = tq.value(1).toString();
+                m_animeTitlesCache[aid] = title;
+            }
+            LOG(QString("[MyListCardManager] Preloaded %1 anime titles into cache for mylist").arg(m_animeTitlesCache.size()));
+        }
+    }
+    
+    // Bulk preload anime data and statistics for better performance
+    preloadAnimeDataCache(aids);
+    
     int cardCount = 0;
     
     // Create cards for each anime
-    while (q.next()) {
-        int aid = q.value(0).toInt();
+    for (int aid : aids) {
+        // Skip if card already exists
+        if (hasCard(aid)) {
+            continue;
+        }
         
-        // Create the card (this will load all its data)
+        // Create the card (this will use the preloaded cache if needed)
         AnimeCard *card = createCard(aid);
         if (card) {
             cardCount++;
@@ -93,6 +133,98 @@ void MyListCardManager::loadAllCards()
     
     qint64 elapsed = timer.elapsed();
     LOG(QString("[MyListCardManager] Loaded %1 cards in %2 ms").arg(cardCount).arg(elapsed));
+    
+    emit allCardsLoaded(cardCount);
+}
+
+void MyListCardManager::loadAllAnimeTitles()
+{
+    QElapsedTimer timer;
+    timer.start();
+    
+    LOG(QString("[MyListCardManager] Starting loadAllAnimeTitles - loading all anime from anime_titles"));
+    
+    // Clear existing cards if any
+    clearAllCards();
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[MyListCardManager] Database not open");
+        return;
+    }
+    
+    // Query all anime from anime_titles table
+    // Prefer type 1 (main title) and language "x-jat" (Japanese transcription/romaji)
+    QString query = "SELECT DISTINCT at.aid, at.title "
+                    "FROM anime_titles at "
+                    "WHERE at.type = 1 AND at.language = 'x-jat' "
+                    "GROUP BY at.aid "
+                    "ORDER BY at.title";
+    
+    QSqlQuery q(db);
+    
+    if (!q.exec(query)) {
+        LOG("[MyListCardManager] Error loading anime_titles: " + q.lastError().text());
+        return;
+    }
+    
+    // Preload all anime titles into cache for bulk access
+    QList<int> aids;
+    m_animeTitlesCache.clear();
+    while (q.next()) {
+        int aid = q.value(0).toInt();
+        QString title = q.value(1).toString();
+        
+        // Only add if not already in cache (prevents duplicates)
+        if (!m_animeTitlesCache.contains(aid)) {
+            aids.append(aid);
+            m_animeTitlesCache[aid] = title;
+        }
+    }
+    
+    LOG(QString("[MyListCardManager] Preloaded %1 anime titles into cache").arg(m_animeTitlesCache.size()));
+    
+    // Bulk preload anime data and statistics (much faster than individual queries)
+    qint64 preloadStart = timer.elapsed();
+    preloadAnimeDataCache(aids);
+    qint64 preloadElapsed = timer.elapsed() - preloadStart;
+    LOG(QString("[MyListCardManager] Bulk preload took %1 ms").arg(preloadElapsed));
+    
+    int cardCount = 0;
+    
+    // Disable layout updates during bulk card creation for performance
+    if (m_layout && m_layout->parent()) {
+        QWidget *container = qobject_cast<QWidget*>(m_layout->parent());
+        if (container) {
+            container->setUpdatesEnabled(false);
+        }
+    }
+    
+    // Create cards for each anime
+    for (int aid : aids) {
+        // Skip if card already exists
+        if (hasCard(aid)) {
+            continue;
+        }
+        
+        // Create the card (this will use the preloaded caches)
+        AnimeCard *card = createCard(aid);
+        if (card) {
+            cardCount++;
+        }
+    }
+    
+    // Re-enable layout updates and force a single refresh
+    if (m_layout && m_layout->parent()) {
+        QWidget *container = qobject_cast<QWidget*>(m_layout->parent());
+        if (container) {
+            container->setUpdatesEnabled(true);
+            container->update();
+        }
+    }
+    
+    qint64 elapsed = timer.elapsed();
+    LOG(QString("[MyListCardManager] Loaded %1 anime title cards in %2 ms").arg(cardCount).arg(elapsed));
     
     emit allCardsLoaded(cardCount);
 }
@@ -111,6 +243,9 @@ void MyListCardManager::clearAllCards()
     }
     
     m_cards.clear();
+    m_animeTitlesCache.clear();  // Clear the titles cache
+    m_animeDataCache.clear();  // Clear the anime data cache
+    m_statsCache.clear();  // Clear the statistics cache
     m_episodesNeedingData.clear();
     m_animeNeedingMetadata.clear();
     m_animeNeedingPoster.clear();
@@ -518,47 +653,112 @@ void MyListCardManager::updateCardAiredDates(AnimeCard* card, const QString& sta
 
 AnimeCard* MyListCardManager::createCard(int aid)
 {
+    // Check if card already exists - prevent duplicates
+    if (hasCard(aid)) {
+        LOG(QString("[MyListCardManager] Card already exists for aid=%1, skipping duplicate creation").arg(aid));
+        return m_cards[aid];
+    }
+    
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         LOG("[MyListCardManager] Database not open");
         return nullptr;
     }
     
-    // Query anime data
-    QSqlQuery q(db);
-    q.prepare("SELECT a.nameromaji, a.nameenglish, a.eptotal, "
-              "at.title as anime_title, "
-              "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
-              "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted "
-              "FROM anime a "
-              "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
-              "WHERE a.aid = ?");
-    q.addBindValue(aid);
+    // Check if we have cached anime data (from bulk preload)
+    bool hasAnimeData = false;
+    QString animeName;
+    QString typeName;
+    QString startDate;
+    QString endDate;
+    QString picname;
+    QByteArray posterData;
+    QString category;
+    QString rating;
+    QString tagNameList;
+    QString tagIdList;
+    QString tagWeightList;
+    bool isHidden = false;
+    bool is18Restricted = false;
+    int eptotal = 0;
     
-    if (!q.exec() || !q.next()) {
-        LOG(QString("[MyListCardManager] Failed to query anime aid=%1: %2")
-            .arg(aid).arg(q.lastError().text()));
-        return nullptr;
+    if (m_animeDataCache.contains(aid)) {
+        // Use cached anime data (bulk preload scenario)
+        const AnimeData& data = m_animeDataCache[aid];
+        hasAnimeData = true;
+        typeName = data.typeName;
+        startDate = data.startDate;
+        endDate = data.endDate;
+        picname = data.picname;
+        posterData = data.posterData;
+        category = data.category;
+        rating = data.rating;
+        tagNameList = data.tagNameList;
+        tagIdList = data.tagIdList;
+        tagWeightList = data.tagWeightList;
+        isHidden = data.isHidden;
+        is18Restricted = data.is18Restricted;
+        eptotal = data.eptotal;
+        
+        animeName = determineAnimeName(data.nameRomaji, data.nameEnglish, data.animeTitle, aid);
+    } else {
+        // No cached data, query anime table individually
+        QSqlQuery q(db);
+        q.prepare("SELECT a.nameromaji, a.nameenglish, a.eptotal, "
+                  "at.title as anime_title, "
+                  "a.eps, a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+                  "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted "
+                  "FROM anime a "
+                  "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
+                  "WHERE a.aid = ?");
+        q.addBindValue(aid);
+        
+        hasAnimeData = q.exec() && q.next();
+        
+        if (hasAnimeData) {
+            // Have anime table data
+            QString animeNameRomaji = q.value(0).toString();
+            QString animeNameEnglish = q.value(1).toString();
+            eptotal = q.value(2).toInt();
+            QString animeTitle = q.value(3).toString();
+            typeName = q.value(5).toString();
+            startDate = q.value(6).toString();
+            endDate = q.value(7).toString();
+            picname = q.value(8).toString();
+            posterData = q.value(9).toByteArray();
+            category = q.value(10).toString();
+            rating = q.value(11).toString();
+            tagNameList = q.value(12).toString();
+            tagIdList = q.value(13).toString();
+            tagWeightList = q.value(14).toString();
+            isHidden = q.value(15).toInt() == 1;
+            is18Restricted = q.value(16).toInt() == 1;
+            
+            animeName = determineAnimeName(animeNameRomaji, animeNameEnglish, animeTitle, aid);
+        }
     }
     
-    QString animeName = q.value(0).toString();
-    QString animeNameEnglish = q.value(1).toString();
-    QString animeTitle = q.value(3).toString();
-    QString typeName = q.value(5).toString();
-    QString startDate = q.value(6).toString();
-    QString endDate = q.value(7).toString();
-    QString picname = q.value(8).toString();
-    QByteArray posterData = q.value(9).toByteArray();
-    QString category = q.value(10).toString();
-    QString rating = q.value(11).toString();
-    QString tagNameList = q.value(12).toString();
-    QString tagIdList = q.value(13).toString();
-    QString tagWeightList = q.value(14).toString();
-    bool isHidden = q.value(15).toInt() == 1;
-    bool is18Restricted = q.value(16).toInt() == 1;
-    
-    // Determine anime name using helper
-    animeName = determineAnimeName(animeName, animeNameEnglish, animeTitle, aid);
+    if (!hasAnimeData) {
+        // No anime table data, try to get basic info from cache or anime_titles
+        if (m_animeTitlesCache.contains(aid)) {
+            // Use preloaded cache (bulk loading scenario)
+            animeName = m_animeTitlesCache[aid];
+        } else {
+            // Fallback to individual query (single card creation scenario)
+            QSqlQuery titleQuery(db);
+            titleQuery.prepare("SELECT title FROM anime_titles WHERE aid = ? AND type = 1 AND language = 'x-jat' LIMIT 1");
+            titleQuery.addBindValue(aid);
+            
+            if (titleQuery.exec() && titleQuery.next()) {
+                animeName = titleQuery.value(0).toString();
+            } else {
+                // Fallback to just showing the AID
+                animeName = QString("Anime %1").arg(aid);
+            }
+        }
+        
+        LOG(QString("[MyListCardManager] Creating basic card for aid=%1 (no anime table data)").arg(aid));
+    }
     
     // Create card
     AnimeCard *card = new AnimeCard(nullptr);
@@ -608,24 +808,41 @@ AnimeCard* MyListCardManager::createCard(int aid)
         m_animeNeedingMetadata.insert(aid);
     }
     
-    // Load episodes
-    loadEpisodesForCard(card, aid);
+    // Load episodes (skip for anime not in mylist - they have no episodes anyway)
+    // If we have stats in cache, it means the anime is in mylist, so load episodes
+    bool inStatsCache = m_statsCache.contains(aid);
+    LOG(QString("[MyListCardManager] aid=%1: inStatsCache=%2, calling loadEpisodesForCard=%3")
+        .arg(aid).arg(inStatsCache ? "YES" : "NO").arg(inStatsCache ? "YES" : "NO"));
     
-    // Calculate and set statistics
-    AnimeStats stats = calculateStatistics(aid);
-    int totalNormalEpisodes = q.value(4).toInt();
+    if (inStatsCache) {
+        loadEpisodesForCard(card, aid);
+    }
+    
+    // Calculate and set statistics (use cache if available)
+    AnimeStats stats;
+    if (m_statsCache.contains(aid)) {
+        // Use cached statistics (bulk preload scenario)
+        stats = m_statsCache[aid];
+    } else {
+        // Calculate statistics individually (single card creation scenario)
+        stats = calculateStatistics(aid);
+    }
+    
+    int totalNormalEpisodes = eptotal;
     if (totalNormalEpisodes <= 0) {
         totalNormalEpisodes = stats.normalEpisodes;
     }
     card->setStatistics(stats.normalEpisodes, totalNormalEpisodes, 
                        stats.normalViewed, stats.otherEpisodes, stats.otherViewed);
     
-    // Add to layout and cache
+    // Add to cache first (before layout to avoid triggering layout updates prematurely)
     QMutexLocker locker(&m_mutex);
+    m_cards[aid] = card;
+    
+    // Add to layout (deferred if in bulk loading mode)
     if (m_layout) {
         m_layout->addWidget(card);
     }
-    m_cards[aid] = card;
     locker.unlock();
     
     // Connect fetch data request signal from card
@@ -959,6 +1176,139 @@ MyListCardManager::AnimeStats MyListCardManager::calculateStatistics(int aid)
     stats.otherViewed = viewedOtherEpisodes.size();
     
     return stats;
+}
+
+void MyListCardManager::preloadAnimeDataCache(const QList<int>& aids)
+{
+    if (aids.isEmpty()) {
+        return;
+    }
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return;
+    }
+    
+    // Build IN clause for bulk query
+    QStringList aidStrings;
+    for (int aid : aids) {
+        aidStrings.append(QString::number(aid));
+    }
+    QString aidsList = aidStrings.join(",");
+    
+    // Bulk load anime table data
+    QString query = QString("SELECT a.aid, a.nameromaji, a.nameenglish, a.eptotal, "
+                           "at.title as anime_title, "
+                           "a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+                           "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted "
+                           "FROM anime a "
+                           "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
+                           "WHERE a.aid IN (%1)").arg(aidsList);
+    
+    QSqlQuery q(db);
+    if (q.exec(query)) {
+        while (q.next()) {
+            int aid = q.value(0).toInt();
+            AnimeData data;
+            data.nameRomaji = q.value(1).toString();
+            data.nameEnglish = q.value(2).toString();
+            data.eptotal = q.value(3).toInt();
+            data.animeTitle = q.value(4).toString();
+            data.typeName = q.value(5).toString();
+            data.startDate = q.value(6).toString();
+            data.endDate = q.value(7).toString();
+            data.picname = q.value(8).toString();
+            data.posterData = q.value(9).toByteArray();
+            data.category = q.value(10).toString();
+            data.rating = q.value(11).toString();
+            data.tagNameList = q.value(12).toString();
+            data.tagIdList = q.value(13).toString();
+            data.tagWeightList = q.value(14).toString();
+            data.isHidden = q.value(15).toInt() == 1;
+            data.is18Restricted = q.value(16).toInt() == 1;
+            
+            m_animeDataCache[aid] = data;
+        }
+    }
+    
+    // Bulk load statistics for all anime
+    QString statsQuery = QString("SELECT m.aid, e.epno, m.viewed "
+                                 "FROM mylist m "
+                                 "LEFT JOIN episode e ON m.eid = e.eid "
+                                 "WHERE m.aid IN (%1) "
+                                 "ORDER BY m.aid").arg(aidsList);
+    
+    QSqlQuery statsQ(db);
+    if (statsQ.exec(statsQuery)) {
+        QMap<int, QSet<int>> normalEpisodesMap;
+        QMap<int, QSet<int>> otherEpisodesMap;
+        QMap<int, QSet<int>> viewedNormalEpisodesMap;
+        QMap<int, QSet<int>> viewedOtherEpisodesMap;
+        
+        while (statsQ.next()) {
+            int aid = statsQ.value(0).toInt();
+            QString epnoStr = statsQ.value(1).toString();
+            int viewed = statsQ.value(2).toInt();
+            
+            if (!epnoStr.isEmpty()) {
+                ::epno episodeNumber(epnoStr);
+                int epType = episodeNumber.type();
+                int eid = statsQ.value(0).toInt(); // Using first column as placeholder
+                
+                if (epType == 1) {
+                    normalEpisodesMap[aid].insert(eid);
+                    if (viewed) {
+                        viewedNormalEpisodesMap[aid].insert(eid);
+                    }
+                } else if (epType > 1) {
+                    otherEpisodesMap[aid].insert(eid);
+                    if (viewed) {
+                        viewedOtherEpisodesMap[aid].insert(eid);
+                    }
+                }
+            }
+        }
+        
+        // Build stats cache - only for anime that actually have mylist entries
+        // Collect all AIDs that appeared in the stats query
+        QSet<int> aidsWithStats;
+        for (int aid : normalEpisodesMap.keys()) {
+            aidsWithStats.insert(aid);
+        }
+        for (int aid : otherEpisodesMap.keys()) {
+            aidsWithStats.insert(aid);
+        }
+        
+        for (int aid : aidsWithStats) {
+            AnimeStats stats;
+            stats.normalEpisodes = normalEpisodesMap[aid].size();
+            stats.normalViewed = viewedNormalEpisodesMap[aid].size();
+            stats.otherEpisodes = otherEpisodesMap[aid].size();
+            stats.otherViewed = viewedOtherEpisodesMap[aid].size();
+            stats.totalNormalEpisodes = 0; // Will be set from anime table or calculated
+            
+            m_statsCache[aid] = stats;
+        }
+    }
+    
+    LOG(QString("[MyListCardManager] Preloaded %1 anime data and %2 stats into cache")
+        .arg(m_animeDataCache.size()).arg(m_statsCache.size()));
+    
+    // Debug: Log which AIDs are in stats cache
+    if (!m_statsCache.isEmpty()) {
+        QList<int> statsCacheAids = m_statsCache.keys();
+        QStringList aidList;
+        int count = 0;
+        for (int aid : statsCacheAids) {
+            if (count < 10) {  // Log first 10 for debugging
+                aidList.append(QString::number(aid));
+                count++;
+            }
+        }
+        LOG(QString("[MyListCardManager] Stats cache contains anime: %1%2")
+            .arg(aidList.join(", "))
+            .arg(statsCacheAids.size() > 10 ? QString(" and %1 more...").arg(statsCacheAids.size() - 10) : ""));
+    }
 }
 
 void MyListCardManager::onHideCardRequested(int aid)

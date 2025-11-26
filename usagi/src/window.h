@@ -468,6 +468,7 @@ private:
     FlowLayout *mylistCardLayout;
     QLabel *mylistStatusLabel;
     bool mylistSortAscending;  // Deprecated: moved to MyListFilterSidebar
+    bool lastInMyListState;  // Track previous "In MyList" filter state for reload detection
     MyListCardManager *cardManager;  // Manages card lifecycle and updates
     MyListFilterSidebar *filterSidebar;  // Filter sidebar widget
     QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead

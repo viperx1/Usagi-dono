@@ -276,6 +276,21 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	{
 		Logger::log("[AniDB Init] Anime titles are up to date, skipping download", __FILE__, __LINE__);
 	}
+	
+	// Check if we need to perform a CALENDAR check (on startup)
+	Logger::log("[AniDB Init] Checking if calendar check is needed", __FILE__, __LINE__);
+	// Calendar check will happen after login, we just initialize the last check time here
+	query.exec("SELECT `value` FROM `settings` WHERE `name` = 'last_calendar_check'");
+	if(query.next())
+	{
+		lastCalendarCheck = QDateTime::fromSecsSinceEpoch(query.value(0).toLongLong());
+		Logger::log("[AniDB Init] Last calendar check was: " + lastCalendarCheck.toString(), __FILE__, __LINE__);
+	}
+	else
+	{
+		lastCalendarCheck = QDateTime::fromSecsSinceEpoch(0); // Never checked
+		Logger::log("[AniDB Init] No previous calendar check found", __FILE__, __LINE__);
+	}
 
 	Logger::log("[AniDB Init] Constructor completed successfully", __FILE__, __LINE__);
 
@@ -444,11 +459,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		SID = token.first();
 		loggedin = 1;
 		emit notifyLoggedIn(Tag, 200);
+		
+		// Check if calendar needs updating after successful login
+		checkCalendarIfNeeded();
 	}
 	else if(ReplyID == "201"){ // 201 {str session_key} LOGIN ACCEPTED - NEW VERSION AVAILABLE
 		SID = token.first();
 		loggedin = 1;
 		emit notifyLoggedIn(Tag, 201);
+		
+		// Check if calendar needs updating after successful login
+		checkCalendarIfNeeded();
 	}
     else if(ReplyID == "203"){ // 203 LOGGED OUT
         Logger::log("[AniDB Response] 203 LOGGED OUT - Tag: " + Tag, __FILE__, __LINE__);
@@ -1546,6 +1567,59 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Logger::log("[AniDB Response] 293 NOTIFYGET - Invalid format, parts count: " + QString::number(parts.size()), __FILE__, __LINE__);
 		}
 	}
+	else if(ReplyID == "297"){ // 297 CALENDAR
+		// CALENDAR response: list of anime with episodes airing soon
+		// Format: 297 CALENDAR
+		// {int4 aid}|{int4 start time}|{str dateflags}
+		// ... (multiple entries, one per line)
+		Logger::log("[AniDB Response] 297 CALENDAR - Received calendar data", __FILE__, __LINE__);
+		
+		QStringList lines = Message.split("\n");
+		lines.pop_front(); // Remove first line (status code line)
+		
+		int newAnimeCount = 0;
+		QSqlDatabase db = QSqlDatabase::database();
+		
+		// Process each anime entry in the calendar
+		for(const QString& line : lines)
+		{
+			if(line.trimmed().isEmpty())
+				continue;
+				
+			QStringList parts = line.split("|");
+			if(parts.size() >= 2)
+			{
+				int aid = parts[0].toInt();
+				// Future use: Parse start time and dateflags if needed for calendar display
+				// int startTime = parts[1].toInt();  // Unix timestamp when episode airs
+				// QString dateflags = parts.size() >= 3 ? parts[2] : "";
+				
+				// Check if this anime is already in anime_titles table
+				QSqlQuery checkQuery(db);
+				checkQuery.prepare("SELECT COUNT(*) FROM anime_titles WHERE aid = ?");
+				checkQuery.bindValue(0, aid);
+				
+				if(checkQuery.exec() && checkQuery.next())
+				{
+					int count = checkQuery.value(0).toInt();
+					if(count == 0)
+					{
+						// New anime not in our database - we should fetch it
+						Logger::log(QString("[AniDB Calendar] New anime detected: aid=%1").arg(aid), __FILE__, __LINE__);
+						newAnimeCount++;
+						
+						// Could trigger an ANIME command here to fetch details
+						// For now, just log it
+					}
+				}
+			}
+		}
+		
+		if(newAnimeCount > 0)
+		{
+			Logger::log(QString("[AniDB Calendar] Found %1 new anime in calendar").arg(newAnimeCount), __FILE__, __LINE__);
+		}
+	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
 		loggedin = 0;
 		if(ReplyTo != "LOGOUT"){
@@ -2330,6 +2404,27 @@ QString AniDBApi::Anime(int aid)
 	return GetTag(msg);
 }
 
+QString AniDBApi::Calendar()
+{
+	// Check if logged in first
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+		return "0";
+	}
+	
+	QString msg = buildCalendarCommand();
+	QString q;
+	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		Logger::log("[AniDB Calendar] Database insert error: " + query.lastError().text(), __FILE__, __LINE__);
+		return "0";
+	}
+	return GetTag(msg);
+}
+
 /* === Command Builders === */
 // These methods build formatted command strings for testing and reuse
 
@@ -2482,6 +2577,13 @@ QString AniDBApi::buildAnimeCommand(int aid)
 	Mask mask(amask);
 	
 	return QString("ANIME aid=%1&amask=%2").arg(aid).arg(mask.toString());
+}
+
+QString AniDBApi::buildCalendarCommand()
+{
+	// CALENDAR command - returns list of anime that have episodes airing soon
+	// No parameters required
+	return QString("CALENDAR");
 }
 
 /* === End Command Builders === */
@@ -3704,6 +3806,57 @@ void AniDBApi::checkForNotifications()
 	
 	// Save state after each check
 	saveExportQueueState();
+}
+
+bool AniDBApi::shouldCheckCalendar()
+{
+	// Check if we should update the calendar (once per day)
+	if(lastCalendarCheck.isNull() || !lastCalendarCheck.isValid())
+	{
+		return true; // Never checked before
+	}
+	
+	// Check if more than 24 hours have passed since last check
+	qint64 secondsSinceLastCheck = lastCalendarCheck.secsTo(QDateTime::currentDateTime());
+	return secondsSinceLastCheck > (24 * 60 * 60); // 24 hours
+}
+
+void AniDBApi::checkCalendarIfNeeded()
+{
+	// Check if calendar update is needed
+	if(!shouldCheckCalendar())
+	{
+		qint64 secondsSinceLastCheck = lastCalendarCheck.secsTo(QDateTime::currentDateTime());
+		qint64 hoursSinceLastCheck = secondsSinceLastCheck / 3600;
+		Logger::log(QString("[AniDB Calendar] Calendar check not needed yet (last check was %1 hours ago)").arg(hoursSinceLastCheck), __FILE__, __LINE__);
+		return;
+	}
+	
+	// Only check if logged in
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Logger::log("[AniDB Calendar] Not logged in, skipping calendar check", __FILE__, __LINE__);
+		return;
+	}
+	
+	Logger::log("[AniDB Calendar] Performing calendar check for new anime", __FILE__, __LINE__);
+	
+	// Call the Calendar() method which will send the CALENDAR command
+	QString tag = Calendar();
+	
+	if(tag != "0")
+	{
+		Logger::log("[AniDB Calendar] Calendar check requested, tag: " + tag, __FILE__, __LINE__);
+		
+		// Update last check time
+		lastCalendarCheck = QDateTime::currentDateTime();
+		saveSetting("last_calendar_check", QString::number(lastCalendarCheck.toSecsSinceEpoch()));
+		Logger::log("[AniDB Calendar] Updated last calendar check time", __FILE__, __LINE__);
+	}
+	else
+	{
+		Logger::log("[AniDB Calendar] Failed to request calendar check", __FILE__, __LINE__);
+	}
 }
 
 void AniDBApi::saveExportQueueState()

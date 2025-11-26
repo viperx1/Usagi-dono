@@ -98,6 +98,18 @@ void MyListFilterSidebar::setupUI()
     typeLayout->addWidget(m_typeFilter);
     mainLayout->addWidget(typeGroup);
     
+    // In MyList filter group
+    QGroupBox *mylistGroup = new QGroupBox("MyList");
+    QVBoxLayout *mylistLayout = new QVBoxLayout(mylistGroup);
+    
+    m_inMyListCheckbox = new QCheckBox("In MyList only");
+    m_inMyListCheckbox->setChecked(true);  // Default to showing only mylist anime
+    connect(m_inMyListCheckbox, &QCheckBox::clicked,
+            this, &MyListFilterSidebar::onFilterChanged);
+    
+    mylistLayout->addWidget(m_inMyListCheckbox);
+    mainLayout->addWidget(mylistGroup);
+    
     // Filter by completion status group
     QGroupBox *completionGroup = new QGroupBox("Completion");
     QVBoxLayout *completionLayout = new QVBoxLayout(completionGroup);
@@ -193,6 +205,11 @@ QString MyListFilterSidebar::getAdultContentFilter() const
     return m_adultContentFilter->currentData().toString();
 }
 
+bool MyListFilterSidebar::getInMyListOnly() const
+{
+    return m_inMyListCheckbox->isChecked();
+}
+
 void MyListFilterSidebar::resetFilters()
 {
     m_searchField->clear();
@@ -202,6 +219,7 @@ void MyListFilterSidebar::resetFilters()
     m_typeFilter->setCurrentIndex(0);
     m_completionFilter->setCurrentIndex(0);
     m_showOnlyUnwatchedCheckbox->setChecked(false);
+    m_inMyListCheckbox->setChecked(true);  // Default to showing only mylist
     m_adultContentFilter->setCurrentIndex(1);  // Reset to "Hide 18+"
     
     emit sortChanged();
