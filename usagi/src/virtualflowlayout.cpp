@@ -154,11 +154,12 @@ void VirtualFlowLayout::refresh()
 
 void VirtualFlowLayout::clear()
 {
-    // Delete all visible widgets
+    // Delete all visible widgets using deleteLater for safety
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
         if (it.value()) {
+            it.value()->hide();
             it.value()->setParent(nullptr);
-            delete it.value();
+            it.value()->deleteLater();
         }
     }
     m_visibleWidgets.clear();
@@ -487,6 +488,8 @@ void VirtualFlowLayout::recycleWidget(int index)
     if (widget) {
         widget->hide();
         widget->setParent(nullptr);
-        delete widget;
+        // Use deleteLater() to safely delete the widget after Qt finishes processing events
+        // This prevents crashes when deleting widgets that may still have pending events
+        widget->deleteLater();
     }
 }
