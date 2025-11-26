@@ -245,7 +245,7 @@ Window::Window()
     layout->addWidget(tabwidget, 1);
 
 	// tabs - Mylist first as default tab
-    tabwidget->addTab(pageMylistParent, "Mylist");
+    tabwidget->addTab(pageMylistParent, "Anime");
     tabwidget->addTab(pageHasherParent, "Hasher");
     tabwidget->addTab(pageNotifyParent, "Notify");
     tabwidget->addTab(pageSettingsParent, "Settings");
@@ -3710,13 +3710,27 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 		return;
 	}
 	
-	// Query all alternative titles for anime in mylist, including all name fields from anime table
-	QString query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish, "
-	                "a.nameother, a.nameshort, a.synonyms "
-	                "FROM anime_titles at "
-	                "LEFT JOIN anime a ON at.aid = a.aid "
-	                "WHERE at.aid IN (SELECT DISTINCT aid FROM mylist) "
-	                "ORDER BY at.aid";
+	// Check if we're in "In MyList only" mode
+	bool inMyListOnly = filterSidebar->getInMyListOnly();
+	
+	// Query all alternative titles based on filter mode
+	QString query;
+	if (inMyListOnly) {
+		// Only load titles for anime in mylist
+		query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish, "
+		        "a.nameother, a.nameshort, a.synonyms "
+		        "FROM anime_titles at "
+		        "LEFT JOIN anime a ON at.aid = a.aid "
+		        "WHERE at.aid IN (SELECT DISTINCT aid FROM mylist) "
+		        "ORDER BY at.aid";
+	} else {
+		// Load titles for all anime
+		query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish, "
+		        "a.nameother, a.nameshort, a.synonyms "
+		        "FROM anime_titles at "
+		        "LEFT JOIN anime a ON at.aid = a.aid "
+		        "ORDER BY at.aid";
+	}
 	
 	QSqlQuery q(db);
 	if (!q.exec(query)) {
@@ -3842,6 +3856,35 @@ void Window::applyMylistFilters()
 	QString completionFilter = filterSidebar->getCompletionFilter();
 	bool showOnlyUnwatched = filterSidebar->getShowOnlyUnwatched();
 	QString adultContentFilter = filterSidebar->getAdultContentFilter();
+	bool inMyListOnly = filterSidebar->getInMyListOnly();
+	
+	// Check if we need to reload cards due to MyList filter change
+	static bool lastInMyListState = true;  // Track previous state
+	if (inMyListOnly != lastInMyListState) {
+		lastInMyListState = inMyListOnly;
+		
+		// Reload cards based on the new filter state
+		LOG(QString("[Window] Reloading cards due to MyList filter change: inMyListOnly=%1").arg(inMyListOnly));
+		
+		if (inMyListOnly) {
+			// Load only mylist anime
+			cardManager->loadAllCards();
+		} else {
+			// Load all anime from anime_titles
+			cardManager->loadAllAnimeTitles();
+		}
+		
+		// Get updated cards list
+		animeCards = cardManager->getAllCards();
+		
+		// Re-apply sorting
+		sortMylistCards(filterSidebar->getSortIndex());
+		
+		// Reload alternative titles for filtering
+		loadAnimeAlternativeTitlesForFiltering();
+		
+		// After reloading, continue with normal filtering
+	}
 	
 	int visibleCount = 0;
 	

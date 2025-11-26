@@ -40,6 +40,9 @@ public:
     // Initialize cards from database (call once on startup or view switch)
     void loadAllCards();
     
+    // Initialize cards for all anime from anime_titles table (for discovery mode)
+    void loadAllAnimeTitles();
+    
     // Clear all cards (when switching views or shutting down)
     void clearAllCards();
     

@@ -97,6 +97,56 @@ void MyListCardManager::loadAllCards()
     emit allCardsLoaded(cardCount);
 }
 
+void MyListCardManager::loadAllAnimeTitles()
+{
+    QElapsedTimer timer;
+    timer.start();
+    
+    LOG(QString("[MyListCardManager] Starting loadAllAnimeTitles - loading all anime from anime_titles"));
+    
+    // Clear existing cards if any
+    clearAllCards();
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[MyListCardManager] Database not open");
+        return;
+    }
+    
+    // Query all anime from anime_titles table
+    // Prefer type 1 (main title) and language "x-jat" (Japanese transcription/romaji)
+    QString query = "SELECT DISTINCT at.aid, at.title "
+                    "FROM anime_titles at "
+                    "WHERE at.type = 1 AND at.language = 'x-jat' "
+                    "GROUP BY at.aid "
+                    "ORDER BY at.title";
+    
+    QSqlQuery q(db);
+    
+    if (!q.exec(query)) {
+        LOG("[MyListCardManager] Error loading anime_titles: " + q.lastError().text());
+        return;
+    }
+    
+    int cardCount = 0;
+    
+    // Create cards for each anime
+    while (q.next()) {
+        int aid = q.value(0).toInt();
+        
+        // Create the card (this will load all its data)
+        AnimeCard *card = createCard(aid);
+        if (card) {
+            cardCount++;
+        }
+    }
+    
+    qint64 elapsed = timer.elapsed();
+    LOG(QString("[MyListCardManager] Loaded %1 anime title cards in %2 ms").arg(cardCount).arg(elapsed));
+    
+    emit allCardsLoaded(cardCount);
+}
+
 void MyListCardManager::clearAllCards()
 {
     QMutexLocker locker(&m_mutex);

@@ -36,6 +36,7 @@ public:
     int getSortIndex() const;
     bool getSortAscending() const;
     QString getAdultContentFilter() const;
+    bool getInMyListOnly() const;
     
     // Reset all filters
     void resetFilters();
@@ -61,6 +62,7 @@ private:
     QComboBox *m_typeFilter;
     QComboBox *m_completionFilter;
     QCheckBox *m_showOnlyUnwatchedCheckbox;
+    QCheckBox *m_inMyListCheckbox;
     QComboBox *m_sortComboBox;
     QPushButton *m_sortOrderButton;
     QComboBox *m_adultContentFilter;
