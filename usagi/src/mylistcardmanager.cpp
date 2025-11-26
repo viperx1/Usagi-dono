@@ -808,10 +808,65 @@ void MyListCardManager::updateCardFromDatabase(int aid)
 
 void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
 {
-    // This function is deprecated and should not be called.
-    // Use loadEpisodesForCardFromCache() instead, which is called from createCard()
-    // after preloadCardCreationData() has been called.
-    LOG(QString("[MyListCardManager] WARNING: loadEpisodesForCard() called for aid=%1 - this is deprecated!").arg(aid));
+    // Query episode data directly from the database
+    // This is used by updateCardFromDatabase() to reload episodes after metadata updates
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG(QString("[MyListCardManager] Database not open in loadEpisodesForCard for aid=%1").arg(aid));
+        return;
+    }
+    
+    QList<EpisodeCacheEntry> episodes;
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT m.lid, m.eid, m.fid, m.state, m.viewed, m.storage, "
+              "e.name as episode_name, e.epno, "
+              "f.filename, m.last_played, "
+              "lf.path as local_file_path, "
+              "f.resolution, f.quality, "
+              "g.name as group_name, "
+              "m.local_watched "
+              "FROM mylist m "
+              "LEFT JOIN episode e ON m.eid = e.eid "
+              "LEFT JOIN file f ON m.fid = f.fid "
+              "LEFT JOIN local_files lf ON m.local_file = lf.id "
+              "LEFT JOIN `group` g ON m.gid = g.gid "
+              "WHERE m.aid = ? "
+              "ORDER BY e.epno, m.lid");
+    q.addBindValue(aid);
+    
+    if (q.exec()) {
+        while (q.next()) {
+            EpisodeCacheEntry entry;
+            entry.lid = q.value(0).toInt();
+            entry.eid = q.value(1).toInt();
+            entry.fid = q.value(2).toInt();
+            entry.state = q.value(3).toInt();
+            entry.viewed = q.value(4).toInt();
+            entry.storage = q.value(5).toString();
+            entry.episodeName = q.value(6).toString();
+            entry.epno = q.value(7).toString();
+            entry.filename = q.value(8).toString();
+            entry.lastPlayed = q.value(9).toLongLong();
+            entry.localFilePath = q.value(10).toString();
+            entry.resolution = q.value(11).toString();
+            entry.quality = q.value(12).toString();
+            entry.groupName = q.value(13).toString();
+            entry.localWatched = q.value(14).toInt();
+            
+            episodes.append(entry);
+        }
+    } else {
+        LOG(QString("[MyListCardManager] Failed to query episodes for aid=%1: %2")
+            .arg(aid).arg(q.lastError().text()));
+        return;
+    }
+    
+    // Use the shared helper function to load episodes into the card
+    loadEpisodesForCardFromCache(card, aid, episodes);
+    
+    LOG(QString("[MyListCardManager] Loaded %1 episode entries for aid=%2").arg(episodes.size()).arg(aid));
 }
 
 void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, const QList<EpisodeCacheEntry>& episodes)
