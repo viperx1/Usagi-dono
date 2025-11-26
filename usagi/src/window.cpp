@@ -1612,6 +1612,9 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Clear existing cards
     cardManager->clearAllCards();
     
+    // Set the virtual layout for virtual scrolling (this sets the item factory)
+    cardManager->setVirtualLayout(mylistVirtualLayout);
+    
     // Comprehensive preload of ALL data needed for card creation
     // This eliminates ALL SQL queries from createCard()
     if (!aids.isEmpty()) {
