@@ -4138,18 +4138,11 @@ void Window::applyMylistFilters()
 		AnimeCard* card = cardsMap.value(aid);
 		bool visible = true;
 		
-		// If the card doesn't exist yet (virtual scrolling), we can't filter by card properties
-		// In that case, we need to skip items that require filtering until the card is created
+		// If the card doesn't exist yet (virtual scrolling), include it anyway
+		// Virtual scrolling creates cards on-demand, so we can't filter without card data
+		// The card will be created when scrolled into view
 		if (!card) {
-			// If there are no filters that require card data, include the anime
-			bool hasCardBasedFilters = !searchText.isEmpty() || !typeFilter.isEmpty() || 
-			                           !completionFilter.isEmpty() || showOnlyUnwatched ||
-			                           adultContentFilter != "ignore";
-			if (!hasCardBasedFilters) {
-				filteredAnimeIds.append(aid);
-			}
-			// Otherwise, exclude anime without card data when filters are active
-			// (they will appear when cards are created and pass the filter)
+			filteredAnimeIds.append(aid);
 			continue;
 		}
 		
