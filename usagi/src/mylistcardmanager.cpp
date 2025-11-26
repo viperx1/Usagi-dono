@@ -112,6 +112,9 @@ void MyListCardManager::loadAllCards()
         }
     }
     
+    // Bulk preload anime data and statistics for better performance
+    preloadAnimeDataCache(aids);
+    
     int cardCount = 0;
     
     // Create cards for each anime
