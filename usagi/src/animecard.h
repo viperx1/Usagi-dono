@@ -55,11 +55,11 @@ public:
         int fid;
         QString fileName;
         QString state;
-        bool viewed;
-        bool localWatched;  // Local watch status (chunk-based tracking)
+        bool viewed;        // AniDB API watch status (synced from server)
+        bool localWatched;  // Local watch status (chunk-based playback tracking)
         QString storage;
         QString localFilePath;  // Path to local file if tracked
-        qint64 lastPlayed;
+        qint64 lastPlayed;  // Timestamp of last playback session (for resume)
         QString resolution;
         QString quality;
         QString groupName;
