@@ -473,6 +473,7 @@ private:
     bool mylistSortAscending;  // Deprecated: moved to MyListFilterSidebar
     bool lastInMyListState;  // Track previous "In MyList" filter state for reload detection
     QSet<int> mylistAnimeIdSet;  // Set of anime IDs that are in the user's mylist (for fast filtering)
+    QList<int> allAnimeIdsList;  // Full unfiltered list of anime IDs for filtering (populated by onMylistLoadingFinished/loadMylistAsCards, never modified by filters)
     bool allAnimeTitlesLoaded;  // Flag to track if all anime titles have been loaded
     MyListCardManager *cardManager;  // Manages card lifecycle and updates
     MyListFilterSidebar *filterSidebar;  // Filter sidebar widget
