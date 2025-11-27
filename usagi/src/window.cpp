@@ -1606,6 +1606,9 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
         mylistAnimeIdSet.insert(aid);
     }
     
+    // Store the full unfiltered list of anime IDs (for filter reset)
+    allAnimeIdsList = aids;
+    
     // Clear existing cards
     cardManager->clearAllCards();
     
@@ -3845,6 +3848,9 @@ void Window::loadMylistAsCards()
 		mylistAnimeIdSet.insert(aid);
 	}
 	
+	// Store the full unfiltered list of anime IDs (for filter reset)
+	allAnimeIdsList = aids;
+	
 	// Preload all data for cards
 	if (!aids.isEmpty()) {
 		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
@@ -4029,14 +4035,17 @@ bool Window::matchesSearchFilter(int aid, const QString &animeName, const QStrin
 // Apply filters to mylist cards
 void Window::applyMylistFilters()
 {
-	// Get the full list of anime IDs
-	QList<int> allAnimeIds = cardManager->getAnimeIdList();
+	// Use the stored full unfiltered list of anime IDs (not the current filtered list)
+	// This ensures that when filters are removed, previously hidden cards reappear
+	QList<int> allAnimeIds = allAnimeIdsList;
 	
-	// If the list is empty, try to build it from animeCards for backward compatibility
+	// If the stored list is empty, try to build it from animeCards for backward compatibility
 	if (allAnimeIds.isEmpty() && !animeCards.isEmpty()) {
 		for (AnimeCard* card : std::as_const(animeCards)) {
 			allAnimeIds.append(card->getAnimeId());
 		}
+		// Store for future use
+		allAnimeIdsList = allAnimeIds;
 	}
 	
 	if (allAnimeIds.isEmpty()) {
@@ -4097,6 +4106,9 @@ void Window::applyMylistFilters()
 			
 			// Mark all anime titles as loaded
 			allAnimeTitlesLoaded = true;
+			
+			// Store the full unfiltered list of all anime IDs
+			allAnimeIdsList = aids;
 			
 			// Set up virtual scrolling with the full list of anime IDs
 			cardManager->setVirtualLayout(mylistVirtualLayout);
