@@ -314,6 +314,7 @@ Window::Window()
     // page mylist (card view only)
     mylistSortAscending = false;  // Default to descending (newest first for aired date)
     lastInMyListState = true;  // Initialize to true (default is "In MyList only")
+    allAnimeTitlesLoaded = false;  // All anime titles are not loaded initially
     
     // Initialize network manager for poster downloads (deprecated, kept for backward compatibility)
     posterNetworkManager = new QNetworkAccessManager(this);
@@ -834,10 +835,10 @@ void Window::debugPrintDatabaseInfoForLid(int lid)
 				{
 					titleCount++;
 					LOG(QString("  Title #%1: type=%2, language=%3, title=%4")
-						.arg(titleCount)
-						.arg(titlesQuery.value("type").toString())
-						.arg(titlesQuery.value("language").toString())
-						.arg(titlesQuery.value("title").toString()));
+					    .arg(titleCount)
+					    .arg(titlesQuery.value("type").toString(),
+					         titlesQuery.value("language").toString(),
+					         titlesQuery.value("title").toString()));
 				}
 				if(titleCount == 0)
 				{
@@ -1609,6 +1610,12 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
 {
     LOG(QString("Background loading: Mylist query complete with %1 anime, using virtual scrolling...").arg(aids.size()));
     
+    // Store the mylist anime IDs for fast filtering later
+    mylistAnimeIdSet.clear();
+    for (int aid : aids) {
+        mylistAnimeIdSet.insert(aid);
+    }
+    
     // Clear existing cards
     cardManager->clearAllCards();
     
@@ -1779,14 +1786,14 @@ void Window::loadMylistProgressively()
 // Load all anime titles progressively (called when unchecking "in mylist only")
 void Window::loadAllAnimeTitlesProgressively()
 {
-	LOG("[Window] Starting progressive anime titles loading...");
+	LOG("[Window] Starting all anime titles loading...");
 	
 	// Stop any ongoing progressive loading
 	if (progressiveCardLoadingTimer && progressiveCardLoadingTimer->isActive()) {
 		progressiveCardLoadingTimer->stop();
 	}
 	
-	// Clear existing cards
+	// Clear existing cards but preserve mylist anime ID set
 	cardManager->clearAllCards();
 	pendingCardsToLoad.clear();
 	
@@ -1818,7 +1825,7 @@ void Window::loadAllAnimeTitlesProgressively()
 		aids.append(aid);
 	}
 	
-	LOG(QString("[Window] Found %1 anime titles, starting progressive card creation...").arg(aids.size()));
+	LOG(QString("[Window] Found %1 anime titles, preloading data...").arg(aids.size()));
 	
 	// Preload all data - this may take some time but is necessary
 	if (!aids.isEmpty()) {
@@ -1830,16 +1837,34 @@ void Window::loadAllAnimeTitlesProgressively()
 		LOG("[Window] Card data preload complete");
 	}
 	
-	// Store AIDs for progressive loading
-	pendingCardsToLoad = aids;
+	// Mark all anime titles as loaded - subsequent filter toggles won't need to reload
+	allAnimeTitlesLoaded = true;
 	
-	// Start progressive loading timer
-	if (!pendingCardsToLoad.isEmpty()) {
-		progressiveCardLoadingTimer->start();
-		mylistStatusLabel->setText(QString("MyList Status: Loading %1 anime...").arg(pendingCardsToLoad.size()));
-	} else {
-		mylistStatusLabel->setText("MyList Status: No anime titles found");
+	// Set up virtual scrolling with the full list of anime IDs
+	cardManager->setVirtualLayout(mylistVirtualLayout);
+	cardManager->setAnimeIdList(aids);
+	
+	// Update the virtual layout with the item count
+	if (mylistVirtualLayout) {
+		mylistVirtualLayout->setItemCount(aids.size());
+		mylistVirtualLayout->refresh();
 	}
+	
+	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
+	animeCards = cardManager->getAllCards();
+	
+	// Apply sorting
+	restoreMylistSorting();
+	sortMylistCards(filterSidebar->getSortIndex());
+	
+	// Reload alternative titles for filtering
+	loadAnimeAlternativeTitlesForFiltering();
+	
+	// Apply current filters (which will now filter from cached data)
+	applyMylistFilters();
+	
+	mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
+	LOG(QString("[Window] All anime titles loaded: %1 anime").arg(aids.size()));
 }
 
 // Called when anime titles loading finishes (in UI thread)
@@ -2109,7 +2134,7 @@ void Window::getNotifyLogAppend(QString str)
 	QTime t;
 	t = t.currentTime();
 	QString a;
-	a = QString("%1: %2").arg(t.toString()).arg(str);
+	a = QString("%1: %2").arg(t.toString(), str);
 	logOutput->append(a);
 	
 	// Note: This slot updates the UI log tab with timestamp
@@ -4178,23 +4203,24 @@ void Window::applyMylistFilters()
 	QString adultContentFilter = filterSidebar->getAdultContentFilter();
 	bool inMyListOnly = filterSidebar->getInMyListOnly();
 	
-	// Check if we need to reload cards due to MyList filter change
+	// Check if we need to handle MyList filter change
 	if (inMyListOnly != lastInMyListState) {
 		lastInMyListState = inMyListOnly;
 		
-		// Reload cards based on the new filter state
-		LOG(QString("[Window] Reloading cards due to MyList filter change: inMyListOnly=%1").arg(inMyListOnly));
-		
-		if (inMyListOnly) {
-			// Load only mylist anime - use progressive loading to avoid UI freeze
-			loadMylistProgressively();
-		} else {
-			// Load all anime from anime_titles - use progressive loading to avoid UI freeze
+		// Check if we need to load all anime titles (only on first uncheck of "In My List")
+		bool needsToLoadAllTitles = !inMyListOnly && !allAnimeTitlesLoaded;
+		if (needsToLoadAllTitles) {
+			// User unchecked "In My List" for the first time - need to load all anime titles
+			// This is the only case where we need to reload from the database
+			LOG("[Window] First time showing all anime - loading all anime titles from database...");
 			loadAllAnimeTitlesProgressively();
+			// Don't continue with filtering yet - wait for progressive loading to complete
+			return;
 		}
 		
-		// Don't continue with filtering yet - wait for progressive loading to complete
-		return;
+		// Otherwise, we can filter from already-loaded cached data
+		// No need to reload from database - all data is already in memory
+		LOG(QString("[Window] Filtering by MyList state change: inMyListOnly=%1 (using cached data)").arg(inMyListOnly));
 	}
 	
 	// Build a map of existing cards for quick lookup (for backward compatibility)
@@ -4217,6 +4243,12 @@ void Window::applyMylistFilters()
 	// Use cached data when card widgets don't exist (virtual scrolling)
 	for (int aid : allAnimeIds) {
 		bool visible = true;
+		
+		// Apply "In My List" filter first - this is a quick check using the set
+		if (inMyListOnly && !mylistAnimeIdSet.contains(aid)) {
+			// This anime is not in mylist, skip it
+			continue;
+		}
 		
 		// Try to get data from existing card first, then fall back to cached data
 		AnimeCard* card = cardsMap.value(aid);
@@ -4608,8 +4640,7 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     // Note: The AniDB API has an undocumented length limit for the 'other' field
     // Testing shows ~100 chars works reliably, so we truncate to stay safe
     QString otherField = QString("File: %1\nHash: %2\nSize: %3")
-        .arg(fileData.filename)
-        .arg(fileData.hash)
+        .arg(fileData.filename, fileData.hash)
         .arg(fileData.size);
     
     // Truncate if too long (limit to 100 chars to stay within API limits)
