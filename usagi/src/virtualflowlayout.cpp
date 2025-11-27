@@ -31,11 +31,15 @@ VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     m_deferredUpdateTimer->setInterval(100);  // 100ms delay
     connect(m_deferredUpdateTimer, &QTimer::timeout, this, [this]() {
         LOG("[VirtualFlowLayout] Deferred update triggered");
+        int savedScrollY = saveScrollPosition();
+        
         m_cachedFirstVisible = -1;
         m_cachedLastVisible = -1;
         calculateLayout();
         updateVisibleItems();
         update();
+        
+        restoreScrollPosition(savedScrollY);
     });
 }
 
@@ -56,6 +60,8 @@ void VirtualFlowLayout::setItemCount(int count)
     if (m_itemCount == count) {
         return;
     }
+    
+    int savedScrollY = saveScrollPosition();
     
     // Clear existing widgets if count decreased
     if (count < m_itemCount) {
@@ -80,6 +86,8 @@ void VirtualFlowLayout::setItemCount(int count)
     calculateLayout();
     updateVisibleItems();
     update();
+    
+    restoreScrollPosition(savedScrollY);
     
     // Also schedule a deferred update to catch any timing issues
     if (count > 0 && m_deferredUpdateTimer) {
@@ -144,6 +152,8 @@ void VirtualFlowLayout::ensureVisible(int index)
 
 void VirtualFlowLayout::refresh()
 {
+    int savedScrollY = saveScrollPosition();
+    
     // Force recalculation and update of all visible items
     // We need to hide and clear all visible widgets first because after
     // sorting/filtering, the same index may now represent a different item
@@ -159,6 +169,8 @@ void VirtualFlowLayout::refresh()
     calculateLayout();
     updateVisibleItems();
     update();
+    
+    restoreScrollPosition(savedScrollY);
 }
 
 void VirtualFlowLayout::clear()
@@ -501,5 +513,20 @@ void VirtualFlowLayout::recycleWidget(int index)
         // Just hide the widget - don't delete it
         // The card manager keeps it in its cache and we'll reuse it when scrolling back
         widget->hide();
+    }
+}
+
+int VirtualFlowLayout::saveScrollPosition() const
+{
+    if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+        return m_scrollArea->verticalScrollBar()->value();
+    }
+    return 0;
+}
+
+void VirtualFlowLayout::restoreScrollPosition(int savedY)
+{
+    if (m_scrollArea && m_scrollArea->verticalScrollBar()) {
+        m_scrollArea->verticalScrollBar()->setValue(savedY);
     }
 }

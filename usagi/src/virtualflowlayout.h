@@ -117,6 +117,11 @@ private:
     // Return a widget to the pool
     void recycleWidget(int index);
     
+    // Scroll position preservation helpers - used during layout updates
+    // to prevent unwanted scroll position changes
+    int saveScrollPosition() const;       // Returns current vertical scroll position
+    void restoreScrollPosition(int savedY); // Restores scroll position to savedY
+    
     // Item data
     int m_itemCount;
     QSize m_itemSize;
