@@ -42,6 +42,7 @@ set(SOURCES
     src/mylistfiltersidebar.cpp
     src/watchchunkmanager.cpp
     src/virtualflowlayout.cpp
+    src/watchsessionmanager.cpp
 )
 
 # Header files
@@ -70,6 +71,7 @@ set(HEADERS
     src/animeutils.h
     src/uicolors.h
     src/virtualflowlayout.h
+    src/watchsessionmanager.h
 )
 
 # Create executable

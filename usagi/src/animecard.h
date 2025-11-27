@@ -49,6 +49,13 @@ public:
         }
     };
     
+    // File marking type enum for download/deletion queue
+    enum class FileMarkType {
+        None = 0,
+        ForDownload = 1,
+        ForDeletion = 2
+    };
+    
     // File and Episode management structures
     struct FileInfo {
         int lid;
@@ -64,6 +71,10 @@ public:
         QString quality;
         QString groupName;
         int version;  // File version (1, 2, 3, etc.)
+        FileMarkType markType;  // File marking for download/deletion
+        
+        FileInfo() : lid(0), fid(0), viewed(false), localWatched(false), 
+                     lastPlayed(0), version(0), markType(FileMarkType::None) {}
     };
     
     struct EpisodeInfo {
@@ -124,6 +135,10 @@ signals:
     void hideCardRequested(int aid);  // Hide card request
     void markEpisodeWatchedRequested(int eid);  // Mark episode as watched
     void markFileWatchedRequested(int lid);  // Mark file as watched
+    void startSessionFromEpisodeRequested(int lid);  // Start session from specific episode/file
+    void markFileForDownloadRequested(int lid);  // Mark file for download
+    void markFileForDeletionRequested(int lid);  // Mark file for deletion
+    void clearFileMarkRequested(int lid);  // Clear file marking
     
 protected:
     void paintEvent(QPaintEvent *event) override;

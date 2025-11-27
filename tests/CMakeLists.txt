@@ -1534,3 +1534,39 @@ if(WIN32)
 endif()
 
 add_test(NAME test_unknown_files_persistence COMMAND test_unknown_files_persistence -v2)
+
+# Test: WatchSessionManager test
+set(WATCHSESSIONMANAGER_TEST_SOURCES
+    test_watchsessionmanager.cpp
+    ../usagi/src/watchsessionmanager.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(WATCHSESSIONMANAGER_TEST_HEADERS
+    ../usagi/src/watchsessionmanager.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_watchsessionmanager ${WATCHSESSIONMANAGER_TEST_SOURCES} ${WATCHSESSIONMANAGER_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_watchsessionmanager)
+
+target_compile_definitions(test_watchsessionmanager PRIVATE CRYPTOPP_DEBUG=0)
+
+target_link_libraries(test_watchsessionmanager PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+target_include_directories(test_watchsessionmanager PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_watchsessionmanager PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_watchsessionmanager COMMAND test_watchsessionmanager -v2)
