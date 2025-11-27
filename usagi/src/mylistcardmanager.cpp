@@ -1135,10 +1135,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
             if (!m_cardCreationDataCache.contains(aid) || !m_cardCreationDataCache[aid].hasData) {
                 CardCreationData& data = m_cardCreationDataCache[aid];
                 data.animeTitle = title;
-                // Mark as having at least minimal data
-                if (data.animeTitle.isEmpty()) {
-                    data.animeTitle = title;
-                }
+                // Mark as having at least minimal data so filtering can work
+                data.hasData = true;
             }
         }
     }
