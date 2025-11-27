@@ -25,10 +25,6 @@ HasherThreadPool *hasherThreadPool = nullptr;
 extern Window *window;
 settings_struct settings;
 
-// Define static constants for Window class
-const int Window::CARD_LOADING_BATCH_SIZE;
-const int Window::CARD_LOADING_TIMER_INTERVAL;
-
 // Worker implementations
 
 void MylistLoaderWorker::doWork()
@@ -614,12 +610,6 @@ Window::Window()
     mylistLoadingThread = nullptr;
     animeTitlesLoadingThread = nullptr;
     unboundFilesLoadingThread = nullptr;
-    
-    // Initialize timer for progressive card loading
-    progressiveCardLoadingTimer = new QTimer(this);
-    progressiveCardLoadingTimer->setSingleShot(false);
-    progressiveCardLoadingTimer->setInterval(CARD_LOADING_TIMER_INTERVAL);
-    connect(progressiveCardLoadingTimer, &QTimer::timeout, this, &Window::loadNextCardBatch);
     
     // Load directory watcher settings from database
     bool watcherEnabledSetting = adbapi->getWatcherEnabled();
@@ -1657,215 +1647,7 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     LOG(QString("[Virtual Scrolling] Ready to display %1 anime").arg(aids.size()));
 }
 
-// Load cards progressively in batches to keep UI responsive
-// NOTE: This is now deprecated in favor of virtual scrolling
-void Window::loadNextCardBatch()
-{
-    if (pendingCardsToLoad.isEmpty()) {
-        // All cards loaded
-        progressiveCardLoadingTimer->stop();
-        
-        // Re-enable layout updates after loading is complete
-        if (mylistCardLayout && mylistCardLayout->parentWidget()) {
-            mylistCardLayout->parentWidget()->setUpdatesEnabled(true);
-            mylistCardLayout->parentWidget()->update();
-        }
-        
-        // Get all cards for backward compatibility
-        animeCards = cardManager->getAllCards();
-        
-        // Apply sorting
-        restoreMylistSorting();
-        sortMylistCards(filterSidebar->getSortIndex());
-        
-        // Reload alternative titles for filtering
-        loadAnimeAlternativeTitlesForFiltering();
-        
-        // Apply current filters
-        applyMylistFilters();
-        
-        mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(animeCards.size()));
-        LOG(QString("[Progressive Loading] All cards loaded: %1 anime").arg(animeCards.size()));
-        return;
-    }
-    
-    // Disable layout updates during batch creation for performance
-    if (mylistCardLayout && mylistCardLayout->parentWidget()) {
-        mylistCardLayout->parentWidget()->setUpdatesEnabled(false);
-    }
-    
-    // Load next batch of cards
-    int cardsToLoad = qMin(CARD_LOADING_BATCH_SIZE, pendingCardsToLoad.size());
-    
-    for (int i = 0; i < cardsToLoad; ++i) {
-        int aid = pendingCardsToLoad.takeFirst();
-        
-        // Create card directly since we've already preloaded all data
-        AnimeCard *card = cardManager->createCard(aid);
-        if (!card) {
-            LOG(QString("[Progressive Loading] WARNING: Failed to create card for aid=%1").arg(aid));
-        }
-    }
-    
-    // Re-enable layout temporarily to show progress and process events
-    if (mylistCardLayout && mylistCardLayout->parentWidget()) {
-        mylistCardLayout->parentWidget()->setUpdatesEnabled(true);
-        mylistCardLayout->parentWidget()->update();
-    }
-    
-    // Process events to keep UI responsive
-    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-    
-    // Update status
-    int remaining = pendingCardsToLoad.size();
-    int loaded = cardManager->getAllCards().size();
-    mylistStatusLabel->setText(QString("MyList Status: Loading... %1 of %2").arg(loaded).arg(loaded + remaining));
-}
 
-// Load mylist anime progressively (called when checking "in mylist only")
-void Window::loadMylistProgressively()
-{
-	LOG("[Window] Starting progressive mylist loading...");
-	
-	// Stop any ongoing progressive loading
-	if (progressiveCardLoadingTimer && progressiveCardLoadingTimer->isActive()) {
-		progressiveCardLoadingTimer->stop();
-	}
-	
-	// Clear existing cards
-	cardManager->clearAllCards();
-	pendingCardsToLoad.clear();
-	
-	// Show status
-	mylistStatusLabel->setText("MyList Status: Loading mylist anime...");
-	
-	// Query mylist anime IDs
-	QSqlDatabase db = QSqlDatabase::database();
-	if (!db.isOpen()) {
-		LOG("[Window] Database not open");
-		mylistStatusLabel->setText("MyList Status: Error - database not open");
-		return;
-	}
-	
-	QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY m.aid";
-	QSqlQuery q(db);
-	
-	if (!q.exec(query)) {
-		LOG(QString("[Window] Error loading mylist: %1").arg(q.lastError().text()));
-		mylistStatusLabel->setText("MyList Status: Error loading mylist");
-		return;
-	}
-	
-	QList<int> aids;
-	while (q.next()) {
-		int aid = q.value(0).toInt();
-		aids.append(aid);
-	}
-	
-	LOG(QString("[Window] Found %1 mylist anime, starting progressive card creation...").arg(aids.size()));
-	
-	// Preload all data
-	if (!aids.isEmpty()) {
-		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
-		cardManager->preloadCardCreationData(aids);
-		LOG("[Window] Card data preload complete");
-	}
-	
-	// Store AIDs for progressive loading
-	pendingCardsToLoad = aids;
-	
-	// Start progressive loading timer
-	if (!pendingCardsToLoad.isEmpty()) {
-		progressiveCardLoadingTimer->start();
-		mylistStatusLabel->setText(QString("MyList Status: Loading %1 anime...").arg(pendingCardsToLoad.size()));
-	} else {
-		mylistStatusLabel->setText("MyList Status: No anime in mylist");
-	}
-}
-
-// Load all anime titles progressively (called when unchecking "in mylist only")
-void Window::loadAllAnimeTitlesProgressively()
-{
-	LOG("[Window] Starting all anime titles loading...");
-	
-	// Stop any ongoing progressive loading
-	if (progressiveCardLoadingTimer && progressiveCardLoadingTimer->isActive()) {
-		progressiveCardLoadingTimer->stop();
-	}
-	
-	// Clear existing cards but preserve mylist anime ID set
-	cardManager->clearAllCards();
-	pendingCardsToLoad.clear();
-	
-	// Show status
-	mylistStatusLabel->setText("MyList Status: Loading all anime titles...");
-	
-	// Query all anime from anime_titles table
-	QSqlDatabase db = QSqlDatabase::database();
-	if (!db.isOpen()) {
-		LOG("[Window] Database not open");
-		mylistStatusLabel->setText("MyList Status: Error - database not open");
-		return;
-	}
-	
-	QString query = "SELECT DISTINCT at.aid FROM anime_titles at "
-	                "WHERE at.type = 1 AND at.language = 'x-jat' "
-	                "ORDER BY at.aid";
-	QSqlQuery q(db);
-	
-	if (!q.exec(query)) {
-		LOG(QString("[Window] Error loading anime_titles: %1").arg(q.lastError().text()));
-		mylistStatusLabel->setText("MyList Status: Error loading anime titles");
-		return;
-	}
-	
-	QList<int> aids;
-	while (q.next()) {
-		int aid = q.value(0).toInt();
-		aids.append(aid);
-	}
-	
-	LOG(QString("[Window] Found %1 anime titles, preloading data...").arg(aids.size()));
-	
-	// Preload all data - this may take some time but is necessary
-	if (!aids.isEmpty()) {
-		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
-		// Process events to keep UI responsive during preload
-		QApplication::processEvents();
-		
-		cardManager->preloadCardCreationData(aids);
-		LOG("[Window] Card data preload complete");
-	}
-	
-	// Mark all anime titles as loaded - subsequent filter toggles won't need to reload
-	allAnimeTitlesLoaded = true;
-	
-	// Set up virtual scrolling with the full list of anime IDs
-	cardManager->setVirtualLayout(mylistVirtualLayout);
-	cardManager->setAnimeIdList(aids);
-	
-	// Update the virtual layout with the item count
-	if (mylistVirtualLayout) {
-		mylistVirtualLayout->setItemCount(aids.size());
-		mylistVirtualLayout->refresh();
-	}
-	
-	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
-	animeCards = cardManager->getAllCards();
-	
-	// Apply sorting
-	restoreMylistSorting();
-	sortMylistCards(filterSidebar->getSortIndex());
-	
-	// Reload alternative titles for filtering
-	loadAnimeAlternativeTitlesForFiltering();
-	
-	// Apply current filters (which will now filter from cached data)
-	applyMylistFilters();
-	
-	mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
-	LOG(QString("[Window] All anime titles loaded: %1 anime").arg(aids.size()));
-}
 
 // Called when anime titles loading finishes (in UI thread)
 void Window::onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid)
@@ -4009,10 +3791,10 @@ void Window::toggleSortOrder()
 	// Kept for backward compatibility
 }
 
-// Load mylist data as cards - now uses progressive loading to avoid UI freeze
+// Load mylist data as cards using virtual scrolling
 void Window::loadMylistAsCards()
 {
-	LOG(QString("[Window] loadMylistAsCards - using progressive loading"));
+	LOG(QString("[Window] loadMylistAsCards - loading mylist directly"));
 	
 	// Set the layout for the card manager
 	cardManager->setCardLayout(mylistCardLayout);
@@ -4026,8 +3808,74 @@ void Window::loadMylistAsCards()
 	connect(adbapi, &myAniDBApi::notifyAnimeUpdated,
 	        cardManager, &MyListCardManager::onAnimeUpdated, Qt::UniqueConnection);
 	
-	// Use progressive loading instead of synchronous loadAllCards()
-	loadMylistProgressively();
+	// Clear existing cards
+	cardManager->clearAllCards();
+	
+	// Show status
+	mylistStatusLabel->setText("MyList Status: Loading mylist anime...");
+	
+	// Query mylist anime IDs
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("[Window] Database not open");
+		mylistStatusLabel->setText("MyList Status: Error - database not open");
+		return;
+	}
+	
+	QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY m.aid";
+	QSqlQuery q(db);
+	
+	if (!q.exec(query)) {
+		LOG(QString("[Window] Error loading mylist: %1").arg(q.lastError().text()));
+		mylistStatusLabel->setText("MyList Status: Error loading mylist");
+		return;
+	}
+	
+	QList<int> aids;
+	while (q.next()) {
+		int aid = q.value(0).toInt();
+		aids.append(aid);
+	}
+	
+	LOG(QString("[Window] Found %1 mylist anime").arg(aids.size()));
+	
+	// Store the mylist anime IDs for fast filtering later
+	mylistAnimeIdSet.clear();
+	for (int aid : aids) {
+		mylistAnimeIdSet.insert(aid);
+	}
+	
+	// Preload all data for cards
+	if (!aids.isEmpty()) {
+		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
+		cardManager->preloadCardCreationData(aids);
+		LOG("[Window] Card data preload complete");
+	}
+	
+	// Set the ordered anime ID list for virtual scrolling
+	cardManager->setAnimeIdList(aids);
+	
+	// Update the virtual layout with the item count
+	if (mylistVirtualLayout) {
+		mylistVirtualLayout->setItemCount(aids.size());
+		mylistVirtualLayout->refresh();
+	}
+	
+	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
+	animeCards = cardManager->getAllCards();
+	
+	// Apply sorting
+	restoreMylistSorting();
+	sortMylistCards(filterSidebar->getSortIndex());
+	
+	// Reload alternative titles for filtering
+	loadAnimeAlternativeTitlesForFiltering();
+	
+	// Apply current filters
+	applyMylistFilters();
+	
+	mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
+	LOG(QString("[Window] Mylist loaded: %1 anime").arg(aids.size()));
 }
 
 // Load alternative titles from anime_titles table for filtering
@@ -4211,11 +4059,70 @@ void Window::applyMylistFilters()
 		bool needsToLoadAllTitles = !inMyListOnly && !allAnimeTitlesLoaded;
 		if (needsToLoadAllTitles) {
 			// User unchecked "In My List" for the first time - need to load all anime titles
-			// This is the only case where we need to reload from the database
 			LOG("[Window] First time showing all anime - loading all anime titles from database...");
-			loadAllAnimeTitlesProgressively();
-			// Don't continue with filtering yet - wait for progressive loading to complete
-			return;
+			
+			// Load all anime titles directly
+			QSqlDatabase db = QSqlDatabase::database();
+			if (!db.isOpen()) {
+				LOG("[Window] Database not open");
+				mylistStatusLabel->setText("MyList Status: Error - database not open");
+				return;
+			}
+			
+			QString query = "SELECT DISTINCT at.aid FROM anime_titles at "
+			                "WHERE at.type = 1 AND at.language = 'x-jat' "
+			                "ORDER BY at.aid";
+			QSqlQuery q(db);
+			
+			if (!q.exec(query)) {
+				LOG(QString("[Window] Error loading anime_titles: %1").arg(q.lastError().text()));
+				mylistStatusLabel->setText("MyList Status: Error loading anime titles");
+				return;
+			}
+			
+			QList<int> aids;
+			while (q.next()) {
+				int aid = q.value(0).toInt();
+				aids.append(aid);
+			}
+			
+			LOG(QString("[Window] Found %1 anime titles, preloading data...").arg(aids.size()));
+			
+			// Preload all data
+			if (!aids.isEmpty()) {
+				mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
+				cardManager->preloadCardCreationData(aids);
+				LOG("[Window] Card data preload complete");
+			}
+			
+			// Mark all anime titles as loaded
+			allAnimeTitlesLoaded = true;
+			
+			// Set up virtual scrolling with the full list of anime IDs
+			cardManager->setVirtualLayout(mylistVirtualLayout);
+			cardManager->setAnimeIdList(aids);
+			
+			// Update the virtual layout with the item count
+			if (mylistVirtualLayout) {
+				mylistVirtualLayout->setItemCount(aids.size());
+				mylistVirtualLayout->refresh();
+			}
+			
+			// Get all cards for backward compatibility
+			animeCards = cardManager->getAllCards();
+			
+			// Apply sorting
+			restoreMylistSorting();
+			sortMylistCards(filterSidebar->getSortIndex());
+			
+			// Reload alternative titles for filtering
+			loadAnimeAlternativeTitlesForFiltering();
+			
+			// Update allAnimeIds for the rest of this function
+			allAnimeIds = aids;
+			
+			mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
+			LOG(QString("[Window] All anime titles loaded: %1 anime").arg(aids.size()));
 		}
 		
 		// Otherwise, we can filter from already-loaded cached data

@@ -1370,6 +1370,7 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/mylistcardmanager.cpp
     ../usagi/src/animecard.cpp
     ../usagi/src/flowlayout.cpp
+    ../usagi/src/virtualflowlayout.cpp
     ../usagi/src/playbuttondelegate.cpp
     ../usagi/src/epno.cpp
     ../usagi/src/aired.cpp
@@ -1387,6 +1388,7 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
     ../usagi/src/mylistcardmanager.h
     ../usagi/src/animecard.h
     ../usagi/src/flowlayout.h
+    ../usagi/src/virtualflowlayout.h
     ../usagi/src/playbuttondelegate.h
     ../usagi/src/epno.h
     ../usagi/src/aired.h

@@ -107,7 +107,6 @@ void TestMyListCardManager::createTestDatabase()
            "nameromaji TEXT, "
            "nameenglish TEXT, "
            "eptotal INTEGER, "
-           "eps INTEGER, "
            "typename TEXT, "
            "startdate TEXT, "
            "enddate TEXT, "
@@ -118,7 +117,8 @@ void TestMyListCardManager::createTestDatabase()
            "tag_name_list TEXT, "
            "tag_id_list TEXT, "
            "tag_weight_list TEXT, "
-           "hidden INTEGER DEFAULT 0)");
+           "hidden INTEGER DEFAULT 0, "
+           "is_18_restricted INTEGER DEFAULT 0)");
     
     // Create episode table
     q.exec("CREATE TABLE episode ("
@@ -156,6 +156,7 @@ void TestMyListCardManager::createTestDatabase()
     q.exec("CREATE TABLE anime_titles ("
            "aid INTEGER, "
            "type INTEGER, "
+           "language TEXT, "
            "title TEXT)");
     
     // Create local_files table
@@ -167,8 +168,14 @@ void TestMyListCardManager::createTestDatabase()
 void TestMyListCardManager::insertTestAnime(int aid, const QString &name)
 {
     QSqlQuery q(db);
-    q.prepare("INSERT INTO anime (aid, nameromaji, eps, typename, startdate, enddate) "
+    q.prepare("INSERT INTO anime (aid, nameromaji, eptotal, typename, startdate, enddate) "
               "VALUES (?, ?, 12, 'TV Series', '2020-01-01', '2020-03-31')");
+    q.addBindValue(aid);
+    q.addBindValue(name);
+    q.exec();
+    
+    // Also insert into anime_titles for the title lookup
+    q.prepare("INSERT INTO anime_titles (aid, type, language, title) VALUES (?, 1, 'x-jat', ?)");
     q.addBindValue(aid);
     q.addBindValue(name);
     q.exec();
@@ -203,18 +210,14 @@ void TestMyListCardManager::testCardCreation()
     insertTestEpisode(1, 1, "Episode 1", "1");
     insertTestMylistEntry(1, 1, 1);
     
-    // Load cards
-    QSignalSpy loadedSpy(manager, &MyListCardManager::allCardsLoaded);
-    manager->loadAllCards();
-    
-    // Verify signal was emitted
-    QCOMPARE(loadedSpy.count(), 1);
-    QList<QVariant> arguments = loadedSpy.takeFirst();
-    QCOMPARE(arguments.at(0).toInt(), 1);  // Should have loaded 1 card
+    // Preload data and create card directly
+    QList<int> aids;
+    aids.append(1);
+    manager->preloadCardCreationData(aids);
+    AnimeCard *card = manager->createCard(1);
     
     // Verify card exists
     QVERIFY(manager->hasCard(1));
-    AnimeCard *card = manager->getCard(1);
     QVERIFY(card != nullptr);
     QCOMPARE(card->getAnimeId(), 1);
 }
@@ -226,8 +229,11 @@ void TestMyListCardManager::testCardCaching()
     insertTestEpisode(1, 1, "Episode 1", "1");
     insertTestMylistEntry(1, 1, 1);
     
-    // Load cards first time
-    manager->loadAllCards();
+    // Load card first time
+    QList<int> aids;
+    aids.append(1);
+    manager->preloadCardCreationData(aids);
+    manager->createCard(1);
     AnimeCard *card1 = manager->getCard(1);
     
     // Update card data
@@ -249,7 +255,12 @@ void TestMyListCardManager::testIndividualUpdate()
     insertTestMylistEntry(2, 2, 2);
     
     // Load all cards
-    manager->loadAllCards();
+    QList<int> aids;
+    aids.append(1);
+    aids.append(2);
+    manager->preloadCardCreationData(aids);
+    manager->createCard(1);
+    manager->createCard(2);
     
     // Get initial card pointers
     AnimeCard *card1 = manager->getCard(1);
@@ -280,7 +291,14 @@ void TestMyListCardManager::testBatchUpdates()
     }
     
     // Load all cards
-    manager->loadAllCards();
+    QList<int> aids;
+    for (int i = 1; i <= 5; i++) {
+        aids.append(i);
+    }
+    manager->preloadCardCreationData(aids);
+    for (int i = 1; i <= 5; i++) {
+        manager->createCard(i);
+    }
     
     // Queue multiple updates
     QSet<int> toUpdate;
@@ -305,8 +323,11 @@ void TestMyListCardManager::testAsynchronousOperations()
     insertTestEpisode(1, 1, "Episode 1", "1");
     insertTestMylistEntry(1, 1, 1);
     
-    // Load cards - should not block
-    manager->loadAllCards();
+    // Load card
+    QList<int> aids;
+    aids.append(1);
+    manager->preloadCardCreationData(aids);
+    manager->createCard(1);
     
     // Update card - should not block (uses batched timer)
     manager->updateCardAnimeInfo(1);
@@ -330,7 +351,14 @@ void TestMyListCardManager::testMemoryManagement()
     }
     
     // Load cards
-    manager->loadAllCards();
+    QList<int> aids;
+    for (int i = 1; i <= 10; i++) {
+        aids.append(i);
+    }
+    manager->preloadCardCreationData(aids);
+    for (int i = 1; i <= 10; i++) {
+        manager->createCard(i);
+    }
     QCOMPARE(manager->getAllCards().count(), 10);
     
     // Clear all cards

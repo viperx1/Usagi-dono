@@ -84,8 +84,6 @@ public:
     // Check if virtual scrolling is enabled
     bool isVirtualScrollingEnabled() const { return m_virtualLayout != nullptr; }
     
-    // loadAllCards() and loadAllAnimeTitles() removed - use progressive loading in Window class
-    
     // Clear all cards (when switching views or shutting down)
     void clearAllCards();
     
