@@ -3791,7 +3791,7 @@ void Window::toggleSortOrder()
 	// Kept for backward compatibility
 }
 
-// Load mylist data as cards - now uses progressive loading to avoid UI freeze
+// Load mylist data as cards using virtual scrolling
 void Window::loadMylistAsCards()
 {
 	LOG(QString("[Window] loadMylistAsCards - loading mylist directly"));
