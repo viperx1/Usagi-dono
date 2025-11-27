@@ -741,7 +741,7 @@ int WatchSessionManager::getEpisodeNumber(int lid) const
         QString epno = q.value(0).toString();
         
         // Try to extract numeric part
-        QRegularExpression regex("(\\d+)");
+        static const QRegularExpression regex("(\\d+)");
         QRegularExpressionMatch match = regex.match(epno);
         if (match.hasMatch()) {
             return match.captured(1).toInt();

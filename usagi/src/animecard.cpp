@@ -549,10 +549,10 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         // Add file marking visual indicator
         switch (file.markType) {
             case FileMarkType::ForDownload:
-                fileText += QString::fromUtf8(" \xE2\xAC\x87");  // ⬇ Down arrow
+                fileText += " " + UIIcons::MARK_DOWNLOAD;
                 break;
             case FileMarkType::ForDeletion:
-                fileText += QString::fromUtf8(" \xF0\x9F\x97\x91");  // 🗑 Wastebasket
+                fileText += " " + UIIcons::MARK_DELETION;
                 break;
             default:
                 break;

@@ -11,6 +11,7 @@
 #include <QPixmap>
 #include "epno.h"
 #include "aired.h"
+#include "watchsessionmanager.h"  // For FileMarkType enum
 
 // Forward declaration
 class PlayButtonDelegate;
@@ -47,13 +48,6 @@ public:
         bool operator<(const TagInfo& other) const {
             return weight > other.weight;
         }
-    };
-    
-    // File marking type enum for download/deletion queue
-    enum class FileMarkType {
-        None = 0,
-        ForDownload = 1,
-        ForDeletion = 2
     };
     
     // File and Episode management structures
