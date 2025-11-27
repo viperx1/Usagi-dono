@@ -106,9 +106,6 @@ AnimeCard* MyListCardManager::createCardForIndex(int index)
     return card;
 }
 
-// loadAllCards() has been removed - use progressive loading via Window::loadMylistProgressively() instead
-// loadAllAnimeTitles() has been removed - use progressive loading via Window::loadAllAnimeTitlesProgressively() instead
-
 void MyListCardManager::clearAllCards()
 {
     QMutexLocker locker(&m_mutex);

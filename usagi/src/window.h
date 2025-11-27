@@ -557,12 +557,6 @@ private:
 	QThread *unboundFilesLoadingThread;
 	void startBackgroundLoading();
 	
-	// Progressive card loading to keep UI responsive
-	QTimer *progressiveCardLoadingTimer;
-	QList<int> pendingCardsToLoad;
-	static const int CARD_LOADING_BATCH_SIZE = 100; // Load 100 cards per timer tick for faster loading
-	static const int CARD_LOADING_TIMER_INTERVAL = 1; // Process as fast as possible
-	
 	// Mutex for protecting shared data between threads
 	QMutex backgroundLoadingMutex;
 
@@ -657,13 +651,8 @@ private slots:
 	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
 	void onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files);
 	
-	// Progressive loading methods for filter changes (to avoid UI freeze)
-	void loadMylistProgressively();
-	void loadAllAnimeTitlesProgressively();
-	
 	// Timer-based processing handlers
 	void processPendingHashedFiles();
-	void loadNextCardBatch();
 
 public:
 	// page hasher
