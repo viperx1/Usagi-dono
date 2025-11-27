@@ -372,7 +372,11 @@ Window::Window()
     
     // Create and add filter sidebar (now includes sorting controls)
     filterSidebar = new MyListFilterSidebar(this);
-    connect(filterSidebar, &MyListFilterSidebar::filterChanged, this, &Window::applyMylistFilters);
+    connect(filterSidebar, &MyListFilterSidebar::filterChanged, this, [this]() {
+        applyMylistFilters();
+        // Re-apply sorting after filtering to preserve sort order
+        sortMylistCards(filterSidebar->getSortIndex());
+    });
     connect(filterSidebar, &MyListFilterSidebar::sortChanged, this, [this]() {
         sortMylistCards(filterSidebar->getSortIndex());
     });
@@ -1636,15 +1640,16 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Get all cards for backward compatibility (will be empty initially with virtual scrolling)
     animeCards = cardManager->getAllCards();
     
-    // Apply sorting
-    restoreMylistSorting();
-    sortMylistCards(filterSidebar->getSortIndex());
-    
     // Reload alternative titles for filtering
     loadAnimeAlternativeTitlesForFiltering();
     
-    // Apply current filters
+    // Apply current filters first, then sorting
+    // (sorting must happen after filtering to preserve sort order on filtered results)
     applyMylistFilters();
+    
+    // Apply sorting after filtering
+    restoreMylistSorting();
+    sortMylistCards(filterSidebar->getSortIndex());
     
     mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
     LOG(QString("[Virtual Scrolling] Ready to display %1 anime").arg(aids.size()));
@@ -3870,15 +3875,16 @@ void Window::loadMylistAsCards()
 	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
 	animeCards = cardManager->getAllCards();
 	
-	// Apply sorting
-	restoreMylistSorting();
-	sortMylistCards(filterSidebar->getSortIndex());
-	
 	// Reload alternative titles for filtering
 	loadAnimeAlternativeTitlesForFiltering();
 	
-	// Apply current filters
+	// Apply current filters first, then sorting
+	// (sorting must happen after filtering to preserve sort order on filtered results)
 	applyMylistFilters();
+	
+	// Apply sorting after filtering
+	restoreMylistSorting();
+	sortMylistCards(filterSidebar->getSortIndex());
 	
 	mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
 	LOG(QString("[Window] Mylist loaded: %1 anime").arg(aids.size()));
@@ -4127,10 +4133,6 @@ void Window::applyMylistFilters()
 			// Get all cards for backward compatibility
 			animeCards = cardManager->getAllCards();
 			
-			// Apply sorting
-			restoreMylistSorting();
-			sortMylistCards(filterSidebar->getSortIndex());
-			
 			// Reload alternative titles for filtering
 			loadAnimeAlternativeTitlesForFiltering();
 			
@@ -4139,6 +4141,9 @@ void Window::applyMylistFilters()
 			
 			mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
 			LOG(QString("[Window] All anime titles loaded: %1 anime").arg(aids.size()));
+			
+			// Note: Sorting will be applied by the caller after this function returns
+			// (sorting must happen after filtering to preserve sort order)
 		}
 		
 		// Otherwise, we can filter from already-loaded cached data
