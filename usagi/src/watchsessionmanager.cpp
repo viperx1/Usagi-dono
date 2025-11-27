@@ -15,13 +15,16 @@ WatchSessionManager::WatchSessionManager(QObject *parent)
     , m_thresholdValue(DEFAULT_THRESHOLD_VALUE)
     , m_autoMarkDeletionEnabled(false)
 {
+    LOG("[WatchSessionManager] Initializing...");
     ensureTablesExist();
     loadSettings();
     loadFromDatabase();
+    LOG("[WatchSessionManager] Initialization complete");
 }
 
 WatchSessionManager::~WatchSessionManager()
 {
+    LOG("[WatchSessionManager] Shutting down, saving session data...");
     saveToDatabase();
 }
 
