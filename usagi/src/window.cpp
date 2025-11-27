@@ -4039,7 +4039,11 @@ void Window::applyMylistFilters()
 	// This ensures that when filters are removed, previously hidden cards reappear
 	QList<int> allAnimeIds = allAnimeIdsList;
 	
-	// If the stored list is empty, try to build it from animeCards for backward compatibility
+	// Fallback for backward compatibility: if the full list wasn't initialized 
+	// (shouldn't happen in normal operation since onMylistLoadingFinished or 
+	// loadMylistAsCards sets it), try to build it from existing cards.
+	// Note: This fallback may not work correctly if animeCards contains only
+	// a subset of cards, but this is an edge case for legacy code paths.
 	if (allAnimeIds.isEmpty() && !animeCards.isEmpty()) {
 		for (AnimeCard* card : std::as_const(animeCards)) {
 			allAnimeIds.append(card->getAnimeId());
