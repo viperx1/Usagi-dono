@@ -835,10 +835,10 @@ void Window::debugPrintDatabaseInfoForLid(int lid)
 				{
 					titleCount++;
 					LOG(QString("  Title #%1: type=%2, language=%3, title=%4")
-						.arg(titleCount)
-						.arg(titlesQuery.value("type").toString(),
-						     titlesQuery.value("language").toString(),
-						     titlesQuery.value("title").toString()));
+					    .arg(titleCount)
+					    .arg(titlesQuery.value("type").toString(),
+					         titlesQuery.value("language").toString(),
+					         titlesQuery.value("title").toString()));
 				}
 				if(titleCount == 0)
 				{
@@ -4207,7 +4207,9 @@ void Window::applyMylistFilters()
 	if (inMyListOnly != lastInMyListState) {
 		lastInMyListState = inMyListOnly;
 		
-		if (!inMyListOnly && !allAnimeTitlesLoaded) {
+		// Check if we need to load all anime titles (only on first uncheck of "In My List")
+		bool needsToLoadAllTitles = !inMyListOnly && !allAnimeTitlesLoaded;
+		if (needsToLoadAllTitles) {
 			// User unchecked "In My List" for the first time - need to load all anime titles
 			// This is the only case where we need to reload from the database
 			LOG("[Window] First time showing all anime - loading all anime titles from database...");
