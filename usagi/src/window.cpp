@@ -633,11 +633,12 @@ Window::Window()
         }
     });
     connect(sessionThresholdTypeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        // Use index directly: 0=FixedGB, 1=Percentage
         if (watchSessionManager) {
-            watchSessionManager->setDeletionThresholdType(static_cast<DeletionThresholdType>(sessionThresholdTypeComboBox->currentData().toInt()));
+            watchSessionManager->setDeletionThresholdType(static_cast<DeletionThresholdType>(index));
         }
         // Update suffix based on type
-        if (sessionThresholdTypeComboBox->currentData().toInt() == 0) {
+        if (index == 0) {
             sessionThresholdValueSpinBox->setSuffix(" GB");
         } else {
             sessionThresholdValueSpinBox->setSuffix(" %");
