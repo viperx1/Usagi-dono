@@ -95,6 +95,12 @@ void WatchSessionManager::loadSettings()
     if (q.exec() && q.next()) {
         m_autoMarkDeletionEnabled = q.value(0).toInt() != 0;
     }
+    
+    // Load watched path (defaults to empty, which means use directory watcher path)
+    q.prepare("SELECT value FROM settings WHERE name = 'session_watched_path'");
+    if (q.exec() && q.next()) {
+        m_watchedPath = q.value(0).toString();
+    }
 }
 
 void WatchSessionManager::saveSettings()
@@ -124,6 +130,11 @@ void WatchSessionManager::saveSettings()
     // Save auto-mark enabled
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('auto_mark_deletion_enabled', ?)");
     q.addBindValue(m_autoMarkDeletionEnabled ? 1 : 0);
+    q.exec();
+    
+    // Save watched path
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('session_watched_path', ?)");
+    q.addBindValue(m_watchedPath);
     q.exec();
 }
 
@@ -594,8 +605,9 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         return;
     }
     
-    // Get available space on the drive where the application is installed
-    QStorageInfo storage(QCoreApplication::applicationDirPath());
+    // Get available space on the watched drive (or application directory if not set)
+    QString pathToMonitor = m_watchedPath.isEmpty() ? QCoreApplication::applicationDirPath() : m_watchedPath;
+    QStorageInfo storage(pathToMonitor);
     qint64 availableBytes = storage.bytesAvailable();
     qint64 totalBytes = storage.bytesTotal();
     
@@ -606,6 +618,7 @@ void WatchSessionManager::autoMarkFilesForDeletion()
                     ? (totalGB - availableGB) : 0.0;
     
     // Log drive information
+    LOG(QString("[WatchSessionManager] Monitored path: %1").arg(pathToMonitor));
     LOG(QString("[WatchSessionManager] Watched drive info - Path: %1, Name: %2, FileSystem: %3")
         .arg(storage.rootPath(), storage.displayName(), QString::fromUtf8(storage.fileSystemType())));
     LOG(QString("[WatchSessionManager] Drive space - Total: %1 GB, Used: %2 GB, Available: %3 GB (%4% free)")
@@ -814,6 +827,25 @@ void WatchSessionManager::setAutoMarkDeletionEnabled(bool enabled)
     
     if (enabled) {
         autoMarkFilesForDeletion();
+    }
+}
+
+QString WatchSessionManager::getWatchedPath() const
+{
+    return m_watchedPath;
+}
+
+void WatchSessionManager::setWatchedPath(const QString& path)
+{
+    if (m_watchedPath != path) {
+        m_watchedPath = path;
+        LOG(QString("[WatchSessionManager] Watched path set to: %1").arg(path.isEmpty() ? "(application directory)" : path));
+        saveSettings();
+        
+        // Trigger space check with new path
+        if (m_autoMarkDeletionEnabled) {
+            autoMarkFilesForDeletion();
+        }
     }
 }
 

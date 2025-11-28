@@ -31,6 +31,8 @@
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QCompleter>
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QSpinBox>
+#include <QtWidgets/QDoubleSpinBox>
 #include <QXmlStreamReader>
 #include <QThread>
 #include "hash/ed2k.h"
@@ -509,6 +511,12 @@ private:
     // Playback settings
     QLineEdit *mediaPlayerPath;
     QPushButton *mediaPlayerBrowseButton;
+    
+    // Session manager settings
+    QSpinBox *sessionAheadBufferSpinBox;
+    QComboBox *sessionThresholdTypeComboBox;
+    QDoubleSpinBox *sessionThresholdValueSpinBox;
+    QCheckBox *sessionAutoMarkDeletionCheckbox;
 
 	// page notify
 	QTextEdit *notifyOutput;
