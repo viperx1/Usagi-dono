@@ -157,6 +157,63 @@ void MyListFilterSidebar::setupUI()
     adultContentLayout->addWidget(m_adultContentFilter);
     mainLayout->addWidget(adultContentGroup);
     
+    // Session settings group
+    QGroupBox *sessionGroup = new QGroupBox("Session Settings");
+    QVBoxLayout *sessionLayout = new QVBoxLayout(sessionGroup);
+    
+    // Ahead buffer setting - global value that applies to all anime
+    QLabel *aheadBufferLabel = new QLabel("Episodes ahead:");
+    m_aheadBufferSpinBox = new QSpinBox();
+    m_aheadBufferSpinBox->setMinimum(1);
+    m_aheadBufferSpinBox->setMaximum(20);
+    m_aheadBufferSpinBox->setValue(3);
+    m_aheadBufferSpinBox->setToolTip("Number of episodes to keep ready for uninterrupted viewing.\n"
+                                      "This value applies to all anime with active sessions.");
+    connect(m_aheadBufferSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MyListFilterSidebar::onSessionSettingsChanged);
+    
+    QHBoxLayout *aheadLayout = new QHBoxLayout();
+    aheadLayout->addWidget(aheadBufferLabel);
+    aheadLayout->addWidget(m_aheadBufferSpinBox);
+    sessionLayout->addLayout(aheadLayout);
+    
+    // Deletion threshold type
+    QLabel *thresholdTypeLabel = new QLabel("Deletion threshold:");
+    m_thresholdTypeComboBox = new QComboBox();
+    m_thresholdTypeComboBox->addItem("Fixed (GB)", 0);
+    m_thresholdTypeComboBox->addItem("Percentage (%)", 1);
+    m_thresholdTypeComboBox->setToolTip("Type of threshold for automatic file cleanup");
+    connect(m_thresholdTypeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MyListFilterSidebar::onSessionSettingsChanged);
+    
+    sessionLayout->addWidget(thresholdTypeLabel);
+    sessionLayout->addWidget(m_thresholdTypeComboBox);
+    
+    // Deletion threshold value
+    QLabel *thresholdValueLabel = new QLabel("Threshold value:");
+    m_thresholdValueSpinBox = new QDoubleSpinBox();
+    m_thresholdValueSpinBox->setMinimum(1.0);
+    m_thresholdValueSpinBox->setMaximum(1000.0);
+    m_thresholdValueSpinBox->setValue(50.0);
+    m_thresholdValueSpinBox->setSuffix(" GB");
+    m_thresholdValueSpinBox->setToolTip("When free space drops below this value, files will be marked for deletion");
+    connect(m_thresholdValueSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MyListFilterSidebar::onSessionSettingsChanged);
+    
+    QHBoxLayout *thresholdLayout = new QHBoxLayout();
+    thresholdLayout->addWidget(thresholdValueLabel);
+    thresholdLayout->addWidget(m_thresholdValueSpinBox);
+    sessionLayout->addLayout(thresholdLayout);
+    
+    // Auto-mark deletion checkbox
+    m_autoMarkDeletionCheckbox = new QCheckBox("Auto-mark for deletion");
+    m_autoMarkDeletionCheckbox->setToolTip("Automatically mark watched files for deletion when disk space is low");
+    connect(m_autoMarkDeletionCheckbox, &QCheckBox::clicked,
+            this, &MyListFilterSidebar::onSessionSettingsChanged);
+    
+    sessionLayout->addWidget(m_autoMarkDeletionCheckbox);
+    mainLayout->addWidget(sessionGroup);
+    
     // Reset button
     m_resetButton = new QPushButton("Reset All Filters");
     connect(m_resetButton, &QPushButton::clicked, this, &MyListFilterSidebar::resetFilters);
@@ -253,4 +310,63 @@ void MyListFilterSidebar::onSortOrderToggled()
     }
     
     emit sortChanged();
+}
+
+void MyListFilterSidebar::onSessionSettingsChanged()
+{
+    // Update threshold suffix based on type
+    if (m_thresholdTypeComboBox->currentData().toInt() == 0) {
+        m_thresholdValueSpinBox->setSuffix(" GB");
+    } else {
+        m_thresholdValueSpinBox->setSuffix(" %");
+    }
+    
+    emit sessionSettingsChanged();
+}
+
+// Session settings getters
+int MyListFilterSidebar::getAheadBuffer() const
+{
+    return m_aheadBufferSpinBox->value();
+}
+
+int MyListFilterSidebar::getDeletionThresholdType() const
+{
+    return m_thresholdTypeComboBox->currentData().toInt();
+}
+
+double MyListFilterSidebar::getDeletionThresholdValue() const
+{
+    return m_thresholdValueSpinBox->value();
+}
+
+bool MyListFilterSidebar::isAutoMarkDeletionEnabled() const
+{
+    return m_autoMarkDeletionCheckbox->isChecked();
+}
+
+// Session settings setters
+void MyListFilterSidebar::setAheadBuffer(int episodes)
+{
+    m_aheadBufferSpinBox->setValue(episodes);
+}
+
+void MyListFilterSidebar::setDeletionThresholdType(int type)
+{
+    m_thresholdTypeComboBox->setCurrentIndex(type);
+    if (type == 0) {
+        m_thresholdValueSpinBox->setSuffix(" GB");
+    } else {
+        m_thresholdValueSpinBox->setSuffix(" %");
+    }
+}
+
+void MyListFilterSidebar::setDeletionThresholdValue(double value)
+{
+    m_thresholdValueSpinBox->setValue(value);
+}
+
+void MyListFilterSidebar::setAutoMarkDeletionEnabled(bool enabled)
+{
+    m_autoMarkDeletionCheckbox->setChecked(enabled);
 }

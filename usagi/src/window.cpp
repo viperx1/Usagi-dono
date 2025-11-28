@@ -323,6 +323,23 @@ Window::Window()
     connect(cardManager, &MyListCardManager::allCardsLoaded, this, [this](int count) {
         mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(count));
         animeCards = cardManager->getAllCards();  // Update legacy list for backward compatibility
+        
+        // Mark initial loading as complete so new anime can be detected
+        cardManager->setInitialLoadComplete();
+        
+        // Perform initial scan for file marking after mylist is loaded
+        if (watchSessionManager) {
+            LOG("[Window] Mylist loaded, triggering initial file marking scan");
+            watchSessionManager->performInitialScan();
+        }
+    });
+    
+    // Connect signal for brand new anime added to mylist (after initial load)
+    connect(cardManager, &MyListCardManager::newAnimeAdded, this, [this](int aid) {
+        LOG(QString("[Window] New anime aid=%1 added to mylist, auto-starting session").arg(aid));
+        if (watchSessionManager) {
+            watchSessionManager->onNewAnimeAdded(aid);
+        }
     });
     
     connect(cardManager, &MyListCardManager::cardCreated, this, [this](int aid, AnimeCard *card) {
@@ -331,6 +348,32 @@ Window::Window()
         connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
         connect(card, &AnimeCard::playAnimeRequested, this, &Window::onPlayAnimeFromCard);
         connect(card, &AnimeCard::resetWatchSessionRequested, this, &Window::onResetWatchSession);
+        
+        // Connect session and file marking signals to WatchSessionManager
+        connect(card, &AnimeCard::startSessionFromEpisodeRequested, this, [this](int lid) {
+            LOG(QString("[Window] Starting session from file lid=%1").arg(lid));
+            if (watchSessionManager) {
+                watchSessionManager->startSessionFromFile(lid);
+            }
+        });
+        connect(card, &AnimeCard::markFileForDownloadRequested, this, [this](int lid) {
+            LOG(QString("[Window] Marking file lid=%1 for download").arg(lid));
+            if (watchSessionManager) {
+                watchSessionManager->setFileMarkType(lid, FileMarkType::ForDownload);
+            }
+        });
+        connect(card, &AnimeCard::markFileForDeletionRequested, this, [this](int lid) {
+            LOG(QString("[Window] Marking file lid=%1 for deletion").arg(lid));
+            if (watchSessionManager) {
+                watchSessionManager->setFileMarkType(lid, FileMarkType::ForDeletion);
+            }
+        });
+        connect(card, &AnimeCard::clearFileMarkRequested, this, [this](int lid) {
+            LOG(QString("[Window] Clearing file mark for lid=%1").arg(lid));
+            if (watchSessionManager) {
+                watchSessionManager->setFileMarkType(lid, FileMarkType::None);
+            }
+        });
     });
     
     connect(cardManager, &MyListCardManager::cardUpdated, this, [](int) {
@@ -595,6 +638,31 @@ Window::Window()
             this, &Window::onPlaybackStateChanged);
     connect(playbackManager, &PlaybackManager::fileMarkedAsLocallyWatched,
             this, &Window::onFileMarkedAsLocallyWatched);
+    
+    // Initialize watch session manager
+    watchSessionManager = new WatchSessionManager(this);
+    LOG("[Window] WatchSessionManager initialized");
+    
+    // Connect sidebar session settings to watch session manager
+    connect(filterSidebar, &MyListFilterSidebar::sessionSettingsChanged, this, [this]() {
+        LOG("[Window] Session settings changed, updating WatchSessionManager");
+        if (watchSessionManager) {
+            watchSessionManager->setAheadBuffer(filterSidebar->getAheadBuffer());
+            watchSessionManager->setDeletionThresholdType(
+                static_cast<DeletionThresholdType>(filterSidebar->getDeletionThresholdType()));
+            watchSessionManager->setDeletionThresholdValue(filterSidebar->getDeletionThresholdValue());
+            watchSessionManager->setAutoMarkDeletionEnabled(filterSidebar->isAutoMarkDeletionEnabled());
+        }
+    });
+    
+    // Connect WatchSessionManager signals to refresh cards when markings change
+    connect(watchSessionManager, &WatchSessionManager::markingsUpdated, this, [this]() {
+        LOG("[Window] File markings updated, refreshing cards");
+        // Trigger card refresh to show updated markings
+        if (cardManager) {
+            cardManager->refreshAllCards();
+        }
+    });
     
     // Initialize play button delegate (kept for card view compatibility)
     playButtonDelegate = new PlayButtonDelegate(this);

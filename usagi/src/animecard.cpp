@@ -229,23 +229,63 @@ void AnimeCard::setupUI()
         
         // Check if this is an episode item (has no parent) or a file item (has parent)
         if (!item->parent()) {
-            // Episode item - mark all files in episode as watched
+            // Episode item - show episode-level options
             int eid = item->data(2, Qt::UserRole + 1).toInt();
+            int lid = item->data(2, Qt::UserRole).toInt();
+            
+            if (lid > 0) {
+                // Add "Start session from here" option
+                QAction *startSessionAction = contextMenu.addAction("Start session from here");
+                connect(startSessionAction, &QAction::triggered, this, [this, lid]() {
+                    emit startSessionFromEpisodeRequested(lid);
+                });
+                contextMenu.addSeparator();
+            }
+            
             if (eid > 0) {
                 QAction *markWatchedAction = contextMenu.addAction("Mark episode as watched");
                 connect(markWatchedAction, &QAction::triggered, this, [this, eid]() {
                     emit markEpisodeWatchedRequested(eid);
                 });
+            }
+            
+            if (!contextMenu.isEmpty()) {
                 contextMenu.exec(m_episodeTree->mapToGlobal(pos));
             }
         } else {
-            // File item - mark this specific file as watched
+            // File item - show file-level options
             int lid = item->data(2, Qt::UserRole).toInt();
             if (lid > 0) {
+                // Add "Start session from here" option
+                QAction *startSessionAction = contextMenu.addAction("Start session from here");
+                connect(startSessionAction, &QAction::triggered, this, [this, lid]() {
+                    emit startSessionFromEpisodeRequested(lid);
+                });
+                contextMenu.addSeparator();
+                
                 QAction *markFileWatchedAction = contextMenu.addAction("Mark file as watched");
                 connect(markFileWatchedAction, &QAction::triggered, this, [this, lid]() {
                     emit markFileWatchedRequested(lid);
                 });
+                
+                contextMenu.addSeparator();
+                
+                // File marking options
+                QAction *markDownloadAction = contextMenu.addAction("Mark for download");
+                connect(markDownloadAction, &QAction::triggered, this, [this, lid]() {
+                    emit markFileForDownloadRequested(lid);
+                });
+                
+                QAction *markDeletionAction = contextMenu.addAction("Mark for deletion");
+                connect(markDeletionAction, &QAction::triggered, this, [this, lid]() {
+                    emit markFileForDeletionRequested(lid);
+                });
+                
+                QAction *clearMarkAction = contextMenu.addAction("Clear marking");
+                connect(clearMarkAction, &QAction::triggered, this, [this, lid]() {
+                    emit clearFileMarkRequested(lid);
+                });
+                
                 contextMenu.exec(m_episodeTree->mapToGlobal(pos));
             }
         }
@@ -506,13 +546,29 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             fileText += QString(" [%1]").arg(file.state);
         }
         
+        // Add file marking visual indicator
+        switch (file.markType) {
+            case FileMarkType::ForDownload:
+                fileText += " " + UIIcons::MARK_DOWNLOAD;
+                break;
+            case FileMarkType::ForDeletion:
+                fileText += " " + UIIcons::MARK_DELETION;
+                break;
+            default:
+                break;
+        }
+        
         // Column 2: File info
         fileItem->setText(2, fileText);
         fileItem->setData(2, Qt::UserRole, file.lid);
         fileItem->setData(2, Qt::UserRole + 1, file.fid);
         
-        // Color code file text based on state
-        if (file.viewed) {
+        // Color code file text based on state and marking
+        if (file.markType == FileMarkType::ForDownload) {
+            fileItem->setBackground(2, QBrush(UIColors::FILE_MARKED_DOWNLOAD));
+        } else if (file.markType == FileMarkType::ForDeletion) {
+            fileItem->setBackground(2, QBrush(UIColors::FILE_MARKED_DELETION));
+        } else if (file.viewed) {
             fileItem->setForeground(2, QBrush(UIColors::FILE_WATCHED)); // Green for viewed
         }
         
@@ -531,6 +587,18 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         }
         if (file.version > 0) {
             tooltip += QString("\nVersion: v%1").arg(file.version);
+        }
+        
+        // Add marking info to tooltip
+        switch (file.markType) {
+            case FileMarkType::ForDownload:
+                tooltip += "\nMarking: For Download";
+                break;
+            case FileMarkType::ForDeletion:
+                tooltip += "\nMarking: For Deletion";
+                break;
+            default:
+                break;
         }
         
         if (file.lastPlayed > 0) {

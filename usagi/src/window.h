@@ -44,6 +44,7 @@
 #include "virtualflowlayout.h"
 #include "mylistcardmanager.h"
 #include "mylistfiltersidebar.h"
+#include "watchsessionmanager.h"
 #include "uicolors.h"
 //#include "hasherthread.h"
 
@@ -51,6 +52,7 @@
 class PlayButtonDelegate;
 class MyListCardManager;
 class VirtualFlowLayout;
+class WatchSessionManager;
 
 // MyList tree widget column indices (using enum for type safety and maintainability)
 // Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
@@ -531,6 +533,9 @@ private:
 	PlayButtonDelegate *playButtonDelegate;
 	QMap<int, int> m_playingItems; // lid -> animation frame (0, 1, 2)
 	QTimer *m_animationTimer;
+	
+	// Watch session manager
+	WatchSessionManager *watchSessionManager;
 	
 	// Batch processing for hashed files
 	// Note: HashedFileData structure removed as identification now happens immediately
