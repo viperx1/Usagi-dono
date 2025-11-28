@@ -671,14 +671,50 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     // 1. Files in mylist with local paths (regardless of watched status)
     // 2. Files in local_files that are not in mylist
     QSqlQuery q(db);
-    q.exec("SELECT lf.lid FROM local_files lf "
-           "WHERE lf.local_path IS NOT NULL AND lf.local_path != ''");
+    
+    // First, log the count of files in local_files table
+    q.exec("SELECT COUNT(*) FROM local_files");
+    int totalLocalFiles = 0;
+    if (q.next()) {
+        totalLocalFiles = q.value(0).toInt();
+    }
+    LOG(QString("[WatchSessionManager] Total rows in local_files table: %1").arg(totalLocalFiles));
+    
+    // Count files with valid local_path
+    q.exec("SELECT COUNT(*) FROM local_files WHERE local_path IS NOT NULL AND local_path != ''");
+    int filesWithPath = 0;
+    if (q.next()) {
+        filesWithPath = q.value(0).toInt();
+    }
+    LOG(QString("[WatchSessionManager] Files with valid local_path: %1").arg(filesWithPath));
+    
+    // Now get the actual candidates
+    bool querySuccess = q.exec("SELECT lf.lid, lf.local_path FROM local_files lf "
+                                "WHERE lf.local_path IS NOT NULL AND lf.local_path != ''");
+    
+    if (!querySuccess) {
+        LOG(QString("[WatchSessionManager] SQL query failed: %1").arg(q.lastError().text()));
+        return;
+    }
     
     QList<QPair<int, int>> candidates; // (lid, score)
+    int processedCount = 0;
     while (q.next()) {
         int lid = q.value(0).toInt();
+        QString localPath = q.value(1).toString();
         int score = calculateMarkScore(lid);
         candidates.append(qMakePair(lid, score));
+        processedCount++;
+        
+        // Log first few candidates for debugging
+        if (processedCount <= 5) {
+            LOG(QString("[WatchSessionManager] Candidate file: lid=%1, path=%2, score=%3")
+                .arg(lid).arg(localPath).arg(score));
+        }
+    }
+    
+    if (processedCount > 5) {
+        LOG(QString("[WatchSessionManager] ... and %1 more candidates").arg(processedCount - 5));
     }
     
     LOG(QString("[WatchSessionManager] Found %1 files as deletion candidates").arg(candidates.size()));
