@@ -601,14 +601,16 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     double availableGB = availableBytes / (1024.0 * 1024.0 * 1024.0);
     double totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
-    double usedGB = totalGB - availableGB;
+    // Ensure usedGB is non-negative (could be negative if values are invalid)
+    double usedGB = (totalGB > availableGB && totalGB > 0.0 && availableGB >= 0.0) 
+                    ? (totalGB - availableGB) : 0.0;
     
     // Log drive information
     LOG(QString("[WatchSessionManager] Watched drive info - Path: %1, Name: %2, FileSystem: %3")
         .arg(storage.rootPath(), storage.displayName(), QString::fromUtf8(storage.fileSystemType())));
     LOG(QString("[WatchSessionManager] Drive space - Total: %1 GB, Used: %2 GB, Available: %3 GB (%4% free)")
         .arg(totalGB, 0, 'f', 2).arg(usedGB, 0, 'f', 2).arg(availableGB, 0, 'f', 2)
-        .arg(totalGB > 0 ? (availableGB / totalGB * 100.0) : 0.0, 0, 'f', 1));
+        .arg(totalGB > 0.0 ? (availableGB / totalGB * 100.0) : 0.0, 0, 'f', 1));
     
     double threshold = 0;
     if (m_thresholdType == DeletionThresholdType::FixedGB) {
