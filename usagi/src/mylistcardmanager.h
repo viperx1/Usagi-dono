@@ -102,6 +102,9 @@ public:
     void updateCardStatistics(int aid);
     void updateCardPoster(int aid, const QString &picname);
     
+    // Refresh all cards to pick up changes (e.g., file markings)
+    void refreshAllCards();
+    
     // Batch update methods for efficiency
     void updateMultipleCards(const QSet<int> &aids);
     

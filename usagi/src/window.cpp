@@ -323,6 +323,12 @@ Window::Window()
     connect(cardManager, &MyListCardManager::allCardsLoaded, this, [this](int count) {
         mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(count));
         animeCards = cardManager->getAllCards();  // Update legacy list for backward compatibility
+        
+        // Perform initial scan for file marking after mylist is loaded
+        if (watchSessionManager) {
+            LOG("[Window] Mylist loaded, triggering initial file marking scan");
+            watchSessionManager->performInitialScan();
+        }
     });
     
     connect(cardManager, &MyListCardManager::cardCreated, this, [this](int aid, AnimeCard *card) {
@@ -625,6 +631,27 @@ Window::Window()
     // Initialize watch session manager
     watchSessionManager = new WatchSessionManager(this);
     LOG("[Window] WatchSessionManager initialized");
+    
+    // Connect sidebar session settings to watch session manager
+    connect(filterSidebar, &MyListFilterSidebar::sessionSettingsChanged, this, [this]() {
+        LOG("[Window] Session settings changed, updating WatchSessionManager");
+        if (watchSessionManager) {
+            watchSessionManager->setAheadBuffer(filterSidebar->getAheadBuffer());
+            watchSessionManager->setDeletionThresholdType(
+                static_cast<DeletionThresholdType>(filterSidebar->getDeletionThresholdType()));
+            watchSessionManager->setDeletionThresholdValue(filterSidebar->getDeletionThresholdValue());
+            watchSessionManager->setAutoMarkDeletionEnabled(filterSidebar->isAutoMarkDeletionEnabled());
+        }
+    });
+    
+    // Connect WatchSessionManager signals to refresh cards when markings change
+    connect(watchSessionManager, &WatchSessionManager::markingsUpdated, this, [this]() {
+        LOG("[Window] File markings updated, refreshing cards");
+        // Trigger card refresh to show updated markings
+        if (cardManager) {
+            cardManager->refreshAllCards();
+        }
+    });
     
     // Initialize play button delegate (kept for card view compatibility)
     playButtonDelegate = new PlayButtonDelegate(this);

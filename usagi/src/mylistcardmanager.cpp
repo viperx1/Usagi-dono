@@ -229,6 +229,33 @@ void MyListCardManager::updateCardStatistics(int aid)
     updateCardAnimeInfo(aid);
 }
 
+void MyListCardManager::refreshAllCards()
+{
+    LOG("[MyListCardManager] Refreshing all cards to update file markings");
+    
+    // Get all current aids and recreate cards to pick up new file marks
+    QList<int> aids = m_orderedAnimeIds;
+    
+    // Clear and recreate all cards
+    for (int aid : aids) {
+        if (m_cards.contains(aid)) {
+            // Remove the old card
+            AnimeCard* oldCard = m_cards.take(aid);
+            if (oldCard) {
+                oldCard->deleteLater();
+            }
+        }
+    }
+    
+    // Recreate cards with updated file marks
+    for (int aid : aids) {
+        createCard(aid);
+    }
+    
+    LOG(QString("[MyListCardManager] Refreshed %1 cards").arg(aids.size()));
+    emit allCardsLoaded(aids.size());
+}
+
 void MyListCardManager::updateCardPoster(int aid, const QString &picname)
 {
     if (picname.isEmpty()) {
@@ -918,6 +945,22 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, c
         fileInfo.resolution = entry.resolution;
         fileInfo.quality = entry.quality;
         fileInfo.groupName = entry.groupName;
+        
+        // Query file mark from database
+        QSqlDatabase db = QSqlDatabase::database();
+        if (db.isOpen()) {
+            QSqlQuery markQuery(db);
+            markQuery.prepare("SELECT mark_type FROM file_marks WHERE lid = ?");
+            markQuery.addBindValue(entry.lid);
+            if (markQuery.exec() && markQuery.next()) {
+                int markType = markQuery.value(0).toInt();
+                fileInfo.markType = static_cast<FileMarkType>(markType);
+            } else {
+                fileInfo.markType = FileMarkType::None;
+            }
+        } else {
+            fileInfo.markType = FileMarkType::None;
+        }
         
         // Assign version number
         episodeFileCount[eid]++;

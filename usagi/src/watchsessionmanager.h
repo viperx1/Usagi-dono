@@ -173,7 +173,7 @@ public:
     QList<int> getFilesForDownload() const;
     
     /**
-     * @brief Automatically mark files for deletion based on available space
+      * @brief Automatically mark files for deletion based on available space
      * 
      * Uses the configured threshold settings to determine which files
      * should be soft-marked for deletion.
@@ -189,6 +189,14 @@ public:
      * - Current playback position
      */
     void autoMarkFilesForDownload();
+    
+    /**
+     * @brief Perform initial scan to mark files based on current state
+     * 
+     * This should be called after mylist data is loaded to mark files
+     * that need download or can be deleted based on current settings.
+     */
+    void performInitialScan();
     
     // ========== Settings ==========
     

@@ -726,6 +726,41 @@ void WatchSessionManager::setAutoMarkDeletionEnabled(bool enabled)
     }
 }
 
+void WatchSessionManager::performInitialScan()
+{
+    LOG("[WatchSessionManager] Performing initial file scan...");
+    
+    // Scan for files that should be marked for download based on active sessions
+    autoMarkFilesForDownload();
+    
+    // Scan for files that should be marked for deletion if auto-deletion is enabled
+    if (m_autoMarkDeletionEnabled) {
+        autoMarkFilesForDeletion();
+    }
+    
+    // Log the results
+    int downloadCount = 0;
+    int deletionCount = 0;
+    for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
+        if (it.value().markType == FileMarkType::ForDownload) {
+            downloadCount++;
+        } else if (it.value().markType == FileMarkType::ForDeletion) {
+            deletionCount++;
+        }
+    }
+    
+    LOG(QString("[WatchSessionManager] Initial scan complete: %1 files marked for download, %2 files marked for deletion")
+        .arg(downloadCount).arg(deletionCount));
+    
+    // Save the marks to database
+    saveToDatabase();
+    
+    // Emit signal to notify UI to refresh
+    if (downloadCount > 0 || deletionCount > 0) {
+        emit markingsUpdated();
+    }
+}
+
 // ========== Helper Methods ==========
 
 int WatchSessionManager::getEpisodeNumber(int lid) const
