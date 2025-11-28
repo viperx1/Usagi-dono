@@ -459,8 +459,11 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         int currentEp = getCurrentSessionEpisode(aid);
         int distance = episodeNumber - currentEp;
         
+        // Use dynamic ahead buffer for this anime
+        int aheadBuffer = calculateDynamicAheadBuffer(aid);
+        
         // Episodes in the ahead buffer get bonus
-        if (distance >= 0 && distance <= m_aheadBuffer) {
+        if (distance >= 0 && distance <= aheadBuffer) {
             score += SCORE_IN_AHEAD_BUFFER;
         }
         
@@ -641,8 +644,11 @@ void WatchSessionManager::autoMarkFilesForDownload()
             continue;
         }
         
+        // Calculate dynamic ahead buffer for this anime
+        int aheadBuffer = calculateDynamicAheadBuffer(session.aid);
+        
         // Find files for episodes in the ahead buffer
-        for (int ep = session.currentEpisode; ep <= session.currentEpisode + m_aheadBuffer; ep++) {
+        for (int ep = session.currentEpisode; ep <= session.currentEpisode + aheadBuffer; ep++) {
             // Query for files that match this episode and don't have a local file
             QSqlQuery q(db);
             q.prepare("SELECT m.lid FROM mylist m "
@@ -729,6 +735,29 @@ void WatchSessionManager::setAutoMarkDeletionEnabled(bool enabled)
 void WatchSessionManager::performInitialScan()
 {
     LOG("[WatchSessionManager] Performing initial file scan...");
+    
+    // Auto-start sessions for all anime in mylist that don't already have sessions
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        // Get all unique anime IDs from mylist that have local files
+        q.exec("SELECT DISTINCT m.aid FROM mylist m "
+               "JOIN local_files lf ON m.lid = lf.lid "
+               "WHERE lf.local_path IS NOT NULL AND lf.local_path != ''");
+        
+        int newSessionCount = 0;
+        while (q.next()) {
+            int aid = q.value(0).toInt();
+            if (aid > 0 && !hasActiveSession(aid)) {
+                // Start session at episode 1 (or first unwatched)
+                startSession(aid, 1);
+                newSessionCount++;
+            }
+        }
+        
+        LOG(QString("[WatchSessionManager] Auto-started %1 new sessions for anime with local files")
+            .arg(newSessionCount));
+    }
     
     // Scan for files that should be marked for download based on active sessions
     autoMarkFilesForDownload();
@@ -823,4 +852,62 @@ bool WatchSessionManager::isCardHidden(int aid) const
     }
     
     return false;
+}
+
+int WatchSessionManager::calculateDynamicAheadBuffer(int aid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return DEFAULT_AHEAD_BUFFER;
+    }
+    
+    // Query total file count and total size for this anime
+    QSqlQuery q(db);
+    q.prepare("SELECT COUNT(*) as file_count, "
+              "COALESCE(SUM(CASE WHEN lf.local_path IS NOT NULL AND lf.local_path != '' THEN 1 ELSE 0 END), 0) as local_count "
+              "FROM mylist m "
+              "LEFT JOIN local_files lf ON m.lid = lf.lid "
+              "WHERE m.aid = ?");
+    q.addBindValue(aid);
+    
+    if (!q.exec() || !q.next()) {
+        return DEFAULT_AHEAD_BUFFER;
+    }
+    
+    int totalFiles = q.value(0).toInt();
+    int localFiles = q.value(1).toInt();
+    
+    // Calculate dynamic ahead buffer based on total episode count
+    // Logic:
+    // - Very short series (1-6 eps): buffer = 2 (keep most ready)
+    // - Short series (7-13 eps): buffer = 3
+    // - Medium series (14-26 eps): buffer = 4
+    // - Long series (27-52 eps): buffer = 5
+    // - Very long series (53+ eps): buffer = 6-10 (progressive)
+    
+    int buffer;
+    if (totalFiles <= 6) {
+        buffer = MIN_AHEAD_BUFFER;  // 2
+    } else if (totalFiles <= 13) {
+        buffer = 3;
+    } else if (totalFiles <= 26) {
+        buffer = 4;
+    } else if (totalFiles <= 52) {
+        buffer = 5;
+    } else {
+        // For very long series, scale progressively
+        // 53-100 eps: 6
+        // 100-200 eps: 7
+        // 200+ eps: up to MAX_AHEAD_BUFFER
+        buffer = std::min(MAX_AHEAD_BUFFER, 6 + (totalFiles - 53) / 50);
+    }
+    
+    // Ensure buffer doesn't exceed remaining unwatched episodes
+    // (no point keeping 5 ahead if only 3 unwatched remain)
+    int unwatchedCount = totalFiles - localFiles;
+    if (unwatchedCount > 0 && buffer > unwatchedCount) {
+        buffer = std::max(MIN_AHEAD_BUFFER, unwatchedCount);
+    }
+    
+    return buffer;
 }

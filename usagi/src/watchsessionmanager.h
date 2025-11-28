@@ -316,6 +316,7 @@ private:
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
+    int calculateDynamicAheadBuffer(int aid) const;  // Calculate buffer based on anime's file count/size
     
     // Score calculation constants
     static const int SCORE_HIDDEN_CARD = -50;
@@ -326,7 +327,9 @@ private:
     static const int SCORE_DISTANCE_FACTOR = -2;  // Per episode away from current
     
     // Default settings
-    static const int DEFAULT_AHEAD_BUFFER = 3;
+    static constexpr int DEFAULT_AHEAD_BUFFER = 3;
+    static constexpr int MIN_AHEAD_BUFFER = 2;   // Minimum ahead buffer
+    static constexpr int MAX_AHEAD_BUFFER = 10;  // Maximum ahead buffer
     static constexpr double DEFAULT_THRESHOLD_VALUE = 50.0; // 50 GB or 50%
 };
 
