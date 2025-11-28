@@ -323,15 +323,6 @@ Window::Window()
     connect(cardManager, &MyListCardManager::allCardsLoaded, this, [this](int count) {
         mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(count));
         animeCards = cardManager->getAllCards();  // Update legacy list for backward compatibility
-        
-        // Mark initial loading as complete so new anime can be detected
-        cardManager->setInitialLoadComplete();
-        
-        // Perform initial scan for file marking after mylist is loaded
-        if (watchSessionManager) {
-            LOG("[Window] Mylist loaded, triggering initial file marking scan");
-            watchSessionManager->performInitialScan();
-        }
     });
     
     // Connect signal for brand new anime added to mylist (after initial load)
@@ -1807,6 +1798,16 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     
     mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
     LOG(QString("[Virtual Scrolling] Ready to display %1 anime").arg(aids.size()));
+    
+    // Perform initial file marking scan after mylist data is loaded
+    // This marks files for deletion/download based on current session state
+    if (watchSessionManager) {
+        LOG("[Window] Mylist loaded, triggering initial file marking scan");
+        watchSessionManager->performInitialScan();
+    }
+    
+    // Mark initial loading as complete so new anime can be detected
+    cardManager->setInitialLoadComplete();
 }
 
 
