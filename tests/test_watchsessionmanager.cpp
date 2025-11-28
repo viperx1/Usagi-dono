@@ -64,12 +64,13 @@ void TestWatchSessionManager::initTestCase()
            "value TEXT"
            ")");
     
-    // Mylist table
+    // Mylist table - matches real schema with local_file reference
     q.exec("CREATE TABLE IF NOT EXISTS mylist ("
            "lid INTEGER PRIMARY KEY, "
            "aid INTEGER, "
            "eid INTEGER, "
-           "local_watched INTEGER DEFAULT 0"
+           "local_watched INTEGER DEFAULT 0, "
+           "local_file INTEGER"
            ")");
     
     // Episode table
@@ -87,10 +88,14 @@ void TestWatchSessionManager::initTestCase()
            "is_hidden INTEGER DEFAULT 0"
            ")");
     
-    // Local files table for file path tracking
+    // Local files table - matches real schema (id, path, filename, status, ed2k_hash, binding_status)
     q.exec("CREATE TABLE IF NOT EXISTS local_files ("
-           "lid INTEGER PRIMARY KEY, "
-           "local_path TEXT"
+           "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+           "path TEXT UNIQUE, "
+           "filename TEXT, "
+           "status INTEGER DEFAULT 0, "
+           "ed2k_hash TEXT, "
+           "binding_status INTEGER DEFAULT 0"
            ")");
 }
 
@@ -154,21 +159,24 @@ void TestWatchSessionManager::setupTestData()
         q.exec();
     }
     
-    // Create test mylist entries
+    // Create test mylist entries with local_file references
     for (int ep = 1; ep <= 6; ep++) {
-        q.prepare("INSERT INTO mylist (lid, aid, eid, local_watched) VALUES (?, 1, ?, 0)");
+        // First insert into local_files to get the id
+        q.prepare("INSERT INTO local_files (path, filename) VALUES (?, ?)");
+        q.addBindValue(QString("/test/anime1/episode%1.mkv").arg(ep));
+        q.addBindValue(QString("episode%1.mkv").arg(ep));
+        q.exec();
+        int localFileId = q.lastInsertId().toInt();
+        
+        // Then insert into mylist with local_file reference
+        q.prepare("INSERT INTO mylist (lid, aid, eid, local_watched, local_file) VALUES (?, 1, ?, 0, ?)");
         q.addBindValue(1000 + ep);
         q.addBindValue(100 + ep);
-        q.exec();
-        
-        // Add local file entries
-        q.prepare("INSERT INTO local_files (lid, local_path) VALUES (?, ?)");
-        q.addBindValue(1000 + ep);
-        q.addBindValue(QString("/test/anime1/episode%1.mkv").arg(ep));
+        q.addBindValue(localFileId);
         q.exec();
     }
     
-    // Create entries for anime 2
+    // Create entries for anime 2 (no local files)
     for (int ep = 1; ep <= 6; ep++) {
         q.prepare("INSERT INTO mylist (lid, aid, eid, local_watched) VALUES (?, 2, ?, 0)");
         q.addBindValue(2000 + ep);

@@ -667,9 +667,9 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2));
     
     // Get all files with local paths that could be candidates for deletion
-    // This includes:
-    // 1. Files in mylist with local paths (regardless of watched status)
-    // 2. Files in local_files that are not in mylist
+    // The local_files table has: id, path, filename, status, ed2k_hash, binding_status
+    // The mylist table has: lid, local_file (references local_files.id)
+    // We want mylist entries that have a corresponding local_files entry with a valid path
     QSqlQuery q(db);
     
     // First, log the count of files in local_files table
@@ -680,17 +680,28 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     }
     LOG(QString("[WatchSessionManager] Total rows in local_files table: %1").arg(totalLocalFiles));
     
-    // Count files with valid local_path
-    q.exec("SELECT COUNT(*) FROM local_files WHERE local_path IS NOT NULL AND local_path != ''");
+    // Count files with valid path
+    q.exec("SELECT COUNT(*) FROM local_files WHERE path IS NOT NULL AND path != ''");
     int filesWithPath = 0;
     if (q.next()) {
         filesWithPath = q.value(0).toInt();
     }
-    LOG(QString("[WatchSessionManager] Files with valid local_path: %1").arg(filesWithPath));
+    LOG(QString("[WatchSessionManager] Files with valid path: %1").arg(filesWithPath));
     
-    // Now get the actual candidates
-    bool querySuccess = q.exec("SELECT lf.lid, lf.local_path FROM local_files lf "
-                                "WHERE lf.local_path IS NOT NULL AND lf.local_path != ''");
+    // Count mylist entries with local_file reference
+    q.exec("SELECT COUNT(*) FROM mylist WHERE local_file IS NOT NULL");
+    int mylistWithLocalFile = 0;
+    if (q.next()) {
+        mylistWithLocalFile = q.value(0).toInt();
+    }
+    LOG(QString("[WatchSessionManager] Mylist entries with local_file reference: %1").arg(mylistWithLocalFile));
+    
+    // Now get mylist entries that have valid local paths
+    // Join mylist with local_files to find files with local paths
+    bool querySuccess = q.exec(
+        "SELECT m.lid, lf.path FROM mylist m "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "WHERE lf.path IS NOT NULL AND lf.path != ''");
     
     if (!querySuccess) {
         LOG(QString("[WatchSessionManager] SQL query failed: %1").arg(q.lastError().text()));
