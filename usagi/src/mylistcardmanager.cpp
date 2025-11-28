@@ -21,6 +21,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_layout(nullptr)
     , m_virtualLayout(nullptr)
     , m_networkManager(nullptr)
+    , m_initialLoadComplete(false)
 {
     // Initialize network manager for poster downloads
     m_networkManager = new QNetworkAccessManager(this);
@@ -307,16 +308,21 @@ void MyListCardManager::updateOrAddMylistEntry(int lid)
     
     // Check if card exists
     QMutexLocker locker(&m_mutex);
-    if (!m_cards.contains(aid)) {
+    bool isNewAnime = !m_cards.contains(aid);
+    locker.unlock();
+    
+    if (isNewAnime) {
         // Card doesn't exist, create it
-        locker.unlock();
         AnimeCard *card = createCard(aid);
         if (!card) {
             LOG(QString("[MyListCardManager] Failed to create card for aid=%1").arg(aid));
+        } else if (m_initialLoadComplete) {
+            // This is a BRAND NEW anime added after initial load - notify for session auto-start
+            LOG(QString("[MyListCardManager] New anime aid=%1 added after initial load").arg(aid));
+            emit newAnimeAdded(aid);
         }
     } else {
         // Card exists, update it
-        locker.unlock();
         updateCardAnimeInfo(aid);
     }
 }

@@ -161,26 +161,20 @@ void MyListFilterSidebar::setupUI()
     QGroupBox *sessionGroup = new QGroupBox("Session Settings");
     QVBoxLayout *sessionLayout = new QVBoxLayout(sessionGroup);
     
-    // Ahead buffer - now automatic based on series length
+    // Ahead buffer setting - global value that applies to all anime
     QLabel *aheadBufferLabel = new QLabel("Episodes ahead:");
     m_aheadBufferSpinBox = new QSpinBox();
-    m_aheadBufferSpinBox->setMinimum(2);
-    m_aheadBufferSpinBox->setMaximum(10);
+    m_aheadBufferSpinBox->setMinimum(1);
+    m_aheadBufferSpinBox->setMaximum(20);
     m_aheadBufferSpinBox->setValue(3);
-    m_aheadBufferSpinBox->setEnabled(false);  // Disabled - now automatic
-    m_aheadBufferSpinBox->setToolTip("Ahead buffer is now automatic based on series length:\n"
-                                      "• 1-6 episodes: 2 ahead\n"
-                                      "• 7-13 episodes: 3 ahead\n"
-                                      "• 14-26 episodes: 4 ahead\n"
-                                      "• 27-52 episodes: 5 ahead\n"
-                                      "• 53+ episodes: 6-10 ahead (progressive)");
+    m_aheadBufferSpinBox->setToolTip("Number of episodes to keep ready for uninterrupted viewing.\n"
+                                      "This value applies to all anime with active sessions.");
+    connect(m_aheadBufferSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MyListFilterSidebar::onSessionSettingsChanged);
     
     QHBoxLayout *aheadLayout = new QHBoxLayout();
     aheadLayout->addWidget(aheadBufferLabel);
     aheadLayout->addWidget(m_aheadBufferSpinBox);
-    QLabel *autoLabel = new QLabel("(Auto)");
-    autoLabel->setStyleSheet("color: gray; font-style: italic;");
-    aheadLayout->addWidget(autoLabel);
     sessionLayout->addLayout(aheadLayout);
     
     // Deletion threshold type

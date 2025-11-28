@@ -198,6 +198,14 @@ public:
      */
     void performInitialScan();
     
+    /**
+     * @brief Handle a new anime being added to mylist
+     * 
+     * Auto-starts a session for brand new anime when they are first added.
+     * @param aid Anime ID
+     */
+    void onNewAnimeAdded(int aid);
+    
     // ========== Settings ==========
     
     /**
@@ -316,7 +324,6 @@ private:
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
-    int calculateDynamicAheadBuffer(int aid) const;  // Calculate buffer based on anime's file count/size
     
     // Score calculation constants
     static const int SCORE_HIDDEN_CARD = -50;
@@ -328,8 +335,6 @@ private:
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
-    static constexpr int MIN_AHEAD_BUFFER = 2;   // Minimum ahead buffer
-    static constexpr int MAX_AHEAD_BUFFER = 10;  // Maximum ahead buffer
     static constexpr double DEFAULT_THRESHOLD_VALUE = 50.0; // 50 GB or 50%
 };
 

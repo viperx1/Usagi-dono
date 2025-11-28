@@ -324,10 +324,21 @@ Window::Window()
         mylistStatusLabel->setText(QString("MyList Status: Loaded %1 anime").arg(count));
         animeCards = cardManager->getAllCards();  // Update legacy list for backward compatibility
         
+        // Mark initial loading as complete so new anime can be detected
+        cardManager->setInitialLoadComplete();
+        
         // Perform initial scan for file marking after mylist is loaded
         if (watchSessionManager) {
             LOG("[Window] Mylist loaded, triggering initial file marking scan");
             watchSessionManager->performInitialScan();
+        }
+    });
+    
+    // Connect signal for brand new anime added to mylist (after initial load)
+    connect(cardManager, &MyListCardManager::newAnimeAdded, this, [this](int aid) {
+        LOG(QString("[Window] New anime aid=%1 added to mylist, auto-starting session").arg(aid));
+        if (watchSessionManager) {
+            watchSessionManager->onNewAnimeAdded(aid);
         }
     });
     

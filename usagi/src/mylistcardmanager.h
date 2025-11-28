@@ -84,6 +84,9 @@ public:
     // Check if virtual scrolling is enabled
     bool isVirtualScrollingEnabled() const { return m_virtualLayout != nullptr; }
     
+    // Mark initial loading as complete (called after first mylist load)
+    void setInitialLoadComplete() { m_initialLoadComplete = true; }
+    
     // Clear all cards (when switching views or shutting down)
     void clearAllCards();
     
@@ -152,6 +155,9 @@ signals:
     
     // Emitted when episode data should be requested from AniDB
     void episodeDataRequested(int eid);
+    
+    // Emitted when a NEW anime is added to mylist (not during initial load)
+    void newAnimeAdded(int aid);
     
 public slots:
     // Slot to handle episode updates from API
@@ -291,6 +297,9 @@ private:
     
     // Thread safety
     mutable QMutex m_mutex;
+    
+    // Flag to track if initial loading is complete
+    bool m_initialLoadComplete;
     
     // Constants
     static const int BATCH_UPDATE_DELAY = 50; // ms
