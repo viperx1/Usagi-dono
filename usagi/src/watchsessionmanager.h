@@ -285,8 +285,9 @@ signals:
     
     /**
      * @brief Emitted when files should be refreshed due to marking changes
+     * @param updatedLids Set of MyList IDs that were updated (empty means refresh all)
      */
-    void markingsUpdated();
+    void markingsUpdated(const QSet<int>& updatedLids);
     
 private:
     // Session data

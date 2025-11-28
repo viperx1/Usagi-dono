@@ -257,6 +257,55 @@ void MyListCardManager::refreshAllCards()
     emit allCardsLoaded(aids.size());
 }
 
+void MyListCardManager::refreshCardsForLids(const QSet<int>& lids)
+{
+    if (lids.isEmpty()) {
+        return;
+    }
+    
+    // Find the unique anime IDs that contain these lids
+    QSet<int> aidsToRefresh;
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[MyListCardManager] Database not open in refreshCardsForLids");
+        return;
+    }
+    
+    // Query the anime IDs for the given lids
+    for (int lid : lids) {
+        QSqlQuery q(db);
+        q.prepare("SELECT aid FROM mylist WHERE lid = ?");
+        q.addBindValue(lid);
+        if (q.exec() && q.next()) {
+            aidsToRefresh.insert(q.value(0).toInt());
+        }
+    }
+    
+    if (aidsToRefresh.isEmpty()) {
+        LOG(QString("[MyListCardManager] No cards to refresh for %1 lids").arg(lids.size()));
+        return;
+    }
+    
+    LOG(QString("[MyListCardManager] Refreshing %1 cards for %2 updated lids")
+        .arg(aidsToRefresh.size()).arg(lids.size()));
+    
+    // Refresh only the affected cards
+    for (int aid : aidsToRefresh) {
+        if (m_cards.contains(aid)) {
+            // Remove the old card
+            AnimeCard* oldCard = m_cards.take(aid);
+            if (oldCard) {
+                oldCard->deleteLater();
+            }
+            // Recreate with updated data
+            createCard(aid);
+        }
+    }
+    
+    LOG(QString("[MyListCardManager] Refreshed %1 cards").arg(aidsToRefresh.size()));
+}
+
 void MyListCardManager::updateCardPoster(int aid, const QString &picname)
 {
     if (picname.isEmpty()) {

@@ -656,11 +656,17 @@ Window::Window()
     });
     
     // Connect WatchSessionManager signals to refresh cards when markings change
-    connect(watchSessionManager, &WatchSessionManager::markingsUpdated, this, [this]() {
-        LOG("[Window] File markings updated, refreshing cards");
-        // Trigger card refresh to show updated markings
+    connect(watchSessionManager, &WatchSessionManager::markingsUpdated, this, [this](const QSet<int>& updatedLids) {
+        LOG(QString("[Window] File markings updated for %1 files, refreshing affected cards").arg(updatedLids.size()));
+        // Trigger targeted card refresh to show updated markings
         if (cardManager) {
-            cardManager->refreshAllCards();
+            if (updatedLids.isEmpty()) {
+                // Fallback: if no specific lids provided, refresh all (shouldn't happen normally)
+                cardManager->refreshAllCards();
+            } else {
+                // Only refresh cards containing the updated lids
+                cardManager->refreshCardsForLids(updatedLids);
+            }
         }
     });
     
