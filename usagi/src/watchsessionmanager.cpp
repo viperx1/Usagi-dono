@@ -663,13 +663,14 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         return;
     }
     
-    LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB")
-        .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2));
+    // Calculate how many bytes we need to free
+    qint64 spaceToFreeBytes = static_cast<qint64>((threshold - availableGB) * 1024.0 * 1024.0 * 1024.0);
+    
+    LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB (%4 bytes)")
+        .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2).arg(spaceToFreeBytes));
     
     // Get all files with local paths that could be candidates for deletion
-    // The local_files table has: id, path, filename, status, ed2k_hash, binding_status
-    // The mylist table has: lid, local_file (references local_files.id)
-    // We want mylist entries that have a corresponding local_files entry with a valid path
+    // Join mylist with local_files and file tables to get lid, path, and file size
     QSqlQuery q(db);
     
     // First, log the count of files in local_files table
@@ -696,11 +697,12 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     }
     LOG(QString("[WatchSessionManager] Mylist entries with local_file reference: %1").arg(mylistWithLocalFile));
     
-    // Now get mylist entries that have valid local paths
-    // Join mylist with local_files to find files with local paths
+    // Get mylist entries with local paths and file sizes
+    // Join mylist -> local_files (for path) and mylist -> file (for size)
     bool querySuccess = q.exec(
-        "SELECT m.lid, lf.path FROM mylist m "
+        "SELECT m.lid, lf.path, COALESCE(f.size, 0) as file_size FROM mylist m "
         "JOIN local_files lf ON m.local_file = lf.id "
+        "LEFT JOIN file f ON m.fid = f.fid "
         "WHERE lf.path IS NOT NULL AND lf.path != ''");
     
     if (!querySuccess) {
@@ -708,19 +710,29 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         return;
     }
     
-    QList<QPair<int, int>> candidates; // (lid, score)
+    // Structure to hold candidate info: lid, score, size, path
+    struct CandidateInfo {
+        int lid;
+        int score;
+        qint64 size;
+        QString path;
+    };
+    
+    QList<CandidateInfo> candidates;
     int processedCount = 0;
     while (q.next()) {
-        int lid = q.value(0).toInt();
-        QString localPath = q.value(1).toString();
-        int score = calculateMarkScore(lid);
-        candidates.append(qMakePair(lid, score));
+        CandidateInfo info;
+        info.lid = q.value(0).toInt();
+        info.path = q.value(1).toString();
+        info.size = q.value(2).toLongLong();
+        info.score = calculateMarkScore(info.lid);
+        candidates.append(info);
         processedCount++;
         
         // Log first few candidates for debugging
         if (processedCount <= 5) {
-            LOG(QString("[WatchSessionManager] Candidate file: lid=%1, path=%2, score=%3")
-                .arg(lid).arg(localPath).arg(score));
+            LOG(QString("[WatchSessionManager] Candidate file: lid=%1, path=%2, score=%3, size=%4 bytes")
+                .arg(info.lid).arg(info.path).arg(info.score).arg(info.size));
         }
     }
     
@@ -732,27 +744,43 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     // Sort by score (lowest first - most eligible for deletion)
     std::sort(candidates.begin(), candidates.end(),
-              [](const QPair<int, int>& a, const QPair<int, int>& b) {
-                  return a.second < b.second;
+              [](const CandidateInfo& a, const CandidateInfo& b) {
+                  return a.score < b.score;
               });
     
-    // Mark files for deletion until we would free enough space
+    // Mark files for deletion until we've accumulated enough space to free
+    qint64 accumulatedSpace = 0;
+    int markedCount = 0;
+    
     for (const auto& candidate : candidates) {
-        FileMarkInfo& info = m_fileMarks[candidate.first];
-        info.lid = candidate.first;
-        info.markType = FileMarkType::ForDeletion;
-        info.markScore = candidate.second;
+        // Stop if we've already marked enough files to free the required space
+        if (accumulatedSpace >= spaceToFreeBytes) {
+            LOG(QString("[WatchSessionManager] Reached deletion target: %1 bytes accumulated >= %2 bytes needed")
+                .arg(accumulatedSpace).arg(spaceToFreeBytes));
+            break;
+        }
         
-        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2")
-            .arg(candidate.first).arg(candidate.second));
+        FileMarkInfo& markInfo = m_fileMarks[candidate.lid];
+        markInfo.lid = candidate.lid;
+        markInfo.markType = FileMarkType::ForDeletion;
+        markInfo.markScore = candidate.score;
         
-        updatedLids.insert(candidate.first);
-        emit fileMarkChanged(candidate.first, FileMarkType::ForDeletion);
+        accumulatedSpace += candidate.size;
+        markedCount++;
+        
+        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2, size=%3 bytes, accumulated=%4 bytes")
+            .arg(candidate.lid).arg(candidate.score).arg(candidate.size).arg(accumulatedSpace));
+        
+        updatedLids.insert(candidate.lid);
+        emit fileMarkChanged(candidate.lid, FileMarkType::ForDeletion);
     }
     
     if (!updatedLids.isEmpty()) {
-        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1").arg(updatedLids.size()));
+        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1 (would free %2 GB)")
+            .arg(updatedLids.size()).arg(accumulatedSpace / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2));
         emit markingsUpdated(updatedLids);
+    } else {
+        LOG("[WatchSessionManager] No files marked for deletion (no candidates or no space needed)");
     }
 }
 
