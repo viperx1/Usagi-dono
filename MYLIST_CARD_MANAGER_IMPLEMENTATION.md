@@ -158,6 +158,30 @@ if (mylistUseCardView && cardManager) {
 }
 ```
 
+## Important Rules
+
+### No Full Card Refresh
+
+**IMPORTANT**: Refreshing all cards at once (`refreshAllCards()`) is NOT allowed. This operation:
+- Deletes and recreates all cards unnecessarily
+- Causes significant performance degradation
+- Triggers unnecessary UI redraws
+- Should be avoided in favor of individual card updates
+
+**Always use individual card update methods instead:**
+```cpp
+// WRONG - Do not use
+cardManager->refreshAllCards();
+
+// CORRECT - Update only specific cards
+cardManager->onAnimeUpdated(aid);           // Single anime update
+cardManager->onEpisodeUpdated(eid, aid);    // Episode update
+cardManager->updateCardAnimeInfo(aid);      // Anime metadata update
+cardManager->updateMultipleCards(aidSet);   // Batch specific cards
+```
+
+When data changes occur (FILE replies, ANIME/EPISODE responses), only the affected cards should be updated using the individual update methods listed above.
+
 ## Future Enhancements
 
 Potential improvements:

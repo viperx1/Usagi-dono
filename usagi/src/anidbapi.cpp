@@ -91,6 +91,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE TABLE IF NOT EXISTS `episode`(`eid` INTEGER PRIMARY KEY, `name` TEXT, `nameromaji` TEXT, `namekanji` TEXT, `rating` INTEGER, `votecount` INTEGER, `epno` TEXT);");
 		// Add epno column if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `episode` ADD COLUMN `epno` TEXT");
+		// Add last_checked column for episode data caching (for existing databases)
+		query.exec("ALTER TABLE `episode` ADD COLUMN `last_checked` INTEGER");
 		// Add eps column if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `anime` ADD COLUMN `eps` INTEGER");
 		// Add typename, startdate, enddate columns if they don't exist (for existing databases)
@@ -693,27 +695,18 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
 		}
 		
-		// Check if episode data is missing (no epno) and queue EPISODE API request
-		if(!fileData.eid.isEmpty() && fileData.eid != QLatin1String("0") && episodeData.epno.isEmpty())
+		// Always queue EPISODE API request after FILE reply to ensure complete episode data
+		if(!fileData.eid.isEmpty() && fileData.eid != QLatin1String("0"))
 		{
-			LOG(QString("Episode data incomplete for EID %1, queuing EPISODE API request").arg(fileData.eid));
+			LOG(QString("Queuing EPISODE API request for EID %1").arg(fileData.eid));
 			Episode(fileData.eid.toInt());
 		}
 		
-		// Check if anime data is incomplete and queue ANIME API request
-		// FILE command returns limited anime data via amask, so we request full anime data
+		// Always queue ANIME API request after FILE reply to ensure complete anime data
 		if(!fileData.aid.isEmpty() && fileData.aid != QLatin1String("0"))
 		{
-			// Check if important anime fields are missing (year, type, or episode count)
-			bool hasYear = !animeData.year.isEmpty();
-			bool hasType = !animeData.type.isEmpty();
-			bool hasEptotal = !animeData.eptotal.isEmpty();
-			bool animeDataIncomplete = !hasYear || !hasType || !hasEptotal;
-			if(animeDataIncomplete)
-			{
-				LOG(QString("Anime data incomplete for AID %1, queuing ANIME API request").arg(fileData.aid));
-				Anime(fileData.aid.toInt());
-			}
+			LOG(QString("Queuing ANIME API request for AID %1").arg(fileData.aid));
+			Anime(fileData.aid.toInt());
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
@@ -1932,7 +1925,7 @@ QString AniDBApi::Episode(int eid)
 	// Check which episode fields are already present in database FIRST
 	// to avoid unnecessary Auth() calls
 	QSqlQuery checkQuery(db);
-	checkQuery.prepare("SELECT name, nameromaji, namekanji, rating, votecount, epno FROM `episode` WHERE eid = ?");
+	checkQuery.prepare("SELECT name, nameromaji, namekanji, rating, votecount, epno, last_checked FROM `episode` WHERE eid = ?");
 	checkQuery.addBindValue(eid);
 	
 	if(checkQuery.exec() && checkQuery.next())
@@ -1944,6 +1937,35 @@ QString AniDBApi::Episode(int eid)
 		bool hasRating = !checkQuery.value(3).isNull();
 		bool hasVoteCount = !checkQuery.value(4).isNull();
 		bool hasEpno = !checkQuery.value(5).isNull() && !checkQuery.value(5).toString().isEmpty();
+		qint64 lastChecked = checkQuery.value(6).toLongLong();
+		
+		// Track which fields are missing for debug output
+		QStringList missingFields;
+		if(!hasName && !hasNameRomaji) missingFields << "name";
+		if(!hasNameKanji) missingFields << "namekanji";
+		if(!hasRating) missingFields << "rating";
+		if(!hasVoteCount) missingFields << "votecount";
+		if(!hasEpno) missingFields << "epno";
+		
+		// Log missing fields that will be requested
+		if(!missingFields.isEmpty())
+		{
+			Logger::log(QString("[AniDB Missing Data] Episode EID %1 missing fields: %2")
+						.arg(eid).arg(missingFields.join(", ")), __FILE__, __LINE__);
+		}
+		
+		// Check if we should skip this request based on last_checked timestamp
+		qint64 currentTime = QDateTime::currentSecsSinceEpoch();
+		qint64 oneWeekInSeconds = 7 * 24 * 60 * 60;
+		
+		if(lastChecked > 0 && (currentTime - lastChecked) < oneWeekInSeconds)
+		{
+			// Data was checked less than a week ago - skip request even though some fields may be missing
+			Logger::log(QString("[AniDB Cache] Episode data was checked %1 seconds ago (EID=%2)")
+						.arg(currentTime - lastChecked).arg(eid), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Cache] Skipping request - data is less than 7 days old (EID=%1)").arg(eid), __FILE__, __LINE__);
+			return GetTag("");
+		}
 		
 		// If all critical fields are present, skip the request
 		// Critical fields: at least one name field and epno
@@ -1969,6 +1991,27 @@ QString AniDBApi::Episode(int eid)
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
 	query.exec(q);
+	
+	// Update last_checked timestamp in database
+	// Use INSERT OR IGNORE to create the row if it doesn't exist yet
+	QSqlQuery insertQuery(db);
+	insertQuery.prepare("INSERT OR IGNORE INTO `episode` (`eid`) VALUES (?)");
+	insertQuery.addBindValue(eid);
+	insertQuery.exec();
+	
+	QSqlQuery updateQuery(db);
+	updateQuery.prepare("UPDATE `episode` SET `last_checked` = ? WHERE `eid` = ?");
+	updateQuery.addBindValue(QDateTime::currentSecsSinceEpoch());
+	updateQuery.addBindValue(eid);
+	if(!updateQuery.exec())
+	{
+		Logger::log(QString("[AniDB Cache] Failed to update last_checked for EID %1").arg(eid), __FILE__, __LINE__);
+	}
+	else
+	{
+		Logger::log(QString("[AniDB Cache] Updated last_checked for EID %1").arg(eid), __FILE__, __LINE__);
+	}
+	
 	return GetTag(msg);
 }
 
