@@ -468,23 +468,40 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
 
 int WatchSessionManager::calculateMarkScore(int lid) const
 {
-    int score = 0;
+    // Base score - all files start with this
+    int score = 50;  // Middle-of-the-road score
     
     int aid = getAnimeIdForFile(lid);
-    if (aid <= 0) {
-        return score;
-    }
-    
     int episodeNumber = getEpisodeNumber(lid);
     
-    // Check if card is hidden
-    if (isCardHidden(aid)) {
-        score += SCORE_HIDDEN_CARD;
+    // Check if card is hidden - hidden cards are more eligible for deletion
+    if (aid > 0 && isCardHidden(aid)) {
+        score += SCORE_HIDDEN_CARD;  // Negative, makes it more eligible for deletion
     }
     
-    // Check session status
-    if (hasActiveSession(aid)) {
-        score += SCORE_ACTIVE_SESSION;
+    // Check if file has been watched (from mylist viewed status)
+    // Watched files are more eligible for deletion than unwatched
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        q.prepare("SELECT viewed, local_watched FROM mylist WHERE lid = ?");
+        q.addBindValue(lid);
+        if (q.exec() && q.next()) {
+            int viewed = q.value(0).toInt();
+            int localWatched = q.value(1).toInt();
+            
+            // Files that have been watched (either server or locally) are more deletable
+            if (viewed > 0 || localWatched > 0) {
+                score += SCORE_ALREADY_WATCHED;  // Negative, more eligible for deletion
+            } else {
+                score += SCORE_NOT_WATCHED;  // Positive, less eligible for deletion
+            }
+        }
+    }
+    
+    // Files with active sessions get significant protection
+    if (aid > 0 && hasActiveSession(aid)) {
+        score += SCORE_ACTIVE_SESSION;  // Large positive, protect from deletion
         
         int currentEp = getCurrentSessionEpisode(aid);
         int distance = episodeNumber - currentEp;
@@ -492,19 +509,17 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         // Use global ahead buffer (applies to all anime)
         int aheadBuffer = m_aheadBuffer;
         
-        // Episodes in the ahead buffer get bonus
+        // Episodes in the ahead buffer get bonus protection
         if (distance >= 0 && distance <= aheadBuffer) {
             score += SCORE_IN_AHEAD_BUFFER;
         }
         
-        // Distance penalty/bonus
+        // Distance penalty/bonus - episodes behind current are more deletable
         score += distance * SCORE_DISTANCE_FACTOR;
         
-        // Already watched in session gets penalty
+        // Already watched in session gets penalty (more deletable)
         if (m_sessions.contains(aid) && m_sessions[aid].watchedEpisodes.contains(episodeNumber)) {
             score += SCORE_ALREADY_WATCHED;
-        } else {
-            score += SCORE_NOT_WATCHED;
         }
     }
     
