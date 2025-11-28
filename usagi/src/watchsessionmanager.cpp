@@ -574,12 +574,12 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     double availableGB = availableBytes / (1024.0 * 1024.0 * 1024.0);
     double totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
-    Q_UNUSED(totalGB);  // Used only when threshold type is Percentage
     
     double threshold = 0;
     if (m_thresholdType == DeletionThresholdType::FixedGB) {
         threshold = m_thresholdValue;
     } else {
+        // Percentage threshold type: use totalGB to calculate threshold
         threshold = (m_thresholdValue / 100.0) * totalGB;
     }
     

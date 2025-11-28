@@ -272,14 +272,24 @@ void MyListCardManager::refreshCardsForLids(const QSet<int>& lids)
         return;
     }
     
-    // Query the anime IDs for the given lids
+    // Query the anime IDs for the given lids using a single IN clause query
+    // Note: lids come from internal tracking (not user input) and are converted
+    // to strings via QString::number(), ensuring they contain only numeric characters.
+    QStringList lidStrings;
+    lidStrings.reserve(lids.size());
     for (int lid : lids) {
-        QSqlQuery q(db);
-        q.prepare("SELECT aid FROM mylist WHERE lid = ?");
-        q.addBindValue(lid);
-        if (q.exec() && q.next()) {
+        lidStrings.append(QString::number(lid));
+    }
+    QString lidsList = lidStrings.join(",");
+    
+    QSqlQuery q(db);
+    QString queryStr = QString("SELECT DISTINCT aid FROM mylist WHERE lid IN (%1)").arg(lidsList);
+    if (q.exec(queryStr)) {
+        while (q.next()) {
             aidsToRefresh.insert(q.value(0).toInt());
         }
+    } else {
+        LOG(QString("[MyListCardManager] Failed to query aids for lids: %1").arg(q.lastError().text()));
     }
     
     if (aidsToRefresh.isEmpty()) {
