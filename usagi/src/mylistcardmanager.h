@@ -106,7 +106,12 @@ public:
     void updateCardPoster(int aid, const QString &picname);
     
     // Refresh all cards to pick up changes (e.g., file markings)
+    // DEPRECATED: Use refreshCardsForLids() instead for targeted updates
     void refreshAllCards();
+    
+    // Refresh only cards containing the specified lids (more efficient than refreshAllCards)
+    // This looks up the anime ID for each lid and refreshes only those specific cards
+    void refreshCardsForLids(const QSet<int>& lids);
     
     // Batch update methods for efficiency
     void updateMultipleCards(const QSet<int> &aids);

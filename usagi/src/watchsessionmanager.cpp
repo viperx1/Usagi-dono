@@ -574,22 +574,29 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     double availableGB = availableBytes / (1024.0 * 1024.0 * 1024.0);
     double totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
-    double availablePercent = (totalBytes > 0) ? (100.0 * availableBytes / totalBytes) : 0;
     
     double threshold = 0;
     if (m_thresholdType == DeletionThresholdType::FixedGB) {
         threshold = m_thresholdValue;
     } else {
+        // Percentage threshold type: use totalGB to calculate threshold
         threshold = (m_thresholdValue / 100.0) * totalGB;
     }
+    
+    // Track which lids were updated
+    QSet<int> updatedLids;
     
     // If we're above threshold, clear deletion marks
     if (availableGB >= threshold) {
         for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
             if (it.value().markType == FileMarkType::ForDeletion) {
                 it.value().markType = FileMarkType::None;
+                updatedLids.insert(it.key());
                 emit fileMarkChanged(it.key(), FileMarkType::None);
             }
+        }
+        if (!updatedLids.isEmpty()) {
+            emit markingsUpdated(updatedLids);
         }
         return;
     }
@@ -623,10 +630,13 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         info.markType = FileMarkType::ForDeletion;
         info.markScore = candidate.second;
         
+        updatedLids.insert(candidate.first);
         emit fileMarkChanged(candidate.first, FileMarkType::ForDeletion);
     }
     
-    emit markingsUpdated();
+    if (!updatedLids.isEmpty()) {
+        emit markingsUpdated(updatedLids);
+    }
 }
 
 void WatchSessionManager::autoMarkFilesForDownload()
@@ -635,6 +645,9 @@ void WatchSessionManager::autoMarkFilesForDownload()
     if (!db.isOpen()) {
         return;
     }
+    
+    // Track which lids were updated
+    QSet<int> updatedLids;
     
     // For each active session, mark files in the ahead buffer for download
     for (auto it = m_sessions.constBegin(); it != m_sessions.constEnd(); ++it) {
@@ -671,6 +684,7 @@ void WatchSessionManager::autoMarkFilesForDownload()
                         info.markType = FileMarkType::ForDownload;
                         info.markScore = calculateMarkScore(lid);
                         
+                        updatedLids.insert(lid);
                         emit fileMarkChanged(lid, FileMarkType::ForDownload);
                     }
                 }
@@ -678,7 +692,9 @@ void WatchSessionManager::autoMarkFilesForDownload()
         }
     }
     
-    emit markingsUpdated();
+    if (!updatedLids.isEmpty()) {
+        emit markingsUpdated(updatedLids);
+    }
 }
 
 // ========== Settings ==========
@@ -741,9 +757,11 @@ void WatchSessionManager::performInitialScan()
     // This preserves user control over which anime have active sessions.
     
     // Scan for files that should be marked for download based on active sessions
+    // (this will emit markingsUpdated with the set of updated lids)
     autoMarkFilesForDownload();
     
     // Scan for files that should be marked for deletion if auto-deletion is enabled
+    // (this will emit markingsUpdated with the set of updated lids)
     if (m_autoMarkDeletionEnabled) {
         autoMarkFilesForDeletion();
     }
@@ -765,10 +783,7 @@ void WatchSessionManager::performInitialScan()
     // Save the marks to database
     saveToDatabase();
     
-    // Emit signal to notify UI to refresh
-    if (downloadCount > 0 || deletionCount > 0) {
-        emit markingsUpdated();
-    }
+    // Note: markingsUpdated signal is emitted by autoMarkFilesForDownload/autoMarkFilesForDeletion
 }
 
 void WatchSessionManager::onNewAnimeAdded(int aid)
@@ -779,9 +794,10 @@ void WatchSessionManager::onNewAnimeAdded(int aid)
         startSession(aid, 1);
         
         // Mark files for download based on the new session
+        // (this will emit markingsUpdated with the set of updated lids)
         autoMarkFilesForDownload();
         saveToDatabase();
-        emit markingsUpdated();
+        // Note: markingsUpdated signal is emitted by autoMarkFilesForDownload
     }
 }
 
