@@ -511,7 +511,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Look up file info (fid, eid, aid, gid) from file table using size and ed2k
 			QString fid, eid, aid, gid;
 			q = QString("SELECT `fid`, `eid`, `aid`, `gid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'")
-				.arg(size).arg(ed2k);
+				.arg(size, ed2k);
 			QSqlQuery fileQuery(db);
 			if(fileQuery.exec(q) && fileQuery.next())
 			{
@@ -693,27 +693,18 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				"Processed %1 fields successfully.").arg(index), __FILE__, __LINE__);
 		}
 		
-		// Check if episode data is missing (no epno) and queue EPISODE API request
-		if(!fileData.eid.isEmpty() && fileData.eid != QLatin1String("0") && episodeData.epno.isEmpty())
+		// Always queue EPISODE API request after FILE reply to ensure complete episode data
+		if(!fileData.eid.isEmpty() && fileData.eid != QLatin1String("0"))
 		{
-			LOG(QString("Episode data incomplete for EID %1, queuing EPISODE API request").arg(fileData.eid));
+			LOG(QString("Queuing EPISODE API request for EID %1").arg(fileData.eid));
 			Episode(fileData.eid.toInt());
 		}
 		
-		// Check if anime data is incomplete and queue ANIME API request
-		// FILE command returns limited anime data via amask, so we request full anime data
+		// Always queue ANIME API request after FILE reply to ensure complete anime data
 		if(!fileData.aid.isEmpty() && fileData.aid != QLatin1String("0"))
 		{
-			// Check if important anime fields are missing (year, type, or episode count)
-			bool hasYear = !animeData.year.isEmpty();
-			bool hasType = !animeData.type.isEmpty();
-			bool hasEptotal = !animeData.eptotal.isEmpty();
-			bool animeDataIncomplete = !hasYear || !hasType || !hasEptotal;
-			if(animeDataIncomplete)
-			{
-				LOG(QString("Anime data incomplete for AID %1, queuing ANIME API request").arg(fileData.aid));
-				Anime(fileData.aid.toInt());
-			}
+			LOG(QString("Queuing ANIME API request for AID %1").arg(fileData.aid));
+			Anime(fileData.aid.toInt());
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
@@ -1235,7 +1226,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Look up file info (fid, eid, aid, gid) from file table using size and ed2k
 			QString fid, eid, aid, gid;
 			q = QString("SELECT `fid`, `eid`, `aid`, `gid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'")
-				.arg(size).arg(ed2k);
+				.arg(size, ed2k);
 			QSqlQuery fileQuery(db);
 			if(fileQuery.exec(q) && fileQuery.next())
 			{
