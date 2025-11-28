@@ -256,6 +256,21 @@ public:
      */
     void setAutoMarkDeletionEnabled(bool enabled);
     
+    /**
+     * @brief Get the path used for space monitoring
+     * @return The monitored directory path
+     */
+    QString getWatchedPath() const;
+    
+    /**
+     * @brief Set the path used for space monitoring
+     * @param path Directory path to monitor for space calculations
+     * 
+     * This should typically be set to match the directory watcher's path
+     * so that space monitoring applies to the correct drive.
+     */
+    void setWatchedPath(const QString& path);
+    
     // ========== Persistence ==========
     
     /**
@@ -315,6 +330,7 @@ private:
     DeletionThresholdType m_thresholdType;      // Threshold type
     double m_thresholdValue;                    // Threshold value
     bool m_autoMarkDeletionEnabled;             // Auto-mark enabled
+    QString m_watchedPath;                      // Path for space monitoring (uses directory watcher path)
     
     // Helper methods
     void loadAnimeRelations(int aid) const;

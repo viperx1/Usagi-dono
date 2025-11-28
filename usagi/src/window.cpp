@@ -579,12 +579,45 @@ Window::Window()
     pageSettings->addWidget(mediaPlayerPath, 10, 1);
     pageSettings->addWidget(mediaPlayerBrowseButton, 10, 2);
     
-    pageSettings->setRowStretch(11, 1000);
-    pageSettings->addWidget(buttonSaveSettings, 12, 0);
-    pageSettings->addWidget(buttonRequestMylistExport, 13, 0);
+    // Add session manager settings after playback
+    QLabel *sessionSettingsLabel = new QLabel("Session Manager:");
+    sessionAheadBufferSpinBox = new QSpinBox();
+    sessionAheadBufferSpinBox->setMinimum(1);
+    sessionAheadBufferSpinBox->setMaximum(20);
+    sessionAheadBufferSpinBox->setValue(3);
+    sessionAheadBufferSpinBox->setToolTip("Number of episodes to keep ready for uninterrupted viewing.\n"
+                                           "This value applies to all anime with active sessions.");
+    
+    sessionThresholdTypeComboBox = new QComboBox();
+    sessionThresholdTypeComboBox->addItem("Fixed (GB)", 0);
+    sessionThresholdTypeComboBox->addItem("Percentage (%)", 1);
+    sessionThresholdTypeComboBox->setToolTip("Type of threshold for automatic file cleanup");
+    
+    sessionThresholdValueSpinBox = new QDoubleSpinBox();
+    sessionThresholdValueSpinBox->setMinimum(1.0);
+    sessionThresholdValueSpinBox->setMaximum(1000.0);
+    sessionThresholdValueSpinBox->setValue(50.0);
+    sessionThresholdValueSpinBox->setSuffix(" GB");
+    sessionThresholdValueSpinBox->setToolTip("When free space drops below this value, files will be marked for deletion");
+    
+    sessionAutoMarkDeletionCheckbox = new QCheckBox("Auto-mark for deletion");
+    sessionAutoMarkDeletionCheckbox->setToolTip("Automatically mark watched files for deletion when disk space is low");
+    
+    pageSettings->addWidget(sessionSettingsLabel, 11, 0, 1, 2);
+    pageSettings->addWidget(new QLabel("Episodes ahead:"), 12, 0);
+    pageSettings->addWidget(sessionAheadBufferSpinBox, 12, 1);
+    pageSettings->addWidget(new QLabel("Deletion threshold:"), 13, 0);
+    pageSettings->addWidget(sessionThresholdTypeComboBox, 13, 1);
+    pageSettings->addWidget(new QLabel("Threshold value:"), 14, 0);
+    pageSettings->addWidget(sessionThresholdValueSpinBox, 14, 1);
+    pageSettings->addWidget(sessionAutoMarkDeletionCheckbox, 15, 0, 1, 2);
+    
+    pageSettings->setRowStretch(16, 1000);
+    pageSettings->addWidget(buttonSaveSettings, 17, 0);
+    pageSettings->addWidget(buttonRequestMylistExport, 18, 0);
 
     pageSettings->setColumnStretch(1, 100);
-    pageSettings->setRowStretch(14, 100);
+    pageSettings->setRowStretch(19, 100);
 
 	// page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
@@ -592,6 +625,35 @@ Window::Window()
     connect(watcherEnabled, SIGNAL(stateChanged(int)), this, SLOT(onWatcherEnabledChanged(int)));
     connect(watcherBrowseButton, SIGNAL(clicked()), this, SLOT(onWatcherBrowseClicked()));
     connect(mediaPlayerBrowseButton, SIGNAL(clicked()), this, SLOT(onMediaPlayerBrowseClicked()));
+    
+    // Session manager settings signals - update WatchSessionManager when settings change
+    connect(sessionAheadBufferSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int value) {
+        if (watchSessionManager) {
+            watchSessionManager->setAheadBuffer(value);
+        }
+    });
+    connect(sessionThresholdTypeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        // Use index directly: 0=FixedGB, 1=Percentage
+        if (watchSessionManager) {
+            watchSessionManager->setDeletionThresholdType(static_cast<DeletionThresholdType>(index));
+        }
+        // Update suffix based on type
+        if (index == 0) {
+            sessionThresholdValueSpinBox->setSuffix(" GB");
+        } else {
+            sessionThresholdValueSpinBox->setSuffix(" %");
+        }
+    });
+    connect(sessionThresholdValueSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) {
+        if (watchSessionManager) {
+            watchSessionManager->setDeletionThresholdValue(value);
+        }
+    });
+    connect(sessionAutoMarkDeletionCheckbox, &QCheckBox::clicked, this, [this](bool checked) {
+        if (watchSessionManager) {
+            watchSessionManager->setAutoMarkDeletionEnabled(checked);
+        }
+    });
 
     // page log
     logOutput = new QTextEdit;
@@ -643,17 +705,27 @@ Window::Window()
     watchSessionManager = new WatchSessionManager(this);
     LOG("[Window] WatchSessionManager initialized");
     
-    // Connect sidebar session settings to watch session manager
-    connect(filterSidebar, &MyListFilterSidebar::sessionSettingsChanged, this, [this]() {
-        LOG("[Window] Session settings changed, updating WatchSessionManager");
-        if (watchSessionManager) {
-            watchSessionManager->setAheadBuffer(filterSidebar->getAheadBuffer());
-            watchSessionManager->setDeletionThresholdType(
-                static_cast<DeletionThresholdType>(filterSidebar->getDeletionThresholdType()));
-            watchSessionManager->setDeletionThresholdValue(filterSidebar->getDeletionThresholdValue());
-            watchSessionManager->setAutoMarkDeletionEnabled(filterSidebar->isAutoMarkDeletionEnabled());
-        }
-    });
+    // Load session settings from WatchSessionManager into Settings tab UI
+    sessionAheadBufferSpinBox->blockSignals(true);
+    sessionThresholdTypeComboBox->blockSignals(true);
+    sessionThresholdValueSpinBox->blockSignals(true);
+    sessionAutoMarkDeletionCheckbox->blockSignals(true);
+    
+    sessionAheadBufferSpinBox->setValue(watchSessionManager->getAheadBuffer());
+    int thresholdType = static_cast<int>(watchSessionManager->getDeletionThresholdType());
+    sessionThresholdTypeComboBox->setCurrentIndex(thresholdType);
+    if (thresholdType == 0) {
+        sessionThresholdValueSpinBox->setSuffix(" GB");
+    } else {
+        sessionThresholdValueSpinBox->setSuffix(" %");
+    }
+    sessionThresholdValueSpinBox->setValue(watchSessionManager->getDeletionThresholdValue());
+    sessionAutoMarkDeletionCheckbox->setChecked(watchSessionManager->isAutoMarkDeletionEnabled());
+    
+    sessionAheadBufferSpinBox->blockSignals(false);
+    sessionThresholdTypeComboBox->blockSignals(false);
+    sessionThresholdValueSpinBox->blockSignals(false);
+    sessionAutoMarkDeletionCheckbox->blockSignals(false);
     
     // Connect WatchSessionManager signals to refresh cards when markings change
     connect(watchSessionManager, &WatchSessionManager::markingsUpdated, this, [this](const QSet<int>& updatedLids) {
@@ -727,9 +799,17 @@ Window::Window()
     if (watcherEnabledSetting && watcherAutoStartSetting && !watcherDir.isEmpty()) {
         directoryWatcher->startWatching(watcherDir);
         watcherStatusLabel->setText("Status: Watching " + watcherDir);
+        // Sync WatchSessionManager's watched path with directory watcher
+        if (watchSessionManager) {
+            watchSessionManager->setWatchedPath(watcherDir);
+        }
     } else if (watcherEnabledSetting && !watcherDir.isEmpty()) {
         // If watcher is enabled but auto-start is not, just update status
         watcherStatusLabel->setText("Status: Enabled (not auto-started)");
+        // Still set the path for WatchSessionManager even if watcher is not auto-started
+        if (watchSessionManager) {
+            watchSessionManager->setWatchedPath(watcherDir);
+        }
     } else if (watcherEnabledSetting && watcherDir.isEmpty()) {
         // If watcher is enabled but no directory is set
         watcherStatusLabel->setText("Status: Enabled (no directory set)");
@@ -3214,6 +3294,10 @@ void Window::onWatcherEnabledChanged(int state)
 			directoryWatcher->startWatching(dir);
 			watcherStatusLabel->setText("Status: Watching " + dir);
 			LOG("Directory watcher started: " + dir);
+			// Sync WatchSessionManager's watched path with directory watcher
+			if (watchSessionManager) {
+				watchSessionManager->setWatchedPath(dir);
+			}
 		} else if (dir.isEmpty()) {
 			watcherStatusLabel->setText("Status: Enabled (no directory set)");
 			LOG("Directory watcher enabled but no directory specified");
@@ -3241,6 +3325,11 @@ void Window::onWatcherBrowseClicked()
 			directoryWatcher->startWatching(dir);
 			watcherStatusLabel->setText("Status: Watching " + dir);
 			LOG("Directory watcher changed to: " + dir);
+		}
+		
+		// Sync WatchSessionManager's watched path with directory watcher
+		if (watchSessionManager) {
+			watchSessionManager->setWatchedPath(dir);
 		}
 	}
 }

@@ -8,8 +8,6 @@
 #include <QVBoxLayout>
 #include <QGroupBox>
 #include <QPushButton>
-#include <QSpinBox>
-#include <QDoubleSpinBox>
 
 /**
  * MyListFilterSidebar - Sidebar widget for filtering anime cards
@@ -19,9 +17,10 @@
  * - Filter by anime type (TV, Movie, OVA, etc.)
  * - Filter by completion status (completed, watching, etc.)
  * - Filter by viewed status
- * - Session management settings (ahead buffer, deletion threshold)
  * 
  * All filtering is done on data already loaded in memory (no database operations)
+ * 
+ * Note: Session manager settings have been moved to the Settings tab.
  */
 class MyListFilterSidebar : public QWidget
 {
@@ -41,18 +40,6 @@ public:
     QString getAdultContentFilter() const;
     bool getInMyListOnly() const;
     
-    // Session settings getters
-    int getAheadBuffer() const;
-    int getDeletionThresholdType() const;  // 0=FixedGB, 1=Percentage
-    double getDeletionThresholdValue() const;
-    bool isAutoMarkDeletionEnabled() const;
-    
-    // Session settings setters (for loading saved values)
-    void setAheadBuffer(int episodes);
-    void setDeletionThresholdType(int type);
-    void setDeletionThresholdValue(double value);
-    void setAutoMarkDeletionEnabled(bool enabled);
-    
     // Reset all filters
     void resetFilters();
     
@@ -63,15 +50,11 @@ signals:
     // Emitted when sort options change
     void sortChanged();
     
-    // Emitted when session settings change
-    void sessionSettingsChanged();
-    
 private slots:
     void onSearchTextChanged();
     void onFilterChanged();
     void onSortChanged();
     void onSortOrderToggled();
-    void onSessionSettingsChanged();
     
 private:
     void setupUI();
@@ -86,12 +69,6 @@ private:
     QPushButton *m_sortOrderButton;
     QComboBox *m_adultContentFilter;
     QPushButton *m_resetButton;
-    
-    // UI elements - Session settings
-    QSpinBox *m_aheadBufferSpinBox;
-    QComboBox *m_thresholdTypeComboBox;
-    QDoubleSpinBox *m_thresholdValueSpinBox;
-    QCheckBox *m_autoMarkDeletionCheckbox;
     
     bool m_sortAscending;
 };

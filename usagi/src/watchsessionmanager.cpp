@@ -95,6 +95,12 @@ void WatchSessionManager::loadSettings()
     if (q.exec() && q.next()) {
         m_autoMarkDeletionEnabled = q.value(0).toInt() != 0;
     }
+    
+    // Load watched path (defaults to empty, which means use directory watcher path)
+    q.prepare("SELECT value FROM settings WHERE name = 'session_watched_path'");
+    if (q.exec() && q.next()) {
+        m_watchedPath = q.value(0).toString();
+    }
 }
 
 void WatchSessionManager::saveSettings()
@@ -125,6 +131,11 @@ void WatchSessionManager::saveSettings()
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('auto_mark_deletion_enabled', ?)");
     q.addBindValue(m_autoMarkDeletionEnabled ? 1 : 0);
     q.exec();
+    
+    // Save watched path
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('session_watched_path', ?)");
+    q.addBindValue(m_watchedPath);
+    q.exec();
 }
 
 void WatchSessionManager::loadFromDatabase()
@@ -134,6 +145,8 @@ void WatchSessionManager::loadFromDatabase()
         LOG("[WatchSessionManager] Database not open, cannot load sessions");
         return;
     }
+    
+    LOG("[WatchSessionManager] Loading session data from database...");
     
     QSqlQuery q(db);
     
@@ -150,6 +163,7 @@ void WatchSessionManager::loadFromDatabase()
     }
     
     // Load watched episodes for each session
+    int activeCount = 0;
     for (auto it = m_sessions.begin(); it != m_sessions.end(); ++it) {
         QSqlQuery epQuery(db);
         epQuery.prepare("SELECT episode_number FROM session_watched_episodes WHERE aid = ?");
@@ -159,9 +173,17 @@ void WatchSessionManager::loadFromDatabase()
                 it.value().watchedEpisodes.insert(epQuery.value(0).toInt());
             }
         }
+        if (it.value().isActive) {
+            activeCount++;
+            LOG(QString("[WatchSessionManager] Loaded active session: aid=%1, startAid=%2, currentEpisode=%3, watchedCount=%4")
+                .arg(it.value().aid).arg(it.value().startAid)
+                .arg(it.value().currentEpisode).arg(it.value().watchedEpisodes.size()));
+        }
     }
     
     // Load file marks
+    int downloadCount = 0;
+    int deletionCount = 0;
     q.exec("SELECT lid, mark_type, mark_score FROM file_marks");
     while (q.next()) {
         FileMarkInfo info;
@@ -169,10 +191,17 @@ void WatchSessionManager::loadFromDatabase()
         info.markType = static_cast<FileMarkType>(q.value(1).toInt());
         info.markScore = q.value(2).toInt();
         m_fileMarks[info.lid] = info;
+        
+        if (info.markType == FileMarkType::ForDownload) {
+            downloadCount++;
+        } else if (info.markType == FileMarkType::ForDeletion) {
+            deletionCount++;
+        }
     }
     
-    LOG(QString("[WatchSessionManager] Loaded %1 sessions and %2 file marks")
-        .arg(m_sessions.size()).arg(m_fileMarks.size()));
+    LOG(QString("[WatchSessionManager] Loaded %1 sessions (%2 active) and %3 file marks (%4 for download, %5 for deletion)")
+        .arg(m_sessions.size()).arg(activeCount).arg(m_fileMarks.size())
+        .arg(downloadCount).arg(deletionCount));
 }
 
 void WatchSessionManager::saveToDatabase()
@@ -498,8 +527,15 @@ void WatchSessionManager::setFileMarkType(int lid, FileMarkType markType)
     
     emit fileMarkChanged(lid, markType);
     
-    LOG(QString("[WatchSessionManager] Set file mark for lid=%1 to type=%2")
-        .arg(lid).arg(static_cast<int>(markType)));
+    QString markTypeName;
+    switch (markType) {
+        case FileMarkType::None: markTypeName = "None"; break;
+        case FileMarkType::ForDownload: markTypeName = "ForDownload"; break;
+        case FileMarkType::ForDeletion: markTypeName = "ForDeletion"; break;
+    }
+    
+    LOG(QString("[WatchSessionManager] Set file mark: lid=%1, type=%2, score=%3")
+        .arg(lid).arg(markTypeName).arg(info.markScore));
 }
 
 FileMarkInfo WatchSessionManager::getFileMarkInfo(int lid) const
@@ -559,28 +595,46 @@ QList<int> WatchSessionManager::getFilesForDownload() const
 void WatchSessionManager::autoMarkFilesForDeletion()
 {
     if (!m_autoMarkDeletionEnabled) {
+        LOG("[WatchSessionManager] autoMarkFilesForDeletion: auto-mark deletion is disabled, skipping");
         return;
     }
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG("[WatchSessionManager] autoMarkFilesForDeletion: database not open, cannot process");
         return;
     }
     
-    // Get available space on the drive where the application is installed
-    QStorageInfo storage(QCoreApplication::applicationDirPath());
+    // Get available space on the watched drive (or application directory if not set)
+    QString pathToMonitor = m_watchedPath.isEmpty() ? QCoreApplication::applicationDirPath() : m_watchedPath;
+    QStorageInfo storage(pathToMonitor);
     qint64 availableBytes = storage.bytesAvailable();
     qint64 totalBytes = storage.bytesTotal();
     
     double availableGB = availableBytes / (1024.0 * 1024.0 * 1024.0);
     double totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
+    // Ensure usedGB is non-negative (could be negative if values are invalid)
+    double usedGB = (totalGB > availableGB && totalGB > 0.0 && availableGB >= 0.0) 
+                    ? (totalGB - availableGB) : 0.0;
+    
+    // Log drive information
+    LOG(QString("[WatchSessionManager] Monitored path: %1").arg(pathToMonitor));
+    LOG(QString("[WatchSessionManager] Watched drive info - Path: %1, Name: %2, FileSystem: %3")
+        .arg(storage.rootPath(), storage.displayName(), QString::fromUtf8(storage.fileSystemType())));
+    LOG(QString("[WatchSessionManager] Drive space - Total: %1 GB, Used: %2 GB, Available: %3 GB (%4% free)")
+        .arg(totalGB, 0, 'f', 2).arg(usedGB, 0, 'f', 2).arg(availableGB, 0, 'f', 2)
+        .arg(totalGB > 0.0 ? (availableGB / totalGB * 100.0) : 0.0, 0, 'f', 1));
     
     double threshold = 0;
     if (m_thresholdType == DeletionThresholdType::FixedGB) {
         threshold = m_thresholdValue;
+        LOG(QString("[WatchSessionManager] Deletion threshold: %1 GB (fixed)")
+            .arg(threshold, 0, 'f', 2));
     } else {
         // Percentage threshold type: use totalGB to calculate threshold
         threshold = (m_thresholdValue / 100.0) * totalGB;
+        LOG(QString("[WatchSessionManager] Deletion threshold: %1 GB (%2% of total)")
+            .arg(threshold, 0, 'f', 2).arg(m_thresholdValue, 0, 'f', 1));
     }
     
     // Track which lids were updated
@@ -588,12 +642,19 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     // If we're above threshold, clear deletion marks
     if (availableGB >= threshold) {
+        LOG(QString("[WatchSessionManager] Space check: %1 GB available >= %2 GB threshold, clearing deletion marks")
+            .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2));
+        int clearedCount = 0;
         for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
             if (it.value().markType == FileMarkType::ForDeletion) {
                 it.value().markType = FileMarkType::None;
                 updatedLids.insert(it.key());
                 emit fileMarkChanged(it.key(), FileMarkType::None);
+                clearedCount++;
             }
+        }
+        if (clearedCount > 0) {
+            LOG(QString("[WatchSessionManager] Cleared deletion marks from %1 files").arg(clearedCount));
         }
         if (!updatedLids.isEmpty()) {
             emit markingsUpdated(updatedLids);
@@ -601,8 +662,8 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         return;
     }
     
-    LOG(QString("[WatchSessionManager] Low space detected: %1 GB available, threshold: %2 GB")
-        .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2));
+    LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB")
+        .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2));
     
     // Get all watched files that could be candidates for deletion
     QSqlQuery q(db);
@@ -617,6 +678,8 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         candidates.append(qMakePair(lid, score));
     }
     
+    LOG(QString("[WatchSessionManager] Found %1 watched files as deletion candidates").arg(candidates.size()));
+    
     // Sort by score (lowest first - most eligible for deletion)
     std::sort(candidates.begin(), candidates.end(),
               [](const QPair<int, int>& a, const QPair<int, int>& b) {
@@ -630,11 +693,15 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         info.markType = FileMarkType::ForDeletion;
         info.markScore = candidate.second;
         
+        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2")
+            .arg(candidate.first).arg(candidate.second));
+        
         updatedLids.insert(candidate.first);
         emit fileMarkChanged(candidate.first, FileMarkType::ForDeletion);
     }
     
     if (!updatedLids.isEmpty()) {
+        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1").arg(updatedLids.size()));
         emit markingsUpdated(updatedLids);
     }
 }
@@ -643,11 +710,16 @@ void WatchSessionManager::autoMarkFilesForDownload()
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG("[WatchSessionManager] autoMarkFilesForDownload: database not open, cannot process");
         return;
     }
     
+    LOG(QString("[WatchSessionManager] autoMarkFilesForDownload: scanning %1 sessions with ahead buffer of %2 episodes")
+        .arg(m_sessions.size()).arg(m_aheadBuffer));
+    
     // Track which lids were updated
     QSet<int> updatedLids;
+    int activeSessionCount = 0;
     
     // For each active session, mark files in the ahead buffer for download
     for (auto it = m_sessions.constBegin(); it != m_sessions.constEnd(); ++it) {
@@ -656,6 +728,10 @@ void WatchSessionManager::autoMarkFilesForDownload()
         if (!session.isActive) {
             continue;
         }
+        
+        activeSessionCount++;
+        LOG(QString("[WatchSessionManager] Processing active session: aid=%1, currentEpisode=%2, startAid=%3")
+            .arg(session.aid).arg(session.currentEpisode).arg(session.startAid));
         
         // Use global ahead buffer setting (applies to all anime)
         int aheadBuffer = m_aheadBuffer;
@@ -684,6 +760,9 @@ void WatchSessionManager::autoMarkFilesForDownload()
                         info.markType = FileMarkType::ForDownload;
                         info.markScore = calculateMarkScore(lid);
                         
+                        LOG(QString("[WatchSessionManager] Marked file for download: lid=%1, aid=%2, episode=%3, score=%4")
+                            .arg(lid).arg(session.aid).arg(ep).arg(info.markScore));
+                        
                         updatedLids.insert(lid);
                         emit fileMarkChanged(lid, FileMarkType::ForDownload);
                     }
@@ -691,6 +770,9 @@ void WatchSessionManager::autoMarkFilesForDownload()
             }
         }
     }
+    
+    LOG(QString("[WatchSessionManager] autoMarkFilesForDownload complete: %1 active sessions processed, %2 files marked for download")
+        .arg(activeSessionCount).arg(updatedLids.size()));
     
     if (!updatedLids.isEmpty()) {
         emit markingsUpdated(updatedLids);
@@ -745,6 +827,25 @@ void WatchSessionManager::setAutoMarkDeletionEnabled(bool enabled)
     
     if (enabled) {
         autoMarkFilesForDeletion();
+    }
+}
+
+QString WatchSessionManager::getWatchedPath() const
+{
+    return m_watchedPath;
+}
+
+void WatchSessionManager::setWatchedPath(const QString& path)
+{
+    if (m_watchedPath != path) {
+        m_watchedPath = path;
+        LOG(QString("[WatchSessionManager] Watched path set to: %1").arg(path.isEmpty() ? "(application directory)" : path));
+        saveSettings();
+        
+        // Trigger space check with new path
+        if (m_autoMarkDeletionEnabled) {
+            autoMarkFilesForDeletion();
+        }
     }
 }
 
