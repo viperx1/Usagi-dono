@@ -31,6 +31,7 @@ private slots:
     void testAheadBuffer();
     void testDeletionThreshold();
     void testAutoMarkDeletion();
+    void testDelayedAutoMarkDeletion();
     
     // Anime relations tests
     void testGetOriginalPrequel();
@@ -352,6 +353,40 @@ void TestWatchSessionManager::testAutoMarkDeletion()
     delete manager;
     manager = new WatchSessionManager();
     QVERIFY(manager->isAutoMarkDeletionEnabled());
+}
+
+void TestWatchSessionManager::testDelayedAutoMarkDeletion()
+{
+    // Test that setWatchedPath() and setAutoMarkDeletionEnabled() don't trigger 
+    // auto-mark before performInitialScan(). This prevents marking files for 
+    // deletion before mylist data is loaded.
+    
+    // Initially, no files should be marked for deletion
+    QList<int> deletionFiles = manager->getFilesForDeletion();
+    QCOMPARE(deletionFiles.size(), 0);
+    
+    // Enable auto-mark deletion - should NOT trigger marking before initial scan
+    manager->setAutoMarkDeletionEnabled(true);
+    QVERIFY(manager->isAutoMarkDeletionEnabled());
+    
+    // Files should still not be marked (because initial scan hasn't happened)
+    deletionFiles = manager->getFilesForDeletion();
+    QCOMPARE(deletionFiles.size(), 0);
+    
+    // Setting watched path should also NOT trigger auto-mark before initial scan
+    manager->setWatchedPath("/some/test/path");
+    
+    // Files should still not be marked
+    deletionFiles = manager->getFilesForDeletion();
+    QCOMPARE(deletionFiles.size(), 0);
+    
+    // Now call performInitialScan - this should mark files
+    manager->performInitialScan();
+    
+    // After initial scan, files should be marked for deletion 
+    // (we have 6 files with local paths in test data)
+    deletionFiles = manager->getFilesForDeletion();
+    QCOMPARE(deletionFiles.size(), 6);
 }
 
 // ========== Anime Relations Tests ==========

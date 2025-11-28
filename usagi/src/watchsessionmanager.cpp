@@ -14,6 +14,7 @@ WatchSessionManager::WatchSessionManager(QObject *parent)
     , m_thresholdType(DeletionThresholdType::FixedGB)
     , m_thresholdValue(DEFAULT_THRESHOLD_VALUE)
     , m_autoMarkDeletionEnabled(false)
+    , m_initialScanComplete(false)
 {
     LOG("[WatchSessionManager] Initializing...");
     ensureTablesExist();
@@ -665,11 +666,13 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB")
         .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2));
     
-    // Get all watched files that could be candidates for deletion
+    // Get all files with local paths that could be candidates for deletion
+    // This includes:
+    // 1. Files in mylist with local paths (regardless of watched status)
+    // 2. Files in local_files that are not in mylist
     QSqlQuery q(db);
-    q.exec("SELECT m.lid, m.aid FROM mylist m "
-           "JOIN local_files lf ON m.lid = lf.lid "
-           "WHERE m.local_watched = 1 AND lf.local_path IS NOT NULL AND lf.local_path != ''");
+    q.exec("SELECT lf.lid FROM local_files lf "
+           "WHERE lf.local_path IS NOT NULL AND lf.local_path != ''");
     
     QList<QPair<int, int>> candidates; // (lid, score)
     while (q.next()) {
@@ -678,7 +681,7 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         candidates.append(qMakePair(lid, score));
     }
     
-    LOG(QString("[WatchSessionManager] Found %1 watched files as deletion candidates").arg(candidates.size()));
+    LOG(QString("[WatchSessionManager] Found %1 files as deletion candidates").arg(candidates.size()));
     
     // Sort by score (lowest first - most eligible for deletion)
     std::sort(candidates.begin(), candidates.end(),
@@ -825,7 +828,8 @@ void WatchSessionManager::setAutoMarkDeletionEnabled(bool enabled)
     m_autoMarkDeletionEnabled = enabled;
     saveSettings();
     
-    if (enabled) {
+    // Only trigger auto-mark if initial scan is complete (mylist data is loaded)
+    if (enabled && m_initialScanComplete) {
         autoMarkFilesForDeletion();
     }
 }
@@ -842,8 +846,9 @@ void WatchSessionManager::setWatchedPath(const QString& path)
         LOG(QString("[WatchSessionManager] Watched path set to: %1").arg(path.isEmpty() ? "(application directory)" : path));
         saveSettings();
         
-        // Trigger space check with new path
-        if (m_autoMarkDeletionEnabled) {
+        // Trigger space check with new path only after initial scan is complete
+        // (before that, the mylist data may not be loaded yet)
+        if (m_autoMarkDeletionEnabled && m_initialScanComplete) {
             autoMarkFilesForDeletion();
         }
     }
@@ -852,6 +857,9 @@ void WatchSessionManager::setWatchedPath(const QString& path)
 void WatchSessionManager::performInitialScan()
 {
     LOG("[WatchSessionManager] Performing initial file scan...");
+    
+    // Mark that initial scan is complete - this enables space checks on path changes
+    m_initialScanComplete = true;
     
     // Note: We do NOT auto-start sessions for existing anime here.
     // Sessions are only auto-started for BRAND NEW anime when they are added to mylist.
