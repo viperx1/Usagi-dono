@@ -511,7 +511,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Look up file info (fid, eid, aid, gid) from file table using size and ed2k
 			QString fid, eid, aid, gid;
 			q = QString("SELECT `fid`, `eid`, `aid`, `gid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'")
-				.arg(size, ed2k);
+				.arg(size).arg(ed2k);
 			QSqlQuery fileQuery(db);
 			if(fileQuery.exec(q) && fileQuery.next())
 			{
@@ -1226,7 +1226,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Look up file info (fid, eid, aid, gid) from file table using size and ed2k
 			QString fid, eid, aid, gid;
 			q = QString("SELECT `fid`, `eid`, `aid`, `gid` FROM `file` WHERE `size` = '%1' AND `ed2k` = '%2'")
-				.arg(size, ed2k);
+				.arg(size).arg(ed2k);
 			QSqlQuery fileQuery(db);
 			if(fileQuery.exec(q) && fileQuery.next())
 			{
