@@ -684,6 +684,21 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB (%4 bytes)")
         .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2).arg(spaceToFreeBytes));
     
+    // First, clear all existing deletion marks before calculating new ones
+    // This ensures we only have the minimum required files marked for deletion
+    int clearedCount = 0;
+    for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
+        if (it.value().markType == FileMarkType::ForDeletion) {
+            it.value().markType = FileMarkType::None;
+            updatedLids.insert(it.key());
+            emit fileMarkChanged(it.key(), FileMarkType::None);
+            clearedCount++;
+        }
+    }
+    if (clearedCount > 0) {
+        LOG(QString("[WatchSessionManager] Cleared %1 existing deletion marks before recalculating").arg(clearedCount));
+    }
+    
     // Get all files with local paths that could be candidates for deletion
     // Join mylist with local_files and file tables to get lid, path, and file size
     QSqlQuery q(db);
