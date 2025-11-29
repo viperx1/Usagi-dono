@@ -6,6 +6,7 @@
 #include <QStorageInfo>
 #include <QCoreApplication>
 #include <QRegularExpression>
+#include <QFileInfo>
 #include <algorithm>
 
 WatchSessionManager::WatchSessionManager(QObject *parent)
@@ -16,16 +17,13 @@ WatchSessionManager::WatchSessionManager(QObject *parent)
     , m_autoMarkDeletionEnabled(false)
     , m_initialScanComplete(false)
 {
-    LOG("[WatchSessionManager] Initializing...");
     ensureTablesExist();
     loadSettings();
     loadFromDatabase();
-    LOG("[WatchSessionManager] Initialization complete");
 }
 
 WatchSessionManager::~WatchSessionManager()
 {
-    LOG("[WatchSessionManager] Shutting down, saving session data...");
     saveToDatabase();
 }
 
@@ -33,7 +31,6 @@ void WatchSessionManager::ensureTablesExist()
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG("[WatchSessionManager] Database not open, cannot create tables");
         return;
     }
     
@@ -143,11 +140,8 @@ void WatchSessionManager::loadFromDatabase()
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG("[WatchSessionManager] Database not open, cannot load sessions");
         return;
     }
-    
-    LOG("[WatchSessionManager] Loading session data from database...");
     
     QSqlQuery q(db);
     
@@ -164,7 +158,6 @@ void WatchSessionManager::loadFromDatabase()
     }
     
     // Load watched episodes for each session
-    int activeCount = 0;
     for (auto it = m_sessions.begin(); it != m_sessions.end(); ++it) {
         QSqlQuery epQuery(db);
         epQuery.prepare("SELECT episode_number FROM session_watched_episodes WHERE aid = ?");
@@ -174,17 +167,9 @@ void WatchSessionManager::loadFromDatabase()
                 it.value().watchedEpisodes.insert(epQuery.value(0).toInt());
             }
         }
-        if (it.value().isActive) {
-            activeCount++;
-            LOG(QString("[WatchSessionManager] Loaded active session: aid=%1, startAid=%2, currentEpisode=%3, watchedCount=%4")
-                .arg(it.value().aid).arg(it.value().startAid)
-                .arg(it.value().currentEpisode).arg(it.value().watchedEpisodes.size()));
-        }
     }
     
     // Load file marks
-    int downloadCount = 0;
-    int deletionCount = 0;
     q.exec("SELECT lid, mark_type, mark_score FROM file_marks");
     while (q.next()) {
         FileMarkInfo info;
@@ -192,24 +177,13 @@ void WatchSessionManager::loadFromDatabase()
         info.markType = static_cast<FileMarkType>(q.value(1).toInt());
         info.markScore = q.value(2).toInt();
         m_fileMarks[info.lid] = info;
-        
-        if (info.markType == FileMarkType::ForDownload) {
-            downloadCount++;
-        } else if (info.markType == FileMarkType::ForDeletion) {
-            deletionCount++;
-        }
     }
-    
-    LOG(QString("[WatchSessionManager] Loaded %1 sessions (%2 active) and %3 file marks (%4 for download, %5 for deletion)")
-        .arg(m_sessions.size()).arg(activeCount).arg(m_fileMarks.size())
-        .arg(downloadCount).arg(deletionCount));
 }
 
 void WatchSessionManager::saveToDatabase()
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG("[WatchSessionManager] Database not open, cannot save sessions");
         return;
     }
     
@@ -251,8 +225,6 @@ void WatchSessionManager::saveToDatabase()
     }
     
     saveSettings();
-    
-    LOG("[WatchSessionManager] Saved session data to database");
 }
 
 // ========== Session Management ==========
@@ -270,9 +242,6 @@ bool WatchSessionManager::startSession(int aid, int startEpisode)
     
     m_sessions[aid] = session;
     
-    LOG(QString("[WatchSessionManager] Started session for aid=%1 (original=%2) at episode %3")
-        .arg(aid).arg(originalAid).arg(session.currentEpisode));
-    
     emit sessionStateChanged(aid, true);
     
     // Auto-mark files for download based on new session
@@ -285,7 +254,6 @@ bool WatchSessionManager::startSessionFromFile(int lid)
 {
     int aid = getAnimeIdForFile(lid);
     if (aid <= 0) {
-        LOG(QString("[WatchSessionManager] Cannot start session: unknown anime for lid=%1").arg(lid));
         return false;
     }
     
@@ -301,7 +269,6 @@ void WatchSessionManager::endSession(int aid)
 {
     if (m_sessions.contains(aid)) {
         m_sessions[aid].isActive = false;
-        LOG(QString("[WatchSessionManager] Ended session for aid=%1").arg(aid));
         emit sessionStateChanged(aid, false);
     }
 }
@@ -334,9 +301,6 @@ void WatchSessionManager::markEpisodeWatched(int aid, int episodeNumber)
         session.currentEpisode = episodeNumber + 1;
     }
     
-    LOG(QString("[WatchSessionManager] Marked episode %1 as watched for aid=%2, next=%3")
-        .arg(episodeNumber).arg(aid).arg(session.currentEpisode));
-    
     // Trigger auto-marking updates
     if (m_autoMarkDeletionEnabled) {
         autoMarkFilesForDeletion();
@@ -351,6 +315,8 @@ int WatchSessionManager::getOriginalPrequel(int aid) const
     int currentAid = aid;
     QSet<int> visited;
     
+    LOG(QString("[WatchSessionManager] getOriginalPrequel: starting from aid=%1").arg(aid));
+    
     // Follow prequel chain until we find the first anime
     while (!visited.contains(currentAid)) {
         visited.insert(currentAid);
@@ -360,18 +326,21 @@ int WatchSessionManager::getOriginalPrequel(int aid) const
         }
         
         if (!m_relationsCache.contains(currentAid)) {
+            LOG(QString("[WatchSessionManager] getOriginalPrequel: no relations found for aid=%1").arg(currentAid));
             break;
         }
         
         // Look for prequel relation
         int prequelAid = findPrequelAid(currentAid, "prequel");
         if (prequelAid > 0 && !visited.contains(prequelAid)) {
+            LOG(QString("[WatchSessionManager] getOriginalPrequel: found prequel aid=%1 -> %2").arg(currentAid).arg(prequelAid));
             currentAid = prequelAid;
         } else {
             break;
         }
     }
     
+    LOG(QString("[WatchSessionManager] getOriginalPrequel: original prequel for aid=%1 is aid=%2").arg(aid).arg(currentAid));
     return currentAid;
 }
 
@@ -383,19 +352,24 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG(QString("[WatchSessionManager] loadAnimeRelations: database not open for aid=%1").arg(aid));
         return;
     }
     
     QSqlQuery q(db);
-    q.prepare("SELECT related_aid_list, related_aid_type FROM anime WHERE aid = ?");
+    q.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
     q.addBindValue(aid);
     
     if (!q.exec() || !q.next()) {
+        LOG(QString("[WatchSessionManager] loadAnimeRelations: query failed or no result for aid=%1").arg(aid));
         return;
     }
     
     QString relatedAids = q.value(0).toString();
     QString relatedTypes = q.value(1).toString();
+    
+    LOG(QString("[WatchSessionManager] loadAnimeRelations: aid=%1, relatedAids='%2', relatedTypes='%3'")
+        .arg(aid).arg(relatedAids, relatedTypes));
     
     QList<QPair<int, QString>> relations;
     
@@ -409,6 +383,8 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
             QString relType = typeList[i].toLower();
             if (relAid > 0) {
                 relations.append(qMakePair(relAid, relType));
+                LOG(QString("[WatchSessionManager] loadAnimeRelations: aid=%1 has relation: %2 (%3)")
+                    .arg(aid).arg(relAid).arg(relType));
             }
         }
     }
@@ -422,9 +398,19 @@ int WatchSessionManager::findPrequelAid(int aid, const QString& relationType) co
         return 0;
     }
     
+    // Map string relation type to numeric code for comparison
+    int targetCode = -1;
+    if (relationType.toLower() == "prequel") {
+        targetCode = RELATION_PREQUEL;
+    } else if (relationType.toLower() == "sequel") {
+        targetCode = RELATION_SEQUEL;
+    }
+    
     const QList<QPair<int, QString>>& relations = m_relationsCache[aid];
     for (const auto& rel : relations) {
-        if (rel.second.contains(relationType, Qt::CaseInsensitive)) {
+        // Check both numeric code and string match (for backwards compatibility with tests)
+        int relCode = rel.second.toInt();
+        if (relCode == targetCode || rel.second.contains(relationType, Qt::CaseInsensitive)) {
             return rel.first;
         }
     }
@@ -440,6 +426,9 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
     // Start from original prequel
     int currentAid = getOriginalPrequel(aid);
     
+    LOG(QString("[WatchSessionManager] getSeriesChain: building chain for aid=%1, starting from original=%2")
+        .arg(aid).arg(currentAid));
+    
     // Follow sequel chain
     while (currentAid > 0 && !visited.contains(currentAid)) {
         chain.append(currentAid);
@@ -447,12 +436,15 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
         
         loadAnimeRelations(currentAid);
         
-        // Look for sequel
+        // Look for sequel (type code 1 or string "sequel")
         int sequelAid = 0;
         if (m_relationsCache.contains(currentAid)) {
             for (const auto& rel : m_relationsCache[currentAid]) {
-                if (rel.second.contains("sequel", Qt::CaseInsensitive)) {
+                int relCode = rel.second.toInt();
+                if (relCode == RELATION_SEQUEL || rel.second.contains("sequel", Qt::CaseInsensitive)) {
                     sequelAid = rel.first;
+                    LOG(QString("[WatchSessionManager] getSeriesChain: found sequel %1 -> %2 (type=%3)")
+                        .arg(currentAid).arg(sequelAid).arg(rel.second));
                     break;
                 }
             }
@@ -460,6 +452,14 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
         
         currentAid = sequelAid;
     }
+    
+    // Log the complete chain
+    QStringList chainStr;
+    for (int a : chain) {
+        chainStr.append(QString::number(a));
+    }
+    LOG(QString("[WatchSessionManager] getSeriesChain: chain for aid=%1 = [%2] (%3 items)")
+        .arg(aid).arg(chainStr.join(", ")).arg(chain.size()));
     
     return chain;
 }
@@ -499,31 +499,115 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
-    // Files with active sessions get significant protection
-    if (aid > 0 && hasActiveSession(aid)) {
-        score += SCORE_ACTIVE_SESSION;  // Large positive, protect from deletion
+    // Calculate distance-based scoring across the series chain
+    // Distance is the primary factor - episodes far from current position are more deletable
+    if (aid > 0) {
+        // Find active session across the series chain
+        // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
+        auto sessionInfo = findActiveSessionInSeriesChain(aid);
+        int sessionAid = std::get<0>(sessionInfo);
+        int episodeOffset = std::get<1>(sessionInfo);  // Cumulative episode offset for this anime in the chain
+        int sessionOffset = std::get<2>(sessionInfo);  // Cumulative episode offset for session anime
         
-        int currentEp = getCurrentSessionEpisode(aid);
-        int distance = episodeNumber - currentEp;
-        
-        // Use global ahead buffer (applies to all anime)
-        int aheadBuffer = m_aheadBuffer;
-        
-        // Episodes in the ahead buffer get bonus protection
-        if (distance >= 0 && distance <= aheadBuffer) {
-            score += SCORE_IN_AHEAD_BUFFER;
-        }
-        
-        // Distance penalty/bonus - episodes behind current are more deletable
-        score += distance * SCORE_DISTANCE_FACTOR;
-        
-        // Already watched in session gets penalty (more deletable)
-        if (m_sessions.contains(aid) && m_sessions[aid].watchedEpisodes.contains(episodeNumber)) {
-            score += SCORE_ALREADY_WATCHED;
+        if (sessionAid > 0) {
+            // Active session is a factor (not the primary reason for scoring)
+            score += SCORE_ACTIVE_SESSION;
+            
+            int currentEp = getCurrentSessionEpisode(sessionAid);
+            
+            // Calculate total episode position in the series chain
+            // episodeOffset is the sum of all episodes in prequels before this anime
+            int totalEpisodePosition = episodeOffset + episodeNumber;
+            int currentTotalPosition = sessionOffset + currentEp;
+            
+            int distance = totalEpisodePosition - currentTotalPosition;
+            
+            // Use global ahead buffer (applies to all anime)
+            int aheadBuffer = m_aheadBuffer;
+            
+            // Episodes in the ahead buffer get bonus protection
+            if (distance >= 0 && distance <= aheadBuffer) {
+                score += SCORE_IN_AHEAD_BUFFER;
+            }
+            
+            // Distance penalty/bonus - episodes far from current are more deletable
+            // This is the primary scoring factor
+            score += distance * SCORE_DISTANCE_FACTOR;
+            
+            // Already watched in session gets penalty (more deletable)
+            if (m_sessions.contains(aid) && m_sessions[aid].watchedEpisodes.contains(episodeNumber)) {
+                score += SCORE_ALREADY_WATCHED;
+            }
         }
     }
     
     return score;
+}
+
+std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(int aid) const
+{
+    // Get the series chain starting from the original prequel
+    QList<int> chain = getSeriesChain(aid);
+    
+    LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: looking for active session in chain for aid=%1")
+        .arg(aid));
+    
+    // Find if any anime in the chain has an active session
+    for (int chainAid : chain) {
+        if (hasActiveSession(chainAid)) {
+            LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: found active session at aid=%1")
+                .arg(chainAid));
+            
+            // Calculate offset for the requested anime
+            int offsetForRequestedAnime = 0;
+            for (int i = 0; i < chain.size(); i++) {
+                if (chain[i] == aid) {
+                    break;
+                }
+                int eps = getTotalEpisodesForAnime(chain[i]);
+                LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: chain[%1]=aid=%2 has %3 episodes")
+                    .arg(i).arg(chain[i]).arg(eps));
+                offsetForRequestedAnime += eps;
+            }
+            
+            // Calculate offset for the session anime
+            int offsetForSessionAnime = 0;
+            for (int i = 0; i < chain.size(); i++) {
+                if (chain[i] == chainAid) {
+                    break;
+                }
+                offsetForSessionAnime += getTotalEpisodesForAnime(chain[i]);
+            }
+            
+            LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: aid=%1, sessionAid=%2, offsetForRequested=%3, offsetForSession=%4")
+                .arg(aid).arg(chainAid).arg(offsetForRequestedAnime).arg(offsetForSessionAnime));
+            
+            return std::make_tuple(chainAid, offsetForRequestedAnime, offsetForSessionAnime);
+        }
+    }
+    
+    LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: no active session found in chain for aid=%1")
+        .arg(aid));
+    return std::make_tuple(0, 0, 0);  // No active session found
+}
+
+int WatchSessionManager::getTotalEpisodesForAnime(int aid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return DEFAULT_EPISODE_COUNT;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT COALESCE(eptotal, episodes, 0) FROM anime WHERE aid = ?");
+    q.addBindValue(aid);
+    
+    if (q.exec() && q.next()) {
+        int total = q.value(0).toInt();
+        return total > 0 ? total : DEFAULT_EPISODE_COUNT;
+    }
+    
+    return DEFAULT_EPISODE_COUNT;
 }
 
 FileMarkType WatchSessionManager::getFileMarkType(int lid) const
@@ -542,16 +626,6 @@ void WatchSessionManager::setFileMarkType(int lid, FileMarkType markType)
     info.markScore = calculateMarkScore(lid);
     
     emit fileMarkChanged(lid, markType);
-    
-    QString markTypeName;
-    switch (markType) {
-        case FileMarkType::None: markTypeName = "None"; break;
-        case FileMarkType::ForDownload: markTypeName = "ForDownload"; break;
-        case FileMarkType::ForDeletion: markTypeName = "ForDeletion"; break;
-    }
-    
-    LOG(QString("[WatchSessionManager] Set file mark: lid=%1, type=%2, score=%3")
-        .arg(lid).arg(markTypeName).arg(info.markScore));
 }
 
 FileMarkInfo WatchSessionManager::getFileMarkInfo(int lid) const
@@ -611,13 +685,11 @@ QList<int> WatchSessionManager::getFilesForDownload() const
 void WatchSessionManager::autoMarkFilesForDeletion()
 {
     if (!m_autoMarkDeletionEnabled) {
-        LOG("[WatchSessionManager] autoMarkFilesForDeletion: auto-mark deletion is disabled, skipping");
         return;
     }
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG("[WatchSessionManager] autoMarkFilesForDeletion: database not open, cannot process");
         return;
     }
     
@@ -629,28 +701,13 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     double availableGB = availableBytes / (1024.0 * 1024.0 * 1024.0);
     double totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
-    // Ensure usedGB is non-negative (could be negative if values are invalid)
-    double usedGB = (totalGB > availableGB && totalGB > 0.0 && availableGB >= 0.0) 
-                    ? (totalGB - availableGB) : 0.0;
-    
-    // Log drive information
-    LOG(QString("[WatchSessionManager] Monitored path: %1").arg(pathToMonitor));
-    LOG(QString("[WatchSessionManager] Watched drive info - Path: %1, Name: %2, FileSystem: %3")
-        .arg(storage.rootPath(), storage.displayName(), QString::fromUtf8(storage.fileSystemType())));
-    LOG(QString("[WatchSessionManager] Drive space - Total: %1 GB, Used: %2 GB, Available: %3 GB (%4% free)")
-        .arg(totalGB, 0, 'f', 2).arg(usedGB, 0, 'f', 2).arg(availableGB, 0, 'f', 2)
-        .arg(totalGB > 0.0 ? (availableGB / totalGB * 100.0) : 0.0, 0, 'f', 1));
     
     double threshold = 0;
     if (m_thresholdType == DeletionThresholdType::FixedGB) {
         threshold = m_thresholdValue;
-        LOG(QString("[WatchSessionManager] Deletion threshold: %1 GB (fixed)")
-            .arg(threshold, 0, 'f', 2));
     } else {
         // Percentage threshold type: use totalGB to calculate threshold
         threshold = (m_thresholdValue / 100.0) * totalGB;
-        LOG(QString("[WatchSessionManager] Deletion threshold: %1 GB (%2% of total)")
-            .arg(threshold, 0, 'f', 2).arg(m_thresholdValue, 0, 'f', 1));
     }
     
     // Track which lids were updated
@@ -658,19 +715,12 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     // If we're above threshold, clear deletion marks
     if (availableGB >= threshold) {
-        LOG(QString("[WatchSessionManager] Space check: %1 GB available >= %2 GB threshold, clearing deletion marks")
-            .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2));
-        int clearedCount = 0;
         for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
             if (it.value().markType == FileMarkType::ForDeletion) {
                 it.value().markType = FileMarkType::None;
                 updatedLids.insert(it.key());
                 emit fileMarkChanged(it.key(), FileMarkType::None);
-                clearedCount++;
             }
-        }
-        if (clearedCount > 0) {
-            LOG(QString("[WatchSessionManager] Cleared deletion marks from %1 files").arg(clearedCount));
         }
         if (!updatedLids.isEmpty()) {
             emit markingsUpdated(updatedLids);
@@ -681,97 +731,48 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     // Calculate how many bytes we need to free
     qint64 spaceToFreeBytes = static_cast<qint64>((threshold - availableGB) * 1024.0 * 1024.0 * 1024.0);
     
-    LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB (%4 bytes)")
-        .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2).arg(spaceToFreeBytes));
-    
     // First, clear all existing deletion marks before calculating new ones
-    // This ensures we only have the minimum required files marked for deletion
-    // Note: We don't add cleared lids to updatedLids here to avoid triggering
-    // a massive card refresh. Cards will pick up the cleared status on next display.
-    int clearedCount = 0;
     for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
         if (it.value().markType == FileMarkType::ForDeletion) {
             it.value().markType = FileMarkType::None;
             emit fileMarkChanged(it.key(), FileMarkType::None);
-            clearedCount++;
         }
     }
-    if (clearedCount > 0) {
-        LOG(QString("[WatchSessionManager] Cleared %1 existing deletion marks before recalculating").arg(clearedCount));
-    }
     
-    // Get all files with local paths that could be candidates for deletion
-    // Join mylist with local_files and file tables to get lid, path, and file size
+    // Get mylist entries with local paths, file sizes, and anime names
+    // Use COALESCE with multiple fallbacks for anime name
     QSqlQuery q(db);
-    
-    // First, log the count of files in local_files table
-    q.exec("SELECT COUNT(*) FROM local_files");
-    int totalLocalFiles = 0;
-    if (q.next()) {
-        totalLocalFiles = q.value(0).toInt();
-    }
-    LOG(QString("[WatchSessionManager] Total rows in local_files table: %1").arg(totalLocalFiles));
-    
-    // Count files with valid path
-    q.exec("SELECT COUNT(*) FROM local_files WHERE path IS NOT NULL AND path != ''");
-    int filesWithPath = 0;
-    if (q.next()) {
-        filesWithPath = q.value(0).toInt();
-    }
-    LOG(QString("[WatchSessionManager] Files with valid path: %1").arg(filesWithPath));
-    
-    // Count mylist entries with local_file reference
-    q.exec("SELECT COUNT(*) FROM mylist WHERE local_file IS NOT NULL");
-    int mylistWithLocalFile = 0;
-    if (q.next()) {
-        mylistWithLocalFile = q.value(0).toInt();
-    }
-    LOG(QString("[WatchSessionManager] Mylist entries with local_file reference: %1").arg(mylistWithLocalFile));
-    
-    // Get mylist entries with local paths and file sizes
-    // Join mylist -> local_files (for path) and mylist -> file (for size)
     bool querySuccess = q.exec(
-        "SELECT m.lid, lf.path, COALESCE(f.size, 0) as file_size FROM mylist m "
+        "SELECT m.lid, lf.path, COALESCE(f.size, 0) as file_size, "
+        "COALESCE(NULLIF(a.nameromaji, ''), NULLIF(a.nameenglish, ''), NULLIF(a.namekanji, ''), '') as anime_name FROM mylist m "
         "JOIN local_files lf ON m.local_file = lf.id "
         "LEFT JOIN file f ON m.fid = f.fid "
+        "LEFT JOIN anime a ON m.aid = a.aid "
         "WHERE lf.path IS NOT NULL AND lf.path != ''");
     
     if (!querySuccess) {
-        LOG(QString("[WatchSessionManager] SQL query failed: %1").arg(q.lastError().text()));
         return;
     }
     
-    // Structure to hold candidate info: lid, score, size, path
+    // Structure to hold candidate info: lid, score, size, path, anime_name
     struct CandidateInfo {
         int lid;
         int score;
         qint64 size;
         QString path;
+        QString animeName;
     };
     
     QList<CandidateInfo> candidates;
-    int processedCount = 0;
     while (q.next()) {
         CandidateInfo info;
         info.lid = q.value(0).toInt();
         info.path = q.value(1).toString();
         info.size = q.value(2).toLongLong();
+        info.animeName = q.value(3).toString();
         info.score = calculateMarkScore(info.lid);
         candidates.append(info);
-        processedCount++;
-        
-        // Log first few candidates for debugging
-        if (processedCount <= 5) {
-            LOG(QString("[WatchSessionManager] Candidate file: lid=%1, path=%2, score=%3, size=%4 bytes")
-                .arg(info.lid).arg(info.path).arg(info.score).arg(info.size));
-        }
     }
-    
-    if (processedCount > 5) {
-        LOG(QString("[WatchSessionManager] ... and %1 more candidates").arg(processedCount - 5));
-    }
-    
-    LOG(QString("[WatchSessionManager] Found %1 files as deletion candidates").arg(candidates.size()));
     
     // Sort by score (lowest first - most eligible for deletion)
     std::sort(candidates.begin(), candidates.end(),
@@ -781,13 +782,10 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     // Mark files for deletion until we've accumulated enough space to free
     qint64 accumulatedSpace = 0;
-    int markedCount = 0;
     
     for (const auto& candidate : candidates) {
         // Stop if we've already marked enough files to free the required space
         if (accumulatedSpace >= spaceToFreeBytes) {
-            LOG(QString("[WatchSessionManager] Reached deletion target: %1 bytes accumulated >= %2 bytes needed")
-                .arg(accumulatedSpace).arg(spaceToFreeBytes));
             break;
         }
         
@@ -797,21 +795,23 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         markInfo.markScore = candidate.score;
         
         accumulatedSpace += candidate.size;
-        markedCount++;
         
-        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2, size=%3 bytes, accumulated=%4 bytes")
-            .arg(candidate.lid).arg(candidate.score).arg(candidate.size).arg(accumulatedSpace));
+        // Extract file name from path
+        QString fileName = QFileInfo(candidate.path).fileName();
+        
+        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2, size=%3 bytes, accumulated=%4 bytes, anime=%5, file=%6")
+            .arg(candidate.lid)
+            .arg(candidate.score)
+            .arg(candidate.size)
+            .arg(accumulatedSpace)
+            .arg(candidate.animeName, fileName));
         
         updatedLids.insert(candidate.lid);
         emit fileMarkChanged(candidate.lid, FileMarkType::ForDeletion);
     }
     
     if (!updatedLids.isEmpty()) {
-        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1 (would free %2 GB), total lids updated: %3")
-            .arg(markedCount).arg(accumulatedSpace / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2).arg(updatedLids.size()));
         emit markingsUpdated(updatedLids);
-    } else {
-        LOG("[WatchSessionManager] No files marked for deletion (no candidates or no space needed)");
     }
 }
 
@@ -819,16 +819,11 @@ void WatchSessionManager::autoMarkFilesForDownload()
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG("[WatchSessionManager] autoMarkFilesForDownload: database not open, cannot process");
         return;
     }
     
-    LOG(QString("[WatchSessionManager] autoMarkFilesForDownload: scanning %1 sessions with ahead buffer of %2 episodes")
-        .arg(m_sessions.size()).arg(m_aheadBuffer));
-    
     // Track which lids were updated
     QSet<int> updatedLids;
-    int activeSessionCount = 0;
     
     // For each active session, mark files in the ahead buffer for download
     for (auto it = m_sessions.constBegin(); it != m_sessions.constEnd(); ++it) {
@@ -837,10 +832,6 @@ void WatchSessionManager::autoMarkFilesForDownload()
         if (!session.isActive) {
             continue;
         }
-        
-        activeSessionCount++;
-        LOG(QString("[WatchSessionManager] Processing active session: aid=%1, currentEpisode=%2, startAid=%3")
-            .arg(session.aid).arg(session.currentEpisode).arg(session.startAid));
         
         // Use global ahead buffer setting (applies to all anime)
         int aheadBuffer = m_aheadBuffer;
@@ -869,9 +860,6 @@ void WatchSessionManager::autoMarkFilesForDownload()
                         info.markType = FileMarkType::ForDownload;
                         info.markScore = calculateMarkScore(lid);
                         
-                        LOG(QString("[WatchSessionManager] Marked file for download: lid=%1, aid=%2, episode=%3, score=%4")
-                            .arg(lid).arg(session.aid).arg(ep).arg(info.markScore));
-                        
                         updatedLids.insert(lid);
                         emit fileMarkChanged(lid, FileMarkType::ForDownload);
                     }
@@ -879,9 +867,6 @@ void WatchSessionManager::autoMarkFilesForDownload()
             }
         }
     }
-    
-    LOG(QString("[WatchSessionManager] autoMarkFilesForDownload complete: %1 active sessions processed, %2 files marked for download")
-        .arg(activeSessionCount).arg(updatedLids.size()));
     
     if (!updatedLids.isEmpty()) {
         emit markingsUpdated(updatedLids);
@@ -949,7 +934,6 @@ void WatchSessionManager::setWatchedPath(const QString& path)
 {
     if (m_watchedPath != path) {
         m_watchedPath = path;
-        LOG(QString("[WatchSessionManager] Watched path set to: %1").arg(path.isEmpty() ? "(application directory)" : path));
         saveSettings();
         
         // Trigger space check with new path only after initial scan is complete
@@ -964,11 +948,8 @@ void WatchSessionManager::autoStartSessionsForExistingAnime()
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG("[WatchSessionManager] autoStartSessionsForExistingAnime: database not open");
         return;
     }
-    
-    LOG("[WatchSessionManager] Auto-starting sessions for existing anime with local files...");
     
     // Find all unique anime IDs that have local files (via mylist -> local_files join)
     // Ensure local_file is not NULL to avoid matching records without valid local file references
@@ -979,13 +960,8 @@ void WatchSessionManager::autoStartSessionsForExistingAnime()
         "WHERE m.local_file IS NOT NULL AND lf.path IS NOT NULL AND lf.path != '' AND m.aid > 0");
     
     if (!querySuccess) {
-        LOG(QString("[WatchSessionManager] autoStartSessionsForExistingAnime: query failed: %1")
-            .arg(q.lastError().text()));
         return;
     }
-    
-    int sessionsStarted = 0;
-    int existingSessions = 0;
     
     while (q.next()) {
         int aid = q.value(0).toInt();
@@ -1003,22 +979,14 @@ void WatchSessionManager::autoStartSessionsForExistingAnime()
             session.isActive = true;
             
             m_sessions[aid] = session;
-            sessionsStarted++;
             
             emit sessionStateChanged(aid, true);
-        } else {
-            existingSessions++;
         }
     }
-    
-    LOG(QString("[WatchSessionManager] Auto-started %1 new sessions, %2 sessions already existed")
-        .arg(sessionsStarted).arg(existingSessions));
 }
 
 void WatchSessionManager::performInitialScan()
 {
-    LOG("[WatchSessionManager] Performing initial file scan...");
-    
     // Mark that initial scan is complete - this enables space checks on path changes
     m_initialScanComplete = true;
     
@@ -1036,20 +1004,6 @@ void WatchSessionManager::performInitialScan()
         autoMarkFilesForDeletion();
     }
     
-    // Log the results
-    int downloadCount = 0;
-    int deletionCount = 0;
-    for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
-        if (it.value().markType == FileMarkType::ForDownload) {
-            downloadCount++;
-        } else if (it.value().markType == FileMarkType::ForDeletion) {
-            deletionCount++;
-        }
-    }
-    
-    LOG(QString("[WatchSessionManager] Initial scan complete: %1 files marked for download, %2 files marked for deletion")
-        .arg(downloadCount).arg(deletionCount));
-    
     // Save the marks to database
     saveToDatabase();
     
@@ -1060,7 +1014,6 @@ void WatchSessionManager::onNewAnimeAdded(int aid)
 {
     // Auto-start session for brand new anime added to mylist
     if (aid > 0 && !hasActiveSession(aid)) {
-        LOG(QString("[WatchSessionManager] New anime aid=%1 added to mylist, auto-starting session").arg(aid));
         startSession(aid, 1);
         
         // Mark files for download based on the new session
