@@ -463,7 +463,8 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
-    // Check for active session in this anime or any related anime (sequel/prequel chain)
+    // Calculate distance-based scoring across the series chain
+    // Distance is the primary factor - episodes far from current position are more deletable
     if (aid > 0) {
         // Find active session across the series chain
         // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
@@ -473,7 +474,8 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         int sessionOffset = std::get<2>(sessionInfo);  // Cumulative episode offset for session anime
         
         if (sessionAid > 0) {
-            score += SCORE_ACTIVE_SESSION;  // Large positive, protect from deletion
+            // Active session is a factor (not the primary reason for scoring)
+            score += SCORE_ACTIVE_SESSION;
             
             int currentEp = getCurrentSessionEpisode(sessionAid);
             
@@ -492,7 +494,8 @@ int WatchSessionManager::calculateMarkScore(int lid) const
                 score += SCORE_IN_AHEAD_BUFFER;
             }
             
-            // Distance penalty/bonus - episodes behind current are more deletable
+            // Distance penalty/bonus - episodes far from current are more deletable
+            // This is the primary scoring factor
             score += distance * SCORE_DISTANCE_FACTOR;
             
             // Already watched in session gets penalty (more deletable)

@@ -360,7 +360,7 @@ private:
     
     // Score calculation constants
     static const int SCORE_HIDDEN_CARD = -50;
-    static const int SCORE_ACTIVE_SESSION = 100;
+    static const int SCORE_ACTIVE_SESSION = 100;  // Factor for being in active watching session
     static const int SCORE_IN_AHEAD_BUFFER = 75;
     static const int SCORE_ALREADY_WATCHED = -30;
     static const int SCORE_NOT_WATCHED = 50;
