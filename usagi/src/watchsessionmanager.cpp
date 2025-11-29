@@ -686,11 +686,12 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     // First, clear all existing deletion marks before calculating new ones
     // This ensures we only have the minimum required files marked for deletion
+    // Note: We don't add cleared lids to updatedLids here to avoid triggering
+    // a massive card refresh. Cards will pick up the cleared status on next display.
     int clearedCount = 0;
     for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
         if (it.value().markType == FileMarkType::ForDeletion) {
             it.value().markType = FileMarkType::None;
-            updatedLids.insert(it.key());
             emit fileMarkChanged(it.key(), FileMarkType::None);
             clearedCount++;
         }
@@ -806,8 +807,8 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     }
     
     if (!updatedLids.isEmpty()) {
-        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1 (would free %2 GB)")
-            .arg(updatedLids.size()).arg(accumulatedSpace / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2));
+        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1 (would free %2 GB), total lids updated: %3")
+            .arg(markedCount).arg(accumulatedSpace / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2).arg(updatedLids.size()));
         emit markingsUpdated(updatedLids);
     } else {
         LOG("[WatchSessionManager] No files marked for deletion (no candidates or no space needed)");
