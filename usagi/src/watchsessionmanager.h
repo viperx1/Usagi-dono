@@ -191,6 +191,15 @@ public:
     void autoMarkFilesForDownload();
     
     /**
+     * @brief Auto-start sessions for existing anime with local files
+     * 
+     * This finds all anime IDs that have local files and creates sessions
+     * for them if they don't already have one. This ensures WatchSessionManager
+     * works for existing anime collections that were added before WatchSessionManager.
+     */
+    void autoStartSessionsForExistingAnime();
+    
+    /**
      * @brief Perform initial scan to mark files based on current state
      * 
      * This should be called after mylist data is loaded to mark files

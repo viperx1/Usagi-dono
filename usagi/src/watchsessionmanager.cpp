@@ -960,6 +960,56 @@ void WatchSessionManager::setWatchedPath(const QString& path)
     }
 }
 
+void WatchSessionManager::autoStartSessionsForExistingAnime()
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[WatchSessionManager] autoStartSessionsForExistingAnime: database not open");
+        return;
+    }
+    
+    LOG("[WatchSessionManager] Auto-starting sessions for existing anime with local files...");
+    
+    // Find all unique anime IDs that have local files (via mylist -> local_files join)
+    QSqlQuery q(db);
+    bool querySuccess = q.exec(
+        "SELECT DISTINCT m.aid FROM mylist m "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "WHERE lf.path IS NOT NULL AND lf.path != '' AND m.aid > 0");
+    
+    if (!querySuccess) {
+        LOG(QString("[WatchSessionManager] autoStartSessionsForExistingAnime: query failed: %1")
+            .arg(q.lastError().text()));
+        return;
+    }
+    
+    int sessionsStarted = 0;
+    int existingSessions = 0;
+    
+    while (q.next()) {
+        int aid = q.value(0).toInt();
+        
+        if (!hasActiveSession(aid)) {
+            // Start session at episode 1 for anime without an active session
+            SessionInfo session;
+            session.aid = aid;
+            session.startAid = getOriginalPrequel(aid);
+            session.currentEpisode = 1;
+            session.isActive = true;
+            
+            m_sessions[aid] = session;
+            sessionsStarted++;
+            
+            emit sessionStateChanged(aid, true);
+        } else {
+            existingSessions++;
+        }
+    }
+    
+    LOG(QString("[WatchSessionManager] Auto-started %1 new sessions, %2 sessions already existed")
+        .arg(sessionsStarted).arg(existingSessions));
+}
+
 void WatchSessionManager::performInitialScan()
 {
     LOG("[WatchSessionManager] Performing initial file scan...");
@@ -967,9 +1017,9 @@ void WatchSessionManager::performInitialScan()
     // Mark that initial scan is complete - this enables space checks on path changes
     m_initialScanComplete = true;
     
-    // Note: We do NOT auto-start sessions for existing anime here.
-    // Sessions are only auto-started for BRAND NEW anime when they are added to mylist.
-    // This preserves user control over which anime have active sessions.
+    // Auto-start sessions for anime that have local files but no active session
+    // This ensures WatchSessionManager works for existing anime collections
+    autoStartSessionsForExistingAnime();
     
     // Scan for files that should be marked for download based on active sessions
     // (this will emit markingsUpdated with the set of updated lids)
