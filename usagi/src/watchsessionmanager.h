@@ -358,6 +358,10 @@ private:
     std::tuple<int, int, int> findActiveSessionInSeriesChain(int aid) const;
     int getTotalEpisodesForAnime(int aid) const;
     
+    // AniDB relation type codes
+    static const int RELATION_SEQUEL = 1;
+    static const int RELATION_PREQUEL = 2;
+    
     // Score calculation constants
     static const int SCORE_HIDDEN_CARD = -50;
     static const int SCORE_ACTIVE_SESSION = 100;  // Factor for being in active watching session

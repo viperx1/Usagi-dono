@@ -398,9 +398,19 @@ int WatchSessionManager::findPrequelAid(int aid, const QString& relationType) co
         return 0;
     }
     
+    // Map string relation type to numeric code for comparison
+    int targetCode = -1;
+    if (relationType.toLower() == "prequel") {
+        targetCode = RELATION_PREQUEL;
+    } else if (relationType.toLower() == "sequel") {
+        targetCode = RELATION_SEQUEL;
+    }
+    
     const QList<QPair<int, QString>>& relations = m_relationsCache[aid];
     for (const auto& rel : relations) {
-        if (rel.second.contains(relationType, Qt::CaseInsensitive)) {
+        // Check both numeric code and string match (for backwards compatibility with tests)
+        int relCode = rel.second.toInt();
+        if (relCode == targetCode || rel.second.contains(relationType, Qt::CaseInsensitive)) {
             return rel.first;
         }
     }
@@ -426,14 +436,15 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
         
         loadAnimeRelations(currentAid);
         
-        // Look for sequel
+        // Look for sequel (type code 1 or string "sequel")
         int sequelAid = 0;
         if (m_relationsCache.contains(currentAid)) {
             for (const auto& rel : m_relationsCache[currentAid]) {
-                if (rel.second.contains("sequel", Qt::CaseInsensitive)) {
+                int relCode = rel.second.toInt();
+                if (relCode == RELATION_SEQUEL || rel.second.contains("sequel", Qt::CaseInsensitive)) {
                     sequelAid = rel.first;
-                    LOG(QString("[WatchSessionManager] getSeriesChain: found sequel %1 -> %2")
-                        .arg(currentAid).arg(sequelAid));
+                    LOG(QString("[WatchSessionManager] getSeriesChain: found sequel %1 -> %2 (type=%3)")
+                        .arg(currentAid).arg(sequelAid).arg(rel.second));
                     break;
                 }
             }
