@@ -83,12 +83,12 @@ void TestWatchSessionManager::initTestCase()
            "epno TEXT"
            ")");
     
-    // Anime table with relations
+    // Anime table with relations - using actual db column names
     q.exec("CREATE TABLE IF NOT EXISTS anime ("
            "aid INTEGER PRIMARY KEY, "
            "name_romaji TEXT, "
-           "related_aid_list TEXT, "
-           "related_aid_type TEXT, "
+           "relaidlist TEXT, "
+           "relaidtype TEXT, "
            "is_hidden INTEGER DEFAULT 0"
            ")");
     
@@ -98,7 +98,7 @@ void TestWatchSessionManager::initTestCase()
            "path TEXT UNIQUE, "
            "filename TEXT, "
            "status INTEGER DEFAULT 0, "
-           "ed2k_hash TEXT, "
+           "ed2k TEXT, "
            "binding_status INTEGER DEFAULT 0"
            ")");
     
@@ -151,15 +151,15 @@ void TestWatchSessionManager::setupTestData()
     
     // Create test anime with relations
     // Anime 1: Original (no prequel)
-    q.exec("INSERT INTO anime (aid, name_romaji, related_aid_list, related_aid_type, is_hidden) "
+    q.exec("INSERT INTO anime (aid, name_romaji, relaidlist, relaidtype, is_hidden) "
            "VALUES (1, 'Test Anime 1', '2', 'sequel', 0)");
     
     // Anime 2: Sequel of Anime 1
-    q.exec("INSERT INTO anime (aid, name_romaji, related_aid_list, related_aid_type, is_hidden) "
+    q.exec("INSERT INTO anime (aid, name_romaji, relaidlist, relaidtype, is_hidden) "
            "VALUES (2, 'Test Anime 2', '1''3', 'prequel''sequel', 0)");
     
     // Anime 3: Sequel of Anime 2 (hidden)
-    q.exec("INSERT INTO anime (aid, name_romaji, related_aid_list, related_aid_type, is_hidden) "
+    q.exec("INSERT INTO anime (aid, name_romaji, relaidlist, relaidtype, is_hidden) "
            "VALUES (3, 'Test Anime 3', '2', 'prequel', 1)");
     
     // Anime 4: Standalone (no relations)

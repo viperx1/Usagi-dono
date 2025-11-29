@@ -357,7 +357,7 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
     }
     
     QSqlQuery q(db);
-    q.prepare("SELECT related_aid_list, related_aid_type FROM anime WHERE aid = ?");
+    q.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
     q.addBindValue(aid);
     
     if (!q.exec() || !q.next()) {
