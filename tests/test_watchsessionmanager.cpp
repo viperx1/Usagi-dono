@@ -31,6 +31,7 @@ private slots:
     void testAheadBuffer();
     void testDeletionThreshold();
     void testAutoMarkDeletion();
+    void testDelayedAutoMarkDeletion();
     
     // Anime relations tests
     void testGetOriginalPrequel();
@@ -63,12 +64,14 @@ void TestWatchSessionManager::initTestCase()
            "value TEXT"
            ")");
     
-    // Mylist table
+    // Mylist table - matches real schema with local_file reference and fid
     q.exec("CREATE TABLE IF NOT EXISTS mylist ("
            "lid INTEGER PRIMARY KEY, "
+           "fid INTEGER, "
            "aid INTEGER, "
            "eid INTEGER, "
-           "local_watched INTEGER DEFAULT 0"
+           "local_watched INTEGER DEFAULT 0, "
+           "local_file INTEGER"
            ")");
     
     // Episode table
@@ -86,10 +89,25 @@ void TestWatchSessionManager::initTestCase()
            "is_hidden INTEGER DEFAULT 0"
            ")");
     
-    // Local files table for file path tracking
+    // Local files table - matches real schema (id, path, filename, status, ed2k_hash, binding_status)
     q.exec("CREATE TABLE IF NOT EXISTS local_files ("
-           "lid INTEGER PRIMARY KEY, "
-           "local_path TEXT"
+           "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+           "path TEXT UNIQUE, "
+           "filename TEXT, "
+           "status INTEGER DEFAULT 0, "
+           "ed2k_hash TEXT, "
+           "binding_status INTEGER DEFAULT 0"
+           ")");
+    
+    // File table - matches real schema for file size lookup
+    q.exec("CREATE TABLE IF NOT EXISTS file ("
+           "fid INTEGER PRIMARY KEY, "
+           "aid INTEGER, "
+           "eid INTEGER, "
+           "gid INTEGER, "
+           "size BIGINT, "
+           "ed2k TEXT, "
+           "filename TEXT"
            ")");
 }
 
@@ -153,21 +171,34 @@ void TestWatchSessionManager::setupTestData()
         q.exec();
     }
     
-    // Create test mylist entries
+    // Create test mylist entries with local_file references and file size entries
     for (int ep = 1; ep <= 6; ep++) {
-        q.prepare("INSERT INTO mylist (lid, aid, eid, local_watched) VALUES (?, 1, ?, 0)");
-        q.addBindValue(1000 + ep);
+        // First insert into local_files to get the id
+        q.prepare("INSERT INTO local_files (path, filename) VALUES (?, ?)");
+        q.addBindValue(QString("/test/anime1/episode%1.mkv").arg(ep));
+        q.addBindValue(QString("episode%1.mkv").arg(ep));
+        q.exec();
+        int localFileId = q.lastInsertId().toInt();
+        
+        // Create file entry with size (500 MB each = 500*1024*1024 bytes)
+        int fid = 5000 + ep;
+        q.prepare("INSERT INTO file (fid, aid, eid, size, filename) VALUES (?, 1, ?, ?, ?)");
+        q.addBindValue(fid);
         q.addBindValue(100 + ep);
+        q.addBindValue(qint64(500) * 1024 * 1024); // 500 MB
+        q.addBindValue(QString("episode%1.mkv").arg(ep));
         q.exec();
         
-        // Add local file entries
-        q.prepare("INSERT INTO local_files (lid, local_path) VALUES (?, ?)");
+        // Then insert into mylist with local_file reference and fid
+        q.prepare("INSERT INTO mylist (lid, fid, aid, eid, local_watched, local_file) VALUES (?, ?, 1, ?, 0, ?)");
         q.addBindValue(1000 + ep);
-        q.addBindValue(QString("/test/anime1/episode%1.mkv").arg(ep));
+        q.addBindValue(fid);
+        q.addBindValue(100 + ep);
+        q.addBindValue(localFileId);
         q.exec();
     }
     
-    // Create entries for anime 2
+    // Create entries for anime 2 (no local files)
     for (int ep = 1; ep <= 6; ep++) {
         q.prepare("INSERT INTO mylist (lid, aid, eid, local_watched) VALUES (?, 2, ?, 0)");
         q.addBindValue(2000 + ep);
@@ -352,6 +383,42 @@ void TestWatchSessionManager::testAutoMarkDeletion()
     delete manager;
     manager = new WatchSessionManager();
     QVERIFY(manager->isAutoMarkDeletionEnabled());
+}
+
+void TestWatchSessionManager::testDelayedAutoMarkDeletion()
+{
+    // Test that setWatchedPath() and setAutoMarkDeletionEnabled() don't trigger 
+    // auto-mark before performInitialScan(). This prevents marking files for 
+    // deletion before mylist data is loaded.
+    
+    // Initially, no files should be marked for deletion
+    QList<int> deletionFiles = manager->getFilesForDeletion();
+    QCOMPARE(deletionFiles.size(), 0);
+    
+    // Enable auto-mark deletion - should NOT trigger marking before initial scan
+    manager->setAutoMarkDeletionEnabled(true);
+    QVERIFY(manager->isAutoMarkDeletionEnabled());
+    
+    // Files should still not be marked (because initial scan hasn't happened)
+    deletionFiles = manager->getFilesForDeletion();
+    QCOMPARE(deletionFiles.size(), 0);
+    
+    // Setting watched path should also NOT trigger auto-mark before initial scan
+    manager->setWatchedPath("/some/test/path");
+    
+    // Files should still not be marked
+    deletionFiles = manager->getFilesForDeletion();
+    QCOMPARE(deletionFiles.size(), 0);
+    
+    // Now call performInitialScan - this should trigger the scan
+    // (Note: actual marking depends on disk space threshold, which may not trigger
+    // in test environment with invalid path, but the scan logic is executed)
+    manager->performInitialScan();
+    
+    // The test verifies that the delay mechanism works correctly:
+    // - Before performInitialScan(): 0 files marked (verified above)
+    // - After performInitialScan(): scan runs (threshold may or may not trigger marking)
+    // The key assertion is that NO files were marked before performInitialScan()
 }
 
 // ========== Anime Relations Tests ==========

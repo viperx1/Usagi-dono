@@ -331,6 +331,7 @@ private:
     double m_thresholdValue;                    // Threshold value
     bool m_autoMarkDeletionEnabled;             // Auto-mark enabled
     QString m_watchedPath;                      // Path for space monitoring (uses directory watcher path)
+    bool m_initialScanComplete;                 // True after performInitialScan() is called
     
     // Helper methods
     void loadAnimeRelations(int aid) const;

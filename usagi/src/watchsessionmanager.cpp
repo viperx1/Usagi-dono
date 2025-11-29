@@ -14,6 +14,7 @@ WatchSessionManager::WatchSessionManager(QObject *parent)
     , m_thresholdType(DeletionThresholdType::FixedGB)
     , m_thresholdValue(DEFAULT_THRESHOLD_VALUE)
     , m_autoMarkDeletionEnabled(false)
+    , m_initialScanComplete(false)
 {
     LOG("[WatchSessionManager] Initializing...");
     ensureTablesExist();
@@ -467,23 +468,40 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
 
 int WatchSessionManager::calculateMarkScore(int lid) const
 {
-    int score = 0;
+    // Base score - all files start with this
+    int score = 50;  // Middle-of-the-road score
     
     int aid = getAnimeIdForFile(lid);
-    if (aid <= 0) {
-        return score;
-    }
-    
     int episodeNumber = getEpisodeNumber(lid);
     
-    // Check if card is hidden
-    if (isCardHidden(aid)) {
-        score += SCORE_HIDDEN_CARD;
+    // Check if card is hidden - hidden cards are more eligible for deletion
+    if (aid > 0 && isCardHidden(aid)) {
+        score += SCORE_HIDDEN_CARD;  // Negative, makes it more eligible for deletion
     }
     
-    // Check session status
-    if (hasActiveSession(aid)) {
-        score += SCORE_ACTIVE_SESSION;
+    // Check if file has been watched (from mylist viewed status)
+    // Watched files are more eligible for deletion than unwatched
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        q.prepare("SELECT viewed, local_watched FROM mylist WHERE lid = ?");
+        q.addBindValue(lid);
+        if (q.exec() && q.next()) {
+            int viewed = q.value(0).toInt();
+            int localWatched = q.value(1).toInt();
+            
+            // Files that have been watched (either server or locally) are more deletable
+            if (viewed > 0 || localWatched > 0) {
+                score += SCORE_ALREADY_WATCHED;  // Negative, more eligible for deletion
+            } else {
+                score += SCORE_NOT_WATCHED;  // Positive, less eligible for deletion
+            }
+        }
+    }
+    
+    // Files with active sessions get significant protection
+    if (aid > 0 && hasActiveSession(aid)) {
+        score += SCORE_ACTIVE_SESSION;  // Large positive, protect from deletion
         
         int currentEp = getCurrentSessionEpisode(aid);
         int distance = episodeNumber - currentEp;
@@ -491,19 +509,17 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         // Use global ahead buffer (applies to all anime)
         int aheadBuffer = m_aheadBuffer;
         
-        // Episodes in the ahead buffer get bonus
+        // Episodes in the ahead buffer get bonus protection
         if (distance >= 0 && distance <= aheadBuffer) {
             score += SCORE_IN_AHEAD_BUFFER;
         }
         
-        // Distance penalty/bonus
+        // Distance penalty/bonus - episodes behind current are more deletable
         score += distance * SCORE_DISTANCE_FACTOR;
         
-        // Already watched in session gets penalty
+        // Already watched in session gets penalty (more deletable)
         if (m_sessions.contains(aid) && m_sessions[aid].watchedEpisodes.contains(episodeNumber)) {
             score += SCORE_ALREADY_WATCHED;
-        } else {
-            score += SCORE_NOT_WATCHED;
         }
     }
     
@@ -662,47 +678,140 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         return;
     }
     
-    LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB")
-        .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2));
+    // Calculate how many bytes we need to free
+    qint64 spaceToFreeBytes = static_cast<qint64>((threshold - availableGB) * 1024.0 * 1024.0 * 1024.0);
     
-    // Get all watched files that could be candidates for deletion
-    QSqlQuery q(db);
-    q.exec("SELECT m.lid, m.aid FROM mylist m "
-           "JOIN local_files lf ON m.lid = lf.lid "
-           "WHERE m.local_watched = 1 AND lf.local_path IS NOT NULL AND lf.local_path != ''");
+    LOG(QString("[WatchSessionManager] Low space detected: %1 GB available < %2 GB threshold, need to free %3 GB (%4 bytes)")
+        .arg(availableGB, 0, 'f', 2).arg(threshold, 0, 'f', 2).arg(threshold - availableGB, 0, 'f', 2).arg(spaceToFreeBytes));
     
-    QList<QPair<int, int>> candidates; // (lid, score)
-    while (q.next()) {
-        int lid = q.value(0).toInt();
-        int score = calculateMarkScore(lid);
-        candidates.append(qMakePair(lid, score));
+    // First, clear all existing deletion marks before calculating new ones
+    // This ensures we only have the minimum required files marked for deletion
+    // Note: We don't add cleared lids to updatedLids here to avoid triggering
+    // a massive card refresh. Cards will pick up the cleared status on next display.
+    int clearedCount = 0;
+    for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
+        if (it.value().markType == FileMarkType::ForDeletion) {
+            it.value().markType = FileMarkType::None;
+            emit fileMarkChanged(it.key(), FileMarkType::None);
+            clearedCount++;
+        }
+    }
+    if (clearedCount > 0) {
+        LOG(QString("[WatchSessionManager] Cleared %1 existing deletion marks before recalculating").arg(clearedCount));
     }
     
-    LOG(QString("[WatchSessionManager] Found %1 watched files as deletion candidates").arg(candidates.size()));
+    // Get all files with local paths that could be candidates for deletion
+    // Join mylist with local_files and file tables to get lid, path, and file size
+    QSqlQuery q(db);
+    
+    // First, log the count of files in local_files table
+    q.exec("SELECT COUNT(*) FROM local_files");
+    int totalLocalFiles = 0;
+    if (q.next()) {
+        totalLocalFiles = q.value(0).toInt();
+    }
+    LOG(QString("[WatchSessionManager] Total rows in local_files table: %1").arg(totalLocalFiles));
+    
+    // Count files with valid path
+    q.exec("SELECT COUNT(*) FROM local_files WHERE path IS NOT NULL AND path != ''");
+    int filesWithPath = 0;
+    if (q.next()) {
+        filesWithPath = q.value(0).toInt();
+    }
+    LOG(QString("[WatchSessionManager] Files with valid path: %1").arg(filesWithPath));
+    
+    // Count mylist entries with local_file reference
+    q.exec("SELECT COUNT(*) FROM mylist WHERE local_file IS NOT NULL");
+    int mylistWithLocalFile = 0;
+    if (q.next()) {
+        mylistWithLocalFile = q.value(0).toInt();
+    }
+    LOG(QString("[WatchSessionManager] Mylist entries with local_file reference: %1").arg(mylistWithLocalFile));
+    
+    // Get mylist entries with local paths and file sizes
+    // Join mylist -> local_files (for path) and mylist -> file (for size)
+    bool querySuccess = q.exec(
+        "SELECT m.lid, lf.path, COALESCE(f.size, 0) as file_size FROM mylist m "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "LEFT JOIN file f ON m.fid = f.fid "
+        "WHERE lf.path IS NOT NULL AND lf.path != ''");
+    
+    if (!querySuccess) {
+        LOG(QString("[WatchSessionManager] SQL query failed: %1").arg(q.lastError().text()));
+        return;
+    }
+    
+    // Structure to hold candidate info: lid, score, size, path
+    struct CandidateInfo {
+        int lid;
+        int score;
+        qint64 size;
+        QString path;
+    };
+    
+    QList<CandidateInfo> candidates;
+    int processedCount = 0;
+    while (q.next()) {
+        CandidateInfo info;
+        info.lid = q.value(0).toInt();
+        info.path = q.value(1).toString();
+        info.size = q.value(2).toLongLong();
+        info.score = calculateMarkScore(info.lid);
+        candidates.append(info);
+        processedCount++;
+        
+        // Log first few candidates for debugging
+        if (processedCount <= 5) {
+            LOG(QString("[WatchSessionManager] Candidate file: lid=%1, path=%2, score=%3, size=%4 bytes")
+                .arg(info.lid).arg(info.path).arg(info.score).arg(info.size));
+        }
+    }
+    
+    if (processedCount > 5) {
+        LOG(QString("[WatchSessionManager] ... and %1 more candidates").arg(processedCount - 5));
+    }
+    
+    LOG(QString("[WatchSessionManager] Found %1 files as deletion candidates").arg(candidates.size()));
     
     // Sort by score (lowest first - most eligible for deletion)
     std::sort(candidates.begin(), candidates.end(),
-              [](const QPair<int, int>& a, const QPair<int, int>& b) {
-                  return a.second < b.second;
+              [](const CandidateInfo& a, const CandidateInfo& b) {
+                  return a.score < b.score;
               });
     
-    // Mark files for deletion until we would free enough space
+    // Mark files for deletion until we've accumulated enough space to free
+    qint64 accumulatedSpace = 0;
+    int markedCount = 0;
+    
     for (const auto& candidate : candidates) {
-        FileMarkInfo& info = m_fileMarks[candidate.first];
-        info.lid = candidate.first;
-        info.markType = FileMarkType::ForDeletion;
-        info.markScore = candidate.second;
+        // Stop if we've already marked enough files to free the required space
+        if (accumulatedSpace >= spaceToFreeBytes) {
+            LOG(QString("[WatchSessionManager] Reached deletion target: %1 bytes accumulated >= %2 bytes needed")
+                .arg(accumulatedSpace).arg(spaceToFreeBytes));
+            break;
+        }
         
-        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2")
-            .arg(candidate.first).arg(candidate.second));
+        FileMarkInfo& markInfo = m_fileMarks[candidate.lid];
+        markInfo.lid = candidate.lid;
+        markInfo.markType = FileMarkType::ForDeletion;
+        markInfo.markScore = candidate.score;
         
-        updatedLids.insert(candidate.first);
-        emit fileMarkChanged(candidate.first, FileMarkType::ForDeletion);
+        accumulatedSpace += candidate.size;
+        markedCount++;
+        
+        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2, size=%3 bytes, accumulated=%4 bytes")
+            .arg(candidate.lid).arg(candidate.score).arg(candidate.size).arg(accumulatedSpace));
+        
+        updatedLids.insert(candidate.lid);
+        emit fileMarkChanged(candidate.lid, FileMarkType::ForDeletion);
     }
     
     if (!updatedLids.isEmpty()) {
-        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1").arg(updatedLids.size()));
+        LOG(QString("[WatchSessionManager] Total files marked for deletion: %1 (would free %2 GB), total lids updated: %3")
+            .arg(markedCount).arg(accumulatedSpace / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2).arg(updatedLids.size()));
         emit markingsUpdated(updatedLids);
+    } else {
+        LOG("[WatchSessionManager] No files marked for deletion (no candidates or no space needed)");
     }
 }
 
@@ -825,7 +934,8 @@ void WatchSessionManager::setAutoMarkDeletionEnabled(bool enabled)
     m_autoMarkDeletionEnabled = enabled;
     saveSettings();
     
-    if (enabled) {
+    // Only trigger auto-mark if initial scan is complete (mylist data is loaded)
+    if (enabled && m_initialScanComplete) {
         autoMarkFilesForDeletion();
     }
 }
@@ -842,8 +952,9 @@ void WatchSessionManager::setWatchedPath(const QString& path)
         LOG(QString("[WatchSessionManager] Watched path set to: %1").arg(path.isEmpty() ? "(application directory)" : path));
         saveSettings();
         
-        // Trigger space check with new path
-        if (m_autoMarkDeletionEnabled) {
+        // Trigger space check with new path only after initial scan is complete
+        // (before that, the mylist data may not be loaded yet)
+        if (m_autoMarkDeletionEnabled && m_initialScanComplete) {
             autoMarkFilesForDeletion();
         }
     }
@@ -852,6 +963,9 @@ void WatchSessionManager::setWatchedPath(const QString& path)
 void WatchSessionManager::performInitialScan()
 {
     LOG("[WatchSessionManager] Performing initial file scan...");
+    
+    // Mark that initial scan is complete - this enables space checks on path changes
+    m_initialScanComplete = true;
     
     // Note: We do NOT auto-start sessions for existing anime here.
     // Sessions are only auto-started for BRAND NEW anime when they are added to mylist.
