@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QList>
 #include <QPair>
+#include <tuple>
 
 /**
  * @brief Represents how a file is marked for queue management
@@ -353,7 +354,8 @@ private:
     void ensureTablesExist();
     
     // Helper method to find active session info across series chain
-    QPair<int, int> findActiveSessionInSeriesChain(int aid) const;  // Returns (sessionAid, totalEpisodeOffset)
+    // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
+    std::tuple<int, int, int> findActiveSessionInSeriesChain(int aid) const;
     int getTotalEpisodesForAnime(int aid) const;
     
     // Score calculation constants
@@ -367,6 +369,7 @@ private:
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
     static constexpr double DEFAULT_THRESHOLD_VALUE = 50.0; // 50 GB or 50%
+    static constexpr int DEFAULT_EPISODE_COUNT = 12;  // Default episode count when unknown (typical anime cour)
 };
 
 #endif // WATCHSESSIONMANAGER_H

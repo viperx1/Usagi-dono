@@ -466,9 +466,11 @@ int WatchSessionManager::calculateMarkScore(int lid) const
     // Check for active session in this anime or any related anime (sequel/prequel chain)
     if (aid > 0) {
         // Find active session across the series chain
-        QPair<int, int> sessionInfo = findActiveSessionInSeriesChain(aid);
-        int sessionAid = sessionInfo.first;
-        int episodeOffset = sessionInfo.second;  // Cumulative episode offset for this anime in the chain
+        // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
+        auto sessionInfo = findActiveSessionInSeriesChain(aid);
+        int sessionAid = std::get<0>(sessionInfo);
+        int episodeOffset = std::get<1>(sessionInfo);  // Cumulative episode offset for this anime in the chain
+        int sessionOffset = std::get<2>(sessionInfo);  // Cumulative episode offset for session anime
         
         if (sessionAid > 0) {
             score += SCORE_ACTIVE_SESSION;  // Large positive, protect from deletion
@@ -478,17 +480,6 @@ int WatchSessionManager::calculateMarkScore(int lid) const
             // Calculate total episode position in the series chain
             // episodeOffset is the sum of all episodes in prequels before this anime
             int totalEpisodePosition = episodeOffset + episodeNumber;
-            
-            // Calculate distance from current watching position
-            // Need to also calculate offset for the anime with active session
-            int sessionOffset = 0;
-            QList<int> chain = getSeriesChain(sessionAid);
-            for (int chainAid : chain) {
-                if (chainAid == sessionAid) {
-                    break;
-                }
-                sessionOffset += getTotalEpisodesForAnime(chainAid);
-            }
             int currentTotalPosition = sessionOffset + currentEp;
             
             int distance = totalEpisodePosition - currentTotalPosition;
@@ -514,16 +505,15 @@ int WatchSessionManager::calculateMarkScore(int lid) const
     return score;
 }
 
-QPair<int, int> WatchSessionManager::findActiveSessionInSeriesChain(int aid) const
+std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(int aid) const
 {
     // Get the series chain starting from the original prequel
     QList<int> chain = getSeriesChain(aid);
     
     // Find if any anime in the chain has an active session
-    int episodeOffset = 0;
     for (int chainAid : chain) {
         if (hasActiveSession(chainAid)) {
-            // Return the session aid and the episode offset for the requested anime
+            // Calculate offset for the requested anime
             int offsetForRequestedAnime = 0;
             for (int i = 0; i < chain.size(); i++) {
                 if (chain[i] == aid) {
@@ -531,18 +521,28 @@ QPair<int, int> WatchSessionManager::findActiveSessionInSeriesChain(int aid) con
                 }
                 offsetForRequestedAnime += getTotalEpisodesForAnime(chain[i]);
             }
-            return qMakePair(chainAid, offsetForRequestedAnime);
+            
+            // Calculate offset for the session anime
+            int offsetForSessionAnime = 0;
+            for (int i = 0; i < chain.size(); i++) {
+                if (chain[i] == chainAid) {
+                    break;
+                }
+                offsetForSessionAnime += getTotalEpisodesForAnime(chain[i]);
+            }
+            
+            return std::make_tuple(chainAid, offsetForRequestedAnime, offsetForSessionAnime);
         }
     }
     
-    return qMakePair(0, 0);  // No active session found
+    return std::make_tuple(0, 0, 0);  // No active session found
 }
 
 int WatchSessionManager::getTotalEpisodesForAnime(int aid) const
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        return 0;
+        return DEFAULT_EPISODE_COUNT;
     }
     
     QSqlQuery q(db);
@@ -551,10 +551,10 @@ int WatchSessionManager::getTotalEpisodesForAnime(int aid) const
     
     if (q.exec() && q.next()) {
         int total = q.value(0).toInt();
-        return total > 0 ? total : 12;  // Default to 12 episodes if unknown
+        return total > 0 ? total : DEFAULT_EPISODE_COUNT;
     }
     
-    return 12;  // Default to 12 episodes if query fails
+    return DEFAULT_EPISODE_COUNT;
 }
 
 FileMarkType WatchSessionManager::getFileMarkType(int lid) const
