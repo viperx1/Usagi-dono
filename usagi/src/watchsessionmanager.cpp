@@ -315,6 +315,8 @@ int WatchSessionManager::getOriginalPrequel(int aid) const
     int currentAid = aid;
     QSet<int> visited;
     
+    LOG(QString("[WatchSessionManager] getOriginalPrequel: starting from aid=%1").arg(aid));
+    
     // Follow prequel chain until we find the first anime
     while (!visited.contains(currentAid)) {
         visited.insert(currentAid);
@@ -324,18 +326,21 @@ int WatchSessionManager::getOriginalPrequel(int aid) const
         }
         
         if (!m_relationsCache.contains(currentAid)) {
+            LOG(QString("[WatchSessionManager] getOriginalPrequel: no relations found for aid=%1").arg(currentAid));
             break;
         }
         
         // Look for prequel relation
         int prequelAid = findPrequelAid(currentAid, "prequel");
         if (prequelAid > 0 && !visited.contains(prequelAid)) {
+            LOG(QString("[WatchSessionManager] getOriginalPrequel: found prequel aid=%1 -> %2").arg(currentAid).arg(prequelAid));
             currentAid = prequelAid;
         } else {
             break;
         }
     }
     
+    LOG(QString("[WatchSessionManager] getOriginalPrequel: original prequel for aid=%1 is aid=%2").arg(aid).arg(currentAid));
     return currentAid;
 }
 
@@ -347,6 +352,7 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG(QString("[WatchSessionManager] loadAnimeRelations: database not open for aid=%1").arg(aid));
         return;
     }
     
@@ -355,11 +361,15 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
     q.addBindValue(aid);
     
     if (!q.exec() || !q.next()) {
+        LOG(QString("[WatchSessionManager] loadAnimeRelations: query failed or no result for aid=%1").arg(aid));
         return;
     }
     
     QString relatedAids = q.value(0).toString();
     QString relatedTypes = q.value(1).toString();
+    
+    LOG(QString("[WatchSessionManager] loadAnimeRelations: aid=%1, relatedAids='%2', relatedTypes='%3'")
+        .arg(aid).arg(relatedAids, relatedTypes));
     
     QList<QPair<int, QString>> relations;
     
@@ -373,6 +383,8 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
             QString relType = typeList[i].toLower();
             if (relAid > 0) {
                 relations.append(qMakePair(relAid, relType));
+                LOG(QString("[WatchSessionManager] loadAnimeRelations: aid=%1 has relation: %2 (%3)")
+                    .arg(aid).arg(relAid).arg(relType));
             }
         }
     }
@@ -404,6 +416,9 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
     // Start from original prequel
     int currentAid = getOriginalPrequel(aid);
     
+    LOG(QString("[WatchSessionManager] getSeriesChain: building chain for aid=%1, starting from original=%2")
+        .arg(aid).arg(currentAid));
+    
     // Follow sequel chain
     while (currentAid > 0 && !visited.contains(currentAid)) {
         chain.append(currentAid);
@@ -417,6 +432,8 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
             for (const auto& rel : m_relationsCache[currentAid]) {
                 if (rel.second.contains("sequel", Qt::CaseInsensitive)) {
                     sequelAid = rel.first;
+                    LOG(QString("[WatchSessionManager] getSeriesChain: found sequel %1 -> %2")
+                        .arg(currentAid).arg(sequelAid));
                     break;
                 }
             }
@@ -424,6 +441,14 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
         
         currentAid = sequelAid;
     }
+    
+    // Log the complete chain
+    QStringList chainStr;
+    for (int a : chain) {
+        chainStr.append(QString::number(a));
+    }
+    LOG(QString("[WatchSessionManager] getSeriesChain: chain for aid=%1 = [%2] (%3 items)")
+        .arg(aid).arg(chainStr.join(", ")).arg(chain.size()));
     
     return chain;
 }
@@ -513,16 +538,25 @@ std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(in
     // Get the series chain starting from the original prequel
     QList<int> chain = getSeriesChain(aid);
     
+    LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: looking for active session in chain for aid=%1")
+        .arg(aid));
+    
     // Find if any anime in the chain has an active session
     for (int chainAid : chain) {
         if (hasActiveSession(chainAid)) {
+            LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: found active session at aid=%1")
+                .arg(chainAid));
+            
             // Calculate offset for the requested anime
             int offsetForRequestedAnime = 0;
             for (int i = 0; i < chain.size(); i++) {
                 if (chain[i] == aid) {
                     break;
                 }
-                offsetForRequestedAnime += getTotalEpisodesForAnime(chain[i]);
+                int eps = getTotalEpisodesForAnime(chain[i]);
+                LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: chain[%1]=aid=%2 has %3 episodes")
+                    .arg(i).arg(chain[i]).arg(eps));
+                offsetForRequestedAnime += eps;
             }
             
             // Calculate offset for the session anime
@@ -534,10 +568,15 @@ std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(in
                 offsetForSessionAnime += getTotalEpisodesForAnime(chain[i]);
             }
             
+            LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: aid=%1, sessionAid=%2, offsetForRequested=%3, offsetForSession=%4")
+                .arg(aid).arg(chainAid).arg(offsetForRequestedAnime).arg(offsetForSessionAnime));
+            
             return std::make_tuple(chainAid, offsetForRequestedAnime, offsetForSessionAnime);
         }
     }
     
+    LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: no active session found in chain for aid=%1")
+        .arg(aid));
     return std::make_tuple(0, 0, 0);  // No active session found
 }
 
