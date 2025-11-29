@@ -36,6 +36,9 @@ private slots:
     // Anime relations tests
     void testGetOriginalPrequel();
     void testGetSeriesChain();
+    
+    // Auto-start session tests
+    void testAutoStartSessionsForExistingAnime();
 
 private:
     QTemporaryFile *tempDbFile;
@@ -457,6 +460,30 @@ void TestWatchSessionManager::testGetSeriesChain()
     chain = manager->getSeriesChain(4);
     QCOMPARE(chain.size(), 1);
     QCOMPARE(chain[0], 4);
+}
+
+void TestWatchSessionManager::testAutoStartSessionsForExistingAnime()
+{
+    // Initially, no sessions should be active
+    QVERIFY(!manager->hasActiveSession(1));
+    QVERIFY(!manager->hasActiveSession(2));
+    
+    // Perform initial scan - this should auto-start sessions for anime with local files
+    manager->performInitialScan();
+    
+    // Anime 1 has local files (set up in setupTestData), so it should now have an active session
+    QVERIFY(manager->hasActiveSession(1));
+    
+    // Anime 2 does NOT have local files (no local_file reference), so it should not have a session
+    QVERIFY(!manager->hasActiveSession(2));
+    
+    // Session should start at episode 1
+    QCOMPARE(manager->getCurrentSessionEpisode(1), 1);
+    
+    // Calling performInitialScan again should not create duplicate sessions
+    manager->performInitialScan();
+    QVERIFY(manager->hasActiveSession(1));
+    QCOMPARE(manager->getCurrentSessionEpisode(1), 1);
 }
 
 QTEST_MAIN(TestWatchSessionManager)
