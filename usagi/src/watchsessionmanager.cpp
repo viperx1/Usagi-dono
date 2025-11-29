@@ -678,8 +678,7 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         QString fileName = QFileInfo(candidate.path).fileName();
         
         LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2, size=%3 bytes, accumulated=%4 bytes, anime=%5, file=%6")
-            .arg(candidate.lid).arg(candidate.score).arg(candidate.size).arg(accumulatedSpace)
-            .arg(candidate.animeName, fileName));
+            .arg(QString::number(candidate.lid), QString::number(candidate.score), QString::number(candidate.size), QString::number(accumulatedSpace), candidate.animeName, fileName));
         
         updatedLids.insert(candidate.lid);
         emit fileMarkChanged(candidate.lid, FileMarkType::ForDeletion);
