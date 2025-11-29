@@ -971,11 +971,12 @@ void WatchSessionManager::autoStartSessionsForExistingAnime()
     LOG("[WatchSessionManager] Auto-starting sessions for existing anime with local files...");
     
     // Find all unique anime IDs that have local files (via mylist -> local_files join)
+    // Ensure local_file is not NULL to avoid matching records without valid local file references
     QSqlQuery q(db);
     bool querySuccess = q.exec(
         "SELECT DISTINCT m.aid FROM mylist m "
         "JOIN local_files lf ON m.local_file = lf.id "
-        "WHERE lf.path IS NOT NULL AND lf.path != '' AND m.aid > 0");
+        "WHERE m.local_file IS NOT NULL AND lf.path IS NOT NULL AND lf.path != '' AND m.aid > 0");
     
     if (!querySuccess) {
         LOG(QString("[WatchSessionManager] autoStartSessionsForExistingAnime: query failed: %1")
@@ -993,7 +994,11 @@ void WatchSessionManager::autoStartSessionsForExistingAnime()
             // Start session at episode 1 for anime without an active session
             SessionInfo session;
             session.aid = aid;
-            session.startAid = getOriginalPrequel(aid);
+            
+            // Get the original prequel, falling back to current aid if not found
+            int startAid = getOriginalPrequel(aid);
+            session.startAid = (startAid > 0) ? startAid : aid;
+            
             session.currentEpisode = 1;
             session.isActive = true;
             
