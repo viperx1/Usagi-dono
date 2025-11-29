@@ -352,13 +352,17 @@ private:
     void saveSettings();
     void ensureTablesExist();
     
+    // Helper method to find active session info across series chain
+    QPair<int, int> findActiveSessionInSeriesChain(int aid) const;  // Returns (sessionAid, totalEpisodeOffset)
+    int getTotalEpisodesForAnime(int aid) const;
+    
     // Score calculation constants
     static const int SCORE_HIDDEN_CARD = -50;
     static const int SCORE_ACTIVE_SESSION = 100;
     static const int SCORE_IN_AHEAD_BUFFER = 75;
     static const int SCORE_ALREADY_WATCHED = -30;
     static const int SCORE_NOT_WATCHED = 50;
-    static const int SCORE_DISTANCE_FACTOR = -2;  // Per episode away from current
+    static const int SCORE_DISTANCE_FACTOR = -5;  // Per episode away from current (increased for more impact)
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;

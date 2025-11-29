@@ -463,31 +463,98 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
-    // Files with active sessions get significant protection
-    if (aid > 0 && hasActiveSession(aid)) {
-        score += SCORE_ACTIVE_SESSION;  // Large positive, protect from deletion
+    // Check for active session in this anime or any related anime (sequel/prequel chain)
+    if (aid > 0) {
+        // Find active session across the series chain
+        QPair<int, int> sessionInfo = findActiveSessionInSeriesChain(aid);
+        int sessionAid = sessionInfo.first;
+        int episodeOffset = sessionInfo.second;  // Cumulative episode offset for this anime in the chain
         
-        int currentEp = getCurrentSessionEpisode(aid);
-        int distance = episodeNumber - currentEp;
-        
-        // Use global ahead buffer (applies to all anime)
-        int aheadBuffer = m_aheadBuffer;
-        
-        // Episodes in the ahead buffer get bonus protection
-        if (distance >= 0 && distance <= aheadBuffer) {
-            score += SCORE_IN_AHEAD_BUFFER;
-        }
-        
-        // Distance penalty/bonus - episodes behind current are more deletable
-        score += distance * SCORE_DISTANCE_FACTOR;
-        
-        // Already watched in session gets penalty (more deletable)
-        if (m_sessions.contains(aid) && m_sessions[aid].watchedEpisodes.contains(episodeNumber)) {
-            score += SCORE_ALREADY_WATCHED;
+        if (sessionAid > 0) {
+            score += SCORE_ACTIVE_SESSION;  // Large positive, protect from deletion
+            
+            int currentEp = getCurrentSessionEpisode(sessionAid);
+            
+            // Calculate total episode position in the series chain
+            // episodeOffset is the sum of all episodes in prequels before this anime
+            int totalEpisodePosition = episodeOffset + episodeNumber;
+            
+            // Calculate distance from current watching position
+            // Need to also calculate offset for the anime with active session
+            int sessionOffset = 0;
+            QList<int> chain = getSeriesChain(sessionAid);
+            for (int chainAid : chain) {
+                if (chainAid == sessionAid) {
+                    break;
+                }
+                sessionOffset += getTotalEpisodesForAnime(chainAid);
+            }
+            int currentTotalPosition = sessionOffset + currentEp;
+            
+            int distance = totalEpisodePosition - currentTotalPosition;
+            
+            // Use global ahead buffer (applies to all anime)
+            int aheadBuffer = m_aheadBuffer;
+            
+            // Episodes in the ahead buffer get bonus protection
+            if (distance >= 0 && distance <= aheadBuffer) {
+                score += SCORE_IN_AHEAD_BUFFER;
+            }
+            
+            // Distance penalty/bonus - episodes behind current are more deletable
+            score += distance * SCORE_DISTANCE_FACTOR;
+            
+            // Already watched in session gets penalty (more deletable)
+            if (m_sessions.contains(aid) && m_sessions[aid].watchedEpisodes.contains(episodeNumber)) {
+                score += SCORE_ALREADY_WATCHED;
+            }
         }
     }
     
     return score;
+}
+
+QPair<int, int> WatchSessionManager::findActiveSessionInSeriesChain(int aid) const
+{
+    // Get the series chain starting from the original prequel
+    QList<int> chain = getSeriesChain(aid);
+    
+    // Find if any anime in the chain has an active session
+    int episodeOffset = 0;
+    for (int chainAid : chain) {
+        if (hasActiveSession(chainAid)) {
+            // Return the session aid and the episode offset for the requested anime
+            int offsetForRequestedAnime = 0;
+            for (int i = 0; i < chain.size(); i++) {
+                if (chain[i] == aid) {
+                    break;
+                }
+                offsetForRequestedAnime += getTotalEpisodesForAnime(chain[i]);
+            }
+            return qMakePair(chainAid, offsetForRequestedAnime);
+        }
+    }
+    
+    return qMakePair(0, 0);  // No active session found
+}
+
+int WatchSessionManager::getTotalEpisodesForAnime(int aid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT COALESCE(eptotal, episodes, 0) FROM anime WHERE aid = ?");
+    q.addBindValue(aid);
+    
+    if (q.exec() && q.next()) {
+        int total = q.value(0).toInt();
+        return total > 0 ? total : 12;  // Default to 12 episodes if unknown
+    }
+    
+    return 12;  // Default to 12 episodes if query fails
 }
 
 FileMarkType WatchSessionManager::getFileMarkType(int lid) const
@@ -620,9 +687,11 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     }
     
     // Get mylist entries with local paths, file sizes, and anime names
+    // Use COALESCE with multiple fallbacks for anime name
     QSqlQuery q(db);
     bool querySuccess = q.exec(
-        "SELECT m.lid, lf.path, COALESCE(f.size, 0) as file_size, COALESCE(a.nameromaji, '') as anime_name FROM mylist m "
+        "SELECT m.lid, lf.path, COALESCE(f.size, 0) as file_size, "
+        "COALESCE(NULLIF(a.nameromaji, ''), NULLIF(a.nameenglish, ''), NULLIF(a.namekanji, ''), '') as anime_name FROM mylist m "
         "JOIN local_files lf ON m.local_file = lf.id "
         "LEFT JOIN file f ON m.fid = f.fid "
         "LEFT JOIN anime a ON m.aid = a.aid "
