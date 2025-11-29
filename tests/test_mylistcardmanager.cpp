@@ -101,12 +101,13 @@ void TestMyListCardManager::createTestDatabase()
 {
     QSqlQuery q(db);
     
-    // Create anime table
+    // Create anime table (matching production schema with both eps and eptotal)
     q.exec("CREATE TABLE anime ("
            "aid INTEGER PRIMARY KEY, "
            "nameromaji TEXT, "
            "nameenglish TEXT, "
            "eptotal INTEGER, "
+           "eps INTEGER, "
            "typename TEXT, "
            "startdate TEXT, "
            "enddate TEXT, "
