@@ -5,6 +5,7 @@
 #include <QShowEvent>
 #include <QPainter>
 #include <QApplication>
+#include <QScopeGuard>
 #include <algorithm>
 
 VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
@@ -312,6 +313,8 @@ void VirtualFlowLayout::calculateLayout()
         return;
     }
     m_inCalculateLayout = true;
+    // Ensure the guard is reset even if an exception occurs
+    auto guardReset = qScopeGuard([this]() { m_inCalculateLayout = false; });
     
     // Calculate how many columns fit in the available width
     int availableWidth = width();
@@ -358,8 +361,6 @@ void VirtualFlowLayout::calculateLayout()
             widget->setGeometry(x, y, m_itemSize.width(), m_itemSize.height());
         }
     }
-    
-    m_inCalculateLayout = false;
 }
 
 void VirtualFlowLayout::updateVisibleItems()
