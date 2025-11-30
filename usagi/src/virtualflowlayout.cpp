@@ -372,12 +372,18 @@ bool VirtualFlowLayout::eventFilter(QObject *watched, QEvent *event)
     if (m_scrollArea && watched == m_scrollArea->viewport() && event->type() == QEvent::Resize) {
         // Re-entrancy guard to prevent recursive layout during setGeometry calls
         if (!m_inLayoutUpdate) {
+            LOG(QString("[VirtualFlowLayout] eventFilter: guard NOT set, proceeding with layout (this=%1)").arg(reinterpret_cast<quintptr>(this)));
             m_inLayoutUpdate = true;
-            auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+            auto guardReset = qScopeGuard([this]() { 
+                LOG(QString("[VirtualFlowLayout] eventFilter: resetting guard (this=%1)").arg(reinterpret_cast<quintptr>(this)));
+                m_inLayoutUpdate = false; 
+            });
             
             LOG("[VirtualFlowLayout] Viewport resized, recalculating layout");
             calculateLayout();
             updateVisibleItems();
+        } else {
+            LOG(QString("[VirtualFlowLayout] eventFilter: guard IS set, SKIPPING layout (this=%1)").arg(reinterpret_cast<quintptr>(this)));
         }
     }
     return QWidget::eventFilter(watched, event);
@@ -397,6 +403,21 @@ void VirtualFlowLayout::onScrollChanged()
 
 void VirtualFlowLayout::calculateLayout()
 {
+    // Static recursion counter to detect infinite recursion
+    static thread_local int recursionDepth = 0;
+    recursionDepth++;
+    
+    // Debug: Log guard state on entry
+    LOG(QString("[VirtualFlowLayout] calculateLayout ENTER: guard=%1, this=%2, depth=%3")
+        .arg(m_inLayoutUpdate ? "SET" : "NOT SET").arg(reinterpret_cast<quintptr>(this)).arg(recursionDepth));
+    
+    // Emergency stop if we're recursing too deep
+    if (recursionDepth > 10) {
+        LOG(QString("[VirtualFlowLayout] calculateLayout: RECURSION DETECTED! depth=%1, ABORTING").arg(recursionDepth));
+        recursionDepth--;
+        return;
+    }
+    
     // Calculate how many columns fit in the available width
     int availableWidth = width();
     if (m_scrollArea) {
@@ -428,9 +449,14 @@ void VirtualFlowLayout::calculateLayout()
         .arg(m_columnsPerRow).arg(m_totalRows).arg(m_contentHeight));
     
     // Update our minimum height to match content
+    LOG("[VirtualFlowLayout] calculateLayout: about to call setMinimumHeight");
     setMinimumHeight(m_contentHeight);
+    LOG("[VirtualFlowLayout] calculateLayout: setMinimumHeight done");
     
     // Reposition visible widgets
+    int widgetCount = m_visibleWidgets.size();
+    LOG(QString("[VirtualFlowLayout] calculateLayout: repositioning %1 visible widgets").arg(widgetCount));
+    
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
         int index = it.key();
         QWidget *widget = it.value();
@@ -439,9 +465,15 @@ void VirtualFlowLayout::calculateLayout()
             int col = index % m_columnsPerRow;
             int x = col * (m_itemSize.width() + m_hSpacing);
             int y = row * m_rowHeight;
+            LOG(QString("[VirtualFlowLayout] calculateLayout: setGeometry for widget %1 at (%2,%3) size (%4,%5)")
+                .arg(index).arg(x).arg(y).arg(m_itemSize.width()).arg(m_itemSize.height()));
             widget->setGeometry(x, y, m_itemSize.width(), m_itemSize.height());
+            LOG(QString("[VirtualFlowLayout] calculateLayout: setGeometry done for widget %1").arg(index));
         }
     }
+    
+    LOG(QString("[VirtualFlowLayout] calculateLayout EXIT: guard=%1, depth=%2").arg(m_inLayoutUpdate ? "SET" : "NOT SET").arg(recursionDepth));
+    recursionDepth--;
 }
 
 void VirtualFlowLayout::updateVisibleItems()
