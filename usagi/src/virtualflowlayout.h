@@ -40,7 +40,7 @@ public:
     void setItemCount(int count);
     
     // Set the fixed size for all items
-    void setItemSize(const QSize &size);
+    void setItemSize(QSize size);
     
     // Set spacing between items
     void setSpacing(int horizontal, int vertical);
