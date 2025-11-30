@@ -21,6 +21,7 @@ VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     , m_cachedFirstVisible(-1)
     , m_cachedLastVisible(-1)
     , m_deferredUpdateTimer(nullptr)
+    , m_inCalculateLayout(false)
 {
     setMinimumSize(m_itemSize);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -306,6 +307,12 @@ void VirtualFlowLayout::onScrollChanged()
 
 void VirtualFlowLayout::calculateLayout()
 {
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inCalculateLayout) {
+        return;
+    }
+    m_inCalculateLayout = true;
+    
     // Calculate how many columns fit in the available width
     int availableWidth = width();
     if (m_scrollArea) {
@@ -351,6 +358,8 @@ void VirtualFlowLayout::calculateLayout()
             widget->setGeometry(x, y, m_itemSize.width(), m_itemSize.height());
         }
     }
+    
+    m_inCalculateLayout = false;
 }
 
 void VirtualFlowLayout::updateVisibleItems()
