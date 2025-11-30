@@ -99,7 +99,7 @@ void VirtualFlowLayout::setItemCount(int count)
     }
 }
 
-void VirtualFlowLayout::setItemSize(const QSize &size)
+void VirtualFlowLayout::setItemSize(QSize size)
 {
     if (m_itemSize == size) {
         return;
@@ -407,11 +407,15 @@ void VirtualFlowLayout::calculateLayout()
         QWidget *widget = it.value();
         if (widget) {
             // Safety check: verify widget is not in the process of being destroyed
-            // by checking if it still has a valid parent or can be cast to QWidget
-            if (!widget->parent() && !widget->isVisible()) {
-                // Widget may be orphaned (could be scheduled for deletion)
-                LOG(QString("[VirtualFlowLayout] calculateLayout: WARNING - widget %1 has no parent and is not visible, may be dead")
+            // A widget without a parent that is also hidden is likely scheduled for deletion
+            // via deleteLater() and should not be accessed
+            if (!widget->parent() && widget->isHidden()) {
+                // Widget is orphaned and hidden - likely scheduled for deletion
+                // Skip setGeometry and mark for removal to prevent access violation
+                LOG(QString("[VirtualFlowLayout] calculateLayout: WARNING - widget %1 has no parent and is hidden, skipping (likely dead)")
                     .arg(index));
+                indicesToRemove.append(index);
+                continue;
             }
             
             int row = index / m_columnsPerRow;
@@ -430,10 +434,10 @@ void VirtualFlowLayout::calculateLayout()
         }
     }
     
-    // Remove any null widget entries
+    // Remove any dead or null widget entries
     for (int index : indicesToRemove) {
         m_visibleWidgets.remove(index);
-        LOG(QString("[VirtualFlowLayout] calculateLayout: removed null widget at index %1").arg(index));
+        LOG(QString("[VirtualFlowLayout] calculateLayout: removed dead/null widget at index %1").arg(index));
     }
     
     LOG(QString("[VirtualFlowLayout] calculateLayout EXIT: guard=%1, depth=%2").arg(m_inLayoutUpdate ? "SET" : "NOT SET").arg(recursionDepth));
