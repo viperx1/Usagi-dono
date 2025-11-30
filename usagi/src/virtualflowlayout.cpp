@@ -269,6 +269,7 @@ int VirtualFlowLayout::contentHeight() const
 void VirtualFlowLayout::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    LOG(QString("[VirtualFlowLayout] resizeEvent: guard=%1").arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
     // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
     calculateLayout();
     updateVisibleItems();
@@ -283,7 +284,7 @@ void VirtualFlowLayout::paintEvent(QPaintEvent *event)
 void VirtualFlowLayout::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
-    LOG("[VirtualFlowLayout] showEvent triggered, recalculating layout");
+    LOG(QString("[VirtualFlowLayout] showEvent triggered, guard=%1").arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
     // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
     calculateLayout();
     updateVisibleItems();
@@ -292,6 +293,7 @@ void VirtualFlowLayout::showEvent(QShowEvent *event)
 bool VirtualFlowLayout::event(QEvent *event)
 {
     if (event->type() == QEvent::LayoutRequest) {
+        LOG(QString("[VirtualFlowLayout] LayoutRequest event, guard=%1").arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
         // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
         calculateLayout();
         updateVisibleItems();
@@ -304,16 +306,18 @@ bool VirtualFlowLayout::eventFilter(QObject *watched, QEvent *event)
 {
     // Handle viewport resize events
     if (m_scrollArea && watched == m_scrollArea->viewport() && event->type() == QEvent::Resize) {
-        LOG("[VirtualFlowLayout] Viewport resized, recalculating layout");
+        LOG(QString("[VirtualFlowLayout] eventFilter: Viewport resized, guard_before=%1").arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
         // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
         calculateLayout();
         updateVisibleItems();
+        LOG(QString("[VirtualFlowLayout] eventFilter: Viewport resize done, guard_after=%1").arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
     }
     return QWidget::eventFilter(watched, event);
 }
 
 void VirtualFlowLayout::onScrollChanged()
 {
+    LOG(QString("[VirtualFlowLayout] onScrollChanged: guard=%1").arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
     // Let updateVisibleItems handle its own re-entrancy guard
     
     updateVisibleItems();
@@ -321,11 +325,20 @@ void VirtualFlowLayout::onScrollChanged()
 
 void VirtualFlowLayout::calculateLayout()
 {
+    // Static recursion counter to detect infinite recursion (backup check)
+    static thread_local int recursionDepth = 0;
+    recursionDepth++;
+    
+    // Debug: Log guard state BEFORE any changes
+    LOG(QString("[VirtualFlowLayout] calculateLayout ENTER: guard_before=%1, this=%2, depth=%3")
+        .arg(m_inLayoutUpdate ? "SET" : "NOT SET").arg(reinterpret_cast<quintptr>(this)).arg(recursionDepth));
+    
     // Re-entrancy guard INSIDE calculateLayout to prevent recursive calls
     // This is the final defense against recursive layout crashes
     if (m_inLayoutUpdate) {
-        LOG(QString("[VirtualFlowLayout] calculateLayout BLOCKED: guard already SET, this=%1")
-            .arg(reinterpret_cast<quintptr>(this)));
+        LOG(QString("[VirtualFlowLayout] calculateLayout BLOCKED: guard already SET, this=%1, depth=%2")
+            .arg(reinterpret_cast<quintptr>(this)).arg(recursionDepth));
+        recursionDepth--;
         return;
     }
     m_inLayoutUpdate = true;
@@ -334,14 +347,6 @@ void VirtualFlowLayout::calculateLayout()
             .arg(reinterpret_cast<quintptr>(this)));
         m_inLayoutUpdate = false; 
     });
-    
-    // Static recursion counter to detect infinite recursion (backup check)
-    static thread_local int recursionDepth = 0;
-    recursionDepth++;
-    
-    // Debug: Log guard state on entry
-    LOG(QString("[VirtualFlowLayout] calculateLayout ENTER: guard=%1, this=%2, depth=%3")
-        .arg(m_inLayoutUpdate ? "SET" : "NOT SET").arg(reinterpret_cast<quintptr>(this)).arg(recursionDepth));
     
     // Emergency stop if we're recursing too deep
     if (recursionDepth > 10) {
@@ -414,6 +419,8 @@ void VirtualFlowLayout::updateVisibleItems()
     // 1. calculateLayout() has a guard that prevents re-entry during setGeometry calls
     // 2. updateVisibleItems is typically called right after calculateLayout from the same entry point
     // 3. If called from a recursive event, calculateLayout's guard will block the chain
+    
+    LOG(QString("[VirtualFlowLayout] updateVisibleItems ENTER: guard=%1").arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
     
     if (!m_itemFactory || m_itemCount == 0) {
         LOG(QString("[VirtualFlowLayout] updateVisibleItems skipped: factory=%1, itemCount=%2")
@@ -527,7 +534,8 @@ QWidget* VirtualFlowLayout::createOrReuseWidget(int index)
         return m_visibleWidgets[index];
     }
     
-    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: creating/reusing widget for index=%1").arg(index));
+    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: creating/reusing widget for index=%1, guard=%2")
+        .arg(index).arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
     
     // Get or create widget using factory
     // The factory may return an existing cached card from the card manager
@@ -545,7 +553,10 @@ QWidget* VirtualFlowLayout::createOrReuseWidget(int index)
         int x = col * (m_itemSize.width() + m_hSpacing);
         int y = row * m_rowHeight;
         
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: about to setGeometry for widget %1 at (%2,%3), guard=%4")
+            .arg(index).arg(x).arg(y).arg(m_inLayoutUpdate ? "SET" : "NOT SET"));
         widget->setGeometry(x, y, m_itemSize.width(), m_itemSize.height());
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: setGeometry done for widget %1").arg(index));
         widget->show();
         
         m_visibleWidgets[index] = widget;
