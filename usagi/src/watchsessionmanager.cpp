@@ -495,27 +495,15 @@ int WatchSessionManager::calculateMarkScore(int lid) const
     }
     
     // Apply file revision penalty - older revisions are more deletable
-    // Only applies when there are multiple files for the same episode
+    // Only applies when there are multiple local files for the same episode
     int fileCount = getFileCountForEpisode(lid);
     if (fileCount > 1) {
-        int fileVersion = getFileVersion(lid);
-        int maxVersion = getMaxVersionForEpisode(lid);
+        // Count how many local files for this episode have a higher version
+        int higherVersionCount = getHigherVersionFileCount(lid);
         
-        // Decrease score for older revisions (lower version = more deletable)
-        // Newest version gets no penalty, older versions get increasing penalties
-        // Files with unknown version (0) are treated as oldest
-        if (maxVersion > 0) {
-            int versionsBehind;
-            if (fileVersion == 0) {
-                // Unknown version treated as older than all known versions
-                versionsBehind = maxVersion;
-            } else {
-                versionsBehind = maxVersion - fileVersion;
-            }
-            
-            if (versionsBehind > 0) {
-                score += versionsBehind * SCORE_OLDER_REVISION;  // Negative, more eligible for deletion
-            }
+        // Apply penalty per local file with higher version
+        if (higherVersionCount > 0) {
+            score += higherVersionCount * SCORE_OLDER_REVISION;  // Negative, more eligible for deletion
         }
     }
     
@@ -1144,24 +1132,32 @@ int WatchSessionManager::getFileCountForEpisode(int lid) const
     return 1;  // Default to 1 file
 }
 
-int WatchSessionManager::getMaxVersionForEpisode(int lid) const
+int WatchSessionManager::getHigherVersionFileCount(int lid) const
 {
-    // Get the maximum file version for files of the same episode
+    // Count how many local files for the same episode have a higher version than this file
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         return 0;
     }
     
+    // First get this file's version
+    int myVersion = getFileVersion(lid);
+    
     QSqlQuery q(db);
-    // Get max version (from state bits 0-2) for files with same eid that have local files
+    // Count local files with same eid that have a higher version
+    // Files with unknown version (0) are considered older than any known version
     q.prepare(
-        "SELECT MAX(f.state & 7) FROM mylist m "
+        "SELECT COUNT(*) FROM mylist m "
         "JOIN file f ON m.fid = f.fid "
         "JOIN local_files lf ON m.local_file = lf.id "
         "WHERE m.eid = (SELECT eid FROM mylist WHERE lid = ?) "
-        "AND lf.path IS NOT NULL AND lf.path != ''"
+        "AND m.lid != ? "
+        "AND lf.path IS NOT NULL AND lf.path != '' "
+        "AND (f.state & 7) > ?"
     );
-    q.addBindValue(lid);
+    q.addBindValue(lid);  // Same episode
+    q.addBindValue(lid);  // Exclude self
+    q.addBindValue(myVersion);  // Files with higher version
     
     if (q.exec() && q.next()) {
         return q.value(0).toInt();

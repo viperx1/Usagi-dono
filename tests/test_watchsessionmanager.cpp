@@ -494,6 +494,8 @@ void TestWatchSessionManager::testFileVersionScoring()
 {
     // Test that files with older revisions get lower scores
     // This test verifies the file version scoring feature
+    // When multiple local files exist for same episode, older versions get penalties
+    // based on count of local files with higher versions
     
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
@@ -529,6 +531,8 @@ void TestWatchSessionManager::testFileVersionScoring()
     manager->startSession(1, 1);
     
     // Get scores for both files (same episode, different versions)
+    // v1 has 1 local file with higher version (v2), so gets -1000 penalty
+    // v2 has 0 local files with higher version, so no penalty
     int scoreV1 = manager->calculateMarkScore(1001);  // v1 (older)
     int scoreV2 = manager->calculateMarkScore(1100);  // v2 (newer)
     

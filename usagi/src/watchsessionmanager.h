@@ -356,8 +356,8 @@ private:
     int getAnimeIdForFile(int lid) const;
     bool isCardHidden(int aid) const;
     int getFileVersion(int lid) const;  // Get file version from state bits
-    int getFileCountForEpisode(int lid) const;  // Get number of files for same episode
-    int getMaxVersionForEpisode(int lid) const;  // Get max version among files for same episode
+    int getFileCountForEpisode(int lid) const;  // Get number of local files for same episode
+    int getHigherVersionFileCount(int lid) const;  // Count local files with higher version for same episode
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
@@ -377,8 +377,8 @@ private:
     static const int SCORE_IN_AHEAD_BUFFER = 75;
     static const int SCORE_ALREADY_WATCHED = -30;
     static const int SCORE_NOT_WATCHED = 50;
-    static const int SCORE_DISTANCE_FACTOR = -5;  // Per episode away from current (increased for more impact)
-    static const int SCORE_OLDER_REVISION = -15;  // Per version behind newest (older revisions more deletable)
+    static const int SCORE_DISTANCE_FACTOR = -1;  // Per episode away from current
+    static const int SCORE_OLDER_REVISION = -1000;  // Per local file with higher version (older revisions more deletable)
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
