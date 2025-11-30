@@ -22,7 +22,7 @@ VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     , m_cachedFirstVisible(-1)
     , m_cachedLastVisible(-1)
     , m_deferredUpdateTimer(nullptr)
-    , m_inCalculateLayout(false)
+    , m_inLayoutUpdate(false)
 {
     setMinimumSize(m_itemSize);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -32,6 +32,13 @@ VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     m_deferredUpdateTimer->setSingleShot(true);
     m_deferredUpdateTimer->setInterval(100);  // 100ms delay
     connect(m_deferredUpdateTimer, &QTimer::timeout, this, [this]() {
+        // Re-entrancy guard to prevent recursive layout during setGeometry calls
+        if (m_inLayoutUpdate) {
+            return;
+        }
+        m_inLayoutUpdate = true;
+        auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+        
         LOG("[VirtualFlowLayout] Deferred update triggered");
         int savedScrollY = saveScrollPosition();
         
@@ -62,6 +69,13 @@ void VirtualFlowLayout::setItemCount(int count)
     if (m_itemCount == count) {
         return;
     }
+    
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
     
     int savedScrollY = saveScrollPosition();
     
@@ -103,6 +117,13 @@ void VirtualFlowLayout::setItemSize(const QSize &size)
         return;
     }
     
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+    
     m_itemSize = size;
     m_rowHeight = size.height() + m_vSpacing;
     calculateLayout();
@@ -115,6 +136,13 @@ void VirtualFlowLayout::setSpacing(int horizontal, int vertical)
     if (m_hSpacing == horizontal && m_vSpacing == vertical) {
         return;
     }
+    
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
     
     m_hSpacing = horizontal;
     m_vSpacing = vertical;
@@ -154,6 +182,13 @@ void VirtualFlowLayout::ensureVisible(int index)
 
 void VirtualFlowLayout::refresh()
 {
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+    
     int savedScrollY = saveScrollPosition();
     
     // Force recalculation and update of all visible items
@@ -249,8 +284,14 @@ void VirtualFlowLayout::setScrollArea(QScrollArea *scrollArea)
             m_scrollArea->viewport()->installEventFilter(this);
         }
         
-        calculateLayout();
-        updateVisibleItems();
+        // Re-entrancy guard to prevent recursive layout during setGeometry calls
+        if (!m_inLayoutUpdate) {
+            m_inLayoutUpdate = true;
+            auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+            
+            calculateLayout();
+            updateVisibleItems();
+        }
     }
 }
 
@@ -262,6 +303,13 @@ int VirtualFlowLayout::contentHeight() const
 void VirtualFlowLayout::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+    
     calculateLayout();
     updateVisibleItems();
 }
@@ -275,6 +323,13 @@ void VirtualFlowLayout::paintEvent(QPaintEvent *event)
 void VirtualFlowLayout::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+    
     LOG("[VirtualFlowLayout] showEvent triggered, recalculating layout");
     calculateLayout();
     updateVisibleItems();
@@ -283,6 +338,13 @@ void VirtualFlowLayout::showEvent(QShowEvent *event)
 bool VirtualFlowLayout::event(QEvent *event)
 {
     if (event->type() == QEvent::LayoutRequest) {
+        // Re-entrancy guard to prevent recursive layout during setGeometry calls
+        if (m_inLayoutUpdate) {
+            return true;
+        }
+        m_inLayoutUpdate = true;
+        auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+        
         calculateLayout();
         updateVisibleItems();
         return true;
@@ -294,9 +356,15 @@ bool VirtualFlowLayout::eventFilter(QObject *watched, QEvent *event)
 {
     // Handle viewport resize events
     if (m_scrollArea && watched == m_scrollArea->viewport() && event->type() == QEvent::Resize) {
-        LOG("[VirtualFlowLayout] Viewport resized, recalculating layout");
-        calculateLayout();
-        updateVisibleItems();
+        // Re-entrancy guard to prevent recursive layout during setGeometry calls
+        if (!m_inLayoutUpdate) {
+            m_inLayoutUpdate = true;
+            auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+            
+            LOG("[VirtualFlowLayout] Viewport resized, recalculating layout");
+            calculateLayout();
+            updateVisibleItems();
+        }
     }
     return QWidget::eventFilter(watched, event);
 }
@@ -308,14 +376,6 @@ void VirtualFlowLayout::onScrollChanged()
 
 void VirtualFlowLayout::calculateLayout()
 {
-    // Re-entrancy guard to prevent recursive layout during setGeometry calls
-    if (m_inCalculateLayout) {
-        return;
-    }
-    m_inCalculateLayout = true;
-    // Ensure the guard is reset even if an exception occurs
-    auto guardReset = qScopeGuard([this]() { m_inCalculateLayout = false; });
-    
     // Calculate how many columns fit in the available width
     int availableWidth = width();
     if (m_scrollArea) {

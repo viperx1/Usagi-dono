@@ -150,8 +150,8 @@ private:
     // Deferred update timer to handle initialization timing
     QTimer *m_deferredUpdateTimer;
     
-    // Re-entrancy guard for calculateLayout
-    bool m_inCalculateLayout = false;
+    // Re-entrancy guard for layout operations (calculateLayout and updateVisibleItems)
+    bool m_inLayoutUpdate = false;
     
     // Constants
     static constexpr int BUFFER_ROWS = 2;  // Extra rows to render above/below viewport
