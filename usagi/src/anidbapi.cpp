@@ -1587,13 +1587,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				qint64 startTime = parts[1].toLongLong();  // Unix timestamp when episode airs
 				QString dateflags = parts.size() >= 3 ? parts[2] : "";
 				
-				// Convert Unix timestamp to ISO date format (YYYY-MM-DDZ)
-				QString startdate;
-				if(startTime > 0)
-				{
-					QDateTime dt = QDateTime::fromSecsSinceEpoch(startTime);
-					startdate = dt.toString("yyyy-MM-dd") + "Z";
-				}
+				// Convert Unix timestamp to ISO date format (YYYY-MM-DDZ) using existing helper
+				QString startdate = convertToISODate(QString::number(startTime));
 				
 				// Check if this anime is already in the anime table
 				QSqlQuery checkQuery(db);
@@ -1609,6 +1604,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				if(animeExists)
 				{
 					// Update existing anime with startdate and dateflags from calendar
+					// Use COALESCE to preserve existing richer data from full ANIME responses
+					// while filling in calendar data only for empty fields
 					QSqlQuery updateQuery(db);
 					updateQuery.prepare("UPDATE anime SET "
 						"startdate = COALESCE(NULLIF(:startdate, ''), startdate), "
@@ -1618,11 +1615,19 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					updateQuery.bindValue(":dateflags", dateflags);
 					updateQuery.bindValue(":aid", aid);
 					
-					if(updateQuery.exec() && updateQuery.numRowsAffected() > 0)
+					if(updateQuery.exec())
 					{
-						updatedAnimeCount++;
-						Logger::log(QString("[AniDB Calendar] Updated anime: aid=%1 startdate=%2 dateflags=%3")
-							.arg(aid).arg(startdate, dateflags), __FILE__, __LINE__);
+						if(updateQuery.numRowsAffected() > 0)
+						{
+							updatedAnimeCount++;
+							Logger::log(QString("[AniDB Calendar] Updated anime: aid=%1 startdate=%2 dateflags=%3")
+								.arg(aid).arg(startdate, dateflags), __FILE__, __LINE__);
+						}
+					}
+					else
+					{
+						Logger::log(QString("[AniDB Calendar] Failed to update anime aid=%1: %2")
+							.arg(aid).arg(updateQuery.lastError().text()), __FILE__, __LINE__);
 					}
 				}
 				else
