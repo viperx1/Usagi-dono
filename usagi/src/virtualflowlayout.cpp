@@ -212,6 +212,13 @@ void VirtualFlowLayout::refresh()
 
 void VirtualFlowLayout::clear()
 {
+    // Re-entrancy guard to prevent recursive layout during widget operations
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+    
     // Just hide all visible widgets - don't delete them
     // The card manager owns the cards and manages their lifecycle
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
@@ -233,6 +240,13 @@ void VirtualFlowLayout::updateItem(int index)
     if (index < 0 || index >= m_itemCount) {
         return;
     }
+    
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
     
     // If the widget is currently visible, recreate it
     if (m_visibleWidgets.contains(index)) {
