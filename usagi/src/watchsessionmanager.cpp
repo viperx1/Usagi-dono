@@ -310,12 +310,15 @@ void WatchSessionManager::markEpisodeWatched(int aid, int episodeNumber)
 
 int WatchSessionManager::getOriginalPrequel(int aid) const
 {
+    // Check cache first
+    if (m_prequelCache.contains(aid)) {
+        return m_prequelCache[aid];
+    }
+    
     loadAnimeRelations(aid);
     
     int currentAid = aid;
     QSet<int> visited;
-    
-    LOG(QString("[WatchSessionManager] getOriginalPrequel: starting from aid=%1").arg(aid));
     
     // Follow prequel chain until we find the first anime
     while (!visited.contains(currentAid)) {
@@ -326,21 +329,23 @@ int WatchSessionManager::getOriginalPrequel(int aid) const
         }
         
         if (!m_relationsCache.contains(currentAid)) {
-            LOG(QString("[WatchSessionManager] getOriginalPrequel: no relations found for aid=%1").arg(currentAid));
             break;
         }
         
         // Look for prequel relation
         int prequelAid = findPrequelAid(currentAid, "prequel");
         if (prequelAid > 0 && !visited.contains(prequelAid)) {
-            LOG(QString("[WatchSessionManager] getOriginalPrequel: found prequel aid=%1 -> %2").arg(currentAid).arg(prequelAid));
             currentAid = prequelAid;
         } else {
             break;
         }
     }
     
-    LOG(QString("[WatchSessionManager] getOriginalPrequel: original prequel for aid=%1 is aid=%2").arg(aid).arg(currentAid));
+    // Cache result for all visited AIDs (they all have the same original prequel)
+    for (int visitedAid : visited) {
+        m_prequelCache[visitedAid] = currentAid;
+    }
+    
     return currentAid;
 }
 
@@ -352,7 +357,6 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG(QString("[WatchSessionManager] loadAnimeRelations: database not open for aid=%1").arg(aid));
         return;
     }
     
@@ -361,15 +365,11 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
     q.addBindValue(aid);
     
     if (!q.exec() || !q.next()) {
-        LOG(QString("[WatchSessionManager] loadAnimeRelations: query failed or no result for aid=%1").arg(aid));
         return;
     }
     
     QString relatedAids = q.value(0).toString();
     QString relatedTypes = q.value(1).toString();
-    
-    LOG(QString("[WatchSessionManager] loadAnimeRelations: aid=%1, relatedAids='%2', relatedTypes='%3'")
-        .arg(aid).arg(relatedAids, relatedTypes));
     
     QList<QPair<int, QString>> relations;
     
@@ -383,8 +383,6 @@ void WatchSessionManager::loadAnimeRelations(int aid) const
             QString relType = typeList[i].toLower();
             if (relAid > 0) {
                 relations.append(qMakePair(relAid, relType));
-                LOG(QString("[WatchSessionManager] loadAnimeRelations: aid=%1 has relation: %2 (%3)")
-                    .arg(aid).arg(relAid).arg(relType));
             }
         }
     }
@@ -420,14 +418,16 @@ int WatchSessionManager::findPrequelAid(int aid, const QString& relationType) co
 
 QList<int> WatchSessionManager::getSeriesChain(int aid) const
 {
+    // Check series chain cache first
+    if (m_seriesChainCache.contains(aid)) {
+        return m_seriesChainCache[aid];
+    }
+    
     QList<int> chain;
     QSet<int> visited;
     
     // Start from original prequel
     int currentAid = getOriginalPrequel(aid);
-    
-    LOG(QString("[WatchSessionManager] getSeriesChain: building chain for aid=%1, starting from original=%2")
-        .arg(aid).arg(currentAid));
     
     // Follow sequel chain
     while (currentAid > 0 && !visited.contains(currentAid)) {
@@ -443,8 +443,6 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
                 int relCode = rel.second.toInt();
                 if (relCode == RELATION_SEQUEL || rel.second.contains("sequel", Qt::CaseInsensitive)) {
                     sequelAid = rel.first;
-                    LOG(QString("[WatchSessionManager] getSeriesChain: found sequel %1 -> %2 (type=%3)")
-                        .arg(currentAid).arg(sequelAid).arg(rel.second));
                     break;
                 }
             }
@@ -453,13 +451,10 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
         currentAid = sequelAid;
     }
     
-    // Log the complete chain
-    QStringList chainStr;
-    for (int a : chain) {
-        chainStr.append(QString::number(a));
+    // Cache result for all AIDs in the chain (they share the same chain)
+    for (int chainAid : chain) {
+        m_seriesChainCache[chainAid] = chain;
     }
-    LOG(QString("[WatchSessionManager] getSeriesChain: chain for aid=%1 = [%2] (%3 items)")
-        .arg(aid).arg(chainStr.join(", ")).arg(chain.size()));
     
     return chain;
 }
@@ -496,6 +491,19 @@ int WatchSessionManager::calculateMarkScore(int lid) const
             } else {
                 score += SCORE_NOT_WATCHED;  // Positive, less eligible for deletion
             }
+        }
+    }
+    
+    // Apply file revision penalty - older revisions are more deletable
+    // Only applies when there are multiple local files for the same episode
+    int fileCount = getFileCountForEpisode(lid);
+    if (fileCount > 1) {
+        // Count how many local files for this episode have a higher version
+        int higherVersionCount = getHigherVersionFileCount(lid);
+        
+        // Apply penalty per local file with higher version
+        if (higherVersionCount > 0) {
+            score += higherVersionCount * SCORE_OLDER_REVISION;  // Negative, more eligible for deletion
         }
     }
     
@@ -549,25 +557,16 @@ std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(in
     // Get the series chain starting from the original prequel
     QList<int> chain = getSeriesChain(aid);
     
-    LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: looking for active session in chain for aid=%1")
-        .arg(aid));
-    
     // Find if any anime in the chain has an active session
     for (int chainAid : chain) {
         if (hasActiveSession(chainAid)) {
-            LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: found active session at aid=%1")
-                .arg(chainAid));
-            
             // Calculate offset for the requested anime
             int offsetForRequestedAnime = 0;
             for (int i = 0; i < chain.size(); i++) {
                 if (chain[i] == aid) {
                     break;
                 }
-                int eps = getTotalEpisodesForAnime(chain[i]);
-                LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: chain[%1]=aid=%2 has %3 episodes")
-                    .arg(i).arg(chain[i]).arg(eps));
-                offsetForRequestedAnime += eps;
+                offsetForRequestedAnime += getTotalEpisodesForAnime(chain[i]);
             }
             
             // Calculate offset for the session anime
@@ -579,15 +578,10 @@ std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(in
                 offsetForSessionAnime += getTotalEpisodesForAnime(chain[i]);
             }
             
-            LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: aid=%1, sessionAid=%2, offsetForRequested=%3, offsetForSession=%4")
-                .arg(aid).arg(chainAid).arg(offsetForRequestedAnime).arg(offsetForSessionAnime));
-            
             return std::make_tuple(chainAid, offsetForRequestedAnime, offsetForSessionAnime);
         }
     }
     
-    LOG(QString("[WatchSessionManager] findActiveSessionInSeriesChain: no active session found in chain for aid=%1")
-        .arg(aid));
     return std::make_tuple(0, 0, 0);  // No active session found
 }
 
@@ -1086,4 +1080,88 @@ bool WatchSessionManager::isCardHidden(int aid) const
     }
     
     return false;
+}
+
+int WatchSessionManager::getFileVersion(int lid) const
+{
+    // Get file version from state bits (AniDB state field, bits 0-1 contain version)
+    // Version encoding: 0=unknown, 1=v1, 2=v2, etc.
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    // Join mylist to file table to get state field
+    q.prepare("SELECT f.state FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        int state = q.value(0).toInt();
+        // Extract version from state bits 0-2 (values 0-7, but typically 0-5)
+        // Bits 0-2 represent file version: 0=unknown, 1=v1, 2=v2, etc.
+        int version = state & 0x07;
+        return version;
+    }
+    
+    return 0;  // Unknown version
+}
+
+int WatchSessionManager::getFileCountForEpisode(int lid) const
+{
+    // Count how many files exist for the same episode (same eid)
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 1;
+    }
+    
+    QSqlQuery q(db);
+    // Count mylist entries with same eid as this lid, that have local files
+    q.prepare(
+        "SELECT COUNT(*) FROM mylist m "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "WHERE m.eid = (SELECT eid FROM mylist WHERE lid = ?) "
+        "AND lf.path IS NOT NULL AND lf.path != ''"
+    );
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 1;  // Default to 1 file
+}
+
+int WatchSessionManager::getHigherVersionFileCount(int lid) const
+{
+    // Count how many local files for the same episode have a higher version than this file
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    // First get this file's version
+    int myVersion = getFileVersion(lid);
+    
+    QSqlQuery q(db);
+    // Count local files with same eid that have a higher version
+    // Files with unknown version (0) are considered older than any known version
+    q.prepare(
+        "SELECT COUNT(*) FROM mylist m "
+        "JOIN file f ON m.fid = f.fid "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "WHERE m.eid = (SELECT eid FROM mylist WHERE lid = ?) "
+        "AND m.lid != ? "
+        "AND lf.path IS NOT NULL AND lf.path != '' "
+        "AND (f.state & 7) > ?"
+    );
+    q.addBindValue(lid);  // Same episode
+    q.addBindValue(lid);  // Exclude self
+    q.addBindValue(myVersion);  // Files with higher version
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 0;
 }
