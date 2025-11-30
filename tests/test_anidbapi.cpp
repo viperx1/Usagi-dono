@@ -53,6 +53,7 @@ private slots:
     void testNotifyListCommandFormat();
     void testPushAckCommandFormat();
     void testNotifyGetCommandFormat();
+    void testCalendarCommandFormat();
     void testAllCommandsHaveProperSpacing();
     
     // Notification database tests
@@ -553,6 +554,24 @@ void TestAniDBApiCommands::testNotifyGetCommandFormat()
     QVERIFY(cmd.contains("type=M"));
 }
 
+void TestAniDBApiCommands::testCalendarCommandFormat()
+{
+    // Test CALENDAR command format using builder
+    // This validates the fix for: CALENDAR command incorrectly constructed
+    // Bug: "CALENDAR&s=Y7TwD&tag=44417" (ampersand after command name)
+    // Fix: "CALENDAR s=Y7TwD&tag=44417" (space after command name)
+    QString cmd = api->buildCalendarCommand();
+    
+    // Verify command is exactly "CALENDAR " (with trailing space)
+    QCOMPARE(cmd, QString("CALENDAR "));
+    
+    // Verify it ends with a space (required for parameterless commands)
+    QVERIFY(cmd.endsWith(' '));
+    
+    // Verify command starts with CALENDAR
+    QVERIFY(cmd.startsWith("CALENDAR"));
+}
+
 // ===== Simplified Global Command Format Validation Test =====
 
 void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
@@ -595,6 +614,9 @@ void TestAniDBApiCommands::testAllCommandsHaveProperSpacing()
     
     commands << api->buildNotifyGetCommand(4998280);
     commandNames << "NOTIFYGET";
+    
+    commands << api->buildCalendarCommand();
+    commandNames << "CALENDAR";
     
     // Validate each command against pattern
     for (int i = 0; i < commands.size(); ++i) {
