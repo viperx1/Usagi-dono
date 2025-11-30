@@ -158,17 +158,21 @@ void VirtualFlowLayout::ensureVisible(int index)
 
 void VirtualFlowLayout::refresh()
 {
+    LOG("[VirtualFlowLayout] refresh: starting, clearing all visible widget references");
     int savedScrollY = saveScrollPosition();
     
     // Force recalculation and update of all visible items
     // We need to hide and clear all visible widgets first because after
     // sorting/filtering, the same index may now represent a different item
+    int clearedCount = 0;
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
         if (it.value()) {
             it.value()->hide();
+            clearedCount++;
         }
     }
     m_visibleWidgets.clear();
+    LOG(QString("[VirtualFlowLayout] refresh: cleared %1 widget references").arg(clearedCount));
     
     m_cachedFirstVisible = -1;
     m_cachedLastVisible = -1;
@@ -178,6 +182,7 @@ void VirtualFlowLayout::refresh()
     update();
     
     restoreScrollPosition(savedScrollY);
+    LOG("[VirtualFlowLayout] refresh: completed");
 }
 
 void VirtualFlowLayout::clear()
@@ -394,10 +399,21 @@ void VirtualFlowLayout::calculateLayout()
     int widgetCount = m_visibleWidgets.size();
     LOG(QString("[VirtualFlowLayout] calculateLayout: repositioning %1 visible widgets").arg(widgetCount));
     
+    // Collect indices of widgets that may need to be removed (invalid or destroyed)
+    QList<int> indicesToRemove;
+    
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
         int index = it.key();
         QWidget *widget = it.value();
         if (widget) {
+            // Safety check: verify widget is not in the process of being destroyed
+            // by checking if it still has a valid parent or can be cast to QWidget
+            if (!widget->parent() && !widget->isVisible()) {
+                // Widget may be orphaned (could be scheduled for deletion)
+                LOG(QString("[VirtualFlowLayout] calculateLayout: WARNING - widget %1 has no parent and is not visible, may be dead")
+                    .arg(index));
+            }
+            
             int row = index / m_columnsPerRow;
             int col = index % m_columnsPerRow;
             int x = col * (m_itemSize.width() + m_hSpacing);
@@ -406,7 +422,18 @@ void VirtualFlowLayout::calculateLayout()
                 .arg(index).arg(x).arg(y).arg(m_itemSize.width()).arg(m_itemSize.height()));
             widget->setGeometry(x, y, m_itemSize.width(), m_itemSize.height());
             LOG(QString("[VirtualFlowLayout] calculateLayout: setGeometry done for widget %1").arg(index));
+        } else {
+            // Null widget pointer in the map - this should not happen
+            LOG(QString("[VirtualFlowLayout] calculateLayout: ERROR - null widget pointer at index %1, marking for removal")
+                .arg(index));
+            indicesToRemove.append(index);
         }
+    }
+    
+    // Remove any null widget entries
+    for (int index : indicesToRemove) {
+        m_visibleWidgets.remove(index);
+        LOG(QString("[VirtualFlowLayout] calculateLayout: removed null widget at index %1").arg(index));
     }
     
     LOG(QString("[VirtualFlowLayout] calculateLayout EXIT: guard=%1, depth=%2").arg(m_inLayoutUpdate ? "SET" : "NOT SET").arg(recursionDepth));

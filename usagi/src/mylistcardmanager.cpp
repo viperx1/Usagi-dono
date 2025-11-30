@@ -253,6 +253,14 @@ void MyListCardManager::refreshAllCards()
         createCard(aid);
     }
     
+    // Notify the virtual layout to refresh its widget references
+    // This is critical because the old widgets are now scheduled for deletion
+    // and the layout must fetch the new widgets from the factory
+    if (m_virtualLayout) {
+        LOG("[MyListCardManager] Refreshing virtual layout after all cards refresh");
+        m_virtualLayout->refresh();
+    }
+    
     LOG(QString("[MyListCardManager] Refreshed %1 cards").arg(aids.size()));
     emit allCardsLoaded(aids.size());
 }
@@ -311,6 +319,14 @@ void MyListCardManager::refreshCardsForLids(const QSet<int>& lids)
             // Recreate with updated data
             createCard(aid);
         }
+    }
+    
+    // Notify the virtual layout to refresh its widget references
+    // This is critical because the old widgets are now scheduled for deletion
+    // and the layout must fetch the new widgets from the factory
+    if (m_virtualLayout) {
+        LOG("[MyListCardManager] Refreshing virtual layout after card updates");
+        m_virtualLayout->refresh();
     }
     
     LOG(QString("[MyListCardManager] Refreshed %1 cards").arg(aidsToRefresh.size()));
