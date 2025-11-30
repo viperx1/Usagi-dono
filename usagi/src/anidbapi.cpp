@@ -2625,8 +2625,8 @@ QString AniDBApi::buildAnimeCommand(int aid)
 QString AniDBApi::buildCalendarCommand()
 {
 	// CALENDAR command - returns list of anime that have episodes airing soon
-	// No parameters required
-	return QString("CALENDAR");
+	// No parameters required - trailing space required for session/tag parameters
+	return QString("CALENDAR ");
 }
 
 /* === End Command Builders === */
