@@ -499,13 +499,23 @@ int WatchSessionManager::calculateMarkScore(int lid) const
     int fileCount = getFileCountForEpisode(lid);
     if (fileCount > 1) {
         int fileVersion = getFileVersion(lid);
-        int maxVersion = fileCount;  // Assume highest version equals file count
+        int maxVersion = getMaxVersionForEpisode(lid);
         
         // Decrease score for older revisions (lower version = more deletable)
-        // Newest version (maxVersion) gets no penalty, older versions get increasing penalties
-        if (fileVersion > 0 && fileVersion < maxVersion) {
-            int versionsBehind = maxVersion - fileVersion;
-            score += versionsBehind * SCORE_OLDER_REVISION;  // Negative, more eligible for deletion
+        // Newest version gets no penalty, older versions get increasing penalties
+        // Files with unknown version (0) are treated as oldest
+        if (maxVersion > 0) {
+            int versionsBehind;
+            if (fileVersion == 0) {
+                // Unknown version treated as older than all known versions
+                versionsBehind = maxVersion;
+            } else {
+                versionsBehind = maxVersion - fileVersion;
+            }
+            
+            if (versionsBehind > 0) {
+                score += versionsBehind * SCORE_OLDER_REVISION;  // Negative, more eligible for deletion
+            }
         }
     }
     
@@ -1100,8 +1110,8 @@ int WatchSessionManager::getFileVersion(int lid) const
     
     if (q.exec() && q.next()) {
         int state = q.value(0).toInt();
-        // Extract version from state bits 0-1 (values 0-7, but typically 0-5)
-        // Bit 0-2 represent file version: 0=unknown, 1=v1, 2=v2, etc.
+        // Extract version from state bits 0-2 (values 0-7, but typically 0-5)
+        // Bits 0-2 represent file version: 0=unknown, 1=v1, 2=v2, etc.
         int version = state & 0x07;
         return version;
     }
@@ -1132,4 +1142,30 @@ int WatchSessionManager::getFileCountForEpisode(int lid) const
     }
     
     return 1;  // Default to 1 file
+}
+
+int WatchSessionManager::getMaxVersionForEpisode(int lid) const
+{
+    // Get the maximum file version for files of the same episode
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    // Get max version (from state bits 0-2) for files with same eid that have local files
+    q.prepare(
+        "SELECT MAX(f.state & 7) FROM mylist m "
+        "JOIN file f ON m.fid = f.fid "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "WHERE m.eid = (SELECT eid FROM mylist WHERE lid = ?) "
+        "AND lf.path IS NOT NULL AND lf.path != ''"
+    );
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 0;
 }

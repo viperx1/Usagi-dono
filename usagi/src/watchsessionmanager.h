@@ -357,6 +357,7 @@ private:
     bool isCardHidden(int aid) const;
     int getFileVersion(int lid) const;  // Get file version from state bits
     int getFileCountForEpisode(int lid) const;  // Get number of files for same episode
+    int getMaxVersionForEpisode(int lid) const;  // Get max version among files for same episode
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
