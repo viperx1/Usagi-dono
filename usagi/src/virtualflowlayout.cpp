@@ -371,6 +371,13 @@ bool VirtualFlowLayout::eventFilter(QObject *watched, QEvent *event)
 
 void VirtualFlowLayout::onScrollChanged()
 {
+    // Re-entrancy guard to prevent recursive layout during setGeometry calls
+    if (m_inLayoutUpdate) {
+        return;
+    }
+    m_inLayoutUpdate = true;
+    auto guardReset = qScopeGuard([this]() { m_inLayoutUpdate = false; });
+    
     updateVisibleItems();
 }
 
