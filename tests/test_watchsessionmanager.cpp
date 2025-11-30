@@ -39,6 +39,9 @@ private slots:
     
     // Auto-start session tests
     void testAutoStartSessionsForExistingAnime();
+    
+    // File version tests
+    void testFileVersionScoring();
 
 private:
     QTemporaryFile *tempDbFile;
@@ -110,7 +113,8 @@ void TestWatchSessionManager::initTestCase()
            "gid INTEGER, "
            "size BIGINT, "
            "ed2k TEXT, "
-           "filename TEXT"
+           "filename TEXT, "
+           "state INTEGER DEFAULT 0"
            ")");
 }
 
@@ -484,6 +488,55 @@ void TestWatchSessionManager::testAutoStartSessionsForExistingAnime()
     manager->performInitialScan();
     QVERIFY(manager->hasActiveSession(1));
     QCOMPARE(manager->getCurrentSessionEpisode(1), 1);
+}
+
+void TestWatchSessionManager::testFileVersionScoring()
+{
+    // Test that files with older revisions get lower scores
+    // This test verifies the file version scoring feature
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    
+    // Create a second file for the same episode (ep 1) with a different version
+    // First, add local_file entry
+    q.prepare("INSERT INTO local_files (path, filename) VALUES (?, ?)");
+    q.addBindValue("/test/anime1/episode1_v2.mkv");
+    q.addBindValue("episode1_v2.mkv");
+    q.exec();
+    int localFileId2 = q.lastInsertId().toInt();
+    
+    // Create file entry with state = 2 (v2) for newer file
+    int fid2 = 5100;
+    q.prepare("INSERT INTO file (fid, aid, eid, size, filename, state) VALUES (?, 1, 101, ?, ?, 2)");
+    q.addBindValue(fid2);
+    q.addBindValue(qint64(500) * 1024 * 1024);
+    q.addBindValue("episode1_v2.mkv");
+    q.exec();
+    
+    // Update original file to have state = 1 (v1)
+    q.exec("UPDATE file SET state = 1 WHERE fid = 5001");
+    
+    // Create mylist entry for the new file (lid 1100)
+    q.prepare("INSERT INTO mylist (lid, fid, aid, eid, local_watched, local_file) VALUES (1100, ?, 1, 101, 0, ?)");
+    q.addBindValue(fid2);
+    q.addBindValue(localFileId2);
+    q.exec();
+    
+    // Reload manager to pick up new data
+    delete manager;
+    manager = new WatchSessionManager();
+    manager->startSession(1, 1);
+    
+    // Get scores for both files (same episode, different versions)
+    int scoreV1 = manager->calculateMarkScore(1001);  // v1 (older)
+    int scoreV2 = manager->calculateMarkScore(1100);  // v2 (newer)
+    
+    // The older version (v1) should have a lower score (more eligible for deletion)
+    // than the newer version (v2)
+    QVERIFY2(scoreV1 < scoreV2, 
+             QString("Older version (score=%1) should have lower score than newer version (score=%2)")
+             .arg(scoreV1).arg(scoreV2).toLatin1().constData());
 }
 
 QTEST_MAIN(TestWatchSessionManager)

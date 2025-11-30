@@ -329,6 +329,12 @@ private:
     // Cache for anime relations
     mutable QMap<int, QList<QPair<int, QString>>> m_relationsCache; // aid -> [(related_aid, relation_type), ...]
     
+    // Cache for prequel lookups (optimization to avoid redundant chain traversal)
+    mutable QMap<int, int> m_prequelCache; // aid -> original prequel aid
+    
+    // Cache for series chains (optimization to avoid redundant chain building)
+    mutable QMap<int, QList<int>> m_seriesChainCache; // aid -> chain of aids
+    
     // Active sessions by anime ID
     QMap<int, SessionInfo> m_sessions;
     
@@ -349,6 +355,8 @@ private:
     int getEpisodeNumber(int lid) const;
     int getAnimeIdForFile(int lid) const;
     bool isCardHidden(int aid) const;
+    int getFileVersion(int lid) const;  // Get file version from state bits
+    int getFileCountForEpisode(int lid) const;  // Get number of files for same episode
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
@@ -369,6 +377,7 @@ private:
     static const int SCORE_ALREADY_WATCHED = -30;
     static const int SCORE_NOT_WATCHED = 50;
     static const int SCORE_DISTANCE_FACTOR = -5;  // Per episode away from current (increased for more impact)
+    static const int SCORE_OLDER_REVISION = -15;  // Per version behind newest (older revisions more deletable)
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
