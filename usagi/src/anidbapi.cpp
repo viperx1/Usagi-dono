@@ -1571,6 +1571,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		lines.pop_front(); // Remove first line (status code line)
 		
 		int newAnimeCount = 0;
+		int updatedAnimeCount = 0;
 		QSqlDatabase db = QSqlDatabase::database();
 		
 		// Process each anime entry in the calendar
@@ -1583,34 +1584,75 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			if(parts.size() >= 2)
 			{
 				int aid = parts[0].toInt();
-				// Future use: Parse start time and dateflags if needed for calendar display
-				// int startTime = parts[1].toInt();  // Unix timestamp when episode airs
-				// QString dateflags = parts.size() >= 3 ? parts[2] : "";
+				qint64 startTime = parts[1].toLongLong();  // Unix timestamp when episode airs
+				QString dateflags = parts.size() >= 3 ? parts[2] : "";
 				
-				// Check if this anime is already in anime_titles table
+				// Convert Unix timestamp to ISO date format (YYYY-MM-DDZ)
+				QString startdate;
+				if(startTime > 0)
+				{
+					QDateTime dt = QDateTime::fromSecsSinceEpoch(startTime);
+					startdate = dt.toString("yyyy-MM-dd") + "Z";
+				}
+				
+				// Check if this anime is already in the anime table
 				QSqlQuery checkQuery(db);
-				checkQuery.prepare("SELECT COUNT(*) FROM anime_titles WHERE aid = ?");
+				checkQuery.prepare("SELECT COUNT(*) FROM anime WHERE aid = ?");
 				checkQuery.bindValue(0, aid);
 				
+				bool animeExists = false;
 				if(checkQuery.exec() && checkQuery.next())
 				{
-					int count = checkQuery.value(0).toInt();
-					if(count == 0)
+					animeExists = checkQuery.value(0).toInt() > 0;
+				}
+				
+				if(animeExists)
+				{
+					// Update existing anime with startdate and dateflags from calendar
+					QSqlQuery updateQuery(db);
+					updateQuery.prepare("UPDATE anime SET "
+						"startdate = COALESCE(NULLIF(:startdate, ''), startdate), "
+						"dateflags = COALESCE(NULLIF(:dateflags, ''), dateflags) "
+						"WHERE aid = :aid");
+					updateQuery.bindValue(":startdate", startdate);
+					updateQuery.bindValue(":dateflags", dateflags);
+					updateQuery.bindValue(":aid", aid);
+					
+					if(updateQuery.exec() && updateQuery.numRowsAffected() > 0)
 					{
-						// New anime not in our database - we should fetch it
-						Logger::log(QString("[AniDB Calendar] New anime detected: aid=%1").arg(aid), __FILE__, __LINE__);
+						updatedAnimeCount++;
+						Logger::log(QString("[AniDB Calendar] Updated anime: aid=%1 startdate=%2 dateflags=%3")
+							.arg(aid).arg(startdate, dateflags), __FILE__, __LINE__);
+					}
+				}
+				else
+				{
+					// Insert new anime entry with just aid, startdate, and dateflags
+					QSqlQuery insertQuery(db);
+					insertQuery.prepare("INSERT INTO anime (aid, startdate, dateflags) VALUES (:aid, :startdate, :dateflags)");
+					insertQuery.bindValue(":aid", aid);
+					insertQuery.bindValue(":startdate", startdate);
+					insertQuery.bindValue(":dateflags", dateflags);
+					
+					if(insertQuery.exec())
+					{
 						newAnimeCount++;
-						
-						// Could trigger an ANIME command here to fetch details
-						// For now, just log it
+						Logger::log(QString("[AniDB Calendar] New anime added: aid=%1 startdate=%2 dateflags=%3")
+							.arg(aid).arg(startdate, dateflags), __FILE__, __LINE__);
+					}
+					else
+					{
+						Logger::log(QString("[AniDB Calendar] Failed to add anime aid=%1: %2")
+							.arg(aid).arg(insertQuery.lastError().text()), __FILE__, __LINE__);
 					}
 				}
 			}
 		}
 		
-		if(newAnimeCount > 0)
+		if(newAnimeCount > 0 || updatedAnimeCount > 0)
 		{
-			Logger::log(QString("[AniDB Calendar] Found %1 new anime in calendar").arg(newAnimeCount), __FILE__, __LINE__);
+			Logger::log(QString("[AniDB Calendar] Processed calendar: %1 new anime added, %2 existing anime updated")
+				.arg(newAnimeCount).arg(updatedAnimeCount), __FILE__, __LINE__);
 		}
 	}
 	else if(ReplyID == "403"){ // 403 NOT LOGGED IN
