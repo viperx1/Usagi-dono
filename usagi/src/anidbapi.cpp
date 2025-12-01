@@ -3749,17 +3749,31 @@ QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
 			}
 			else
 			{
-				Logger::log(QString("[AniDB deleteFileFromMylist] Failed to delete file from disk: %1 - %2")
-				            .arg(filePath, file.errorString()), __FILE__, __LINE__);
+				// Provide detailed error information for access denied errors
+				QFileInfo fileInfo(filePath);
+				QString errorDetails = file.errorString();
+				QString permissions;
+				if (fileInfo.exists()) {
+					permissions = QString("readable=%1, writable=%2, executable=%3, isFile=%4, isDir=%5, size=%6")
+						.arg(fileInfo.isReadable() ? "yes" : "no",
+						     fileInfo.isWritable() ? "yes" : "no",
+						     fileInfo.isExecutable() ? "yes" : "no",
+						     fileInfo.isFile() ? "yes" : "no",
+						     fileInfo.isDir() ? "yes" : "no",
+						     QString::number(fileInfo.size()));
+				} else {
+					permissions = "file info unavailable";
+				}
+				Logger::log(QString("[AniDB deleteFileFromMylist] Failed to delete file from disk: %1 - Error: %2, Permissions: [%3]")
+				            .arg(filePath, errorDetails, permissions), __FILE__, __LINE__);
 				// Skip all other steps if file deletion fails
 				return QString();
 			}
 		}
 		else
 		{
-			Logger::log(QString("[AniDB deleteFileFromMylist] File not found on disk: %1").arg(filePath), __FILE__, __LINE__);
-			// Skip all other steps if file doesn't exist
-			return QString();
+			Logger::log(QString("[AniDB deleteFileFromMylist] File not found on disk (assuming already deleted): %1").arg(filePath), __FILE__, __LINE__);
+			// Continue with database cleanup - file was probably already deleted externally
 		}
 	}
 	
