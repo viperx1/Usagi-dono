@@ -15,6 +15,10 @@
 #include <QFile>
 #include <QSet>
 #include <QApplication>
+#include <QSettings>
+#include <QTextStream>
+#include <QStyle>
+#include <QCoreApplication>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -436,7 +440,7 @@ Window::Window()
     });
     
     // Wrap filter sidebar in a scroll area for vertical scrolling
-    QScrollArea *filterSidebarScrollArea = new QScrollArea(this);
+    filterSidebarScrollArea = new QScrollArea(this);
     filterSidebarScrollArea->setWidget(filterSidebar);
     filterSidebarScrollArea->setWidgetResizable(true);
     filterSidebarScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -445,6 +449,19 @@ Window::Window()
     filterSidebarScrollArea->setMaximumWidth(320);
     
     mylistContentLayout->addWidget(filterSidebarScrollArea);
+    
+    // Create a vertical layout for the card view and toggle button
+    QVBoxLayout *cardViewLayout = new QVBoxLayout();
+    
+    // Add toggle button at the top right to show/hide filter bar
+    QHBoxLayout *topBarLayout = new QHBoxLayout();
+    topBarLayout->addStretch();  // Push button to the right
+    toggleFilterBarButton = new QPushButton("◀ Hide Filters");
+    toggleFilterBarButton->setMaximumWidth(120);
+    toggleFilterBarButton->setToolTip("Toggle filter sidebar visibility");
+    connect(toggleFilterBarButton, &QPushButton::clicked, this, &Window::onToggleFilterBarClicked);
+    topBarLayout->addWidget(toggleFilterBarButton);
+    cardViewLayout->addLayout(topBarLayout);
     
     // Card view (only view mode available)
     // Use VirtualFlowLayout for efficient virtual scrolling
@@ -464,7 +481,8 @@ Window::Window()
     mylistCardContainer = nullptr;
     mylistCardLayout = nullptr;
     
-    mylistContentLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
+    cardViewLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
+    mylistContentLayout->addLayout(cardViewLayout, 1);  // Give card view layout stretch factor of 1
     
     pageMylist->addLayout(mylistContentLayout);
     
@@ -550,58 +568,73 @@ Window::Window()
 	// page hasher - progress (already added in loop above)
 	progress->addLayout(progressTotalLayout);
 
-    // page settings
-    labelLogin = new QLabel("Login:");
+    // page settings - reorganized with group boxes for better visual grouping
+    
+    // Create a scroll area for the settings page
+    QScrollArea *settingsScrollArea = new QScrollArea(pageSettingsParent);
+    settingsScrollArea->setWidgetResizable(true);
+    settingsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    settingsScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    
+    QWidget *settingsContainer = new QWidget();
+    QVBoxLayout *settingsMainLayout = new QVBoxLayout(settingsContainer);
+    settingsMainLayout->setSpacing(10);
+    settingsMainLayout->setContentsMargins(10, 10, 10, 10);
+    
+    // Login Settings Group
+    QGroupBox *loginGroup = new QGroupBox("Login Credentials");
+    QGridLayout *loginLayout = new QGridLayout(loginGroup);
+    labelLogin = new QLabel("Username:");
     editLogin = new QLineEdit;
 	editLogin->setText(adbapi->getUsername());
     labelPassword = new QLabel("Password:");
     editPassword = new QLineEdit;
 	editPassword->setText(adbapi->getPassword());
     editPassword->setEchoMode(QLineEdit::Password);
-    buttonSaveSettings = new QPushButton("Save");
-    buttonRequestMylistExport = new QPushButton("Request MyList Export");
+    loginLayout->addWidget(labelLogin, 0, 0);
+    loginLayout->addWidget(editLogin, 0, 1);
+    loginLayout->addWidget(labelPassword, 1, 0);
+    loginLayout->addWidget(editPassword, 1, 1);
+    settingsMainLayout->addWidget(loginGroup);
     
-    // Directory watcher UI
-    QLabel *watcherLabel = new QLabel("Directory Watcher:");
+    // Directory Watcher Group
+    QGroupBox *watcherGroup = new QGroupBox("Directory Watcher");
+    QVBoxLayout *watcherLayout = new QVBoxLayout(watcherGroup);
     watcherEnabled = new QCheckBox("Enable Directory Watcher");
-    watcherDirectory = new QLineEdit;
-    watcherBrowseButton = new QPushButton("Browse...");
     watcherAutoStart = new QCheckBox("Auto-start on application launch");
     watcherStatusLabel = new QLabel("Status: Not watching");
-
-    pageSettings->addWidget(labelLogin, 0, 0);
-    pageSettings->addWidget(editLogin, 0, 1);
-    pageSettings->addWidget(labelPassword, 1, 0);
-    pageSettings->addWidget(editPassword, 1, 1);
+    QHBoxLayout *watcherDirLayout = new QHBoxLayout();
+    watcherDirectory = new QLineEdit;
+    watcherBrowseButton = new QPushButton("Browse...");
+    watcherDirLayout->addWidget(new QLabel("Watch Directory:"));
+    watcherDirLayout->addWidget(watcherDirectory, 1);
+    watcherDirLayout->addWidget(watcherBrowseButton);
+    watcherLayout->addWidget(watcherEnabled);
+    watcherLayout->addLayout(watcherDirLayout);
+    watcherLayout->addWidget(watcherAutoStart);
+    watcherLayout->addWidget(watcherStatusLabel);
+    settingsMainLayout->addWidget(watcherGroup);
     
-    // Add directory watcher controls right after login/password
-    pageSettings->addWidget(watcherLabel, 2, 0, 1, 2);
-    pageSettings->addWidget(watcherEnabled, 3, 0, 1, 2);
-    pageSettings->addWidget(new QLabel("Watch Directory:"), 4, 0);
-    pageSettings->addWidget(watcherDirectory, 4, 1);
-    pageSettings->addWidget(watcherBrowseButton, 4, 2);
-    pageSettings->addWidget(watcherAutoStart, 5, 0, 1, 2);
-    pageSettings->addWidget(watcherStatusLabel, 6, 0, 1, 2);
-    
-    // Add auto-fetch settings after directory watcher
-    QLabel *autoFetchLabel = new QLabel("Auto-fetch:");
+    // Auto-fetch Group
+    QGroupBox *autoFetchGroup = new QGroupBox("Auto-fetch");
+    QVBoxLayout *autoFetchLayout = new QVBoxLayout(autoFetchGroup);
     autoFetchEnabled = new QCheckBox("Automatically download anime titles and other data on startup");
+    autoFetchLayout->addWidget(autoFetchEnabled);
+    settingsMainLayout->addWidget(autoFetchGroup);
     
-    pageSettings->addWidget(autoFetchLabel, 7, 0, 1, 2);
-    pageSettings->addWidget(autoFetchEnabled, 8, 0, 1, 2);
-    
-    // Add playback settings after auto-fetch
-    QLabel *playbackLabel = new QLabel("Playback:");
+    // Playback Group
+    QGroupBox *playbackGroup = new QGroupBox("Playback");
+    QHBoxLayout *playbackLayout = new QHBoxLayout(playbackGroup);
     mediaPlayerPath = new QLineEdit;
     mediaPlayerBrowseButton = new QPushButton("Browse...");
+    playbackLayout->addWidget(new QLabel("Media Player:"));
+    playbackLayout->addWidget(mediaPlayerPath, 1);
+    playbackLayout->addWidget(mediaPlayerBrowseButton);
+    settingsMainLayout->addWidget(playbackGroup);
     
-    pageSettings->addWidget(playbackLabel, 9, 0, 1, 2);
-    pageSettings->addWidget(new QLabel("Media Player:"), 10, 0);
-    pageSettings->addWidget(mediaPlayerPath, 10, 1);
-    pageSettings->addWidget(mediaPlayerBrowseButton, 10, 2);
-    
-    // Add session manager settings after playback
-    QLabel *sessionSettingsLabel = new QLabel("Session Manager:");
+    // Session Manager Group
+    QGroupBox *sessionGroup = new QGroupBox("Session Manager");
+    QGridLayout *sessionLayout = new QGridLayout(sessionGroup);
     sessionAheadBufferSpinBox = new QSpinBox();
     sessionAheadBufferSpinBox->setMinimum(1);
     sessionAheadBufferSpinBox->setMaximum(20);
@@ -624,17 +657,18 @@ Window::Window()
     sessionAutoMarkDeletionCheckbox = new QCheckBox("Auto-mark for deletion");
     sessionAutoMarkDeletionCheckbox->setToolTip("Automatically mark watched files for deletion when disk space is low");
     
-    pageSettings->addWidget(sessionSettingsLabel, 11, 0, 1, 2);
-    pageSettings->addWidget(new QLabel("Episodes ahead:"), 12, 0);
-    pageSettings->addWidget(sessionAheadBufferSpinBox, 12, 1);
-    pageSettings->addWidget(new QLabel("Deletion threshold:"), 13, 0);
-    pageSettings->addWidget(sessionThresholdTypeComboBox, 13, 1);
-    pageSettings->addWidget(new QLabel("Threshold value:"), 14, 0);
-    pageSettings->addWidget(sessionThresholdValueSpinBox, 14, 1);
-    pageSettings->addWidget(sessionAutoMarkDeletionCheckbox, 15, 0, 1, 2);
+    sessionLayout->addWidget(new QLabel("Episodes ahead:"), 0, 0);
+    sessionLayout->addWidget(sessionAheadBufferSpinBox, 0, 1);
+    sessionLayout->addWidget(new QLabel("Deletion threshold:"), 1, 0);
+    sessionLayout->addWidget(sessionThresholdTypeComboBox, 1, 1);
+    sessionLayout->addWidget(new QLabel("Threshold value:"), 2, 0);
+    sessionLayout->addWidget(sessionThresholdValueSpinBox, 2, 1);
+    sessionLayout->addWidget(sessionAutoMarkDeletionCheckbox, 3, 0, 1, 2);
+    settingsMainLayout->addWidget(sessionGroup);
     
-    // Add file deletion settings
-    QLabel *deletionSettingsLabel = new QLabel("File Deletion:");
+    // File Deletion Group
+    QGroupBox *deletionGroup = new QGroupBox("File Deletion");
+    QVBoxLayout *deletionLayout = new QVBoxLayout(deletionGroup);
     sessionEnableAutoDeletionCheckbox = new QCheckBox("Enable automatic file deletion");
     sessionEnableAutoDeletionCheckbox->setToolTip("When enabled, files marked for deletion will be automatically deleted");
     sessionEnableAutoDeletionCheckbox->setChecked(false);  // Default: disabled for safety
@@ -643,16 +677,51 @@ Window::Window()
     sessionForceDeletePermissionsCheckbox->setToolTip("Attempt to remove read-only attribute before deletion (Windows)");
     sessionForceDeletePermissionsCheckbox->setChecked(false);  // Default: disabled for safety
     
-    pageSettings->addWidget(deletionSettingsLabel, 16, 0, 1, 2);
-    pageSettings->addWidget(sessionEnableAutoDeletionCheckbox, 17, 0, 1, 2);
-    pageSettings->addWidget(sessionForceDeletePermissionsCheckbox, 18, 0, 1, 2);
+    deletionLayout->addWidget(sessionEnableAutoDeletionCheckbox);
+    deletionLayout->addWidget(sessionForceDeletePermissionsCheckbox);
+    settingsMainLayout->addWidget(deletionGroup);
     
-    pageSettings->setRowStretch(19, 1000);
-    pageSettings->addWidget(buttonSaveSettings, 20, 0);
-    pageSettings->addWidget(buttonRequestMylistExport, 21, 0);
-
-    pageSettings->setColumnStretch(1, 100);
-    pageSettings->setRowStretch(22, 100);
+    // System Tray Group
+    QGroupBox *trayGroup = new QGroupBox("System Tray");
+    QVBoxLayout *trayLayout = new QVBoxLayout(trayGroup);
+    trayMinimizeToTray = new QCheckBox("Minimize to tray");
+    trayMinimizeToTray->setToolTip("Minimize the application to system tray instead of taskbar");
+    trayCloseToTray = new QCheckBox("Close to tray");
+    trayCloseToTray->setToolTip("Hide to system tray when closing the window instead of exiting");
+    trayStartMinimized = new QCheckBox("Start minimized to tray");
+    trayStartMinimized->setToolTip("Start the application minimized to system tray");
+    trayLayout->addWidget(trayMinimizeToTray);
+    trayLayout->addWidget(trayCloseToTray);
+    trayLayout->addWidget(trayStartMinimized);
+    settingsMainLayout->addWidget(trayGroup);
+    
+    // Auto-start Group
+    QGroupBox *autoStartGroup = new QGroupBox("Application Startup");
+    QVBoxLayout *autoStartLayout = new QVBoxLayout(autoStartGroup);
+    autoStartEnabled = new QCheckBox("Start with operating system");
+    autoStartEnabled->setToolTip("Automatically start the application when you log in");
+    autoStartLayout->addWidget(autoStartEnabled);
+    settingsMainLayout->addWidget(autoStartGroup);
+    
+    // Action Buttons
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonSaveSettings = new QPushButton("Save Settings");
+    buttonRequestMylistExport = new QPushButton("Request MyList Export");
+    buttonLayout->addWidget(buttonSaveSettings);
+    buttonLayout->addWidget(buttonRequestMylistExport);
+    buttonLayout->addStretch();
+    settingsMainLayout->addLayout(buttonLayout);
+    
+    // Add stretch at the end to push everything to the top
+    settingsMainLayout->addStretch();
+    
+    // Set the container as the scroll area widget
+    settingsScrollArea->setWidget(settingsContainer);
+    
+    // Add scroll area to the settings page layout
+    pageSettings->addWidget(settingsScrollArea, 0, 0, 1, 3);
+    pageSettings->setRowStretch(0, 1);
+    pageSettings->setColumnStretch(0, 1);
 
 	// page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
@@ -904,6 +973,22 @@ Window::Window()
         // If watcher is enabled but no directory is set
         watcherStatusLabel->setText("Status: Enabled (no directory set)");
     }
+    
+    // Initialize system tray
+    createTrayIcon();
+    loadTraySettings();
+    
+    // Load filter bar visibility setting
+    bool filterBarVisible = adbapi->getFilterBarVisible();
+    filterSidebarScrollArea->setVisible(filterBarVisible);
+    if (filterBarVisible) {
+        toggleFilterBarButton->setText("◀ Hide Filters");
+    } else {
+        toggleFilterBarButton->setText("▶ Show Filters");
+    }
+    
+    // Load auto-start setting
+    autoStartEnabled->setChecked(adbapi->getAutoStartEnabled());
 
     // end
     this->setLayout(layout);
@@ -2201,6 +2286,24 @@ void Window::shot()
 
 void Window::closeEvent(QCloseEvent *event)
 {
+    // First check if we should close to tray
+    if (closeToTrayEnabled && trayIcon->isVisible()) {
+        this->hide();
+        event->ignore();
+        LOG("Window close intercepted, hidden to tray");
+        
+        // Show balloon notification once to inform user
+        static bool notificationShown = false;
+        if (!notificationShown) {
+            trayIcon->showMessage("Usagi-dono", 
+                                  "Application minimized to tray. Use tray menu to exit.",
+                                  QSystemTrayIcon::Information, 3000);
+            notificationShown = true;
+        }
+        return;
+    }
+    
+    // Otherwise, handle normal close with logout
     if(adbapi->LoggedIn() && !safeclose->isActive())
 	{
 		adbapi->Logout();
@@ -2211,6 +2314,7 @@ void Window::closeEvent(QCloseEvent *event)
     if(!adbapi->LoggedIn() || waitforlogout.elapsed() > 5000)
     {
         event->accept();
+        LOG("Window close accepted, application exiting");
     }
 }
 
@@ -2230,6 +2334,19 @@ void Window::saveSettings()
 	
 	// Save media player path
 	PlaybackManager::setMediaPlayerPath(mediaPlayerPath->text());
+	
+	// Save tray settings
+	saveTraySettings();
+	
+	// Save auto-start settings
+	bool autoStartWasEnabled = adbapi->getAutoStartEnabled();
+	bool autoStartNowEnabled = autoStartEnabled->isChecked();
+	adbapi->setAutoStartEnabled(autoStartNowEnabled);
+	
+	// Update auto-start registration if changed
+	if (autoStartWasEnabled != autoStartNowEnabled) {
+		setAutoStartEnabled(autoStartNowEnabled);
+	}
 	
 	LOG("Settings saved");
 }
@@ -5037,4 +5154,219 @@ void Window::onUnknownFileRecheckClicked(int row)
     }
     
     LOG(QString("Re-check initiated for file: %1").arg(fileData.filename));
+}
+
+// ========== Filter Bar Toggle Implementation ==========
+
+void Window::onToggleFilterBarClicked()
+{
+    bool isVisible = filterSidebarScrollArea->isVisible();
+    filterSidebarScrollArea->setVisible(!isVisible);
+    
+    if (!isVisible) {
+        toggleFilterBarButton->setText("◀ Hide Filters");
+    } else {
+        toggleFilterBarButton->setText("▶ Show Filters");
+    }
+    
+    // Save the state
+    adbapi->setFilterBarVisible(!isVisible);
+    LOG(QString("Filter bar visibility toggled: %1").arg(!isVisible ? "visible" : "hidden"));
+}
+
+// ========== System Tray Implementation ==========
+
+void Window::createTrayIcon()
+{
+    // Create system tray icon menu
+    trayIconMenu = new QMenu(this);
+    
+    QAction *showHideAction = new QAction("Show/Hide", this);
+    connect(showHideAction, &QAction::triggered, this, &Window::onTrayShowHideAction);
+    
+    QAction *exitAction = new QAction("Exit", this);
+    connect(exitAction, &QAction::triggered, this, &Window::onTrayExitAction);
+    
+    trayIconMenu->addAction(showHideAction);
+    trayIconMenu->addSeparator();
+    trayIconMenu->addAction(exitAction);
+    
+    // Create system tray icon
+    trayIcon = new QSystemTrayIcon(this);
+    trayIcon->setContextMenu(trayIconMenu);
+    
+    // Set icon (use application icon or a default icon)
+    QIcon appIcon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+    trayIcon->setIcon(appIcon);
+    trayIcon->setToolTip("Usagi-dono");
+    
+    // Connect activation signal (for double-click)
+    connect(trayIcon, &QSystemTrayIcon::activated, this, &Window::onTrayIconActivated);
+    
+    LOG("System tray icon created");
+}
+
+void Window::loadTraySettings()
+{
+    // Load tray settings from database
+    minimizeToTrayEnabled = adbapi->getTrayMinimizeToTray();
+    closeToTrayEnabled = adbapi->getTrayCloseToTray();
+    startMinimizedEnabled = adbapi->getTrayStartMinimized();
+    
+    // Update UI checkboxes
+    trayMinimizeToTray->setChecked(minimizeToTrayEnabled);
+    trayCloseToTray->setChecked(closeToTrayEnabled);
+    trayStartMinimized->setChecked(startMinimizedEnabled);
+    
+    // Update tray icon visibility
+    updateTrayIconVisibility();
+    
+    // If start minimized is enabled, minimize to tray on startup
+    if (startMinimizedEnabled) {
+        this->hide();
+        trayIcon->show();
+        LOG("Application started minimized to tray");
+    }
+    
+    LOG(QString("Tray settings loaded: minimize=%1, close=%2, startMinimized=%3")
+        .arg(minimizeToTrayEnabled).arg(closeToTrayEnabled).arg(startMinimizedEnabled));
+}
+
+void Window::saveTraySettings()
+{
+    adbapi->setTrayMinimizeToTray(trayMinimizeToTray->isChecked());
+    adbapi->setTrayCloseToTray(trayCloseToTray->isChecked());
+    adbapi->setTrayStartMinimized(trayStartMinimized->isChecked());
+    
+    // Update local flags
+    minimizeToTrayEnabled = trayMinimizeToTray->isChecked();
+    closeToTrayEnabled = trayCloseToTray->isChecked();
+    startMinimizedEnabled = trayStartMinimized->isChecked();
+    
+    // Update tray icon visibility
+    updateTrayIconVisibility();
+    
+    LOG("Tray settings saved");
+}
+
+void Window::updateTrayIconVisibility()
+{
+    // Show tray icon if any tray feature is enabled
+    if (minimizeToTrayEnabled || closeToTrayEnabled || startMinimizedEnabled) {
+        if (!trayIcon->isVisible()) {
+            trayIcon->show();
+            LOG("System tray icon shown");
+        }
+    } else {
+        if (trayIcon->isVisible()) {
+            trayIcon->hide();
+            LOG("System tray icon hidden");
+        }
+    }
+}
+
+void Window::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+    if (reason == QSystemTrayIcon::DoubleClick) {
+        onTrayShowHideAction();
+    }
+}
+
+void Window::onTrayShowHideAction()
+{
+    if (this->isVisible()) {
+        this->hide();
+        LOG("Window hidden to tray");
+    } else {
+        this->show();
+        this->activateWindow();
+        this->raise();
+        LOG("Window shown from tray");
+    }
+}
+
+void Window::onTrayExitAction()
+{
+    // Bypass close to tray and exit directly
+    closeToTrayEnabled = false;
+    QApplication::quit();
+}
+
+// ========== Auto-start Implementation ==========
+
+void Window::registerAutoStart()
+{
+#ifdef Q_OS_WIN
+    // Windows: Add registry entry in HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+    QString appPath = QCoreApplication::applicationFilePath();
+    appPath = QDir::toNativeSeparators(appPath);
+    settings.setValue("Usagi-dono", "\"" + appPath + "\"");
+    LOG(QString("Auto-start registered (Windows): %1").arg(appPath));
+#elif defined(Q_OS_LINUX)
+    // Linux: Create .desktop file in ~/.config/autostart/
+    QString autostartDir = QDir::homePath() + "/.config/autostart";
+    QDir dir;
+    if (!dir.exists(autostartDir)) {
+        dir.mkpath(autostartDir);
+    }
+    
+    QString desktopFile = autostartDir + "/usagi-dono.desktop";
+    QFile file(desktopFile);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out << "[Desktop Entry]\n";
+        out << "Type=Application\n";
+        out << "Name=Usagi-dono\n";
+        out << "Exec=" << QCoreApplication::applicationFilePath() << "\n";
+        out << "X-GNOME-Autostart-enabled=true\n";
+        file.close();
+        LOG(QString("Auto-start registered (Linux): %1").arg(desktopFile));
+    } else {
+        LOG(QString("Failed to create auto-start file: %1").arg(desktopFile));
+    }
+#else
+    LOG("Auto-start not supported on this platform");
+#endif
+}
+
+void Window::unregisterAutoStart()
+{
+#ifdef Q_OS_WIN
+    // Windows: Remove registry entry
+    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+    settings.remove("Usagi-dono");
+    LOG("Auto-start unregistered (Windows)");
+#elif defined(Q_OS_LINUX)
+    // Linux: Remove .desktop file
+    QString desktopFile = QDir::homePath() + "/.config/autostart/usagi-dono.desktop";
+    if (QFile::exists(desktopFile)) {
+        QFile::remove(desktopFile);
+        LOG(QString("Auto-start unregistered (Linux): %1").arg(desktopFile));
+    }
+#else
+    LOG("Auto-start not supported on this platform");
+#endif
+}
+
+bool Window::isAutoStartEnabled()
+{
+#ifdef Q_OS_WIN
+    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+    return settings.contains("Usagi-dono");
+#elif defined(Q_OS_LINUX)
+    QString desktopFile = QDir::homePath() + "/.config/autostart/usagi-dono.desktop";
+    return QFile::exists(desktopFile);
+#else
+    return false;
+#endif
+}
+
+void Window::setAutoStartEnabled(bool enabled)
+{
+    if (enabled) {
+        registerAutoStart();
+    } else {
+        unregisterAutoStart();
+    }
 }

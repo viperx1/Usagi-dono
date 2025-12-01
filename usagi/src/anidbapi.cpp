@@ -204,6 +204,17 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	// Initialize auto-fetch settings with defaults (disabled by default)
 	autoFetchEnabled = false;
 	
+	// Initialize tray settings with defaults
+	trayMinimizeToTray = false;
+	trayCloseToTray = false;
+	trayStartMinimized = false;
+	
+	// Initialize auto-start settings with defaults
+	autoStartEnabled = false;
+	
+	// Initialize filter bar visibility with defaults (visible by default)
+	filterBarVisible = true;
+	
 	while(query.next())
 	{
 		if(query.value(0).toString() == "username")
@@ -237,6 +248,26 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		if(query.value(0).toString() == "autoFetchEnabled")
 		{
 			autoFetchEnabled = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "trayMinimizeToTray")
+		{
+			trayMinimizeToTray = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "trayCloseToTray")
+		{
+			trayCloseToTray = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "trayStartMinimized")
+		{
+			trayStartMinimized = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "autoStartEnabled")
+		{
+			autoStartEnabled = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "filterBarVisible")
+		{
+			filterBarVisible = (query.value(1).toString() == "1");
 		}
 	}
 

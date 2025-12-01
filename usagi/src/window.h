@@ -33,6 +33,9 @@
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QSpinBox>
 #include <QtWidgets/QDoubleSpinBox>
+#include <QtWidgets/QSystemTrayIcon>
+#include <QtWidgets/QMenu>
+#include <QtWidgets/QGroupBox>
 #include <QXmlStreamReader>
 #include <QThread>
 #include "hash/ed2k.h"
@@ -481,6 +484,8 @@ private:
     bool allAnimeTitlesLoaded;  // Flag to track if all anime titles have been loaded
     MyListCardManager *cardManager;  // Manages card lifecycle and updates
     MyListFilterSidebar *filterSidebar;  // Filter sidebar widget
+    QScrollArea *filterSidebarScrollArea;  // Scroll area containing filter sidebar
+    QPushButton *toggleFilterBarButton;  // Button to show/hide filter sidebar
     QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead
 	QSet<int> episodesNeedingData;  // Deprecated: moved to MyListCardManager
 	QSet<int> animeNeedingMetadata;  // Deprecated: moved to MyListCardManager
@@ -507,6 +512,14 @@ private:
     
     // Auto-fetch settings
     QCheckBox *autoFetchEnabled;
+    
+    // Tray settings
+    QCheckBox *trayMinimizeToTray;
+    QCheckBox *trayCloseToTray;
+    QCheckBox *trayStartMinimized;
+    
+    // Auto-start settings
+    QCheckBox *autoStartEnabled;
     
     // Playback settings
     QLineEdit *mediaPlayerPath;
@@ -548,6 +561,13 @@ private:
 	
 	// Watch session manager
 	WatchSessionManager *watchSessionManager;
+	
+	// System tray icon
+	QSystemTrayIcon *trayIcon;
+	QMenu *trayIconMenu;
+	bool closeToTrayEnabled;
+	bool minimizeToTrayEnabled;
+	bool startMinimizedEnabled;
 	
 	// Batch processing for hashed files
 	// Note: HashedFileData structure removed as identification now happens immediately
@@ -659,6 +679,14 @@ public slots:
     void onUnknownFileBindClicked(int row, const QString& epno);
     void onUnknownFileNotAnimeClicked(int row);
     void onUnknownFileRecheckClicked(int row);
+    
+    // Filter bar toggle slot
+    void onToggleFilterBarClicked();
+    
+    // System tray slots
+    void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
+    void onTrayShowHideAction();
+    void onTrayExitAction();
 
 signals:
 	void notifyStopHasher();
@@ -723,6 +751,18 @@ private:
     void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
     bool isItemPlaying(QTreeWidgetItem *item) const;
     void updateUIForWatchedFile(int lid);  // Update tree view and anime card for a watched file
+    
+    // System tray helper methods
+    void createTrayIcon();
+    void updateTrayIconVisibility();
+    void loadTraySettings();
+    void saveTraySettings();
+    
+    // Auto-start helper methods
+    void setAutoStartEnabled(bool enabled);
+    bool isAutoStartEnabled();
+    void registerAutoStart();
+    void unregisterAutoStart();
 };
 
 #endif // WINDOW_H

@@ -105,3 +105,61 @@ void AniDBApi::setAutoFetchEnabled(bool enabled)
 	AniDBApi::autoFetchEnabled = enabled;
 	saveSetting("autoFetchEnabled", enabled ? "1" : "0");
 }
+
+// Tray settings
+bool AniDBApi::getTrayMinimizeToTray()
+{
+	return AniDBApi::trayMinimizeToTray;
+}
+
+void AniDBApi::setTrayMinimizeToTray(bool enabled)
+{
+	AniDBApi::trayMinimizeToTray = enabled;
+	saveSetting("trayMinimizeToTray", enabled ? "1" : "0");
+}
+
+bool AniDBApi::getTrayCloseToTray()
+{
+	return AniDBApi::trayCloseToTray;
+}
+
+void AniDBApi::setTrayCloseToTray(bool enabled)
+{
+	AniDBApi::trayCloseToTray = enabled;
+	saveSetting("trayCloseToTray", enabled ? "1" : "0");
+}
+
+bool AniDBApi::getTrayStartMinimized()
+{
+	return AniDBApi::trayStartMinimized;
+}
+
+void AniDBApi::setTrayStartMinimized(bool enabled)
+{
+	AniDBApi::trayStartMinimized = enabled;
+	saveSetting("trayStartMinimized", enabled ? "1" : "0");
+}
+
+// Auto-start settings
+bool AniDBApi::getAutoStartEnabled()
+{
+	return AniDBApi::autoStartEnabled;
+}
+
+void AniDBApi::setAutoStartEnabled(bool enabled)
+{
+	AniDBApi::autoStartEnabled = enabled;
+	saveSetting("autoStartEnabled", enabled ? "1" : "0");
+}
+
+// Filter bar visibility settings
+bool AniDBApi::getFilterBarVisible()
+{
+	return AniDBApi::filterBarVisible;
+}
+
+void AniDBApi::setFilterBarVisible(bool visible)
+{
+	AniDBApi::filterBarVisible = visible;
+	saveSetting("filterBarVisible", visible ? "1" : "0");
+}
