@@ -856,6 +856,9 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     if (!updatedLids.isEmpty()) {
         emit markingsUpdated(updatedLids);
+        
+        // Actually delete the marked files now
+        deleteMarkedFiles(true);
     }
 }
 
