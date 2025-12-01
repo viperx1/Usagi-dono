@@ -676,6 +676,51 @@ QList<int> WatchSessionManager::getFilesForDownload() const
     return result;
 }
 
+bool WatchSessionManager::deleteFile(int lid, bool deleteFromDisk)
+{
+    LOG(QString("[WatchSessionManager] deleteFile called for lid=%1, deleteFromDisk=%2").arg(lid).arg(deleteFromDisk));
+    
+    // Get the aid for this file before deletion
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[WatchSessionManager] Database not open, cannot delete file");
+        return false;
+    }
+    
+    // Query aid for the file
+    QSqlQuery aidQuery(db);
+    aidQuery.prepare("SELECT aid FROM mylist WHERE lid = ?");
+    aidQuery.addBindValue(lid);
+    int aid = 0;
+    if (aidQuery.exec() && aidQuery.next()) {
+        aid = aidQuery.value(0).toInt();
+    }
+    
+    // Remove from file marks
+    m_fileMarks.remove(lid);
+    
+    // Emit signal to request file deletion (Window will handle it with API access)
+    emit deleteFileRequested(lid, deleteFromDisk);
+    
+    // Emit signals for UI update
+    emit fileMarkChanged(lid, FileMarkType::None);
+    emit fileDeleted(lid, aid);
+    
+    LOG(QString("[WatchSessionManager] File deletion requested for lid=%1, aid=%2").arg(lid).arg(aid));
+    return true;
+}
+
+void WatchSessionManager::deleteMarkedFiles(bool deleteFromDisk)
+{
+    QList<int> filesToDelete = getFilesForDeletion();
+    
+    LOG(QString("[WatchSessionManager] deleteMarkedFiles: %1 files to delete").arg(filesToDelete.size()));
+    
+    for (int lid : filesToDelete) {
+        deleteFile(lid, deleteFromDisk);
+    }
+}
+
 void WatchSessionManager::autoMarkFilesForDeletion()
 {
     if (!m_autoMarkDeletionEnabled) {

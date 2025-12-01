@@ -133,6 +133,7 @@ signals:
     void markFileForDownloadRequested(int lid);  // Mark file for download
     void markFileForDeletionRequested(int lid);  // Mark file for deletion
     void clearFileMarkRequested(int lid);  // Clear file marking
+    void deleteFileRequested(int lid);  // Delete file completely (from disk and mylist)
     
 protected:
     void paintEvent(QPaintEvent *event) override;

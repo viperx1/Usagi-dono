@@ -338,6 +338,7 @@ public:
 	QString Logout();
     QString MylistAdd(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit = 0);
     QString MylistAddGeneric(int aid, QString epno, int viewed, int state, QString storage, QString other);
+    QString MylistDel(int lid);
     QString Mylist(int lid = -1);
     QString File(qint64, QString);
 	QString PushAck(int nid);
@@ -353,6 +354,7 @@ public:
 	QString buildLogoutCommand();
 	QString buildMylistAddCommand(qint64 size, QString ed2khash, int viewed, int state, QString storage, bool edit);
 	QString buildMylistAddGenericCommand(int aid, QString epno, int viewed, int state, QString storage, QString other);
+	QString buildMylistDelCommand(int lid);
 	QString buildMylistCommand(int lid);
 	QString buildMylistStatsCommand();
 	QString buildFileCommand(qint64 size, QString ed2k, unsigned int fmask, unsigned int amask);
@@ -384,6 +386,20 @@ public:
 	void updateLocalFileHash(QString localPath, QString ed2kHash, int status);
 	void batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& pathHashPairs, int status);
 	QString getLocalFileHash(QString localPath);
+	
+	/**
+	 * Delete a file from the mylist completely.
+	 * This includes:
+	 * - Sending MYLISTDEL command to AniDB API
+	 * - Removing entry from local mylist table
+	 * - Removing entry from local_files table
+	 * - Optionally deleting the actual file from disk
+	 * 
+	 * @param lid MyList ID of the file to delete
+	 * @param deleteFromDisk If true, also delete the physical file from disk
+	 * @return tag for the MYLISTDEL command, or empty string on error
+	 */
+	QString deleteFileFromMylist(int lid, bool deleteFromDisk = true);
 	
 	struct FileHashInfo {
 		QString path;
@@ -459,6 +475,8 @@ private slots:
 	void checkForExistingExport();
 signals:
 	void notifyMylistAdd(QString, int);
+	void notifyMylistDel(QString tag, int lid, bool success);
+	void notifyFileDeleted(int lid, int aid, bool success);  // Emitted when file deletion process completes
     void notifyLoggedIn(QString, int);
     void notifyLoggedOut(QString, int);
 	void notifyMessageReceived(int nid, QString message);

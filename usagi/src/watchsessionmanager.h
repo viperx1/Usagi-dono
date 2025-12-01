@@ -168,6 +168,31 @@ public:
     QList<int> getFilesForDeletion() const;
     
     /**
+     * @brief Actually delete a file that was marked for deletion
+     * 
+     * This performs the complete file deletion process:
+     * - Deletes the physical file from disk
+     * - Removes entry from local_files table
+     * - Marks as deleted in mylist table (state=3)
+     * - Sends update to AniDB API
+     * 
+     * @param lid MyList ID of the file to delete
+     * @param deleteFromDisk If true, delete the physical file from disk
+     * @return true if deletion was initiated successfully
+     */
+    bool deleteFile(int lid, bool deleteFromDisk = true);
+    
+    /**
+     * @brief Delete all files currently marked for deletion
+     * 
+     * Processes all files in the deletion queue, deleting them one by one.
+     * Files are deleted in order of their mark score (lowest first).
+     * 
+     * @param deleteFromDisk If true, delete the physical files from disk
+     */
+    void deleteMarkedFiles(bool deleteFromDisk = true);
+    
+    /**
      * @brief Get all files marked for download
      * @return List of LIDs marked for download
      */
@@ -313,6 +338,20 @@ signals:
      * @param updatedLids Set of MyList IDs that were updated (empty means refresh all)
      */
     void markingsUpdated(const QSet<int>& updatedLids);
+    
+    /**
+     * @brief Emitted when a file has been deleted
+     * @param lid MyList ID of the deleted file
+     * @param aid Anime ID the file belonged to
+     */
+    void fileDeleted(int lid, int aid);
+    
+    /**
+     * @brief Emitted to request file deletion (handled by Window which has API access)
+     * @param lid MyList ID of the file to delete
+     * @param deleteFromDisk If true, delete the physical file from disk
+     */
+    void deleteFileRequested(int lid, bool deleteFromDisk);
     
 private:
     // Session data

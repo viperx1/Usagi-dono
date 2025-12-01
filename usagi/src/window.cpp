@@ -365,6 +365,26 @@ Window::Window()
                 watchSessionManager->setFileMarkType(lid, FileMarkType::None);
             }
         });
+        connect(card, &AnimeCard::deleteFileRequested, this, [this](int lid) {
+            LOG(QString("[Window] Delete file requested for lid=%1").arg(lid));
+            // Show confirmation dialog
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                this, "Delete File",
+                "Are you sure you want to delete this file?\n\n"
+                "This will:\n"
+                "- Delete the file from your disk\n"
+                "- Remove it from your local database\n"
+                "- Mark it as deleted in AniDB\n\n"
+                "This action cannot be undone.",
+                QMessageBox::Yes | QMessageBox::No,
+                QMessageBox::No);
+            
+            if (reply == QMessageBox::Yes) {
+                if (watchSessionManager) {
+                    watchSessionManager->deleteFile(lid, true);
+                }
+            }
+        });
     });
     
     connect(cardManager, &MyListCardManager::cardUpdated, this, [](int) {
@@ -730,6 +750,24 @@ Window::Window()
                 // Only refresh cards containing the updated lids
                 cardManager->refreshCardsForLids(updatedLids);
             }
+        }
+    });
+    
+    // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion
+    connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
+        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2").arg(lid).arg(deleteFromDisk));
+        if (adbapi) {
+            adbapi->deleteFileFromMylist(lid, deleteFromDisk);
+        }
+    });
+    
+    // Connect WatchSessionManager fileDeleted signal to refresh UI
+    connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
+        LOG(QString("[Window] File deleted: lid=%1, aid=%2 - refreshing cards").arg(lid).arg(aid));
+        Q_UNUSED(lid);
+        // Refresh all cards since the deleted file's card needs to be updated
+        if (cardManager) {
+            cardManager->refreshAllCards();
         }
     });
     
