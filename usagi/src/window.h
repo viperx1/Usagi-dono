@@ -395,6 +395,7 @@ class Window : public QWidget
 private:
 	bool eventFilter(QObject *, QEvent *);
 	void closeEvent(QCloseEvent *);
+	void changeEvent(QEvent *event);
     QTimer *safeclose;
     QTimer *startupTimer;
     QElapsedTimer waitforlogout;

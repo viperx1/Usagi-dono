@@ -2287,7 +2287,7 @@ void Window::shot()
 void Window::closeEvent(QCloseEvent *event)
 {
     // First check if we should close to tray
-    if (closeToTrayEnabled && trayIcon->isVisible()) {
+    if (closeToTrayEnabled && QSystemTrayIcon::isSystemTrayAvailable() && trayIcon && trayIcon->isVisible()) {
         this->hide();
         event->ignore();
         LOG("Window close intercepted, hidden to tray");
@@ -2316,6 +2316,22 @@ void Window::closeEvent(QCloseEvent *event)
         event->accept();
         LOG("Window close accepted, application exiting");
     }
+}
+
+void Window::changeEvent(QEvent *event)
+{
+    // Handle minimize to tray
+    if (event->type() == QEvent::WindowStateChange) {
+        if (isMinimized() && minimizeToTrayEnabled && QSystemTrayIcon::isSystemTrayAvailable() && trayIcon && trayIcon->isVisible()) {
+            // Hide window and show in tray
+            this->hide();
+            event->ignore();
+            LOG("Window minimized to tray");
+            return;
+        }
+    }
+    
+    QWidget::changeEvent(event);
 }
 
 void Window::saveSettings()
@@ -5178,6 +5194,12 @@ void Window::onToggleFilterBarClicked()
 
 void Window::createTrayIcon()
 {
+    // Check if system tray is available
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
+        LOG("System tray not available on this system");
+        return;
+    }
+    
     // Create system tray icon menu
     trayIconMenu = new QMenu(this);
     
@@ -5208,6 +5230,25 @@ void Window::createTrayIcon()
 
 void Window::loadTraySettings()
 {
+    // Check if system tray is available
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
+        LOG("System tray not available, disabling tray features");
+        // Disable tray checkboxes in UI
+        if (trayMinimizeToTray) {
+            trayMinimizeToTray->setEnabled(false);
+            trayMinimizeToTray->setToolTip("System tray not available on this platform");
+        }
+        if (trayCloseToTray) {
+            trayCloseToTray->setEnabled(false);
+            trayCloseToTray->setToolTip("System tray not available on this platform");
+        }
+        if (trayStartMinimized) {
+            trayStartMinimized->setEnabled(false);
+            trayStartMinimized->setToolTip("System tray not available on this platform");
+        }
+        return;
+    }
+    
     // Load tray settings from database
     minimizeToTrayEnabled = adbapi->getTrayMinimizeToTray();
     closeToTrayEnabled = adbapi->getTrayCloseToTray();
@@ -5224,7 +5265,9 @@ void Window::loadTraySettings()
     // If start minimized is enabled, minimize to tray on startup
     if (startMinimizedEnabled) {
         this->hide();
-        trayIcon->show();
+        if (trayIcon) {
+            trayIcon->show();
+        }
         LOG("Application started minimized to tray");
     }
     
@@ -5251,14 +5294,18 @@ void Window::saveTraySettings()
 
 void Window::updateTrayIconVisibility()
 {
-    // Show tray icon if any tray feature is enabled
+    // Only show tray icon if system tray is available and any tray feature is enabled
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
+        return;
+    }
+    
     if (minimizeToTrayEnabled || closeToTrayEnabled || startMinimizedEnabled) {
-        if (!trayIcon->isVisible()) {
+        if (trayIcon && !trayIcon->isVisible()) {
             trayIcon->show();
             LOG("System tray icon shown");
         }
     } else {
-        if (trayIcon->isVisible()) {
+        if (trayIcon && trayIcon->isVisible()) {
             trayIcon->hide();
             LOG("System tray icon hidden");
         }
