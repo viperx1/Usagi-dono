@@ -438,6 +438,7 @@ Window::Window()
     connect(filterSidebar, &MyListFilterSidebar::sortChanged, this, [this]() {
         sortMylistCards(filterSidebar->getSortIndex());
     });
+    connect(filterSidebar, &MyListFilterSidebar::collapseRequested, this, &Window::onToggleFilterBarClicked);
     
     // Wrap filter sidebar in a scroll area for vertical scrolling
     filterSidebarScrollArea = new QScrollArea(this);
@@ -450,18 +451,17 @@ Window::Window()
     
     mylistContentLayout->addWidget(filterSidebarScrollArea);
     
-    // Create a vertical layout for the card view and toggle button
-    QVBoxLayout *cardViewLayout = new QVBoxLayout();
-    
-    // Add toggle button at the top right to show/hide filter bar
-    QHBoxLayout *topBarLayout = new QHBoxLayout();
-    topBarLayout->addStretch();  // Push button to the right
-    toggleFilterBarButton = new QPushButton("◀ Hide Filters");
-    toggleFilterBarButton->setMaximumWidth(120);
-    toggleFilterBarButton->setToolTip("Toggle filter sidebar visibility");
+    // Create toggle button to show filter sidebar when collapsed
+    toggleFilterBarButton = new QPushButton("▶");
+    toggleFilterBarButton->setMaximumWidth(30);
+    toggleFilterBarButton->setMaximumHeight(30);
+    toggleFilterBarButton->setToolTip("Show filter sidebar");
+    toggleFilterBarButton->setVisible(false);  // Hidden by default
     connect(toggleFilterBarButton, &QPushButton::clicked, this, &Window::onToggleFilterBarClicked);
-    topBarLayout->addWidget(toggleFilterBarButton);
-    cardViewLayout->addLayout(topBarLayout);
+    mylistContentLayout->addWidget(toggleFilterBarButton);
+    
+    // Create a vertical layout for the card view
+    QVBoxLayout *cardViewLayout = new QVBoxLayout();
     
     // Card view (only view mode available)
     // Use VirtualFlowLayout for efficient virtual scrolling
@@ -981,11 +981,7 @@ Window::Window()
     // Load filter bar visibility setting
     bool filterBarVisible = adbapi->getFilterBarVisible();
     filterSidebarScrollArea->setVisible(filterBarVisible);
-    if (filterBarVisible) {
-        toggleFilterBarButton->setText("◀ Hide Filters");
-    } else {
-        toggleFilterBarButton->setText("▶ Show Filters");
-    }
+    toggleFilterBarButton->setVisible(!filterBarVisible);
     
     // Load auto-start setting
     autoStartEnabled->setChecked(adbapi->getAutoStartEnabled());
@@ -5178,12 +5174,7 @@ void Window::onToggleFilterBarClicked()
 {
     bool isVisible = filterSidebarScrollArea->isVisible();
     filterSidebarScrollArea->setVisible(!isVisible);
-    
-    if (!isVisible) {
-        toggleFilterBarButton->setText("◀ Hide Filters");
-    } else {
-        toggleFilterBarButton->setText("▶ Show Filters");
-    }
+    toggleFilterBarButton->setVisible(isVisible);
     
     // Save the state
     adbapi->setFilterBarVisible(!isVisible);
@@ -5327,7 +5318,8 @@ void Window::onTrayShowHideAction()
         this->hide();
         LOG("Window hidden to tray");
     } else {
-        this->show();
+        // Restore window state before showing
+        this->showNormal();
         this->activateWindow();
         this->raise();
         LOG("Window shown from tray");
