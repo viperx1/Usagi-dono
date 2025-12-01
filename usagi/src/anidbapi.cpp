@@ -3743,11 +3743,37 @@ QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
 		QFile file(filePath);
 		if (file.exists())
 		{
+			bool deleted = false;
+			
+			// First attempt: try to remove normally
 			if (file.remove())
 			{
 				Logger::log(QString("[AniDB deleteFileFromMylist] Deleted file from disk: %1").arg(filePath), __FILE__, __LINE__);
+				deleted = true;
 			}
 			else
+			{
+				// If first attempt failed, try to remove read-only attribute and retry
+				// This is common on Windows where downloaded files may be read-only
+				QFile::Permissions originalPerms = file.permissions();
+				bool hadReadOnly = !(originalPerms & QFile::WriteUser);
+				
+				if (hadReadOnly)
+				{
+					Logger::log(QString("[AniDB deleteFileFromMylist] File is read-only, attempting to remove read-only attribute: %1").arg(filePath), __FILE__, __LINE__);
+					// Add write permission and retry
+					if (file.setPermissions(originalPerms | QFile::WriteUser | QFile::WriteOwner))
+					{
+						if (file.remove())
+						{
+							Logger::log(QString("[AniDB deleteFileFromMylist] Deleted file from disk after removing read-only attribute: %1").arg(filePath), __FILE__, __LINE__);
+							deleted = true;
+						}
+					}
+				}
+			}
+			
+			if (!deleted)
 			{
 				// Provide detailed error information for access denied errors
 				QFileInfo fileInfo(filePath);
@@ -3764,8 +3790,15 @@ QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
 				} else {
 					permissions = "file info unavailable";
 				}
-				Logger::log(QString("[AniDB deleteFileFromMylist] Failed to delete file from disk: %1 - Error: %2, Permissions: [%3]")
-				            .arg(filePath, errorDetails, permissions), __FILE__, __LINE__);
+				
+				// Check if file might be locked by another process
+				QString lockHint;
+				if (!fileInfo.isWritable()) {
+					lockHint = " (file may be read-only or locked by another process like a video player or torrent client)";
+				}
+				
+				Logger::log(QString("[AniDB deleteFileFromMylist] Failed to delete file from disk: %1 - Error: %2, Permissions: [%3]%4")
+				            .arg(filePath, errorDetails, permissions, lockHint), __FILE__, __LINE__);
 				// Skip all other steps if file deletion fails
 				return QString();
 			}
