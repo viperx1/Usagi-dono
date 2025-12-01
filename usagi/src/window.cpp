@@ -424,7 +424,7 @@ Window::Window()
     // Create horizontal layout for sidebar and card view
     QHBoxLayout *mylistContentLayout = new QHBoxLayout();
     
-    // Create and add filter sidebar (now includes sorting controls)
+    // Create filter sidebar (now includes sorting controls)
     filterSidebar = new MyListFilterSidebar(this);
     connect(filterSidebar, &MyListFilterSidebar::filterChanged, this, [this]() {
         applyMylistFilters();
@@ -434,7 +434,17 @@ Window::Window()
     connect(filterSidebar, &MyListFilterSidebar::sortChanged, this, [this]() {
         sortMylistCards(filterSidebar->getSortIndex());
     });
-    mylistContentLayout->addWidget(filterSidebar);
+    
+    // Wrap filter sidebar in a scroll area for vertical scrolling
+    QScrollArea *filterSidebarScrollArea = new QScrollArea(this);
+    filterSidebarScrollArea->setWidget(filterSidebar);
+    filterSidebarScrollArea->setWidgetResizable(true);
+    filterSidebarScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    filterSidebarScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    filterSidebarScrollArea->setMinimumWidth(220);  // Account for scrollbar
+    filterSidebarScrollArea->setMaximumWidth(320);
+    
+    mylistContentLayout->addWidget(filterSidebarScrollArea);
     
     // Card view (only view mode available)
     // Use VirtualFlowLayout for efficient virtual scrolling
@@ -623,12 +633,26 @@ Window::Window()
     pageSettings->addWidget(sessionThresholdValueSpinBox, 14, 1);
     pageSettings->addWidget(sessionAutoMarkDeletionCheckbox, 15, 0, 1, 2);
     
-    pageSettings->setRowStretch(16, 1000);
-    pageSettings->addWidget(buttonSaveSettings, 17, 0);
-    pageSettings->addWidget(buttonRequestMylistExport, 18, 0);
+    // Add file deletion settings
+    QLabel *deletionSettingsLabel = new QLabel("File Deletion:");
+    sessionEnableAutoDeletionCheckbox = new QCheckBox("Enable automatic file deletion");
+    sessionEnableAutoDeletionCheckbox->setToolTip("When enabled, files marked for deletion will be automatically deleted");
+    sessionEnableAutoDeletionCheckbox->setChecked(true);  // Default: enabled
+    
+    sessionForceDeletePermissionsCheckbox = new QCheckBox("Force delete (change permissions)");
+    sessionForceDeletePermissionsCheckbox->setToolTip("Attempt to remove read-only attribute before deletion (Windows)");
+    sessionForceDeletePermissionsCheckbox->setChecked(true);  // Default: enabled
+    
+    pageSettings->addWidget(deletionSettingsLabel, 16, 0, 1, 2);
+    pageSettings->addWidget(sessionEnableAutoDeletionCheckbox, 17, 0, 1, 2);
+    pageSettings->addWidget(sessionForceDeletePermissionsCheckbox, 18, 0, 1, 2);
+    
+    pageSettings->setRowStretch(19, 1000);
+    pageSettings->addWidget(buttonSaveSettings, 20, 0);
+    pageSettings->addWidget(buttonRequestMylistExport, 21, 0);
 
     pageSettings->setColumnStretch(1, 100);
-    pageSettings->setRowStretch(19, 100);
+    pageSettings->setRowStretch(22, 100);
 
 	// page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
@@ -4289,6 +4313,7 @@ void Window::applyMylistFilters()
 	QString typeFilter = filterSidebar->getTypeFilter();
 	QString completionFilter = filterSidebar->getCompletionFilter();
 	bool showOnlyUnwatched = filterSidebar->getShowOnlyUnwatched();
+	bool showMarkedForDeletion = filterSidebar->getShowMarkedForDeletion();
 	QString adultContentFilter = filterSidebar->getAdultContentFilter();
 	bool inMyListOnly = filterSidebar->getInMyListOnly();
 	
@@ -4487,6 +4512,32 @@ void Window::applyMylistFilters()
 			
 			// Show only if there are unwatched episodes
 			visible = visible && ((normalEpisodes > normalViewed) || (otherEpisodes > otherViewed));
+		}
+		
+		// Apply marked for deletion filter
+		if (showMarkedForDeletion) {
+			// Check if this anime has any files marked for deletion
+			bool hasMarkedFiles = false;
+			if (watchSessionManager) {
+				// Query all lids for this anime from mylist table
+				QSqlDatabase db = QSqlDatabase::database();
+				if (db.isOpen()) {
+					QSqlQuery q(db);
+					q.prepare("SELECT lid FROM mylist WHERE aid = ?");
+					q.addBindValue(aid);
+					if (q.exec()) {
+						while (q.next()) {
+							int lid = q.value(0).toInt();
+							FileMarkType markType = watchSessionManager->getFileMarkType(lid);
+							if (markType == FileMarkType::ForDeletion) {
+								hasMarkedFiles = true;
+								break;
+							}
+						}
+					}
+				}
+			}
+			visible = visible && hasMarkedFiles;
 		}
 		
 		// Apply adult content filter
