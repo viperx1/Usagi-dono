@@ -517,6 +517,10 @@ private:
     QComboBox *sessionThresholdTypeComboBox;
     QDoubleSpinBox *sessionThresholdValueSpinBox;
     QCheckBox *sessionAutoMarkDeletionCheckbox;
+    
+    // File deletion settings
+    QCheckBox *sessionEnableAutoDeletionCheckbox;
+    QCheckBox *sessionForceDeletePermissionsCheckbox;
 
 	// page notify
 	QTextEdit *notifyOutput;

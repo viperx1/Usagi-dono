@@ -9,6 +9,8 @@
 #include <QDateTime>
 #include <QStandardPaths>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 
 // Global pointer to the AniDB API instance
 // This is initialized by the application (window.cpp) or tests
@@ -1274,6 +1276,64 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 	}
 	else if(ReplyID == "312"){ // 312 NO SUCH MYLIST ENTRY
 		Logger::log("[AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag, __FILE__, __LINE__);
+		
+		// Check if this was a MYLISTDEL command
+		// Note: MYLISTDEL is implemented but not actively used (we use MYLISTADD with state=3 instead)
+		// The notifyMylistDel signal is available for future use if MYLISTDEL is needed
+		QSqlQuery query(db);
+		query.prepare("SELECT str FROM packets WHERE tag = ?");
+		query.addBindValue(Tag);
+		if(query.exec() && query.next())
+		{
+			QString cmd = query.value(0).toString();
+			if(cmd.startsWith("MYLISTDEL"))
+			{
+				// Extract lid from command - use shared static regex
+				static const QRegularExpression lidRegex("lid=(\\d+)");
+				QRegularExpressionMatch match = lidRegex.match(cmd);
+				if(match.hasMatch())
+				{
+					int lid = match.captured(1).toInt();
+					emit notifyMylistDel(Tag, lid, false);
+				}
+			}
+		}
+	}
+	else if(ReplyID == "211"){ // 211 MYLIST ENTRY DELETED
+		Logger::log("[AniDB Response] 211 MYLIST ENTRY DELETED - Tag: " + Tag, __FILE__, __LINE__);
+		
+		// Parse the response to get the number of deleted entries
+		// Format: 211 MYLIST ENTRY DELETED\n{int count}
+		// Note: MYLISTDEL is implemented but not actively used (we use MYLISTADD with state=3 instead)
+		// The notifyMylistDel signal is available for future use if MYLISTDEL is needed
+		QStringList lines = Message.split("\n");
+		int count = 0;
+		if(lines.size() > 1)
+		{
+			count = lines.at(1).trimmed().toInt();
+			Logger::log(QString("[AniDB Response] %1 mylist entry(ies) deleted").arg(count), __FILE__, __LINE__);
+		}
+		
+		// Get the lid from the original command - use shared static regex
+		static const QRegularExpression lidRegex("lid=(\\d+)");
+		QSqlQuery query(db);
+		query.prepare("SELECT str FROM packets WHERE tag = ?");
+		query.addBindValue(Tag);
+		if(query.exec() && query.next())
+		{
+			QString cmd = query.value(0).toString();
+			QRegularExpressionMatch match = lidRegex.match(cmd);
+			if(match.hasMatch())
+			{
+				int lid = match.captured(1).toInt();
+				emit notifyMylistDel(Tag, lid, true);
+			}
+		}
+		
+		// Mark packet as processed
+		QString q = QString("UPDATE `packets` SET `processed` = 1, `got_reply` = 1, `reply` = '%1' WHERE `tag` = '%2'").arg(ReplyID, Tag);
+		QSqlQuery updateQuery(db);
+		updateQuery.exec(q);
 	}
     else if(ReplyID == "320"){ // 320 NO SUCH FILE
         emit notifyMylistAdd(Tag, 320);
@@ -1784,6 +1844,25 @@ QString AniDBApi::MylistAddGeneric(int aid, QString epno, int viewed, int state,
 		Logger::log("[AniDB MylistAddGeneric] Database insert error: " + query.lastError().text(), __FILE__, __LINE__);
 		return "0";
 	}
+	return GetTag(msg);
+}
+
+QString AniDBApi::MylistDel(int lid)
+{
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Auth();
+	}
+	QString msg = buildMylistDelCommand(lid);
+	QString q;
+	q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
+	QSqlQuery query(db);
+	if(!query.exec(q))
+	{
+		Logger::log("[AniDB MylistDel] Database insert error: " + query.lastError().text(), __FILE__, __LINE__);
+		return "0";
+	}
+	Logger::log(QString("[AniDB MylistDel] Queued deletion for lid=%1").arg(lid), __FILE__, __LINE__);
 	return GetTag(msg);
 }
 
@@ -2573,6 +2652,11 @@ QString AniDBApi::buildMylistAddGenericCommand(int aid, QString epno, int viewed
 	}
 	msg += QString("&state=%1").arg(state);
 	return msg;
+}
+
+QString AniDBApi::buildMylistDelCommand(int lid)
+{
+	return QString("MYLISTDEL lid=%1").arg(lid);
 }
 
 QString AniDBApi::buildMylistCommand(int lid)
@@ -3614,6 +3698,172 @@ QList<AniDBApi::FileHashInfo> AniDBApi::getUnboundFiles()
 	
 	LOG(QString("Found %1 unbound files").arg(results.size()));
 	return results;
+}
+
+QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
+{
+	Logger::log(QString("[AniDB deleteFileFromMylist] Starting deletion for lid=%1, deleteFromDisk=%2")
+	            .arg(lid).arg(deleteFromDisk), __FILE__, __LINE__);
+	
+	// Check if database is valid and open
+	if (!db.isValid() || !db.isOpen())
+	{
+		Logger::log("[AniDB deleteFileFromMylist] Database not available", __FILE__, __LINE__);
+		return QString();
+	}
+	
+	// Get the file info from mylist and local_files tables
+	QSqlQuery query(db);
+	query.prepare("SELECT m.fid, m.aid, f.size, f.ed2k, lf.path "
+	              "FROM mylist m "
+	              "LEFT JOIN file f ON m.fid = f.fid "
+	              "LEFT JOIN local_files lf ON m.local_file = lf.id "
+	              "WHERE m.lid = ?");
+	query.addBindValue(lid);
+	
+	if (!query.exec() || !query.next())
+	{
+		Logger::log(QString("[AniDB deleteFileFromMylist] Failed to find mylist entry for lid=%1: %2")
+		            .arg(lid).arg(query.lastError().text()), __FILE__, __LINE__);
+		return QString();
+	}
+	
+	int fid = query.value(0).toInt();
+	int aid = query.value(1).toInt();
+	qint64 size = query.value(2).toLongLong();
+	QString ed2k = query.value(3).toString();
+	QString filePath = query.value(4).toString();
+	
+	Logger::log(QString("[AniDB deleteFileFromMylist] Found file: fid=%1, aid=%2, size=%3, path=%4")
+	            .arg(fid).arg(aid).arg(size).arg(filePath), __FILE__, __LINE__);
+	
+	// Step 1: Delete the physical file from disk if requested
+	if (deleteFromDisk && !filePath.isEmpty())
+	{
+		QFile file(filePath);
+		if (file.exists())
+		{
+			bool deleted = false;
+			
+			// First attempt: try to remove normally
+			if (file.remove())
+			{
+				Logger::log(QString("[AniDB deleteFileFromMylist] Deleted file from disk: %1").arg(filePath), __FILE__, __LINE__);
+				deleted = true;
+			}
+			else
+			{
+				// If first attempt failed, try to remove read-only attribute and retry
+				// This is common on Windows where downloaded files may be read-only
+				QFile::Permissions originalPerms = file.permissions();
+				bool hadReadOnly = !(originalPerms & QFile::WriteUser);
+				
+				if (hadReadOnly)
+				{
+					Logger::log(QString("[AniDB deleteFileFromMylist] File is read-only, attempting to remove read-only attribute: %1").arg(filePath), __FILE__, __LINE__);
+					// Add write permission and retry
+					if (file.setPermissions(originalPerms | QFile::WriteUser | QFile::WriteOwner))
+					{
+						if (file.remove())
+						{
+							Logger::log(QString("[AniDB deleteFileFromMylist] Deleted file from disk after removing read-only attribute: %1").arg(filePath), __FILE__, __LINE__);
+							deleted = true;
+						}
+					}
+				}
+			}
+			
+			if (!deleted)
+			{
+				// Provide detailed error information for access denied errors
+				QFileInfo fileInfo(filePath);
+				QString errorDetails = file.errorString();
+				QString permissions;
+				if (fileInfo.exists()) {
+					permissions = QString("readable=%1, writable=%2, executable=%3, isFile=%4, isDir=%5, size=%6")
+						.arg(fileInfo.isReadable() ? "yes" : "no",
+						     fileInfo.isWritable() ? "yes" : "no",
+						     fileInfo.isExecutable() ? "yes" : "no",
+						     fileInfo.isFile() ? "yes" : "no",
+						     fileInfo.isDir() ? "yes" : "no",
+						     QString::number(fileInfo.size()));
+				} else {
+					permissions = "file info unavailable";
+				}
+				
+				// Check if file might be locked by another process
+				QString lockHint;
+				if (!fileInfo.isWritable()) {
+					lockHint = " (file may be read-only or locked by another process like a video player or torrent client)";
+				}
+				
+				Logger::log(QString("[AniDB deleteFileFromMylist] Failed to delete file from disk: %1 - Error: %2, Permissions: [%3]%4")
+				            .arg(filePath, errorDetails, permissions, lockHint), __FILE__, __LINE__);
+				// Skip all other steps if file deletion fails
+				return QString();
+			}
+		}
+		else
+		{
+			Logger::log(QString("[AniDB deleteFileFromMylist] File not found on disk (assuming already deleted): %1").arg(filePath), __FILE__, __LINE__);
+			// Continue with database cleanup - file was probably already deleted externally
+		}
+	}
+	
+	// Step 2: Remove from local_files table
+	if (!filePath.isEmpty())
+	{
+		QSqlQuery deleteLocalFile(db);
+		deleteLocalFile.prepare("DELETE FROM local_files WHERE path = ?");
+		deleteLocalFile.addBindValue(filePath);
+		if (deleteLocalFile.exec())
+		{
+			Logger::log(QString("[AniDB deleteFileFromMylist] Removed from local_files: %1").arg(filePath), __FILE__, __LINE__);
+		}
+		else
+		{
+			Logger::log(QString("[AniDB deleteFileFromMylist] Failed to remove from local_files: %1")
+			            .arg(deleteLocalFile.lastError().text()), __FILE__, __LINE__);
+		}
+	}
+	
+	// Step 3: Update local mylist table to mark as deleted (state=3)
+	QSqlQuery updateMylist(db);
+	updateMylist.prepare("UPDATE mylist SET state = 3, local_file = NULL WHERE lid = ?");
+	updateMylist.addBindValue(lid);
+	if (updateMylist.exec())
+	{
+		Logger::log(QString("[AniDB deleteFileFromMylist] Updated mylist state to deleted for lid=%1").arg(lid), __FILE__, __LINE__);
+	}
+	else
+	{
+		Logger::log(QString("[AniDB deleteFileFromMylist] Failed to update mylist state: %1")
+		            .arg(updateMylist.lastError().text()), __FILE__, __LINE__);
+	}
+	
+	// Step 4: Clear watch chunks for this lid
+	QSqlQuery deleteChunks(db);
+	deleteChunks.prepare("DELETE FROM watch_chunks WHERE lid = ?");
+	deleteChunks.addBindValue(lid);
+	deleteChunks.exec();
+	
+	// Step 5: Send MYLISTADD with state=3 to mark as deleted in AniDB API
+	// state=3 means "deleted" in AniDB mylist state enum (0=unknown, 1=HDD, 2=CD/DVD, 3=deleted)
+	// edit=true (1) means we're updating an existing mylist entry rather than creating a new one
+	if (size > 0 && !ed2k.isEmpty())
+	{
+		QString tag = MylistAdd(size, ed2k, 0, 3, "", true);
+		Logger::log(QString("[AniDB deleteFileFromMylist] Sent MYLISTADD with state=3 for lid=%1, tag=%2")
+		            .arg(lid).arg(tag), __FILE__, __LINE__);
+		return tag;
+	}
+	else
+	{
+		Logger::log(QString("[AniDB deleteFileFromMylist] Cannot update AniDB API - missing size or ed2k for lid=%1")
+		            .arg(lid), __FILE__, __LINE__);
+	}
+	
+	return QString();
 }
 
 QString AniDBApi::GetTag(QString str)

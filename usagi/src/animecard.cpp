@@ -286,6 +286,14 @@ void AnimeCard::setupUI()
                     emit clearFileMarkRequested(lid);
                 });
                 
+                contextMenu.addSeparator();
+                
+                // Destructive action - delete file completely
+                QAction *deleteFileAction = contextMenu.addAction("Delete file...");
+                connect(deleteFileAction, &QAction::triggered, this, [this, lid]() {
+                    emit deleteFileRequested(lid);
+                });
+                
                 contextMenu.exec(m_episodeTree->mapToGlobal(pos));
             }
         }

@@ -15,6 +15,8 @@ WatchSessionManager::WatchSessionManager(QObject *parent)
     , m_thresholdType(DeletionThresholdType::FixedGB)
     , m_thresholdValue(DEFAULT_THRESHOLD_VALUE)
     , m_autoMarkDeletionEnabled(false)
+    , m_enableActualDeletion(false)          // Default: disabled for safety
+    , m_forceDeletePermissions(false)        // Default: disabled for safety
     , m_initialScanComplete(false)
 {
     ensureTablesExist();
@@ -94,6 +96,18 @@ void WatchSessionManager::loadSettings()
         m_autoMarkDeletionEnabled = q.value(0).toInt() != 0;
     }
     
+    // Load actual deletion enabled
+    q.prepare("SELECT value FROM settings WHERE name = 'enable_actual_deletion'");
+    if (q.exec() && q.next()) {
+        m_enableActualDeletion = q.value(0).toInt() != 0;
+    }
+    
+    // Load force delete permissions
+    q.prepare("SELECT value FROM settings WHERE name = 'force_delete_permissions'");
+    if (q.exec() && q.next()) {
+        m_forceDeletePermissions = q.value(0).toInt() != 0;
+    }
+    
     // Load watched path (defaults to empty, which means use directory watcher path)
     q.prepare("SELECT value FROM settings WHERE name = 'session_watched_path'");
     if (q.exec() && q.next()) {
@@ -128,6 +142,16 @@ void WatchSessionManager::saveSettings()
     // Save auto-mark enabled
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('auto_mark_deletion_enabled', ?)");
     q.addBindValue(m_autoMarkDeletionEnabled ? 1 : 0);
+    q.exec();
+    
+    // Save actual deletion enabled
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('enable_actual_deletion', ?)");
+    q.addBindValue(m_enableActualDeletion ? 1 : 0);
+    q.exec();
+    
+    // Save force delete permissions
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('force_delete_permissions', ?)");
+    q.addBindValue(m_forceDeletePermissions ? 1 : 0);
     q.exec();
     
     // Save watched path
@@ -676,6 +700,61 @@ QList<int> WatchSessionManager::getFilesForDownload() const
     return result;
 }
 
+bool WatchSessionManager::deleteFile(int lid, bool deleteFromDisk)
+{
+    LOG(QString("[WatchSessionManager] deleteFile called for lid=%1, deleteFromDisk=%2").arg(lid).arg(deleteFromDisk));
+    
+    // Get the aid for this file before deletion
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[WatchSessionManager] Database not open, cannot delete file");
+        return false;
+    }
+    
+    // Query aid for the file
+    QSqlQuery aidQuery(db);
+    aidQuery.prepare("SELECT aid FROM mylist WHERE lid = ?");
+    aidQuery.addBindValue(lid);
+    int aid = 0;
+    if (aidQuery.exec() && aidQuery.next()) {
+        aid = aidQuery.value(0).toInt();
+    }
+    
+    // Remove from file marks
+    m_fileMarks.remove(lid);
+    
+    // Emit signal to request file deletion (Window will handle it with API access)
+    // Window will call onFileDeletionResult() when the operation completes
+    emit deleteFileRequested(lid, deleteFromDisk);
+    
+    // Emit fileMarkChanged immediately since we've removed from marks
+    emit fileMarkChanged(lid, FileMarkType::None);
+    
+    LOG(QString("[WatchSessionManager] File deletion requested for lid=%1, aid=%2").arg(lid).arg(aid));
+    return true;
+}
+
+void WatchSessionManager::deleteMarkedFiles(bool deleteFromDisk)
+{
+    QList<int> filesToDelete = getFilesForDeletion();
+    
+    LOG(QString("[WatchSessionManager] deleteMarkedFiles: %1 files to delete").arg(filesToDelete.size()));
+    
+    for (int lid : filesToDelete) {
+        deleteFile(lid, deleteFromDisk);
+    }
+}
+
+void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
+{
+    if (success) {
+        LOG(QString("[WatchSessionManager] File deletion succeeded for lid=%1, aid=%2").arg(lid).arg(aid));
+        emit fileDeleted(lid, aid);
+    } else {
+        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - not emitting fileDeleted").arg(lid).arg(aid));
+    }
+}
+
 void WatchSessionManager::autoMarkFilesForDeletion()
 {
     if (!m_autoMarkDeletionEnabled) {
@@ -806,6 +885,11 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     if (!updatedLids.isEmpty()) {
         emit markingsUpdated(updatedLids);
+        
+        // Actually delete the marked files if deletion is enabled
+        if (m_enableActualDeletion) {
+            deleteMarkedFiles(true);
+        }
     }
 }
 
@@ -936,6 +1020,28 @@ void WatchSessionManager::setWatchedPath(const QString& path)
             autoMarkFilesForDeletion();
         }
     }
+}
+
+bool WatchSessionManager::isActualDeletionEnabled() const
+{
+    return m_enableActualDeletion;
+}
+
+void WatchSessionManager::setActualDeletionEnabled(bool enabled)
+{
+    m_enableActualDeletion = enabled;
+    saveSettings();
+}
+
+bool WatchSessionManager::isForceDeletePermissionsEnabled() const
+{
+    return m_forceDeletePermissions;
+}
+
+void WatchSessionManager::setForceDeletePermissionsEnabled(bool enabled)
+{
+    m_forceDeletePermissions = enabled;
+    saveSettings();
 }
 
 void WatchSessionManager::autoStartSessionsForExistingAnime()

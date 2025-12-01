@@ -168,6 +168,31 @@ public:
     QList<int> getFilesForDeletion() const;
     
     /**
+     * @brief Actually delete a file that was marked for deletion
+     * 
+     * This performs the complete file deletion process:
+     * - Deletes the physical file from disk
+     * - Removes entry from local_files table
+     * - Marks as deleted in mylist table (state=3)
+     * - Sends update to AniDB API
+     * 
+     * @param lid MyList ID of the file to delete
+     * @param deleteFromDisk If true, delete the physical file from disk
+     * @return true if deletion was initiated successfully
+     */
+    bool deleteFile(int lid, bool deleteFromDisk = true);
+    
+    /**
+     * @brief Delete all files currently marked for deletion
+     * 
+     * Processes all files in the deletion queue, deleting them one by one.
+     * Files are deleted in order of their mark score (lowest first).
+     * 
+     * @param deleteFromDisk If true, delete the physical files from disk
+     */
+    void deleteMarkedFiles(bool deleteFromDisk = true);
+    
+    /**
      * @brief Get all files marked for download
      * @return List of LIDs marked for download
      */
@@ -281,6 +306,30 @@ public:
      */
     void setWatchedPath(const QString& path);
     
+    /**
+     * @brief Check if actual file deletion is enabled
+     * @return true if files will be actually deleted (not just marked)
+     */
+    bool isActualDeletionEnabled() const;
+    
+    /**
+     * @brief Enable or disable actual file deletion
+     * @param enabled New state
+     */
+    void setActualDeletionEnabled(bool enabled);
+    
+    /**
+     * @brief Check if force delete permissions is enabled
+     * @return true if read-only attribute will be removed before deletion
+     */
+    bool isForceDeletePermissionsEnabled() const;
+    
+    /**
+     * @brief Enable or disable force delete permissions
+     * @param enabled New state
+     */
+    void setForceDeletePermissionsEnabled(bool enabled);
+    
     // ========== Persistence ==========
     
     /**
@@ -292,6 +341,19 @@ public:
      * @brief Save session data to database
      */
     void saveToDatabase();
+    
+public slots:
+    /**
+     * @brief Handle the result of a file deletion operation
+     * 
+     * Called by Window after adbapi->deleteFileFromMylist() completes.
+     * Only emits fileDeleted signal if the deletion was successful.
+     * 
+     * @param lid MyList ID of the file
+     * @param aid Anime ID the file belonged to
+     * @param success True if the file was successfully deleted
+     */
+    void onFileDeletionResult(int lid, int aid, bool success);
     
 signals:
     /**
@@ -313,6 +375,20 @@ signals:
      * @param updatedLids Set of MyList IDs that were updated (empty means refresh all)
      */
     void markingsUpdated(const QSet<int>& updatedLids);
+    
+    /**
+     * @brief Emitted when a file has been deleted
+     * @param lid MyList ID of the deleted file
+     * @param aid Anime ID the file belonged to
+     */
+    void fileDeleted(int lid, int aid);
+    
+    /**
+     * @brief Emitted to request file deletion (handled by Window which has API access)
+     * @param lid MyList ID of the file to delete
+     * @param deleteFromDisk If true, delete the physical file from disk
+     */
+    void deleteFileRequested(int lid, bool deleteFromDisk);
     
 private:
     // Session data
@@ -346,6 +422,8 @@ private:
     DeletionThresholdType m_thresholdType;      // Threshold type
     double m_thresholdValue;                    // Threshold value
     bool m_autoMarkDeletionEnabled;             // Auto-mark enabled
+    bool m_enableActualDeletion;                // Actually delete files (not just mark)
+    bool m_forceDeletePermissions;              // Try to remove read-only before deletion
     QString m_watchedPath;                      // Path for space monitoring (uses directory watcher path)
     bool m_initialScanComplete;                 // True after performInitialScan() is called
     
