@@ -5336,9 +5336,12 @@ void Window::onTrayShowHideAction()
 
 void Window::onTrayExitAction()
 {
-    // Bypass close to tray and exit directly
+    // Set a flag to bypass close-to-tray logic for this exit
+    // Don't modify the user's closeToTrayEnabled setting
+    bool originalCloseToTray = closeToTrayEnabled;
     closeToTrayEnabled = false;
     QApplication::quit();
+    // Note: Application will exit, so no need to restore the flag
 }
 
 // ========== Auto-start Implementation ==========
