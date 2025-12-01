@@ -306,6 +306,30 @@ public:
      */
     void setWatchedPath(const QString& path);
     
+    /**
+     * @brief Check if actual file deletion is enabled
+     * @return true if files will be actually deleted (not just marked)
+     */
+    bool isActualDeletionEnabled() const;
+    
+    /**
+     * @brief Enable or disable actual file deletion
+     * @param enabled New state
+     */
+    void setActualDeletionEnabled(bool enabled);
+    
+    /**
+     * @brief Check if force delete permissions is enabled
+     * @return true if read-only attribute will be removed before deletion
+     */
+    bool isForceDeletePermissionsEnabled() const;
+    
+    /**
+     * @brief Enable or disable force delete permissions
+     * @param enabled New state
+     */
+    void setForceDeletePermissionsEnabled(bool enabled);
+    
     // ========== Persistence ==========
     
     /**
@@ -398,6 +422,8 @@ private:
     DeletionThresholdType m_thresholdType;      // Threshold type
     double m_thresholdValue;                    // Threshold value
     bool m_autoMarkDeletionEnabled;             // Auto-mark enabled
+    bool m_enableActualDeletion;                // Actually delete files (not just mark)
+    bool m_forceDeletePermissions;              // Try to remove read-only before deletion
     QString m_watchedPath;                      // Path for space monitoring (uses directory watcher path)
     bool m_initialScanComplete;                 // True after performInitialScan() is called
     

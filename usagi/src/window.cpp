@@ -637,11 +637,11 @@ Window::Window()
     QLabel *deletionSettingsLabel = new QLabel("File Deletion:");
     sessionEnableAutoDeletionCheckbox = new QCheckBox("Enable automatic file deletion");
     sessionEnableAutoDeletionCheckbox->setToolTip("When enabled, files marked for deletion will be automatically deleted");
-    sessionEnableAutoDeletionCheckbox->setChecked(true);  // Default: enabled
+    sessionEnableAutoDeletionCheckbox->setChecked(false);  // Default: disabled for safety
     
     sessionForceDeletePermissionsCheckbox = new QCheckBox("Force delete (change permissions)");
     sessionForceDeletePermissionsCheckbox->setToolTip("Attempt to remove read-only attribute before deletion (Windows)");
-    sessionForceDeletePermissionsCheckbox->setChecked(true);  // Default: enabled
+    sessionForceDeletePermissionsCheckbox->setChecked(false);  // Default: disabled for safety
     
     pageSettings->addWidget(deletionSettingsLabel, 16, 0, 1, 2);
     pageSettings->addWidget(sessionEnableAutoDeletionCheckbox, 17, 0, 1, 2);
@@ -687,6 +687,16 @@ Window::Window()
     connect(sessionAutoMarkDeletionCheckbox, &QCheckBox::clicked, this, [this](bool checked) {
         if (watchSessionManager) {
             watchSessionManager->setAutoMarkDeletionEnabled(checked);
+        }
+    });
+    connect(sessionEnableAutoDeletionCheckbox, &QCheckBox::clicked, this, [this](bool checked) {
+        if (watchSessionManager) {
+            watchSessionManager->setActualDeletionEnabled(checked);
+        }
+    });
+    connect(sessionForceDeletePermissionsCheckbox, &QCheckBox::clicked, this, [this](bool checked) {
+        if (watchSessionManager) {
+            watchSessionManager->setForceDeletePermissionsEnabled(checked);
         }
     });
 
@@ -745,6 +755,8 @@ Window::Window()
     sessionThresholdTypeComboBox->blockSignals(true);
     sessionThresholdValueSpinBox->blockSignals(true);
     sessionAutoMarkDeletionCheckbox->blockSignals(true);
+    sessionEnableAutoDeletionCheckbox->blockSignals(true);
+    sessionForceDeletePermissionsCheckbox->blockSignals(true);
     
     sessionAheadBufferSpinBox->setValue(watchSessionManager->getAheadBuffer());
     int thresholdType = static_cast<int>(watchSessionManager->getDeletionThresholdType());
@@ -756,11 +768,15 @@ Window::Window()
     }
     sessionThresholdValueSpinBox->setValue(watchSessionManager->getDeletionThresholdValue());
     sessionAutoMarkDeletionCheckbox->setChecked(watchSessionManager->isAutoMarkDeletionEnabled());
+    sessionEnableAutoDeletionCheckbox->setChecked(watchSessionManager->isActualDeletionEnabled());
+    sessionForceDeletePermissionsCheckbox->setChecked(watchSessionManager->isForceDeletePermissionsEnabled());
     
     sessionAheadBufferSpinBox->blockSignals(false);
     sessionThresholdTypeComboBox->blockSignals(false);
     sessionThresholdValueSpinBox->blockSignals(false);
     sessionAutoMarkDeletionCheckbox->blockSignals(false);
+    sessionEnableAutoDeletionCheckbox->blockSignals(false);
+    sessionForceDeletePermissionsCheckbox->blockSignals(false);
     
     // Connect WatchSessionManager signals to refresh cards when markings change
     connect(watchSessionManager, &WatchSessionManager::markingsUpdated, this, [this](const QSet<int>& updatedLids) {
@@ -2256,6 +2272,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 if(lid > 0)
                 {
                     updateOrAddMylistEntry(lid);
+                    
+                    // Trigger deletion mechanism as file was updated (space may have changed)
+                    if (watchSessionManager && watchSessionManager->isAutoMarkDeletionEnabled()) {
+                        watchSessionManager->autoMarkFilesForDeletion();
+                    }
                 }
                 else
                 {
@@ -2370,6 +2391,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 				if(lid > 0)
 				{
 					updateOrAddMylistEntry(lid);
+					
+					// Trigger deletion mechanism as new files were added (space may have decreased)
+					if (watchSessionManager && watchSessionManager->isAutoMarkDeletionEnabled()) {
+						watchSessionManager->autoMarkFilesForDeletion();
+					}
 				}
 				
 				// Remove from unknown files widget if present (re-check succeeded)
