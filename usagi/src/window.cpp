@@ -763,11 +763,13 @@ Window::Window()
     
     // Connect WatchSessionManager fileDeleted signal to refresh UI
     connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
-        LOG(QString("[Window] File deleted: lid=%1, aid=%2 - refreshing cards").arg(lid).arg(aid));
-        Q_UNUSED(lid);
-        // Refresh all cards since the deleted file's card needs to be updated
+        LOG(QString("[Window] File deleted: lid=%1, aid=%2 - refreshing card").arg(lid).arg(aid));
+        Q_UNUSED(aid);
+        // Refresh only the card containing the deleted file
         if (cardManager) {
-            cardManager->refreshAllCards();
+            QSet<int> lids;
+            lids.insert(lid);
+            cardManager->refreshCardsForLids(lids);
         }
     });
     

@@ -3751,12 +3751,15 @@ QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
 			{
 				Logger::log(QString("[AniDB deleteFileFromMylist] Failed to delete file from disk: %1 - %2")
 				            .arg(filePath, file.errorString()), __FILE__, __LINE__);
-				// Continue with the process even if file deletion fails
+				// Skip all other steps if file deletion fails
+				return QString();
 			}
 		}
 		else
 		{
 			Logger::log(QString("[AniDB deleteFileFromMylist] File not found on disk: %1").arg(filePath), __FILE__, __LINE__);
+			// Skip all other steps if file doesn't exist
+			return QString();
 		}
 	}
 	
