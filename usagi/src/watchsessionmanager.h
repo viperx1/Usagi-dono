@@ -318,6 +318,19 @@ public:
      */
     void saveToDatabase();
     
+public slots:
+    /**
+     * @brief Handle the result of a file deletion operation
+     * 
+     * Called by Window after adbapi->deleteFileFromMylist() completes.
+     * Only emits fileDeleted signal if the deletion was successful.
+     * 
+     * @param lid MyList ID of the file
+     * @param aid Anime ID the file belonged to
+     * @param success True if the file was successfully deleted
+     */
+    void onFileDeletionResult(int lid, int aid, bool success);
+    
 signals:
     /**
      * @brief Emitted when a session state changes

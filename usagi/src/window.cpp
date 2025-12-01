@@ -757,7 +757,26 @@ Window::Window()
     connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
         LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2").arg(lid).arg(deleteFromDisk));
         if (adbapi) {
-            adbapi->deleteFileFromMylist(lid, deleteFromDisk);
+            // Get the aid before deletion for the callback
+            int aid = 0;
+            QSqlDatabase db = QSqlDatabase::database();
+            if (db.isOpen()) {
+                QSqlQuery q(db);
+                q.prepare("SELECT aid FROM mylist WHERE lid = ?");
+                q.addBindValue(lid);
+                if (q.exec() && q.next()) {
+                    aid = q.value(0).toInt();
+                }
+            }
+            
+            // Perform deletion and check result
+            QString result = adbapi->deleteFileFromMylist(lid, deleteFromDisk);
+            bool success = !result.isEmpty();
+            
+            // Notify WatchSessionManager of the result
+            if (watchSessionManager) {
+                watchSessionManager->onFileDeletionResult(lid, aid, success);
+            }
         }
     });
     

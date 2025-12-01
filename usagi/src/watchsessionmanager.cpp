@@ -700,16 +700,11 @@ bool WatchSessionManager::deleteFile(int lid, bool deleteFromDisk)
     m_fileMarks.remove(lid);
     
     // Emit signal to request file deletion (Window will handle it with API access)
-    // This performs local cleanup synchronously (database, file deletion) and 
-    // queues the AniDB API update asynchronously
+    // Window will call onFileDeletionResult() when the operation completes
     emit deleteFileRequested(lid, deleteFromDisk);
     
-    // Emit signals for UI update
-    // Note: fileDeleted is emitted after local cleanup is complete but before
-    // the asynchronous AniDB API update completes. This is acceptable because
-    // the UI should reflect the local state immediately.
+    // Emit fileMarkChanged immediately since we've removed from marks
     emit fileMarkChanged(lid, FileMarkType::None);
-    emit fileDeleted(lid, aid);
     
     LOG(QString("[WatchSessionManager] File deletion requested for lid=%1, aid=%2").arg(lid).arg(aid));
     return true;
@@ -723,6 +718,16 @@ void WatchSessionManager::deleteMarkedFiles(bool deleteFromDisk)
     
     for (int lid : filesToDelete) {
         deleteFile(lid, deleteFromDisk);
+    }
+}
+
+void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
+{
+    if (success) {
+        LOG(QString("[WatchSessionManager] File deletion succeeded for lid=%1, aid=%2").arg(lid).arg(aid));
+        emit fileDeleted(lid, aid);
+    } else {
+        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - not emitting fileDeleted").arg(lid).arg(aid));
     }
 }
 
