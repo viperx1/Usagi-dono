@@ -1278,6 +1278,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		Logger::log("[AniDB Response] 312 NO SUCH MYLIST ENTRY - Tag: " + Tag, __FILE__, __LINE__);
 		
 		// Check if this was a MYLISTDEL command
+		// Note: MYLISTDEL is implemented but not actively used (we use MYLISTADD with state=3 instead)
+		// The notifyMylistDel signal is available for future use if MYLISTDEL is needed
 		QSqlQuery query(db);
 		query.prepare("SELECT str FROM packets WHERE tag = ?");
 		query.addBindValue(Tag);
@@ -1286,7 +1288,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			QString cmd = query.value(0).toString();
 			if(cmd.startsWith("MYLISTDEL"))
 			{
-				// Extract lid from command
+				// Extract lid from command - use shared static regex
 				static const QRegularExpression lidRegex("lid=(\\d+)");
 				QRegularExpressionMatch match = lidRegex.match(cmd);
 				if(match.hasMatch())
@@ -1302,6 +1304,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		
 		// Parse the response to get the number of deleted entries
 		// Format: 211 MYLIST ENTRY DELETED\n{int count}
+		// Note: MYLISTDEL is implemented but not actively used (we use MYLISTADD with state=3 instead)
+		// The notifyMylistDel signal is available for future use if MYLISTDEL is needed
 		QStringList lines = Message.split("\n");
 		int count = 0;
 		if(lines.size() > 1)
@@ -1310,15 +1314,15 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			Logger::log(QString("[AniDB Response] %1 mylist entry(ies) deleted").arg(count), __FILE__, __LINE__);
 		}
 		
-		// Get the lid from the original command
+		// Get the lid from the original command - use shared static regex
+		static const QRegularExpression lidRegex("lid=(\\d+)");
 		QSqlQuery query(db);
 		query.prepare("SELECT str FROM packets WHERE tag = ?");
 		query.addBindValue(Tag);
 		if(query.exec() && query.next())
 		{
 			QString cmd = query.value(0).toString();
-			static const QRegularExpression lidRegex211("lid=(\\d+)");
-			QRegularExpressionMatch match = lidRegex211.match(cmd);
+			QRegularExpressionMatch match = lidRegex.match(cmd);
 			if(match.hasMatch())
 			{
 				int lid = match.captured(1).toInt();
@@ -3793,11 +3797,12 @@ QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
 	deleteChunks.addBindValue(lid);
 	deleteChunks.exec();
 	
-	// Step 5: Send MYLISTADD with state=3 (deleted) to mark as deleted in AniDB API
-	// This uses MYLISTADD with edit=1 to update the existing entry
+	// Step 5: Send MYLISTADD with state=3 to mark as deleted in AniDB API
+	// state=3 means "deleted" in AniDB mylist state enum (0=unknown, 1=HDD, 2=CD/DVD, 3=deleted)
+	// edit=true (1) means we're updating an existing mylist entry rather than creating a new one
 	if (size > 0 && !ed2k.isEmpty())
 	{
-		QString tag = MylistAdd(size, ed2k, 0, 3, "", true);  // state=3 (deleted), edit=true
+		QString tag = MylistAdd(size, ed2k, 0, 3, "", true);
 		Logger::log(QString("[AniDB deleteFileFromMylist] Sent MYLISTADD with state=3 for lid=%1, tag=%2")
 		            .arg(lid).arg(tag), __FILE__, __LINE__);
 		return tag;

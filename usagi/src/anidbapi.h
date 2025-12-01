@@ -475,8 +475,7 @@ private slots:
 	void checkForExistingExport();
 signals:
 	void notifyMylistAdd(QString, int);
-	void notifyMylistDel(QString tag, int lid, bool success);
-	void notifyFileDeleted(int lid, int aid, bool success);  // Emitted when file deletion process completes
+	void notifyMylistDel(QString tag, int lid, bool success);  // For MYLISTDEL command (kept for future use)
     void notifyLoggedIn(QString, int);
     void notifyLoggedOut(QString, int);
 	void notifyMessageReceived(int nid, QString message);
