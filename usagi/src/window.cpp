@@ -5259,15 +5259,12 @@ void Window::loadTraySettings()
     trayCloseToTray->setChecked(closeToTrayEnabled);
     trayStartMinimized->setChecked(startMinimizedEnabled);
     
-    // Update tray icon visibility
+    // Update tray icon visibility (this will show the tray icon if any tray feature is enabled)
     updateTrayIconVisibility();
     
-    // If start minimized is enabled, minimize to tray on startup
-    if (startMinimizedEnabled) {
+    // If start minimized is enabled and tray icon is properly shown, minimize to tray on startup
+    if (startMinimizedEnabled && trayIcon && trayIcon->isVisible()) {
         this->hide();
-        if (trayIcon) {
-            trayIcon->show();
-        }
         LOG("Application started minimized to tray");
     }
     
@@ -5299,13 +5296,18 @@ void Window::updateTrayIconVisibility()
         return;
     }
     
+    // Check if tray icon exists first
+    if (!trayIcon) {
+        return;
+    }
+    
     if (minimizeToTrayEnabled || closeToTrayEnabled || startMinimizedEnabled) {
-        if (trayIcon && !trayIcon->isVisible()) {
+        if (!trayIcon->isVisible()) {
             trayIcon->show();
             LOG("System tray icon shown");
         }
     } else {
-        if (trayIcon && trayIcon->isVisible()) {
+        if (trayIcon->isVisible()) {
             trayIcon->hide();
             LOG("System tray icon hidden");
         }
@@ -5362,10 +5364,15 @@ void Window::registerAutoStart()
     QFile file(desktopFile);
     if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QTextStream out(&file);
+        QString appPath = QCoreApplication::applicationFilePath();
+        // Escape the path for shell execution (quote if contains spaces or special characters)
+        if (appPath.contains(' ') || appPath.contains('\'') || appPath.contains('"')) {
+            appPath = "\"" + appPath.replace("\"", "\\\"") + "\"";
+        }
         out << "[Desktop Entry]\n";
         out << "Type=Application\n";
         out << "Name=Usagi-dono\n";
-        out << "Exec=" << QCoreApplication::applicationFilePath() << "\n";
+        out << "Exec=" << appPath << "\n";
         out << "X-GNOME-Autostart-enabled=true\n";
         file.close();
         LOG(QString("Auto-start registered (Linux): %1").arg(desktopFile));
