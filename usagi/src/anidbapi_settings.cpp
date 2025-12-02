@@ -8,7 +8,7 @@ static bool s_settingsLogged = false;
 void AniDBApi::saveSetting(const QString& name, const QString& value)
 {
 	QSqlQuery query;
-	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, '%1', '%2');").arg(name).arg(value);
+	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, '%1', '%2');").arg(name, value);
 	query.exec(q);
 }
 
