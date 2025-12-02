@@ -440,6 +440,17 @@ private:
     void saveSettings();
     void ensureTablesExist();
     
+    // Helper methods for new marking criteria
+    bool matchesPreferredAudioLanguage(int lid) const;
+    bool matchesPreferredSubtitleLanguage(int lid) const;
+    int getQualityScore(const QString& quality) const;  // Convert AniDB quality string to numeric score
+    QString getFileQuality(int lid) const;
+    QString getFileAudioLanguage(int lid) const;
+    QString getFileSubtitleLanguage(int lid) const;
+    int getFileRating(int lid) const;  // Get anime rating for this file
+    int getFileGroupId(int lid) const;  // Get group ID for this file
+    int getGroupStatus(int gid) const;  // Get group status (0=unknown, 1=ongoing, 2=stalled, 3=disbanded)
+    
     // Helper method to find active session info across series chain
     // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
     std::tuple<int, int, int> findActiveSessionInSeriesChain(int aid) const;
@@ -457,6 +468,27 @@ private:
     static const int SCORE_NOT_WATCHED = 50;
     static const int SCORE_DISTANCE_FACTOR = -1;  // Per episode away from current
     static const int SCORE_OLDER_REVISION = -1000;  // Per local file with higher version (older revisions more deletable)
+    static const int SCORE_PREFERRED_AUDIO = 30;  // Bonus for matching preferred audio language
+    static const int SCORE_PREFERRED_SUBTITLE = 20;  // Bonus for matching preferred subtitle language
+    static const int SCORE_NOT_PREFERRED_AUDIO = -40;  // Penalty for not matching preferred audio language
+    static const int SCORE_NOT_PREFERRED_SUBTITLE = -20;  // Penalty for not matching preferred subtitle language
+    static const int SCORE_HIGHER_QUALITY = 25;  // Bonus for higher quality/resolution
+    static const int SCORE_LOWER_QUALITY = -35;  // Penalty for lower quality/resolution
+    static const int SCORE_HIGH_RATING = 15;  // Bonus for highly rated anime (rating >= 800)
+    static const int SCORE_LOW_RATING = -15;  // Penalty for poorly rated anime (rating < 600)
+    
+    // Quality thresholds for scoring (based on AniDB quality field)
+    static constexpr int QUALITY_HIGH_THRESHOLD = 60;  // Quality score above this is considered high (e.g., "high", "very high")
+    static constexpr int QUALITY_LOW_THRESHOLD = 40;   // Quality score below this is considered low (e.g., "low", "very low")
+    
+    // Rating thresholds (on 0-1000 scale)
+    static constexpr int RATING_HIGH_THRESHOLD = 800;  // 8.0/10 - excellent anime
+    static constexpr int RATING_LOW_THRESHOLD = 600;   // 6.0/10 - below average anime
+    
+    // Group status scores
+    static const int SCORE_ACTIVE_GROUP = 20;      // Bonus for files from active groups
+    static const int SCORE_STALLED_GROUP = -10;    // Penalty for files from stalled groups
+    static const int SCORE_DISBANDED_GROUP = -25;  // Penalty for files from disbanded groups
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;

@@ -8,8 +8,11 @@ static bool s_settingsLogged = false;
 void AniDBApi::saveSetting(const QString& name, const QString& value)
 {
 	QSqlQuery query;
-	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, '%1', '%2');").arg(name).arg(value);
-	query.exec(q);
+	// Use prepared statement with explicit column names (id is auto-increment PRIMARY KEY)
+	query.prepare("INSERT OR REPLACE INTO `settings` (`name`, `value`) VALUES (?, ?)");
+	query.addBindValue(name);
+	query.addBindValue(value);
+	query.exec();
 }
 
 void AniDBApi::setUsername(QString username)
@@ -162,4 +165,49 @@ void AniDBApi::setFilterBarVisible(bool visible)
 {
 	AniDBApi::filterBarVisible = visible;
 	saveSetting("filterBarVisible", visible ? "1" : "0");
+}
+
+// File marking preferences
+QString AniDBApi::getPreferredAudioLanguages()
+{
+	return AniDBApi::preferredAudioLanguages;
+}
+
+void AniDBApi::setPreferredAudioLanguages(const QString& languages)
+{
+	AniDBApi::preferredAudioLanguages = languages;
+	saveSetting("preferredAudioLanguages", languages);
+}
+
+QString AniDBApi::getPreferredSubtitleLanguages()
+{
+	return AniDBApi::preferredSubtitleLanguages;
+}
+
+void AniDBApi::setPreferredSubtitleLanguages(const QString& languages)
+{
+	AniDBApi::preferredSubtitleLanguages = languages;
+	saveSetting("preferredSubtitleLanguages", languages);
+}
+
+bool AniDBApi::getPreferHighestVersion()
+{
+	return AniDBApi::preferHighestVersion;
+}
+
+void AniDBApi::setPreferHighestVersion(bool prefer)
+{
+	AniDBApi::preferHighestVersion = prefer;
+	saveSetting("preferHighestVersion", prefer ? "1" : "0");
+}
+
+bool AniDBApi::getPreferHighestQuality()
+{
+	return AniDBApi::preferHighestQuality;
+}
+
+void AniDBApi::setPreferHighestQuality(bool prefer)
+{
+	AniDBApi::preferHighestQuality = prefer;
+	saveSetting("preferHighestQuality", prefer ? "1" : "0");
 }

@@ -523,6 +523,70 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
+    // Check language preferences (if settings are enabled)
+    bool hasAudioMatch = matchesPreferredAudioLanguage(lid);
+    bool hasSubtitleMatch = matchesPreferredSubtitleLanguage(lid);
+    
+    if (hasAudioMatch) {
+        score += SCORE_PREFERRED_AUDIO;  // Bonus for matching preferred audio
+    } else {
+        // Only apply penalty if we have audio language info but it doesn't match
+        QString audioLang = getFileAudioLanguage(lid);
+        if (!audioLang.isEmpty()) {
+            score += SCORE_NOT_PREFERRED_AUDIO;  // Penalty for not matching
+        }
+    }
+    
+    if (hasSubtitleMatch) {
+        score += SCORE_PREFERRED_SUBTITLE;  // Bonus for matching preferred subtitles
+    } else {
+        // Only apply penalty if we have subtitle language info but it doesn't match
+        QString subLang = getFileSubtitleLanguage(lid);
+        if (!subLang.isEmpty()) {
+            score += SCORE_NOT_PREFERRED_SUBTITLE;  // Penalty for not matching
+        }
+    }
+    
+    // Check quality (if preference is enabled)
+    // Quality is the file.quality field from AniDB (e.g., "very high", "high", "medium", "low")
+    // Reuse existing database connection instead of creating a new one
+    if (db.isOpen()) {
+        QSqlQuery q2(db);
+        q2.prepare("SELECT value FROM settings WHERE name = 'preferHighestQuality'");
+        if (q2.exec() && q2.next() && q2.value(0).toString() == "1") {
+            QString quality = getFileQuality(lid);
+            int qualityScore = getQualityScore(quality);
+            
+            // Compare with thresholds - files above threshold get bonus, below get penalty
+            if (qualityScore >= QUALITY_HIGH_THRESHOLD) {
+                score += SCORE_HIGHER_QUALITY;  // High quality
+            } else if (qualityScore < QUALITY_LOW_THRESHOLD) {
+                score += SCORE_LOWER_QUALITY;  // Low quality
+            }
+        }
+    }
+    
+    // Check anime rating
+    int rating = getFileRating(lid);
+    if (rating >= RATING_HIGH_THRESHOLD) {
+        score += SCORE_HIGH_RATING;  // Highly rated anime - keep longer
+    } else if (rating > 0 && rating < RATING_LOW_THRESHOLD) {
+        score += SCORE_LOW_RATING;  // Poorly rated anime - more eligible for deletion
+    }
+    
+    // Check group status
+    int gid = getFileGroupId(lid);
+    if (gid > 0) {
+        int groupStatus = getGroupStatus(gid);
+        if (groupStatus == 1) {  // Ongoing
+            score += SCORE_ACTIVE_GROUP;  // Active groups are preferred
+        } else if (groupStatus == 2) {  // Stalled
+            score += SCORE_STALLED_GROUP;  // Stalled groups get penalty
+        } else if (groupStatus == 3) {  // Disbanded
+            score += SCORE_DISBANDED_GROUP;  // Disbanded groups get larger penalty
+        }
+    }
+    
     // Calculate distance-based scoring across the series chain
     // Distance is the primary factor - episodes far from current position are more deletable
     if (aid > 0) {
@@ -1293,3 +1357,218 @@ int WatchSessionManager::getHigherVersionFileCount(int lid) const
     
     return 0;
 }
+
+// Helper methods for new marking criteria
+bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
+{
+    QString audioLang = getFileAudioLanguage(lid);
+    if (audioLang.isEmpty()) {
+        return false;  // No audio language info
+    }
+    
+    // Get preferred languages from global settings
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return false;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT value FROM settings WHERE name = 'preferredAudioLanguages'");
+    if (!q.exec() || !q.next()) {
+        return false;  // No preference set
+    }
+    
+    QString preferredLangs = q.value(0).toString().toLower();
+    QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
+    
+    // Normalize and check if file's audio language matches any preferred language
+    // Use word boundary matching to avoid false positives (e.g., 'eng' in 'bengali')
+    QString normalizedAudioLang = audioLang.toLower().trimmed();
+    for (const QString& lang : langList) {
+        QString trimmedLang = lang.trimmed();
+        // Check for exact match or word boundary match
+        if (normalizedAudioLang == trimmedLang || 
+            normalizedAudioLang.startsWith(trimmedLang + " ") ||
+            normalizedAudioLang.endsWith(" " + trimmedLang) ||
+            normalizedAudioLang.contains(" " + trimmedLang + " ")) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
+{
+    QString subLang = getFileSubtitleLanguage(lid);
+    if (subLang.isEmpty()) {
+        return false;  // No subtitle language info
+    }
+    
+    // Get preferred languages from global settings
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return false;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT value FROM settings WHERE name = 'preferredSubtitleLanguages'");
+    if (!q.exec() || !q.next()) {
+        return false;  // No preference set
+    }
+    
+    QString preferredLangs = q.value(0).toString().toLower();
+    QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
+    
+    // Normalize and check if file's subtitle language matches any preferred language
+    // Use word boundary matching to avoid false positives (e.g., 'eng' in 'bengali')
+    QString normalizedSubLang = subLang.toLower().trimmed();
+    for (const QString& lang : langList) {
+        QString trimmedLang = lang.trimmed();
+        // Check for exact match or word boundary match
+        if (normalizedSubLang == trimmedLang || 
+            normalizedSubLang.startsWith(trimmedLang + " ") ||
+            normalizedSubLang.endsWith(" " + trimmedLang) ||
+            normalizedSubLang.contains(" " + trimmedLang + " ")) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+int WatchSessionManager::getQualityScore(const QString& quality) const
+{
+    // Convert AniDB quality string to numeric score
+    // AniDB quality values: "very high", "high", "medium", "low", "very low", "corrupted", "eyecancer"
+    // Higher score = better quality (less likely to delete)
+    QString q = quality.toLower().trimmed();
+    
+    if (q == "very high") return 100;
+    if (q == "high") return 80;
+    if (q == "medium") return 60;
+    if (q == "low") return 40;
+    if (q == "very low") return 20;
+    if (q == "corrupted" || q == "eyecancer") return 10;
+    
+    return 50;  // Unknown/default quality
+}
+
+QString WatchSessionManager::getFileQuality(int lid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.quality FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+QString WatchSessionManager::getFileAudioLanguage(int lid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.lang_dub FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+QString WatchSessionManager::getFileSubtitleLanguage(int lid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.lang_sub FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+int WatchSessionManager::getFileRating(int lid) const
+{
+    // Get anime rating for this file (0-1000 scale, where 800+ is excellent)
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    // Extract numeric rating from anime.rating field (format: "8.23" -> 823)
+    q.prepare("SELECT a.rating FROM mylist m JOIN anime a ON m.aid = a.aid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        QString ratingStr = q.value(0).toString();
+        if (!ratingStr.isEmpty()) {
+            // Convert "8.23" to 823 using qRound for predictable rounding
+            double rating = ratingStr.toDouble() * 100.0;
+            return qRound(rating);
+        }
+    }
+    
+    return 0;  // No rating available
+}
+
+int WatchSessionManager::getFileGroupId(int lid) const
+{
+    // Get group ID for this file
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.gid FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 0;  // No group ID available
+}
+
+int WatchSessionManager::getGroupStatus(int gid) const
+{
+    // Get group status from database
+    // Status values: 0=unknown, 1=ongoing, 2=stalled, 3=disbanded
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT status FROM `group` WHERE gid = ?");
+    q.addBindValue(gid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 0;  // Unknown status
+}
+

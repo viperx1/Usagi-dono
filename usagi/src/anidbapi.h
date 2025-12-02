@@ -73,6 +73,12 @@ private:
 	
 	// Filter bar visibility settings
 	bool filterBarVisible;
+	
+	// File marking preferences
+	QString preferredAudioLanguages;  // Comma-separated list of preferred audio languages (e.g., "japanese,english")
+	QString preferredSubtitleLanguages;  // Comma-separated list of preferred subtitle languages (e.g., "english,none")
+	bool preferHighestVersion;  // Prefer highest version when marking files
+	bool preferHighestQuality;  // Prefer highest quality when marking files
     /* Settings End === */
 
 	int protover; // AniDB API version = 3
@@ -469,6 +475,16 @@ public:
 	bool getFilterBarVisible();
 	void setFilterBarVisible(bool visible);
 	
+	// File marking preferences
+	QString getPreferredAudioLanguages();
+	void setPreferredAudioLanguages(const QString& languages);
+	QString getPreferredSubtitleLanguages();
+	void setPreferredSubtitleLanguages(const QString& languages);
+	bool getPreferHighestVersion();
+	void setPreferHighestVersion(bool prefer);
+	bool getPreferHighestQuality();
+	void setPreferHighestQuality(bool prefer);
+	
 private:
 	// Helper method for saving settings to database
 	void saveSetting(const QString& name, const QString& value);
@@ -485,6 +501,11 @@ public:
 	bool shouldCheckCalendar();
 	void checkCalendarIfNeeded();
 	/* Anime Titles End === */
+	
+	/* === Group Status Start */
+	// Request group status information from AniDB
+	void requestGroupStatus(int gid);
+	/* Group Status End === */
 	
 	/* === Duplicate Detection Start */
 	// Get list of local_files IDs with same ed2k_hash (duplicates)

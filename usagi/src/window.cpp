@@ -723,6 +723,45 @@ Window::Window()
     autoStartLayout->addWidget(autoStartEnabled);
     settingsMainLayout->addWidget(autoStartGroup);
     
+    // File Marking Preferences Group
+    QGroupBox *fileMarkingGroup = new QGroupBox("File Marking Preferences");
+    QGridLayout *fileMarkingLayout = new QGridLayout(fileMarkingGroup);
+    
+    QLabel *audioLangLabel = new QLabel("Preferred Audio Languages:");
+    audioLangLabel->setToolTip("Comma-separated list of preferred audio languages (e.g., japanese,english)\n"
+                                "Files matching these languages will be prioritized for keeping.");
+    QLineEdit *preferredAudioLanguagesEdit = new QLineEdit();
+    preferredAudioLanguagesEdit->setObjectName("preferredAudioLanguagesEdit");
+    preferredAudioLanguagesEdit->setText(adbapi->getPreferredAudioLanguages());
+    preferredAudioLanguagesEdit->setPlaceholderText("japanese,english");
+    
+    QLabel *subLangLabel = new QLabel("Preferred Subtitle Languages:");
+    subLangLabel->setToolTip("Comma-separated list of preferred subtitle languages (e.g., english,none)\n"
+                              "Files matching these languages will be prioritized for keeping.");
+    QLineEdit *preferredSubtitleLanguagesEdit = new QLineEdit();
+    preferredSubtitleLanguagesEdit->setObjectName("preferredSubtitleLanguagesEdit");
+    preferredSubtitleLanguagesEdit->setText(adbapi->getPreferredSubtitleLanguages());
+    preferredSubtitleLanguagesEdit->setPlaceholderText("english,none");
+    
+    QCheckBox *preferHighestVersionCheckbox = new QCheckBox("Prefer highest version");
+    preferHighestVersionCheckbox->setObjectName("preferHighestVersionCheckbox");
+    preferHighestVersionCheckbox->setChecked(adbapi->getPreferHighestVersion());
+    preferHighestVersionCheckbox->setToolTip("When multiple versions of the same episode exist, prefer the highest version");
+    
+    QCheckBox *preferHighestQualityCheckbox = new QCheckBox("Prefer highest quality");
+    preferHighestQualityCheckbox->setObjectName("preferHighestQualityCheckbox");
+    preferHighestQualityCheckbox->setChecked(adbapi->getPreferHighestQuality());
+    preferHighestQualityCheckbox->setToolTip("Prefer files with higher quality and resolution");
+    
+    fileMarkingLayout->addWidget(audioLangLabel, 0, 0);
+    fileMarkingLayout->addWidget(preferredAudioLanguagesEdit, 0, 1);
+    fileMarkingLayout->addWidget(subLangLabel, 1, 0);
+    fileMarkingLayout->addWidget(preferredSubtitleLanguagesEdit, 1, 1);
+    fileMarkingLayout->addWidget(preferHighestVersionCheckbox, 2, 0, 1, 2);
+    fileMarkingLayout->addWidget(preferHighestQualityCheckbox, 3, 0, 1, 2);
+    
+    settingsMainLayout->addWidget(fileMarkingGroup);
+    
     // Action Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonSaveSettings = new QPushButton("Save Settings");
@@ -2393,6 +2432,27 @@ void Window::saveSettings()
 	// Update auto-start registration if changed
 	if (autoStartWasEnabled != autoStartNowEnabled) {
 		setAutoStartEnabled(autoStartNowEnabled);
+	}
+	
+	// Save file marking preferences
+	QLineEdit *audioEdit = this->findChild<QLineEdit*>("preferredAudioLanguagesEdit");
+	if (audioEdit) {
+		adbapi->setPreferredAudioLanguages(audioEdit->text());
+	}
+	
+	QLineEdit *subtitleEdit = this->findChild<QLineEdit*>("preferredSubtitleLanguagesEdit");
+	if (subtitleEdit) {
+		adbapi->setPreferredSubtitleLanguages(subtitleEdit->text());
+	}
+	
+	QCheckBox *versionCheckbox = this->findChild<QCheckBox*>("preferHighestVersionCheckbox");
+	if (versionCheckbox) {
+		adbapi->setPreferHighestVersion(versionCheckbox->isChecked());
+	}
+	
+	QCheckBox *qualityCheckbox = this->findChild<QCheckBox*>("preferHighestQualityCheckbox");
+	if (qualityCheckbox) {
+		adbapi->setPreferHighestQuality(qualityCheckbox->isChecked());
 	}
 	
 	LOG("Settings saved");
