@@ -4811,10 +4811,20 @@ void Window::applyMylistFilters()
 	// If series chain display is enabled and search text is provided, expand results to include full chains
 	if (showSeriesChain && !searchText.isEmpty() && watchSessionManager) {
 		QSet<int> expandedAnimeIds;  // Use a set to avoid duplicates
+		QMap<int, QList<int>> chainCache;  // Cache series chains to avoid redundant lookups
 		
 		// For each anime in filtered results, get its entire series chain
 		for (int aid : filteredAnimeIds) {
-			QList<int> seriesChain = watchSessionManager->getSeriesChain(aid);
+			QList<int> seriesChain;
+			if (!chainCache.contains(aid)) {
+				seriesChain = watchSessionManager->getSeriesChain(aid);
+				// Cache the chain for all anime in it
+				for (int chainAid : seriesChain) {
+					chainCache[chainAid] = seriesChain;
+				}
+			} else {
+				seriesChain = chainCache[aid];
+			}
 			
 			// Add all anime in the chain to the expanded set
 			for (int chainAid : seriesChain) {
@@ -4827,15 +4837,13 @@ void Window::applyMylistFilters()
 		
 		// Convert set back to list and replace filtered results
 		if (!expandedAnimeIds.isEmpty()) {
-			filteredAnimeIds.clear();
-			filteredAnimeIds = expandedAnimeIds.values();
+			QSet<int> allAnimeIdsSet = QSet<int>(allAnimeIds.constBegin(), allAnimeIds.constEnd());
 			
-			// Sort the expanded list to maintain chain order
-			// Group by series chain and sort within each chain
+			// Group by series chain
 			QMap<int, QList<int>> chainGroups;  // Map from first anime in chain -> list of anime in that chain
 			
-			for (int aid : filteredAnimeIds) {
-				QList<int> chain = watchSessionManager->getSeriesChain(aid);
+			for (int aid : expandedAnimeIds) {
+				QList<int> chain = chainCache.value(aid);
 				if (!chain.isEmpty()) {
 					int firstAid = chain.first();  // Use first anime as group key
 					if (!chainGroups.contains(firstAid)) {
@@ -4845,11 +4853,15 @@ void Window::applyMylistFilters()
 			}
 			
 			// Rebuild the filtered list with chains grouped together
+			// Use QSet for O(1) lookup instead of QList::contains which is O(n)
+			QSet<int> addedIds;
 			filteredAnimeIds.clear();
+			
 			for (const QList<int>& chain : std::as_const(chainGroups)) {
 				for (int aid : chain) {
-					if (!filteredAnimeIds.contains(aid) && allAnimeIds.contains(aid)) {
+					if (!addedIds.contains(aid) && allAnimeIdsSet.contains(aid)) {
 						filteredAnimeIds.append(aid);
+						addedIds.insert(aid);
 					}
 				}
 			}
@@ -4864,12 +4876,22 @@ void Window::applyMylistFilters()
 	
 	// If series chain display is enabled, set arrows for cards that have a sequel in the filtered list
 	if (showSeriesChain && watchSessionManager) {
+		// Cache series chains to avoid redundant lookups
+		QMap<int, QList<int>> chainCache;
+		
 		for (int i = 0; i < filteredAnimeIds.size() - 1; ++i) {
 			int currentAid = filteredAnimeIds[i];
 			int nextAid = filteredAnimeIds[i + 1];
 			
-			// Check if nextAid is the sequel of currentAid
-			QList<int> chain = watchSessionManager->getSeriesChain(currentAid);
+			// Get cached chain or fetch and cache it
+			QList<int> chain;
+			if (!chainCache.contains(currentAid)) {
+				chain = watchSessionManager->getSeriesChain(currentAid);
+				chainCache[currentAid] = chain;
+			} else {
+				chain = chainCache[currentAid];
+			}
+			
 			int currentIndex = chain.indexOf(currentAid);
 			
 			if (currentIndex >= 0 && currentIndex < chain.size() - 1) {
