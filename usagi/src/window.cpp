@@ -4812,6 +4812,7 @@ void Window::applyMylistFilters()
 	if (showSeriesChain && !searchText.isEmpty() && watchSessionManager) {
 		QSet<int> expandedAnimeIds;  // Use a set to avoid duplicates
 		QMap<int, QList<int>> chainCache;  // Cache series chains to avoid redundant lookups
+		QSet<int> allAnimeIdsSet = QSet<int>(allAnimeIds.constBegin(), allAnimeIds.constEnd());  // Convert once for O(1) lookups
 		
 		// For each anime in filtered results, get its entire series chain
 		for (int aid : filteredAnimeIds) {
@@ -4828,8 +4829,8 @@ void Window::applyMylistFilters()
 			
 			// Add all anime in the chain to the expanded set
 			for (int chainAid : seriesChain) {
-				// Only add if it's in the full list of available anime
-				if (allAnimeIds.contains(chainAid)) {
+				// Only add if it's in the full list of available anime (O(1) lookup with set)
+				if (allAnimeIdsSet.contains(chainAid)) {
 					expandedAnimeIds.insert(chainAid);
 				}
 			}
@@ -4837,8 +4838,6 @@ void Window::applyMylistFilters()
 		
 		// Convert set back to list and replace filtered results
 		if (!expandedAnimeIds.isEmpty()) {
-			QSet<int> allAnimeIdsSet = QSet<int>(allAnimeIds.constBegin(), allAnimeIds.constEnd());
-			
 			// Group by series chain
 			QMap<int, QList<int>> chainGroups;  // Map from first anime in chain -> list of anime in that chain
 			

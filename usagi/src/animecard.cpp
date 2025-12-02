@@ -702,23 +702,32 @@ void AnimeCard::paintEvent(QPaintEvent *event)
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         
-        // Draw arrow on the right side of the card pointing to the next card
-        int arrowX = width() - 15;  // 15 pixels from right edge
+        // Constants for arrow positioning and appearance
+        const int arrowMarginRight = 15;  // Distance from right edge
+        const int arrowLineLength = 30;    // Length of horizontal line
+        const int arrowLineOffsetFromTip = 5;  // Distance from tip to start of line
+        const int arrowHeadHeight = 8;     // Half-height of arrow head triangle
+        const int arrowLineThickness = 3;  // Pen thickness
+        const QColor arrowColor(0, 120, 215);  // Blue color for visibility
+        
+        // Calculate arrow position
+        int arrowX = width() - arrowMarginRight;  // Right side of card
         int arrowY = height() / 2;   // Vertically centered
         
-        // Set arrow color - use a visible color that stands out
-        painter.setPen(QPen(QColor(0, 120, 215), 3));  // Blue arrow, 3px thick
-        painter.setBrush(QColor(0, 120, 215));
+        // Set arrow color
+        painter.setPen(QPen(arrowColor, arrowLineThickness));
+        painter.setBrush(arrowColor);
         
         // Draw arrow shape: ──>
         // Horizontal line
-        painter.drawLine(arrowX - 30, arrowY, arrowX - 5, arrowY);
+        painter.drawLine(arrowX - arrowLineLength, arrowY, 
+                        arrowX - arrowLineOffsetFromTip, arrowY);
         
         // Arrow head (triangle pointing right)
         QPolygon arrowHead;
-        arrowHead << QPoint(arrowX - 5, arrowY - 8)   // Top point
-                  << QPoint(arrowX, arrowY)           // Tip point
-                  << QPoint(arrowX - 5, arrowY + 8);  // Bottom point
+        arrowHead << QPoint(arrowX - arrowLineOffsetFromTip, arrowY - arrowHeadHeight)  // Top point
+                  << QPoint(arrowX, arrowY)                                              // Tip point
+                  << QPoint(arrowX - arrowLineOffsetFromTip, arrowY + arrowHeadHeight); // Bottom point
         painter.drawPolygon(arrowHead);
     }
 }
