@@ -75,7 +75,11 @@ set(HEADERS
 )
 
 # Create executable
-add_executable(usagi ${SOURCES} ${HEADERS})
+if(WIN32)
+    add_executable(usagi ${SOURCES} ${HEADERS} usagi.rc)
+else()
+    add_executable(usagi ${SOURCES} ${HEADERS})
+endif()
 
 # Link Qt libraries - DYNAMIC LINKING ONLY
 # Simplified linking for dynamic Qt builds
