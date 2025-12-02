@@ -55,12 +55,7 @@ void WatchSessionManager::ensureTablesExist()
            ")");
     q.exec("CREATE INDEX IF NOT EXISTS idx_session_watched_aid ON session_watched_episodes(aid)");
     
-    // Create file_marks table for manual/auto file markings
-    q.exec("CREATE TABLE IF NOT EXISTS file_marks ("
-           "lid INTEGER PRIMARY KEY, "
-           "mark_type INTEGER DEFAULT 0, "
-           "mark_score INTEGER DEFAULT 0"
-           ")");
+    // Note: file_marks table removed - all marks are calculated on demand and kept in memory only
 }
 
 void WatchSessionManager::loadSettings()
@@ -193,15 +188,7 @@ void WatchSessionManager::loadFromDatabase()
         }
     }
     
-    // Load file marks
-    q.exec("SELECT lid, mark_type, mark_score FROM file_marks");
-    while (q.next()) {
-        FileMarkInfo info;
-        info.lid = q.value(0).toInt();
-        info.markType = static_cast<FileMarkType>(q.value(1).toInt());
-        info.markScore = q.value(2).toInt();
-        m_fileMarks[info.lid] = info;
-    }
+    // Note: file_marks are no longer persisted - they are calculated on demand and kept in memory only
 }
 
 void WatchSessionManager::saveToDatabase()
@@ -244,26 +231,7 @@ void WatchSessionManager::saveToDatabase()
         }
     }
     
-    // Save file marks - delete all existing marks first to ensure sync with memory
-    // This prevents stale marks from remaining in the database when files are unmarked
-    if (!q.exec("DELETE FROM file_marks")) {
-        LOG(QString("ERROR: Failed to delete file_marks: %1").arg(q.lastError().text()));
-        db.rollback();
-        return;
-    }
-    
-    for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
-        const FileMarkInfo& info = it.value();
-        q.prepare("INSERT OR REPLACE INTO file_marks (lid, mark_type, mark_score) VALUES (?, ?, ?)");
-        q.addBindValue(info.lid);
-        q.addBindValue(static_cast<int>(info.markType));
-        q.addBindValue(info.markScore);
-        if (!q.exec()) {
-            LOG(QString("ERROR: Failed to insert file_mark for lid=%1: %2").arg(info.lid).arg(q.lastError().text()));
-            db.rollback();
-            return;
-        }
-    }
+    // Note: file_marks are no longer persisted to database - they are kept in memory only
     
     // Commit transaction
     if (!db.commit()) {
