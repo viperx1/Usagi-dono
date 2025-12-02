@@ -5173,6 +5173,51 @@ Mask AniDBApi::calculateReducedMask(const Mask& originalMask, const QByteArray& 
  */
 void AniDBApi::storeFileData(const FileData& data)
 {
+	// Debug: Log the state field value and extracted version
+	// State field bit encoding (from AniDB UDP API):
+	//   Bit 0 (1): FILE_CRCOK
+	//   Bit 1 (2): FILE_CRCERR
+	//   Bit 2 (4): FILE_ISV2 - file is version 2
+	//   Bit 3 (8): FILE_ISV3 - file is version 3
+	//   Bit 4 (16): FILE_ISV4 - file is version 4
+	//   Bit 5 (32): FILE_ISV5 - file is version 5
+	//   Bit 6 (64): FILE_UNC - uncensored
+	//   Bit 7 (128): FILE_CEN - censored
+	if (!data.state.isEmpty()) {
+		bool ok;
+		int stateValue = data.state.toInt(&ok);
+		if (ok) {
+			// Extract version from state bits 2-5
+			int version = 1;  // Default to version 1
+			if (stateValue & 32) {      // Bit 5: FILE_ISV5
+				version = 5;
+			} else if (stateValue & 16) { // Bit 4: FILE_ISV4
+				version = 4;
+			} else if (stateValue & 8) {  // Bit 3: FILE_ISV3
+				version = 3;
+			} else if (stateValue & 4) {  // Bit 2: FILE_ISV2
+				version = 2;
+			}
+			
+			// Decode CRC status
+			QString crcStatus = "not checked";
+			if (stateValue & 1) {
+				crcStatus = "CRC OK";
+			} else if (stateValue & 2) {
+				crcStatus = "CRC ERROR";
+			}
+			
+			Logger::log(QString("[AniDB storeFileData] fid=%1, raw_state=%2 (0x%3), extracted_version=%4, crc_status=%5")
+				.arg(data.fid).arg(stateValue).arg(stateValue, 0, 16).arg(version).arg(crcStatus), __FILE__, __LINE__);
+		} else {
+			Logger::log(QString("[AniDB storeFileData] fid=%1, state field not numeric: '%2'")
+				.arg(data.fid).arg(data.state), __FILE__, __LINE__);
+		}
+	} else {
+		Logger::log(QString("[AniDB storeFileData] fid=%1, state field is empty")
+			.arg(data.fid), __FILE__, __LINE__);
+	}
+	
 	QString q = QString("INSERT OR REPLACE INTO `file` "
 		"(`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, "
 		"`size`, `ed2k`, `md5`, `sha1`, `crc`, `quality`, `source`, "

@@ -433,7 +433,7 @@ private:
     int getEpisodeNumber(int lid) const;
     int getAnimeIdForFile(int lid) const;
     bool isCardHidden(int aid) const;
-    int getFileVersion(int lid) const;  // Get file version from state bits
+    int getFileVersion(int lid) const;  // Get file version from state bits (bits 2-5 as flags: v2=4, v3=8, v4=16, v5=32, none=v1)
     int getFileCountForEpisode(int lid) const;  // Get number of local files for same episode
     int getHigherVersionFileCount(int lid) const;  // Count local files with higher version for same episode
     void loadSettings();
