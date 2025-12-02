@@ -2314,10 +2314,15 @@ void Window::closeEvent(QCloseEvent *event)
         safeclose->start();
         event->ignore();
 	}
-    if(!adbapi->LoggedIn() || waitforlogout.elapsed() > 5000)
+    else if(!adbapi->LoggedIn() || waitforlogout.elapsed() > 5000)
     {
         event->accept();
         LOG("Window close accepted, application exiting");
+    }
+    else
+    {
+        // Still waiting for logout to complete
+        event->ignore();
     }
 }
 
