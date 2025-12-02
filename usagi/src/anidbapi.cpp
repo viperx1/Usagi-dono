@@ -141,7 +141,16 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// binding_status: 0=not_bound, 1=bound_to_anime, 2=not_anime
 		// marked_for_deletion: 0=keep, 1=marked for deletion (duplicate)
 		// duplicate_score: higher score = better quality/preference (used to determine which duplicate to keep)
-		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT, `binding_status` INTEGER DEFAULT 0, `file_size` BIGINT, `marked_for_deletion` INTEGER DEFAULT 0, `duplicate_score` INTEGER DEFAULT 0)");
+		query.exec("CREATE TABLE IF NOT EXISTS `local_files`("
+		           "`id` INTEGER PRIMARY KEY AUTOINCREMENT, "
+		           "`path` TEXT UNIQUE, "
+		           "`filename` TEXT, "
+		           "`status` INTEGER DEFAULT 0, "
+		           "`ed2k_hash` TEXT, "
+		           "`binding_status` INTEGER DEFAULT 0, "
+		           "`file_size` BIGINT, "
+		           "`marked_for_deletion` INTEGER DEFAULT 0, "
+		           "`duplicate_score` INTEGER DEFAULT 0)");
 		// Add ed2k_hash column to local_files if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `local_files` ADD COLUMN `ed2k_hash` TEXT");
 		// Add binding_status column to local_files if it doesn't exist (for existing databases)
@@ -5691,6 +5700,7 @@ bool AniDBApi::extractMasksFromCommand(const QString& command, unsigned int& fma
 /**
  * Get list of local_files IDs with the same ed2k_hash (duplicates).
  * Returns empty list if no duplicates found or if hash is NULL/empty.
+ * Results are not ordered - caller should sort if needed.
  */
 QList<int> AniDBApi::getDuplicateLocalFileIds(const QString& ed2k_hash)
 {
@@ -5702,7 +5712,7 @@ QList<int> AniDBApi::getDuplicateLocalFileIds(const QString& ed2k_hash)
 	
 	QSqlQuery query(db);
 	
-	query.prepare("SELECT id FROM local_files WHERE ed2k_hash = ? ORDER BY id");
+	query.prepare("SELECT id FROM local_files WHERE ed2k_hash = ?");
 	query.addBindValue(ed2k_hash);
 	
 	if (!query.exec()) {
