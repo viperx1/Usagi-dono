@@ -598,7 +598,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				}
 				else
 				{
-					LOG(QString("Successfully added mylist entry - lid=%1, fid=%2").arg(lid).arg(fid));
+					LOG(QString("Successfully added mylist entry - lid=%1, fid=%2").arg(lid, fid));
 				}
 			}
 			else
