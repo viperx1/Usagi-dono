@@ -107,3 +107,18 @@ endif()
 target_include_directories(usagi PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+# Copy icon files to build output directory for runtime loading
+add_custom_command(TARGET usagi POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/usagi.ico
+        $<TARGET_FILE_DIR:usagi>/usagi.ico
+    COMMENT "Copying usagi.ico to output directory"
+)
+
+add_custom_command(TARGET usagi POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/usagi.png
+        $<TARGET_FILE_DIR:usagi>/usagi.png
+    COMMENT "Copying usagi.png to output directory"
+)

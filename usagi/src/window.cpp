@@ -5217,6 +5217,8 @@ QIcon Window::loadUsagiIcon()
         ":/usagi.png"          // Qt resource (if added to .qrc in future)
     };
     
+    LOG(QString("Searching for icon. Application dir: %1").arg(QCoreApplication::applicationDirPath()));
+    
     for (const QString &path : iconPaths) {
         // Handle Qt resource paths separately (they don't exist as files)
         if (path.startsWith(":/")) {
@@ -5232,6 +5234,8 @@ QIcon Window::loadUsagiIcon()
                 if (!icon.isNull()) {
                     LOG(QString("Loaded icon from: %1").arg(path));
                     return icon;
+                } else {
+                    LOG(QString("Icon file exists but failed to load: %1").arg(path));
                 }
             }
         }
