@@ -5357,8 +5357,9 @@ void Window::onTrayExitAction()
         waitforlogout.start();
         safeclose->start();
     } else {
-        // Not logged in, close immediately
-        this->close();
+        // Not logged in, initiate close via timer for consistency
+        LOG("Tray exit requested while not logged in, closing immediately");
+        safeclose->start();
     }
     // Note: Application will exit, so no need to restore the flag
 }
