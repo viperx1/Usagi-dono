@@ -8,8 +8,10 @@ static bool s_settingsLogged = false;
 void AniDBApi::saveSetting(const QString& name, const QString& value)
 {
 	QSqlQuery query;
-	QString q = QString("INSERT OR REPLACE INTO `settings` VALUES (NULL, '%1', '%2');").arg(name, value);
-	query.exec(q);
+	query.prepare("INSERT OR REPLACE INTO `settings` (name, value) VALUES (?, ?)");
+	query.addBindValue(name);
+	query.addBindValue(value);
+	query.exec();
 }
 
 void AniDBApi::setUsername(QString username)

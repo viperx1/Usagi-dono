@@ -477,6 +477,16 @@ private:
     static const int SCORE_HIGH_RATING = 15;  // Bonus for highly rated anime (rating >= 800)
     static const int SCORE_LOW_RATING = -15;  // Penalty for poorly rated anime (rating < 600)
     
+    // Quality/resolution thresholds for scoring
+    static constexpr int QUALITY_HIGH_THRESHOLD = 60;  // Quality score above this is considered high
+    static constexpr int QUALITY_LOW_THRESHOLD = 40;   // Quality score below this is considered low
+    static constexpr int RESOLUTION_HIGH_THRESHOLD = 60;  // Resolution score above this is considered high
+    static constexpr int RESOLUTION_LOW_THRESHOLD = 40;   // Resolution score below this is considered low
+    
+    // Rating thresholds (on 0-1000 scale)
+    static constexpr int RATING_HIGH_THRESHOLD = 800;  // 8.0/10 - excellent anime
+    static constexpr int RATING_LOW_THRESHOLD = 600;   // 6.0/10 - below average anime
+    
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
     static constexpr double DEFAULT_THRESHOLD_VALUE = 50.0; // 50 GB or 50%

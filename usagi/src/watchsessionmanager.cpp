@@ -548,9 +548,9 @@ int WatchSessionManager::calculateMarkScore(int lid) const
     }
     
     // Check quality and resolution (if preference is enabled)
-    QSqlDatabase db2 = QSqlDatabase::database();
-    if (db2.isOpen()) {
-        QSqlQuery q2(db2);
+    // Reuse existing database connection instead of creating a new one
+    if (db.isOpen()) {
+        QSqlQuery q2(db);
         q2.prepare("SELECT value FROM settings WHERE name = 'preferHighestQuality'");
         if (q2.exec() && q2.next() && q2.value(0).toString() == "1") {
             QString quality = getFileQuality(lid);
@@ -559,10 +559,10 @@ int WatchSessionManager::calculateMarkScore(int lid) const
             int qualityScore = getQualityScore(quality);
             int resolutionScore = getResolutionScore(resolution);
             
-            // Compare with average - files above average get bonus, below get penalty
-            if (qualityScore >= 60 && resolutionScore >= 60) {
+            // Compare with thresholds - files above threshold get bonus, below get penalty
+            if (qualityScore >= QUALITY_HIGH_THRESHOLD && resolutionScore >= RESOLUTION_HIGH_THRESHOLD) {
                 score += SCORE_HIGHER_QUALITY;  // High quality/resolution
-            } else if (qualityScore < 40 || resolutionScore < 40) {
+            } else if (qualityScore < QUALITY_LOW_THRESHOLD || resolutionScore < RESOLUTION_LOW_THRESHOLD) {
                 score += SCORE_LOWER_QUALITY;  // Low quality/resolution
             }
         }
@@ -570,9 +570,9 @@ int WatchSessionManager::calculateMarkScore(int lid) const
     
     // Check anime rating
     int rating = getFileRating(lid);
-    if (rating >= 800) {
+    if (rating >= RATING_HIGH_THRESHOLD) {
         score += SCORE_HIGH_RATING;  // Highly rated anime - keep longer
-    } else if (rating > 0 && rating < 600) {
+    } else if (rating > 0 && rating < RATING_LOW_THRESHOLD) {
         score += SCORE_LOW_RATING;  // Poorly rated anime - more eligible for deletion
     }
     
@@ -1535,9 +1535,9 @@ int WatchSessionManager::getFileRating(int lid) const
     if (q.exec() && q.next()) {
         QString ratingStr = q.value(0).toString();
         if (!ratingStr.isEmpty()) {
-            // Convert "8.23" to 823
+            // Convert "8.23" to 823 using qRound for predictable rounding
             double rating = ratingStr.toDouble() * 100.0;
-            return static_cast<int>(rating);
+            return qRound(rating);
         }
     }
     
