@@ -26,6 +26,7 @@ private slots:
     void testSetFileMarkType();
     void testGetFilesForDeletion();
     void testGetFilesForDownload();
+    void testFileMarkPersistence();
     
     // Settings tests
     void testAheadBuffer();
@@ -338,6 +339,45 @@ void TestWatchSessionManager::testGetFilesForDownload()
     QVERIFY(downloadFiles.contains(1001));
     QVERIFY(downloadFiles.contains(1002));
     QVERIFY(!downloadFiles.contains(1003));
+}
+
+void TestWatchSessionManager::testFileMarkPersistence()
+{
+    // Test that file marks are correctly persisted to database
+    // This tests the fix for issue #2: unmarked files should not appear as marked after reload
+    
+    // Mark some files
+    manager->setFileMarkType(1001, FileMarkType::ForDeletion);
+    manager->setFileMarkType(1002, FileMarkType::ForDeletion);
+    manager->setFileMarkType(1003, FileMarkType::ForDownload);
+    
+    // Verify marks are set
+    QCOMPARE(manager->getFileMarkType(1001), FileMarkType::ForDeletion);
+    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::ForDeletion);
+    QCOMPARE(manager->getFileMarkType(1003), FileMarkType::ForDownload);
+    
+    // Save to database
+    manager->saveToDatabase();
+    
+    // Now unmark file 1002 (remove it from deletion)
+    manager->setFileMarkType(1002, FileMarkType::None);
+    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::None);
+    
+    // Save again to ensure the removal is persisted
+    manager->saveToDatabase();
+    
+    // Create new manager instance to test loading
+    delete manager;
+    manager = new WatchSessionManager();
+    
+    // File 1001 should still be marked for deletion
+    QCOMPARE(manager->getFileMarkType(1001), FileMarkType::ForDeletion);
+    
+    // File 1002 should NOT be marked (this is the critical test for the bug fix)
+    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::None);
+    
+    // File 1003 should still be marked for download
+    QCOMPARE(manager->getFileMarkType(1003), FileMarkType::ForDownload);
 }
 
 // ========== Settings Tests ==========
