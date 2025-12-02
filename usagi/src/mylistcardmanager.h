@@ -11,8 +11,9 @@
 #include "animecard.h"
 #include "flowlayout.h"
 
-// Forward declaration
+// Forward declarations
 class VirtualFlowLayout;
+class WatchSessionManager;
 
 /**
  * MyListCardManager - Manages the lifecycle and updates of anime cards
@@ -70,6 +71,9 @@ public:
     
     // Set the virtual layout for virtual scrolling (new)
     void setVirtualLayout(VirtualFlowLayout *layout);
+    
+    // Set the watch session manager for file mark queries
+    void setWatchSessionManager(WatchSessionManager *manager) { m_watchSessionManager = manager; }
     
     // Get the list of anime IDs in the current order (for virtual scrolling)
     QList<int> getAnimeIdList() const;
@@ -281,6 +285,9 @@ private:
     
     // Virtual layout for virtual scrolling (optional)
     VirtualFlowLayout *m_virtualLayout;
+    
+    // Watch session manager for file mark queries
+    WatchSessionManager *m_watchSessionManager;
     
     // Ordered list of anime IDs for virtual scrolling
     QList<int> m_orderedAnimeIds;

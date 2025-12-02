@@ -26,6 +26,7 @@ private slots:
     void testSetFileMarkType();
     void testGetFilesForDeletion();
     void testGetFilesForDownload();
+    void testFileMarkPersistence();
     
     // Settings tests
     void testAheadBuffer();
@@ -338,6 +339,38 @@ void TestWatchSessionManager::testGetFilesForDownload()
     QVERIFY(downloadFiles.contains(1001));
     QVERIFY(downloadFiles.contains(1002));
     QVERIFY(!downloadFiles.contains(1003));
+}
+
+void TestWatchSessionManager::testFileMarkPersistence()
+{
+    // Test that file marks are NOT persisted (they are in-memory only)
+    // File marks will be recalculated on startup and set on demand
+    
+    // Mark some files
+    manager->setFileMarkType(1001, FileMarkType::ForDeletion);
+    manager->setFileMarkType(1002, FileMarkType::ForDeletion);
+    manager->setFileMarkType(1003, FileMarkType::ForDownload);
+    
+    // Verify marks are set in current session
+    QCOMPARE(manager->getFileMarkType(1001), FileMarkType::ForDeletion);
+    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::ForDeletion);
+    QCOMPARE(manager->getFileMarkType(1003), FileMarkType::ForDownload);
+    
+    // Now unmark file 1002 (remove it from deletion)
+    manager->setFileMarkType(1002, FileMarkType::None);
+    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::None);
+    
+    // Save to database (file marks are NOT saved)
+    manager->saveToDatabase();
+    
+    // Create new manager instance - marks should NOT be loaded
+    delete manager;
+    manager = new WatchSessionManager();
+    
+    // All file marks should be None after restart (not persisted)
+    QCOMPARE(manager->getFileMarkType(1001), FileMarkType::None);
+    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::None);
+    QCOMPARE(manager->getFileMarkType(1003), FileMarkType::None);
 }
 
 // ========== Settings Tests ==========

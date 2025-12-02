@@ -75,7 +75,7 @@ QString aired::toDisplayString() const
         else
         {
             // Finished (end date is in the past)
-            return QString("%1-%2").arg(formatDate(m_startDate)).arg(formatDate(m_endDate));
+            return QString("%1-%2").arg(formatDate(m_startDate), formatDate(m_endDate));
         }
     }
     else

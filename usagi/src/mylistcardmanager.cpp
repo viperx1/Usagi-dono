@@ -3,6 +3,7 @@
 #include "animeutils.h"
 #include "logger.h"
 #include "main.h"
+#include "watchsessionmanager.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -20,6 +21,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     : QObject(parent)
     , m_layout(nullptr)
     , m_virtualLayout(nullptr)
+    , m_watchSessionManager(nullptr)
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
@@ -1027,18 +1029,9 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, c
         fileInfo.quality = entry.quality;
         fileInfo.groupName = entry.groupName;
         
-        // Query file mark from database
-        QSqlDatabase db = QSqlDatabase::database();
-        if (db.isOpen()) {
-            QSqlQuery markQuery(db);
-            markQuery.prepare("SELECT mark_type FROM file_marks WHERE lid = ?");
-            markQuery.addBindValue(entry.lid);
-            if (markQuery.exec() && markQuery.next()) {
-                int markType = markQuery.value(0).toInt();
-                fileInfo.markType = static_cast<FileMarkType>(markType);
-            } else {
-                fileInfo.markType = FileMarkType::None;
-            }
+        // Get file mark from WatchSessionManager (single source of truth)
+        if (m_watchSessionManager) {
+            fileInfo.markType = m_watchSessionManager->getFileMarkType(entry.lid);
         } else {
             fileInfo.markType = FileMarkType::None;
         }
