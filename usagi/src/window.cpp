@@ -2314,7 +2314,7 @@ void Window::closeEvent(QCloseEvent *event)
         safeclose->start();
         event->ignore();
 	}
-    else if(!adbapi->LoggedIn() || waitforlogout.elapsed() > 5000)
+    else if(!adbapi->LoggedIn() || waitforlogout.elapsed() > LOGOUT_TIMEOUT_MS)
     {
         event->accept();
         LOG("Window close accepted, application exiting");
@@ -5358,7 +5358,7 @@ void Window::onTrayExitAction()
         safeclose->start();
     } else {
         // Not logged in, initiate close via timer for consistency
-        LOG("Tray exit requested while not logged in, closing immediately");
+        LOG("Tray exit requested while not logged in, initiating close via timer");
         safeclose->start();
     }
     // Note: Application will exit, so no need to restore the flag

@@ -422,6 +422,9 @@ private:
     static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
     QColor m_hashedFileColor; // Reusable color object for UI updates
     
+    // Logout timeout constant
+    static const int LOGOUT_TIMEOUT_MS = 5000; // Wait up to 5 seconds for logout to complete
+    
     // Legacy constants for backward compatibility (deprecated, use enum instead)
     static const int PLAY_COLUMN = COL_PLAY;
     static const int MYLIST_ID_COLUMN = COL_MYLIST_ID;
