@@ -139,11 +139,28 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// Create local_files table for directory watcher feature
 		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 		// binding_status: 0=not_bound, 1=bound_to_anime, 2=not_anime
-		query.exec("CREATE TABLE IF NOT EXISTS `local_files`(`id` INTEGER PRIMARY KEY AUTOINCREMENT, `path` TEXT UNIQUE, `filename` TEXT, `status` INTEGER DEFAULT 0, `ed2k_hash` TEXT, `binding_status` INTEGER DEFAULT 0)");
+		// marked_for_deletion: 0=keep, 1=marked for deletion (duplicate)
+		// duplicate_score: higher score = better quality/preference (used to determine which duplicate to keep)
+		query.exec("CREATE TABLE IF NOT EXISTS `local_files`("
+		           "`id` INTEGER PRIMARY KEY AUTOINCREMENT, "
+		           "`path` TEXT UNIQUE, "
+		           "`filename` TEXT, "
+		           "`status` INTEGER DEFAULT 0, "
+		           "`ed2k_hash` TEXT, "
+		           "`binding_status` INTEGER DEFAULT 0, "
+		           "`file_size` BIGINT, "
+		           "`marked_for_deletion` INTEGER DEFAULT 0, "
+		           "`duplicate_score` INTEGER DEFAULT 0)");
 		// Add ed2k_hash column to local_files if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `local_files` ADD COLUMN `ed2k_hash` TEXT");
 		// Add binding_status column to local_files if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `local_files` ADD COLUMN `binding_status` INTEGER DEFAULT 0");
+		// Add file_size column to local_files for duplicate detection (for existing databases)
+		query.exec("ALTER TABLE `local_files` ADD COLUMN `file_size` BIGINT");
+		// Add marked_for_deletion column to flag duplicate files for deletion (for existing databases)
+		query.exec("ALTER TABLE `local_files` ADD COLUMN `marked_for_deletion` INTEGER DEFAULT 0");
+		// Add duplicate_score column to prioritize which duplicate to keep (for existing databases)
+		query.exec("ALTER TABLE `local_files` ADD COLUMN `duplicate_score` INTEGER DEFAULT 0");
 		// Add local_file column to mylist if it doesn't exist (references local_files.id)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
@@ -164,6 +181,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		query.exec("CREATE INDEX IF NOT EXISTS `idx_mylist_gid` ON `mylist`(`gid`);");
 		query.exec("CREATE INDEX IF NOT EXISTS `idx_episode_eid` ON `episode`(`eid`);");
 		query.exec("CREATE INDEX IF NOT EXISTS `idx_file_fid` ON `file`(`fid`);");
+		// Create index on local_files for duplicate detection by ed2k_hash
+		query.exec("CREATE INDEX IF NOT EXISTS `idx_local_files_ed2k_hash` ON `local_files`(`ed2k_hash`);");
 		
 		// Add playback tracking columns to mylist if they don't exist
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `playback_position` INTEGER DEFAULT 0");
@@ -3454,17 +3473,22 @@ void AniDBApi::updateLocalFileHash(QString localPath, QString ed2kHash, int stat
 		return;
 	}
 	
-	// Update the ed2k_hash and status in local_files table
+	// Get file size
+	QFileInfo fileInfo(localPath);
+	qint64 fileSize = fileInfo.exists() ? fileInfo.size() : 0;
+	
+	// Update the ed2k_hash, file_size and status in local_files table
 	// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 	QSqlQuery query(db);
-	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `status` = ? WHERE `path` = ?");
+	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `file_size` = ?, `status` = ? WHERE `path` = ?");
 	query.addBindValue(ed2kHash);
+	query.addBindValue(fileSize);
 	query.addBindValue(status);
 	query.addBindValue(localPath);
 	
 	if(query.exec())
 	{
-		LOG(QString("Updated local_files hash and status for path=%1 to status=%2").arg(localPath).arg(status));
+		LOG(QString("Updated local_files hash, size and status for path=%1 to status=%2").arg(localPath).arg(status));
 	}
 	else
 	{
@@ -3494,7 +3518,7 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 	}
 	
 	QSqlQuery query(db);
-	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `status` = ? WHERE `path` = ?");
+	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `file_size` = ?, `status` = ? WHERE `path` = ?");
 	
 	int successCount = 0;
 	int failCount = 0;
@@ -3503,7 +3527,12 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 	// Batch all updates in a single transaction
 	for (const auto& pair : pathHashPairs)
 	{
+		// Get file size
+		QFileInfo fileInfo(pair.first);
+		qint64 fileSize = fileInfo.exists() ? fileInfo.size() : 0;
+		
 		query.addBindValue(pair.second); // ed2k hash
+		query.addBindValue(fileSize);    // file size
 		query.addBindValue(status);
 		query.addBindValue(pair.first);  // path
 		
@@ -5664,4 +5693,66 @@ bool AniDBApi::extractMasksFromCommand(const QString& command, unsigned int& fma
 	}
 	
 	return success;
+}
+
+/* === Duplicate Detection Implementation === */
+
+/**
+ * Get list of local_files IDs with the same ed2k_hash (duplicates).
+ * Returns empty list if no duplicates found or if hash is NULL/empty.
+ * Results are not ordered - caller should sort if needed.
+ */
+QList<int> AniDBApi::getDuplicateLocalFileIds(const QString& ed2k_hash)
+{
+	QList<int> fileIds;
+	
+	if (ed2k_hash.isEmpty()) {
+		return fileIds;
+	}
+	
+	QSqlQuery query(db);
+	
+	query.prepare("SELECT id FROM local_files WHERE ed2k_hash = ?");
+	query.addBindValue(ed2k_hash);
+	
+	if (!query.exec()) {
+		LOG(QString("Failed to get duplicate file IDs: %1").arg(query.lastError().text()));
+		return fileIds;
+	}
+	
+	while (query.next()) {
+		fileIds.append(query.value(0).toInt());
+	}
+	
+	return fileIds;
+}
+
+/**
+ * Get list of all ed2k_hash values that have duplicates (appear more than once).
+ * Only returns hashes for files that have been hashed (status > 0).
+ */
+QStringList AniDBApi::getAllDuplicateHashes()
+{
+	QStringList hashes;
+	QSqlQuery query(db);
+	
+	// Find all ed2k_hash values that have duplicates (appear more than once)
+	// Only consider files that have been hashed (ed2k_hash is not NULL or empty)
+	QString queryStr = 
+		"SELECT ed2k_hash, COUNT(*) as count "
+		"FROM local_files "
+		"WHERE ed2k_hash IS NOT NULL AND ed2k_hash != '' "
+		"GROUP BY ed2k_hash "
+		"HAVING count > 1";
+	
+	if (!query.exec(queryStr)) {
+		LOG(QString("Failed to find duplicate hashes: %1").arg(query.lastError().text()));
+		return hashes;
+	}
+	
+	while (query.next()) {
+		hashes.append(query.value(0).toString());
+	}
+	
+	return hashes;
 }

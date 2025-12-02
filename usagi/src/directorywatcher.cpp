@@ -338,12 +338,15 @@ void DirectoryWatcher::saveProcessedFile(const QString &filePath)
     
     QFileInfo fileInfo(filePath);
     QString filename = fileInfo.fileName();
+    qint64 fileSize = fileInfo.size();
     
     // Insert into local_files table with status=0 (not checked)
+    // Include file size for duplicate detection
     // Use parameterized query to prevent SQL injection
-    query.prepare("INSERT OR IGNORE INTO local_files (path, filename, status) VALUES (?, ?, 0)");
+    query.prepare("INSERT OR IGNORE INTO local_files (path, filename, file_size, status) VALUES (?, ?, ?, 0)");
     query.addBindValue(filePath);
     query.addBindValue(filename);
+    query.addBindValue(fileSize);
     
     if (!query.exec()) {
         LOG("DirectoryWatcher: Failed to save processed file: " + query.lastError().text());
