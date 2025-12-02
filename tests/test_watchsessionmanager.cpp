@@ -530,6 +530,15 @@ void TestWatchSessionManager::testFileVersionScoring()
     // When multiple local files exist for same episode, older versions get penalties
     // based on count of local files with higher versions
     
+    // State field encoding per AniDB API:
+    //   Bit 0 (1): FILE_CRCOK
+    //   Bit 1 (2): FILE_CRCERR
+    //   Bit 2 (4): FILE_ISV2 - version 2
+    //   Bit 3 (8): FILE_ISV3 - version 3
+    //   Bit 4 (16): FILE_ISV4 - version 4
+    //   Bit 5 (32): FILE_ISV5 - version 5
+    // No version bits set = version 1
+    
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
     
@@ -541,15 +550,15 @@ void TestWatchSessionManager::testFileVersionScoring()
     q.exec();
     int localFileId2 = q.lastInsertId().toInt();
     
-    // Create file entry with state = 2 (v2) for newer file
+    // Create file entry with state = 4 (FILE_ISV2 bit set = v2) for newer file
     int fid2 = 5100;
-    q.prepare("INSERT INTO file (fid, aid, eid, size, filename, state) VALUES (?, 1, 101, ?, ?, 2)");
+    q.prepare("INSERT INTO file (fid, aid, eid, size, filename, state) VALUES (?, 1, 101, ?, ?, 4)");
     q.addBindValue(fid2);
     q.addBindValue(qint64(500) * 1024 * 1024);
     q.addBindValue("episode1_v2.mkv");
     q.exec();
     
-    // Update original file to have state = 1 (v1)
+    // Update original file to have state = 1 (FILE_CRCOK, no version bits = v1)
     q.exec("UPDATE file SET state = 1 WHERE fid = 5001");
     
     // Create mylist entry for the new file (lid 1100)

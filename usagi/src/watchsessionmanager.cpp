@@ -1182,11 +1182,20 @@ bool WatchSessionManager::isCardHidden(int aid) const
 
 int WatchSessionManager::getFileVersion(int lid) const
 {
-    // Get file version from state bits (AniDB state field, bits 0-1 contain version)
-    // Version encoding: 0=unknown, 1=v1, 2=v2, etc.
+    // Get file version from state bits (AniDB state field)
+    // State field bit encoding (from AniDB UDP API):
+    //   Bit 0 (1): FILE_CRCOK
+    //   Bit 1 (2): FILE_CRCERR
+    //   Bit 2 (4): FILE_ISV2 - file is version 2
+    //   Bit 3 (8): FILE_ISV3 - file is version 3
+    //   Bit 4 (16): FILE_ISV4 - file is version 4
+    //   Bit 5 (32): FILE_ISV5 - file is version 5
+    //   Bit 6 (64): FILE_UNC - uncensored
+    //   Bit 7 (128): FILE_CEN - censored
+    // If no version bits are set, the file is version 1
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        return 0;
+        return 1;  // Default to version 1
     }
     
     QSqlQuery q(db);
@@ -1196,13 +1205,25 @@ int WatchSessionManager::getFileVersion(int lid) const
     
     if (q.exec() && q.next()) {
         int state = q.value(0).toInt();
-        // Extract version from state bits 0-2 (values 0-7, but typically 0-5)
-        // Bits 0-2 represent file version: 0=unknown, 1=v1, 2=v2, etc.
-        int version = state & 0x07;
+        
+        // Extract version from state bits 2-5
+        // Check version flags in priority order (v5 > v4 > v3 > v2)
+        int version = 1;  // Default to version 1
+        if (state & 32) {      // Bit 5: FILE_ISV5
+            version = 5;
+        } else if (state & 16) { // Bit 4: FILE_ISV4
+            version = 4;
+        } else if (state & 8) {  // Bit 3: FILE_ISV3
+            version = 3;
+        } else if (state & 4) {  // Bit 2: FILE_ISV2
+            version = 2;
+        }
+        // else version = 1 (no version bits set means version 1)
+        
         return version;
     }
     
-    return 0;  // Unknown version
+    return 1;  // Default to version 1
 }
 
 int WatchSessionManager::getFileCountForEpisode(int lid) const
@@ -1243,7 +1264,10 @@ int WatchSessionManager::getHigherVersionFileCount(int lid) const
     
     QSqlQuery q(db);
     // Count local files with same eid that have a higher version
-    // Files with unknown version (0) are considered older than any known version
+    // Version is encoded in state bits 2-5 as flags:
+    //   Bit 2 (4): v2, Bit 3 (8): v3, Bit 4 (16): v4, Bit 5 (32): v5
+    //   No bits set = v1
+    // We need to extract version from state and compare
     q.prepare(
         "SELECT COUNT(*) FROM mylist m "
         "JOIN file f ON m.fid = f.fid "
@@ -1251,7 +1275,13 @@ int WatchSessionManager::getHigherVersionFileCount(int lid) const
         "WHERE m.eid = (SELECT eid FROM mylist WHERE lid = ?) "
         "AND m.lid != ? "
         "AND lf.path IS NOT NULL AND lf.path != '' "
-        "AND (f.state & 7) > ?"
+        "AND CASE "
+        "  WHEN (f.state & 32) THEN 5 "  // Bit 5: v5
+        "  WHEN (f.state & 16) THEN 4 "  // Bit 4: v4
+        "  WHEN (f.state & 8) THEN 3 "   // Bit 3: v3
+        "  WHEN (f.state & 4) THEN 2 "   // Bit 2: v2
+        "  ELSE 1 "                       // No version bits: v1
+        "END > ?"
     );
     q.addBindValue(lid);  // Same episode
     q.addBindValue(lid);  // Exclude self
