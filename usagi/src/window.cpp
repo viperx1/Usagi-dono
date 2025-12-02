@@ -839,6 +839,9 @@ Window::Window()
     watchSessionManager = new WatchSessionManager(this);
     LOG("[Window] WatchSessionManager initialized");
     
+    // Connect card manager to watch session manager for file marks
+    cardManager->setWatchSessionManager(watchSessionManager);
+    
     // Load session settings from WatchSessionManager into Settings tab UI
     sessionAheadBufferSpinBox->blockSignals(true);
     sessionThresholdTypeComboBox->blockSignals(true);
