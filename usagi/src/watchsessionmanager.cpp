@@ -211,6 +211,12 @@ void WatchSessionManager::saveToDatabase()
         return;
     }
     
+    // Start transaction for atomic save operation
+    if (!db.transaction()) {
+        LOG(QString("ERROR: Failed to start transaction: %1").arg(db.lastError().text()));
+        // Continue without transaction for backwards compatibility
+    }
+    
     QSqlQuery q(db);
     
     // Save sessions
@@ -242,6 +248,8 @@ void WatchSessionManager::saveToDatabase()
     // This prevents stale marks from remaining in the database when files are unmarked
     if (!q.exec("DELETE FROM file_marks")) {
         LOG(QString("ERROR: Failed to delete file_marks: %1").arg(q.lastError().text()));
+        db.rollback();
+        return;
     }
     
     for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
@@ -252,7 +260,16 @@ void WatchSessionManager::saveToDatabase()
         q.addBindValue(info.markScore);
         if (!q.exec()) {
             LOG(QString("ERROR: Failed to insert file_mark for lid=%1: %2").arg(info.lid).arg(q.lastError().text()));
+            db.rollback();
+            return;
         }
+    }
+    
+    // Commit transaction
+    if (!db.commit()) {
+        LOG(QString("ERROR: Failed to commit transaction: %1").arg(db.lastError().text()));
+        db.rollback();
+        return;
     }
     
     saveSettings();
