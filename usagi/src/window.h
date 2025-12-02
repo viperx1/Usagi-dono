@@ -761,6 +761,9 @@ private:
     void loadTraySettings();
     void saveTraySettings();
     
+    // Icon helper method
+    QIcon loadUsagiIcon();
+    
     // Auto-start helper methods
     void setAutoStartEnabled(bool enabled);
     bool isAutoStartEnabled();

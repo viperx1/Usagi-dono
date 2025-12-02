@@ -226,23 +226,7 @@ Window::Window()
     this->setWindowTitle("Usagi");
     
     // Set window icon (use usagi.png if available)
-    QStringList iconPaths = {
-        "usagi.png",           // Current directory
-        "../usagi.png",        // Parent directory (if running from build dir)
-        ":/usagi.png",         // Qt resource (if added to .qrc in future)
-        QCoreApplication::applicationDirPath() + "/usagi.png"
-    };
-    
-    for (const QString &path : iconPaths) {
-        if (QFile::exists(path)) {
-            QIcon windowIcon(path);
-            if (!windowIcon.isNull()) {
-                this->setWindowIcon(windowIcon);
-                LOG(QString("Loaded window icon from: %1").arg(path));
-                break;
-            }
-        }
-    }
+    this->setWindowIcon(loadUsagiIcon());
     
 //    this->setFixedWidth(800);
     this->setMinimumSize(800, 600);
@@ -5210,6 +5194,41 @@ void Window::onToggleFilterBarClicked()
 
 // ========== System Tray Implementation ==========
 
+QIcon Window::loadUsagiIcon()
+{
+    // Try to load usagi.png from various possible locations
+    QStringList iconPaths = {
+        "usagi.png",           // Current directory
+        "../usagi.png",        // Parent directory (if running from build dir)
+        QCoreApplication::applicationDirPath() + "/usagi.png",
+        ":/usagi.png"          // Qt resource (if added to .qrc in future)
+    };
+    
+    for (const QString &path : iconPaths) {
+        // Handle Qt resource paths separately
+        if (path.startsWith(":/")) {
+            QIcon icon(path);
+            if (!icon.isNull()) {
+                LOG(QString("Loaded icon from Qt resource: %1").arg(path));
+                return icon;
+            }
+        } else {
+            // Regular file system paths
+            if (QFile::exists(path)) {
+                QIcon icon(path);
+                if (!icon.isNull()) {
+                    LOG(QString("Loaded icon from: %1").arg(path));
+                    return icon;
+                }
+            }
+        }
+    }
+    
+    // Fall back to default icon if usagi.png not found
+    LOG("Using default icon (usagi.png not found)");
+    return QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+}
+
 void Window::createTrayIcon()
 {
     // Check if system tray is available
@@ -5236,35 +5255,7 @@ void Window::createTrayIcon()
     trayIcon->setContextMenu(trayIconMenu);
     
     // Set icon (use usagi.png if available, otherwise fall back to default icon)
-    QIcon appIcon;
-    
-    // Try to load usagi.png from various possible locations
-    QStringList iconPaths = {
-        "usagi.png",           // Current directory
-        "../usagi.png",        // Parent directory (if running from build dir)
-        ":/usagi.png",         // Qt resource (if added to .qrc in future)
-        QCoreApplication::applicationDirPath() + "/usagi.png"
-    };
-    
-    bool iconLoaded = false;
-    for (const QString &path : iconPaths) {
-        if (QFile::exists(path)) {
-            appIcon = QIcon(path);
-            if (!appIcon.isNull()) {
-                iconLoaded = true;
-                LOG(QString("Loaded tray icon from: %1").arg(path));
-                break;
-            }
-        }
-    }
-    
-    // Fall back to default icon if usagi.png not found
-    if (!iconLoaded) {
-        appIcon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
-        LOG("Using default tray icon (usagi.png not found)");
-    }
-    
-    trayIcon->setIcon(appIcon);
+    trayIcon->setIcon(loadUsagiIcon());
     trayIcon->setToolTip("Usagi-dono");
     
     // Connect activation signal (for double-click)
