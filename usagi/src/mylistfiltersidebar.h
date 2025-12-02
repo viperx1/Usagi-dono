@@ -63,6 +63,9 @@ private slots:
     void onSortChanged();
     void onSortOrderToggled();
     
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+    
 private:
     void setupUI();
     
