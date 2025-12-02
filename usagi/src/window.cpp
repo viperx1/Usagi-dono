@@ -5197,15 +5197,16 @@ void Window::onToggleFilterBarClicked()
 QIcon Window::loadUsagiIcon()
 {
     // Try to load usagi.png from various possible locations
+    // Ordered by reliability: application dir first, then relative paths, then Qt resources
     QStringList iconPaths = {
+        QCoreApplication::applicationDirPath() + "/usagi.png",  // Most reliable for deployment
         "usagi.png",           // Current directory
         "../usagi.png",        // Parent directory (if running from build dir)
-        QCoreApplication::applicationDirPath() + "/usagi.png",
         ":/usagi.png"          // Qt resource (if added to .qrc in future)
     };
     
     for (const QString &path : iconPaths) {
-        // Handle Qt resource paths separately
+        // Handle Qt resource paths separately (they don't exist as files)
         if (path.startsWith(":/")) {
             QIcon icon(path);
             if (!icon.isNull()) {
@@ -5213,7 +5214,7 @@ QIcon Window::loadUsagiIcon()
                 return icon;
             }
         } else {
-            // Regular file system paths
+            // Regular file system paths - check existence first to avoid unnecessary QIcon creation
             if (QFile::exists(path)) {
                 QIcon icon(path);
                 if (!icon.isNull()) {

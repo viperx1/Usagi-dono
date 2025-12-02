@@ -762,7 +762,7 @@ private:
     void saveTraySettings();
     
     // Icon helper method
-    QIcon loadUsagiIcon();
+    QIcon loadUsagiIcon();  // Loads usagi.png from various paths, falls back to default icon
     
     // Auto-start helper methods
     void setAutoStartEnabled(bool enabled);
