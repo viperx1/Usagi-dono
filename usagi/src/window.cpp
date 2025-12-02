@@ -5328,15 +5328,18 @@ void Window::onTrayShowHideAction()
         LOG("Window hidden to tray");
     } else {
         // Restore the previous window state
-        this->setWindowState(windowStateBeforeHide);
         this->show();
+        this->setWindowState(windowStateBeforeHide);
         this->activateWindow();
         this->raise();
-        // Force layout update to ensure content fills the window
+        // Force geometry recalculation
+        QApplication::processEvents();
+        // Trigger resize event to force layout recalculation
         if (layout) {
-            layout->update();
+            layout->invalidate();
             layout->activate();
         }
+        this->updateGeometry();
         LOG("Window shown from tray");
     }
 }
