@@ -5322,24 +5322,18 @@ void Window::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
 void Window::onTrayShowHideAction()
 {
     if (this->isVisible()) {
-        // Store the current window state before hiding
+        // Store the current window state and geometry before hiding
         windowStateBeforeHide = this->windowState();
+        windowGeometryBeforeHide = this->geometry();
         this->hide();
         LOG("Window hidden to tray");
     } else {
-        // Restore the previous window state
-        this->show();
+        // Restore the previous window state and geometry
+        this->setGeometry(windowGeometryBeforeHide);
         this->setWindowState(windowStateBeforeHide);
+        this->show();
         this->activateWindow();
         this->raise();
-        // Force geometry recalculation
-        QApplication::processEvents();
-        // Trigger resize event to force layout recalculation
-        if (layout) {
-            layout->invalidate();
-            layout->activate();
-        }
-        this->updateGeometry();
         LOG("Window shown from tray");
     }
 }

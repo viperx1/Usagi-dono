@@ -570,6 +570,7 @@ private:
 	bool minimizeToTrayEnabled;
 	bool startMinimizedEnabled;
 	Qt::WindowStates windowStateBeforeHide;  // Store window state before hiding to tray
+	QRect windowGeometryBeforeHide;  // Store window geometry before hiding to tray
 	
 	// Batch processing for hashed files
 	// Note: HashedFileData structure removed as identification now happens immediately
