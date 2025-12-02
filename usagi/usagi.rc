@@ -1,4 +1,4 @@
-#include "resource.h"
+#include "src/resource.h"
 
 IDI_ICON1 ICON "usagi.ico"
 
