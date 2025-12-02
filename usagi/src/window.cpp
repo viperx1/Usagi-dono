@@ -5344,7 +5344,17 @@ void Window::onTrayExitAction()
     // Don't modify the user's closeToTrayEnabled setting
     bool originalCloseToTray = closeToTrayEnabled;
     closeToTrayEnabled = false;
-    QApplication::quit();
+    
+    // Send logout command if logged in
+    if (adbapi->LoggedIn()) {
+        LOG("Tray exit requested while logged in, sending LOGOUT command");
+        adbapi->Logout();
+        waitforlogout.start();
+        safeclose->start();
+    } else {
+        // Not logged in, close immediately
+        this->close();
+    }
     // Note: Application will exit, so no need to restore the flag
 }
 
