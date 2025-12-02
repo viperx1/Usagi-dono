@@ -24,6 +24,10 @@
 #include <memory>
 #include <QDirIterator>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 HasherThreadPool *hasherThreadPool = nullptr;
 // adbapi is now defined in anidbapi.cpp (core library)
 extern Window *window;
@@ -5196,12 +5200,41 @@ void Window::onToggleFilterBarClicked()
 
 QIcon Window::loadUsagiIcon()
 {
-    // Try to load usagi.png from various possible locations
-    // Ordered by reliability: application dir first, then relative paths, then Qt resources
+#ifdef Q_OS_WIN
+    // On Windows, first try to load from embedded resources
+    // IDI_ICON1 is defined in usagi.rc and embedded in the executable
+    QIcon icon(":/usagi.png");  // Try Qt resource first
+    if (!icon.isNull()) {
+        LOG("Loaded icon from Qt resource");
+        return icon;
+    }
+    
+    // If Qt resource not available, try loading ICO from Windows native resource
+    // IDI_ICON1 is the resource ID defined in usagi.rc
+    // We need to use the string name since it's not defined as a numeric constant
+    HICON hIcon = (HICON)LoadImageW(GetModuleHandleW(NULL), 
+                                     L"IDI_ICON1",  // Use the string name from .rc file
+                                     IMAGE_ICON,
+                                     0, 0,
+                                     LR_DEFAULTSIZE | LR_SHARED);
+    if (hIcon) {
+        QPixmap pixmap = QPixmap::fromWinHICON(hIcon);
+        if (!pixmap.isNull()) {
+            LOG("Loaded icon from Windows resource (IDI_ICON1)");
+            return QIcon(pixmap);
+        }
+    }
+#endif
+    
+    // Try to load from file system paths
+    // Ordered by reliability: application dir first, then relative paths
     QStringList iconPaths = {
-        QCoreApplication::applicationDirPath() + "/usagi.png",  // Most reliable for deployment
-        "usagi.png",           // Current directory
-        "../usagi.png",        // Parent directory (if running from build dir)
+        QCoreApplication::applicationDirPath() + "/usagi.ico",  // ICO file in app dir
+        QCoreApplication::applicationDirPath() + "/usagi.png",  // PNG in app dir
+        "usagi.ico",           // ICO in current directory
+        "usagi.png",           // PNG in current directory
+        "../usagi.ico",        // ICO in parent directory (if running from build dir)
+        "../usagi.png",        // PNG in parent directory (if running from build dir)
         ":/usagi.png"          // Qt resource (if added to .qrc in future)
     };
     
@@ -5225,8 +5258,8 @@ QIcon Window::loadUsagiIcon()
         }
     }
     
-    // Fall back to default icon if usagi.png not found
-    LOG("Using default icon (usagi.png not found)");
+    // Fall back to default icon if usagi icon not found
+    LOG("Using default icon (usagi icon not found)");
     return QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
 }
 
