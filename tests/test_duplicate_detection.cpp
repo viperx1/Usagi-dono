@@ -141,16 +141,18 @@ void TestDuplicateDetection::testNoDuplicatesFound()
 {
     // Insert files with different hashes
     QSqlQuery query(db);
-    query.prepare("INSERT INTO local_files (path, filename, ed2k_hash, status) VALUES (?, ?, ?, 1)");
+    query.prepare("INSERT INTO local_files (path, filename, ed2k_hash, file_size, status) VALUES (?, ?, ?, ?, 1)");
     
     query.addBindValue("/test/file1.mkv");
     query.addBindValue("file1.mkv");
     query.addBindValue("hash1111111111111111111111111111");
+    query.addBindValue(100000000);
     QVERIFY(query.exec());
     
     query.addBindValue("/test/file2.mkv");
     query.addBindValue("file2.mkv");
     query.addBindValue("hash2222222222222222222222222222");
+    query.addBindValue(200000000);
     QVERIFY(query.exec());
     
     // Get all duplicate hashes (should be empty)
