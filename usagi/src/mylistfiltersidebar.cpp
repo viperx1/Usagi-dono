@@ -1,6 +1,7 @@
 #include "mylistfiltersidebar.h"
 #include <QLabel>
 #include <QTimer>
+#include <QResizeEvent>
 
 MyListFilterSidebar::MyListFilterSidebar(QWidget *parent)
     : QWidget(parent)
@@ -19,10 +20,18 @@ void MyListFilterSidebar::setupUI()
     mainLayout->setContentsMargins(5, 5, 5, 5);
     mainLayout->setSpacing(10);
     
-    // Title
+    // Title - centered
     QLabel *titleLabel = new QLabel("<b>Search & Filter</b>");
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
+    
+    // Collapse button - will be positioned absolutely on top of the title area
+    m_collapseButton = new QPushButton("◀", this);
+    m_collapseButton->setMaximumWidth(30);
+    m_collapseButton->setMaximumHeight(30);
+    m_collapseButton->setToolTip("Hide filter sidebar");
+    m_collapseButton->raise();  // Bring to front
+    connect(m_collapseButton, &QPushButton::clicked, this, &MyListFilterSidebar::collapseRequested);
     
     // Search group
     QGroupBox *searchGroup = new QGroupBox("Search");
@@ -270,4 +279,17 @@ void MyListFilterSidebar::onSortOrderToggled()
     }
     
     emit sortChanged();
+}
+
+void MyListFilterSidebar::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    
+    // Position collapse button on the right side, ignoring layout
+    if (m_collapseButton) {
+        int buttonWidth = m_collapseButton->width();
+        int buttonHeight = m_collapseButton->height();
+        // Position at top-right corner with some margin
+        m_collapseButton->move(width() - buttonWidth - 10, 0);
+    }
 }

@@ -62,6 +62,17 @@ private:
 	
 	// Auto-fetch settings
 	bool autoFetchEnabled;
+	
+	// Tray settings
+	bool trayMinimizeToTray;
+	bool trayCloseToTray;
+	bool trayStartMinimized;
+	
+	// Auto-start settings
+	bool autoStartEnabled;
+	
+	// Filter bar visibility settings
+	bool filterBarVisible;
     /* Settings End === */
 
 	int protover; // AniDB API version = 3
@@ -441,6 +452,22 @@ public:
 	// Auto-fetch settings
 	bool getAutoFetchEnabled();
 	void setAutoFetchEnabled(bool enabled);
+	
+	// Tray settings
+	bool getTrayMinimizeToTray();
+	bool getTrayCloseToTray();
+	bool getTrayStartMinimized();
+	void setTrayMinimizeToTray(bool enabled);
+	void setTrayCloseToTray(bool enabled);
+	void setTrayStartMinimized(bool enabled);
+	
+	// Auto-start settings
+	bool getAutoStartEnabled();
+	void setAutoStartEnabled(bool enabled);
+	
+	// Filter bar visibility settings
+	bool getFilterBarVisible();
+	void setFilterBarVisible(bool visible);
 	
 private:
 	// Helper method for saving settings to database

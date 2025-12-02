@@ -44,6 +44,9 @@ public:
     // Reset all filters
     void resetFilters();
     
+    // Set the toggle button for external use
+    void setToggleButton(QPushButton *button);
+    
 signals:
     // Emitted when any filter changes
     void filterChanged();
@@ -51,11 +54,17 @@ signals:
     // Emitted when sort options change
     void sortChanged();
     
+    // Emitted when collapse button is clicked
+    void collapseRequested();
+    
 private slots:
     void onSearchTextChanged();
     void onFilterChanged();
     void onSortChanged();
     void onSortOrderToggled();
+    
+protected:
+    void resizeEvent(QResizeEvent *event) override;
     
 private:
     void setupUI();
@@ -71,6 +80,7 @@ private:
     QPushButton *m_sortOrderButton;
     QComboBox *m_adultContentFilter;
     QPushButton *m_resetButton;
+    QPushButton *m_collapseButton;
     
     bool m_sortAscending;
 };
