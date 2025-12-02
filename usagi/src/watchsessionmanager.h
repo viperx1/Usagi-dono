@@ -440,6 +440,17 @@ private:
     void saveSettings();
     void ensureTablesExist();
     
+    // Helper methods for new marking criteria
+    bool matchesPreferredAudioLanguage(int lid) const;
+    bool matchesPreferredSubtitleLanguage(int lid) const;
+    int getQualityScore(const QString& quality) const;  // Convert quality string to numeric score
+    int getResolutionScore(const QString& resolution) const;  // Convert resolution to numeric score
+    QString getFileQuality(int lid) const;
+    QString getFileResolution(int lid) const;
+    QString getFileAudioLanguage(int lid) const;
+    QString getFileSubtitleLanguage(int lid) const;
+    int getFileRating(int lid) const;  // Get anime rating for this file
+    
     // Helper method to find active session info across series chain
     // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
     std::tuple<int, int, int> findActiveSessionInSeriesChain(int aid) const;
@@ -457,6 +468,14 @@ private:
     static const int SCORE_NOT_WATCHED = 50;
     static const int SCORE_DISTANCE_FACTOR = -1;  // Per episode away from current
     static const int SCORE_OLDER_REVISION = -1000;  // Per local file with higher version (older revisions more deletable)
+    static const int SCORE_PREFERRED_AUDIO = 30;  // Bonus for matching preferred audio language
+    static const int SCORE_PREFERRED_SUBTITLE = 20;  // Bonus for matching preferred subtitle language
+    static const int SCORE_NOT_PREFERRED_AUDIO = -40;  // Penalty for not matching preferred audio language
+    static const int SCORE_NOT_PREFERRED_SUBTITLE = -20;  // Penalty for not matching preferred subtitle language
+    static const int SCORE_HIGHER_QUALITY = 25;  // Bonus for higher quality/resolution
+    static const int SCORE_LOWER_QUALITY = -35;  // Penalty for lower quality/resolution
+    static const int SCORE_HIGH_RATING = 15;  // Bonus for highly rated anime (rating >= 800)
+    static const int SCORE_LOW_RATING = -15;  // Penalty for poorly rated anime (rating < 600)
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;

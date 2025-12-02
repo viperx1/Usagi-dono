@@ -523,6 +523,59 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
+    // Check language preferences (if settings are enabled)
+    bool hasAudioMatch = matchesPreferredAudioLanguage(lid);
+    bool hasSubtitleMatch = matchesPreferredSubtitleLanguage(lid);
+    
+    if (hasAudioMatch) {
+        score += SCORE_PREFERRED_AUDIO;  // Bonus for matching preferred audio
+    } else {
+        // Only apply penalty if we have audio language info but it doesn't match
+        QString audioLang = getFileAudioLanguage(lid);
+        if (!audioLang.isEmpty()) {
+            score += SCORE_NOT_PREFERRED_AUDIO;  // Penalty for not matching
+        }
+    }
+    
+    if (hasSubtitleMatch) {
+        score += SCORE_PREFERRED_SUBTITLE;  // Bonus for matching preferred subtitles
+    } else {
+        // Only apply penalty if we have subtitle language info but it doesn't match
+        QString subLang = getFileSubtitleLanguage(lid);
+        if (!subLang.isEmpty()) {
+            score += SCORE_NOT_PREFERRED_SUBTITLE;  // Penalty for not matching
+        }
+    }
+    
+    // Check quality and resolution (if preference is enabled)
+    QSqlDatabase db2 = QSqlDatabase::database();
+    if (db2.isOpen()) {
+        QSqlQuery q2(db2);
+        q2.prepare("SELECT value FROM settings WHERE name = 'preferHighestQuality'");
+        if (q2.exec() && q2.next() && q2.value(0).toString() == "1") {
+            QString quality = getFileQuality(lid);
+            QString resolution = getFileResolution(lid);
+            
+            int qualityScore = getQualityScore(quality);
+            int resolutionScore = getResolutionScore(resolution);
+            
+            // Compare with average - files above average get bonus, below get penalty
+            if (qualityScore >= 60 && resolutionScore >= 60) {
+                score += SCORE_HIGHER_QUALITY;  // High quality/resolution
+            } else if (qualityScore < 40 || resolutionScore < 40) {
+                score += SCORE_LOWER_QUALITY;  // Low quality/resolution
+            }
+        }
+    }
+    
+    // Check anime rating
+    int rating = getFileRating(lid);
+    if (rating >= 800) {
+        score += SCORE_HIGH_RATING;  // Highly rated anime - keep longer
+    } else if (rating > 0 && rating < 600) {
+        score += SCORE_LOW_RATING;  // Poorly rated anime - more eligible for deletion
+    }
+    
     // Calculate distance-based scoring across the series chain
     // Distance is the primary factor - episodes far from current position are more deletable
     if (aid > 0) {
@@ -1293,3 +1346,201 @@ int WatchSessionManager::getHigherVersionFileCount(int lid) const
     
     return 0;
 }
+
+// Helper methods for new marking criteria
+bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
+{
+    QString audioLang = getFileAudioLanguage(lid);
+    if (audioLang.isEmpty()) {
+        return false;  // No audio language info
+    }
+    
+    // Get preferred languages from global settings
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return false;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT value FROM settings WHERE name = 'preferredAudioLanguages'");
+    if (!q.exec() || !q.next()) {
+        return false;  // No preference set
+    }
+    
+    QString preferredLangs = q.value(0).toString().toLower();
+    QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
+    
+    // Normalize and check if file's audio language matches any preferred language
+    QString normalizedAudioLang = audioLang.toLower().trimmed();
+    for (const QString& lang : langList) {
+        if (normalizedAudioLang.contains(lang.trimmed())) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
+{
+    QString subLang = getFileSubtitleLanguage(lid);
+    if (subLang.isEmpty()) {
+        return false;  // No subtitle language info
+    }
+    
+    // Get preferred languages from global settings
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return false;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT value FROM settings WHERE name = 'preferredSubtitleLanguages'");
+    if (!q.exec() || !q.next()) {
+        return false;  // No preference set
+    }
+    
+    QString preferredLangs = q.value(0).toString().toLower();
+    QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
+    
+    // Normalize and check if file's subtitle language matches any preferred language
+    QString normalizedSubLang = subLang.toLower().trimmed();
+    for (const QString& lang : langList) {
+        if (normalizedSubLang.contains(lang.trimmed())) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+int WatchSessionManager::getQualityScore(const QString& quality) const
+{
+    // Convert quality string to numeric score
+    // Higher score = better quality (less likely to delete)
+    QString q = quality.toLower();
+    
+    if (q.contains("blu-ray") || q.contains("bluray")) return 100;
+    if (q.contains("dvd")) return 70;
+    if (q.contains("hdtv")) return 60;
+    if (q.contains("web")) return 50;
+    if (q.contains("tv")) return 40;
+    if (q.contains("vhs")) return 20;
+    
+    return 30;  // Unknown/default quality
+}
+
+int WatchSessionManager::getResolutionScore(const QString& resolution) const
+{
+    // Convert resolution string to numeric score
+    // Higher score = better resolution (less likely to delete)
+    QString res = resolution.toLower();
+    
+    if (res.contains("3840") || res.contains("2160") || res.contains("4k")) return 100;
+    if (res.contains("2560") || res.contains("1440")) return 85;
+    if (res.contains("1920") || res.contains("1080")) return 80;
+    if (res.contains("1280") || res.contains("720")) return 60;
+    if (res.contains("854") || res.contains("480")) return 40;
+    if (res.contains("640") || res.contains("360")) return 30;
+    if (res.contains("426") || res.contains("240")) return 20;
+    
+    return 50;  // Unknown/default resolution
+}
+
+QString WatchSessionManager::getFileQuality(int lid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.quality FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+QString WatchSessionManager::getFileResolution(int lid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.resolution FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+QString WatchSessionManager::getFileAudioLanguage(int lid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.lang_dub FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+QString WatchSessionManager::getFileSubtitleLanguage(int lid) const
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.lang_sub FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+int WatchSessionManager::getFileRating(int lid) const
+{
+    // Get anime rating for this file (0-1000 scale, where 800+ is excellent)
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    // Extract numeric rating from anime.rating field (format: "8.23" -> 823)
+    q.prepare("SELECT a.rating FROM mylist m JOIN anime a ON m.aid = a.aid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        QString ratingStr = q.value(0).toString();
+        if (!ratingStr.isEmpty()) {
+            // Convert "8.23" to 823
+            double rating = ratingStr.toDouble() * 100.0;
+            return static_cast<int>(rating);
+        }
+    }
+    
+    return 0;  // No rating available
+}
+

@@ -73,6 +73,12 @@ private:
 	
 	// Filter bar visibility settings
 	bool filterBarVisible;
+	
+	// File marking preferences
+	QString preferredAudioLanguages;  // Comma-separated list of preferred audio languages (e.g., "japanese,english")
+	QString preferredSubtitleLanguages;  // Comma-separated list of preferred subtitle languages (e.g., "english,none")
+	bool preferHighestVersion;  // Prefer highest version when marking files
+	bool preferHighestQuality;  // Prefer highest quality when marking files
     /* Settings End === */
 
 	int protover; // AniDB API version = 3
@@ -468,6 +474,16 @@ public:
 	// Filter bar visibility settings
 	bool getFilterBarVisible();
 	void setFilterBarVisible(bool visible);
+	
+	// File marking preferences
+	QString getPreferredAudioLanguages();
+	void setPreferredAudioLanguages(const QString& languages);
+	QString getPreferredSubtitleLanguages();
+	void setPreferredSubtitleLanguages(const QString& languages);
+	bool getPreferHighestVersion();
+	void setPreferHighestVersion(bool prefer);
+	bool getPreferHighestQuality();
+	void setPreferHighestQuality(bool prefer);
 	
 private:
 	// Helper method for saving settings to database

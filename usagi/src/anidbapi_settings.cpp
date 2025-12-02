@@ -163,3 +163,48 @@ void AniDBApi::setFilterBarVisible(bool visible)
 	AniDBApi::filterBarVisible = visible;
 	saveSetting("filterBarVisible", visible ? "1" : "0");
 }
+
+// File marking preferences
+QString AniDBApi::getPreferredAudioLanguages()
+{
+	return AniDBApi::preferredAudioLanguages;
+}
+
+void AniDBApi::setPreferredAudioLanguages(const QString& languages)
+{
+	AniDBApi::preferredAudioLanguages = languages;
+	saveSetting("preferredAudioLanguages", languages);
+}
+
+QString AniDBApi::getPreferredSubtitleLanguages()
+{
+	return AniDBApi::preferredSubtitleLanguages;
+}
+
+void AniDBApi::setPreferredSubtitleLanguages(const QString& languages)
+{
+	AniDBApi::preferredSubtitleLanguages = languages;
+	saveSetting("preferredSubtitleLanguages", languages);
+}
+
+bool AniDBApi::getPreferHighestVersion()
+{
+	return AniDBApi::preferHighestVersion;
+}
+
+void AniDBApi::setPreferHighestVersion(bool prefer)
+{
+	AniDBApi::preferHighestVersion = prefer;
+	saveSetting("preferHighestVersion", prefer ? "1" : "0");
+}
+
+bool AniDBApi::getPreferHighestQuality()
+{
+	return AniDBApi::preferHighestQuality;
+}
+
+void AniDBApi::setPreferHighestQuality(bool prefer)
+{
+	AniDBApi::preferHighestQuality = prefer;
+	saveSetting("preferHighestQuality", prefer ? "1" : "0");
+}

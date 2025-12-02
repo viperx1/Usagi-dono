@@ -234,6 +234,12 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	// Initialize filter bar visibility with defaults (visible by default)
 	filterBarVisible = true;
 	
+	// Initialize file marking preferences with defaults
+	preferredAudioLanguages = "japanese";  // Default to Japanese audio
+	preferredSubtitleLanguages = "english";  // Default to English subtitles
+	preferHighestVersion = true;  // Default to preferring highest version
+	preferHighestQuality = true;  // Default to preferring highest quality
+	
 	while(query.next())
 	{
 		if(query.value(0).toString() == "username")
@@ -287,6 +293,22 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		if(query.value(0).toString() == "filterBarVisible")
 		{
 			filterBarVisible = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "preferredAudioLanguages")
+		{
+			preferredAudioLanguages = query.value(1).toString();
+		}
+		if(query.value(0).toString() == "preferredSubtitleLanguages")
+		{
+			preferredSubtitleLanguages = query.value(1).toString();
+		}
+		if(query.value(0).toString() == "preferHighestVersion")
+		{
+			preferHighestVersion = (query.value(1).toString() == "1");
+		}
+		if(query.value(0).toString() == "preferHighestQuality")
+		{
+			preferHighestQuality = (query.value(1).toString() == "1");
 		}
 	}
 
