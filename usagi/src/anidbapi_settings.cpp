@@ -8,7 +8,8 @@ static bool s_settingsLogged = false;
 void AniDBApi::saveSetting(const QString& name, const QString& value)
 {
 	QSqlQuery query;
-	query.prepare("INSERT OR REPLACE INTO `settings` (name, value) VALUES (?, ?)");
+	// Use prepared statement with explicit column names (id is auto-increment PRIMARY KEY)
+	query.prepare("INSERT OR REPLACE INTO `settings` (`name`, `value`) VALUES (?, ?)");
 	query.addBindValue(name);
 	query.addBindValue(value);
 	query.exec();

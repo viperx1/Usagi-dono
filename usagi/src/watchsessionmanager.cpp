@@ -1371,9 +1371,15 @@ bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
     QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
     
     // Normalize and check if file's audio language matches any preferred language
+    // Use word boundary matching to avoid false positives (e.g., 'eng' in 'bengali')
     QString normalizedAudioLang = audioLang.toLower().trimmed();
     for (const QString& lang : langList) {
-        if (normalizedAudioLang.contains(lang.trimmed())) {
+        QString trimmedLang = lang.trimmed();
+        // Check for exact match or word boundary match
+        if (normalizedAudioLang == trimmedLang || 
+            normalizedAudioLang.startsWith(trimmedLang + " ") ||
+            normalizedAudioLang.endsWith(" " + trimmedLang) ||
+            normalizedAudioLang.contains(" " + trimmedLang + " ")) {
             return true;
         }
     }
@@ -1404,9 +1410,15 @@ bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
     QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
     
     // Normalize and check if file's subtitle language matches any preferred language
+    // Use word boundary matching to avoid false positives (e.g., 'eng' in 'bengali')
     QString normalizedSubLang = subLang.toLower().trimmed();
     for (const QString& lang : langList) {
-        if (normalizedSubLang.contains(lang.trimmed())) {
+        QString trimmedLang = lang.trimmed();
+        // Check for exact match or word boundary match
+        if (normalizedSubLang == trimmedLang || 
+            normalizedSubLang.startsWith(trimmedLang + " ") ||
+            normalizedSubLang.endsWith(" " + trimmedLang) ||
+            normalizedSubLang.contains(" " + trimmedLang + " ")) {
             return true;
         }
     }
