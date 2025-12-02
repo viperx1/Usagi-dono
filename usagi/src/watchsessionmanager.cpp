@@ -1195,18 +1195,16 @@ int WatchSessionManager::getFileVersion(int lid) const
     // If no version bits are set, the file is version 1
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        Logger::log(QString("[WatchSessionManager::getFileVersion] Database not open for lid=%1").arg(lid), __FILE__, __LINE__);
         return 1;  // Default to version 1
     }
     
     QSqlQuery q(db);
     // Join mylist to file table to get state field
-    q.prepare("SELECT f.state, f.fid FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.prepare("SELECT f.state FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
     q.addBindValue(lid);
     
     if (q.exec() && q.next()) {
         int state = q.value(0).toInt();
-        int fid = q.value(1).toInt();
         
         // Extract version from state bits 2-5
         // Check version flags in priority order (v5 > v4 > v3 > v2)
@@ -1222,13 +1220,9 @@ int WatchSessionManager::getFileVersion(int lid) const
         }
         // else version = 1 (no version bits set means version 1)
         
-        Logger::log(QString("[WatchSessionManager::getFileVersion] lid=%1, fid=%2, raw_state=%3 (0x%4), extracted_version=%5")
-            .arg(lid).arg(fid).arg(state).arg(state, 0, 16).arg(version), __FILE__, __LINE__);
         return version;
     }
     
-    Logger::log(QString("[WatchSessionManager::getFileVersion] No file found for lid=%1, query error: %2")
-        .arg(lid).arg(q.lastError().text()), __FILE__, __LINE__);
     return 1;  // Default to version 1
 }
 
@@ -1237,7 +1231,6 @@ int WatchSessionManager::getFileCountForEpisode(int lid) const
     // Count how many files exist for the same episode (same eid)
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        Logger::log(QString("[WatchSessionManager::getFileCountForEpisode] Database not open for lid=%1").arg(lid), __FILE__, __LINE__);
         return 1;
     }
     
@@ -1252,14 +1245,9 @@ int WatchSessionManager::getFileCountForEpisode(int lid) const
     q.addBindValue(lid);
     
     if (q.exec() && q.next()) {
-        int count = q.value(0).toInt();
-        Logger::log(QString("[WatchSessionManager::getFileCountForEpisode] lid=%1, file_count=%2")
-            .arg(lid).arg(count), __FILE__, __LINE__);
-        return count;
+        return q.value(0).toInt();
     }
     
-    Logger::log(QString("[WatchSessionManager::getFileCountForEpisode] Query failed for lid=%1, error: %2")
-        .arg(lid).arg(q.lastError().text()), __FILE__, __LINE__);
     return 1;  // Default to 1 file
 }
 
@@ -1268,7 +1256,6 @@ int WatchSessionManager::getHigherVersionFileCount(int lid) const
     // Count how many local files for the same episode have a higher version than this file
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        Logger::log(QString("[WatchSessionManager::getHigherVersionFileCount] Database not open for lid=%1").arg(lid), __FILE__, __LINE__);
         return 0;
     }
     
@@ -1301,57 +1288,8 @@ int WatchSessionManager::getHigherVersionFileCount(int lid) const
     q.addBindValue(myVersion);  // Files with higher version
     
     if (q.exec() && q.next()) {
-        int count = q.value(0).toInt();
-        Logger::log(QString("[WatchSessionManager::getHigherVersionFileCount] lid=%1, my_version=%2, higher_version_count=%3")
-            .arg(lid).arg(myVersion).arg(count), __FILE__, __LINE__);
-        
-        // Debug: log details of files with higher versions
-        if (count > 0) {
-            QSqlQuery detailQuery(db);
-            detailQuery.prepare(
-                "SELECT m.lid, f.fid, f.state, "
-                "CASE "
-                "  WHEN (f.state & 32) THEN 5 "
-                "  WHEN (f.state & 16) THEN 4 "
-                "  WHEN (f.state & 8) THEN 3 "
-                "  WHEN (f.state & 4) THEN 2 "
-                "  ELSE 1 "
-                "END as version, "
-                "lf.path FROM mylist m "
-                "JOIN file f ON m.fid = f.fid "
-                "JOIN local_files lf ON m.local_file = lf.id "
-                "WHERE m.eid = (SELECT eid FROM mylist WHERE lid = ?) "
-                "AND m.lid != ? "
-                "AND lf.path IS NOT NULL AND lf.path != '' "
-                "AND CASE "
-                "  WHEN (f.state & 32) THEN 5 "
-                "  WHEN (f.state & 16) THEN 4 "
-                "  WHEN (f.state & 8) THEN 3 "
-                "  WHEN (f.state & 4) THEN 2 "
-                "  ELSE 1 "
-                "END > ?"
-            );
-            detailQuery.addBindValue(lid);
-            detailQuery.addBindValue(lid);
-            detailQuery.addBindValue(myVersion);
-            
-            if (detailQuery.exec()) {
-                while (detailQuery.next()) {
-                    int otherLid = detailQuery.value(0).toInt();
-                    int otherFid = detailQuery.value(1).toInt();
-                    int otherState = detailQuery.value(2).toInt();
-                    int otherVersion = detailQuery.value(3).toInt();
-                    QString otherPath = detailQuery.value(4).toString();
-                    Logger::log(QString("[WatchSessionManager::getHigherVersionFileCount]   Higher version file: lid=%1, fid=%2, state=%3 (0x%4), version=%5, path=%6")
-                        .arg(otherLid).arg(otherFid).arg(otherState).arg(otherState, 0, 16).arg(otherVersion).arg(otherPath), __FILE__, __LINE__);
-                }
-            }
-        }
-        
-        return count;
+        return q.value(0).toInt();
     }
     
-    Logger::log(QString("[WatchSessionManager::getHigherVersionFileCount] Query failed for lid=%1, error: %2")
-        .arg(lid).arg(q.lastError().text()), __FILE__, __LINE__);
     return 0;
 }
