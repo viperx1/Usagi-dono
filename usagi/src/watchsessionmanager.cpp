@@ -238,10 +238,12 @@ void WatchSessionManager::saveToDatabase()
         }
     }
     
-    // Save file marks
+    // Save file marks - delete all existing marks first to ensure sync with memory
+    q.exec("DELETE FROM file_marks");
+    
     for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
         const FileMarkInfo& info = it.value();
-        q.prepare("INSERT OR REPLACE INTO file_marks (lid, mark_type, mark_score) VALUES (?, ?, ?)");
+        q.prepare("INSERT INTO file_marks (lid, mark_type, mark_score) VALUES (?, ?, ?)");
         q.addBindValue(info.lid);
         q.addBindValue(static_cast<int>(info.markType));
         q.addBindValue(info.markScore);

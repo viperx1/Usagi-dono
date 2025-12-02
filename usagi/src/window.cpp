@@ -216,6 +216,7 @@ Window::Window()
 	
 	// Initialize window state for tray restore
 	windowStateBeforeHide = Qt::WindowNoState;
+	exitingFromTray = false;
 	
     safeclose = new QTimer;
     safeclose->setInterval(100);
@@ -1787,6 +1788,13 @@ void Window::getNotifyFileHashed(int threadId, ed2k::ed2kfilestruct data)
 
 void Window::safeClose()
 {
+    // If exiting from tray, quit the application directly after logout timeout
+    if (exitingFromTray && (!adbapi->LoggedIn() || waitforlogout.elapsed() > LOGOUT_TIMEOUT_MS)) {
+        LOG("Exiting from tray - quitting application");
+        QApplication::quit();
+        return;
+    }
+    
     this->close();
 }
 
@@ -5405,7 +5413,7 @@ void Window::onTrayExitAction()
 {
     // Set a flag to bypass close-to-tray logic for this exit
     // Don't modify the user's closeToTrayEnabled setting
-    bool originalCloseToTray = closeToTrayEnabled;
+    exitingFromTray = true;
     closeToTrayEnabled = false;
     
     // Send logout command if logged in
@@ -5415,11 +5423,10 @@ void Window::onTrayExitAction()
         waitforlogout.start();
         safeclose->start();
     } else {
-        // Not logged in, initiate close via timer for consistency
-        LOG("Tray exit requested while not logged in, initiating close via timer");
-        safeclose->start();
+        // Not logged in, quit application directly
+        LOG("Tray exit requested while not logged in, quitting application");
+        QApplication::quit();
     }
-    // Note: Application will exit, so no need to restore the flag
 }
 
 void Window::onApplicationAboutToQuit()

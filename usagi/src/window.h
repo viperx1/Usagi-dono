@@ -572,6 +572,7 @@ private:
 	bool closeToTrayEnabled;
 	bool minimizeToTrayEnabled;
 	bool startMinimizedEnabled;
+	bool exitingFromTray;  // Flag to indicate exit was triggered from tray menu
 	Qt::WindowStates windowStateBeforeHide;  // Store window state before hiding to tray
 	QRect windowGeometryBeforeHide;  // Store window geometry before hiding to tray
 	
