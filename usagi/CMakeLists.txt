@@ -118,7 +118,7 @@ add_custom_command(TARGET usagi POST_BUILD
 
 add_custom_command(TARGET usagi POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_SOURCE_DIR}/usagi.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/../usagi.png
         $<TARGET_FILE_DIR:usagi>/usagi.png
     COMMENT "Copying usagi.png to output directory"
 )
