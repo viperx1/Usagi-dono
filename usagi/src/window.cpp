@@ -224,6 +224,26 @@ Window::Window()
 
     // main window
     this->setWindowTitle("Usagi");
+    
+    // Set window icon (use usagi.png if available)
+    QStringList iconPaths = {
+        "usagi.png",           // Current directory
+        "../usagi.png",        // Parent directory (if running from build dir)
+        ":/usagi.png",         // Qt resource (if added to .qrc in future)
+        QCoreApplication::applicationDirPath() + "/usagi.png"
+    };
+    
+    for (const QString &path : iconPaths) {
+        if (QFile::exists(path)) {
+            QIcon windowIcon(path);
+            if (!windowIcon.isNull()) {
+                this->setWindowIcon(windowIcon);
+                LOG(QString("Loaded window icon from: %1").arg(path));
+                break;
+            }
+        }
+    }
+    
 //    this->setFixedWidth(800);
     this->setMinimumSize(800, 600);
 //    this->setFixedHeight(600);
@@ -5215,8 +5235,35 @@ void Window::createTrayIcon()
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
     
-    // Set icon (use application icon or a default icon)
-    QIcon appIcon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+    // Set icon (use usagi.png if available, otherwise fall back to default icon)
+    QIcon appIcon;
+    
+    // Try to load usagi.png from various possible locations
+    QStringList iconPaths = {
+        "usagi.png",           // Current directory
+        "../usagi.png",        // Parent directory (if running from build dir)
+        ":/usagi.png",         // Qt resource (if added to .qrc in future)
+        QCoreApplication::applicationDirPath() + "/usagi.png"
+    };
+    
+    bool iconLoaded = false;
+    for (const QString &path : iconPaths) {
+        if (QFile::exists(path)) {
+            appIcon = QIcon(path);
+            if (!appIcon.isNull()) {
+                iconLoaded = true;
+                LOG(QString("Loaded tray icon from: %1").arg(path));
+                break;
+            }
+        }
+    }
+    
+    // Fall back to default icon if usagi.png not found
+    if (!iconLoaded) {
+        appIcon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+        LOG("Using default tray icon (usagi.png not found)");
+    }
+    
     trayIcon->setIcon(appIcon);
     trayIcon->setToolTip("Usagi-dono");
     
