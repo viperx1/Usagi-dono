@@ -239,15 +239,20 @@ void WatchSessionManager::saveToDatabase()
     }
     
     // Save file marks - delete all existing marks first to ensure sync with memory
-    q.exec("DELETE FROM file_marks");
+    // This prevents stale marks from remaining in the database when files are unmarked
+    if (!q.exec("DELETE FROM file_marks")) {
+        LOG(QString("ERROR: Failed to delete file_marks: %1").arg(q.lastError().text()));
+    }
     
     for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
         const FileMarkInfo& info = it.value();
-        q.prepare("INSERT INTO file_marks (lid, mark_type, mark_score) VALUES (?, ?, ?)");
+        q.prepare("INSERT OR REPLACE INTO file_marks (lid, mark_type, mark_score) VALUES (?, ?, ?)");
         q.addBindValue(info.lid);
         q.addBindValue(static_cast<int>(info.markType));
         q.addBindValue(info.markScore);
-        q.exec();
+        if (!q.exec()) {
+            LOG(QString("ERROR: Failed to insert file_mark for lid=%1: %2").arg(info.lid).arg(q.lastError().text()));
+        }
     }
     
     saveSettings();
