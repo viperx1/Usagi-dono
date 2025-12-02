@@ -5207,6 +5207,9 @@ QIcon Window::loadUsagiIcon()
     QStringList iconPaths = {
         QCoreApplication::applicationDirPath() + "/usagi.ico",  // ICO file in app dir
         QCoreApplication::applicationDirPath() + "/usagi.png",  // PNG in app dir
+        QCoreApplication::applicationDirPath() + "/../usagi.ico",  // ICO one level up from app dir
+        QCoreApplication::applicationDirPath() + "/../usagi.png",  // PNG one level up from app dir
+        "usagi/usagi.ico",     // ICO in usagi subdirectory (development)
         "usagi.ico",           // ICO in current directory
         "usagi.png",           // PNG in current directory
         "../usagi.ico",        // ICO in parent directory (if running from build dir)
