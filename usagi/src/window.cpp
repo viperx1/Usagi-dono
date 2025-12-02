@@ -216,6 +216,9 @@ Window::Window()
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
 
+    // Connect to application aboutToQuit signal to handle external termination
+    connect(qApp, &QApplication::aboutToQuit, this, &Window::onApplicationAboutToQuit);
+
     // Timer for startup initialization (delayed to ensure UI is ready)
     startupTimer = new QTimer(this);
     startupTimer->setSingleShot(true);
@@ -5362,6 +5365,23 @@ void Window::onTrayExitAction()
         safeclose->start();
     }
     // Note: Application will exit, so no need to restore the flag
+}
+
+void Window::onApplicationAboutToQuit()
+{
+    // This slot is called when the application is about to quit
+    // This handles external termination (e.g., Qt Creator stop button, kill signals)
+    // where closeEvent might be bypassed or ignored due to close-to-tray logic
+    
+    if (adbapi && adbapi->LoggedIn()) {
+        LOG("Application terminating while logged in, sending LOGOUT command");
+        adbapi->Logout();
+        
+        // Give a short time for the logout to be sent (event loop is still running)
+        QEventLoop loop;
+        QTimer::singleShot(200, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
 }
 
 // ========== Auto-start Implementation ==========

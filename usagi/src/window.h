@@ -693,6 +693,9 @@ public slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onTrayShowHideAction();
     void onTrayExitAction();
+    
+    // Application quit handler (for external termination)
+    void onApplicationAboutToQuit();
 
 signals:
 	void notifyStopHasher();
