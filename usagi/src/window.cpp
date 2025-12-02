@@ -4846,7 +4846,7 @@ void Window::applyMylistFilters()
 			
 			// Rebuild the filtered list with chains grouped together
 			filteredAnimeIds.clear();
-			for (const QList<int>& chain : chainGroups) {
+			for (const QList<int>& chain : std::as_const(chainGroups)) {
 				for (int aid : chain) {
 					if (!filteredAnimeIds.contains(aid) && allAnimeIds.contains(aid)) {
 						filteredAnimeIds.append(aid);
