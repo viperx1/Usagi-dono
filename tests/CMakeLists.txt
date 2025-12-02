@@ -1382,6 +1382,8 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+    ../usagi/src/watchsessionmanager.cpp
+    ../usagi/src/watchchunkmanager.cpp
 )
 
 set(MYLISTCARDMANAGER_TEST_HEADERS
@@ -1398,6 +1400,8 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+    ../usagi/src/watchsessionmanager.h
+    ../usagi/src/watchchunkmanager.h
 )
 
 add_executable(test_mylistcardmanager ${MYLISTCARDMANAGER_TEST_SOURCES} ${MYLISTCARDMANAGER_TEST_HEADERS})

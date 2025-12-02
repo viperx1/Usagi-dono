@@ -118,6 +118,7 @@ public slots:
     void updateNextEpisodeIndicator();  // Update which episode will play next
     void setHidden(bool hidden);  // Set card hidden state
     void setIs18Restricted(bool restricted);  // Set 18+ restriction status
+    void setShowSeriesArrow(bool show);  // Set whether to show arrow to next in series
     
 signals:
     void episodeClicked(int lid);
@@ -165,6 +166,7 @@ private:
     bool m_isHidden;  // Hidden state of card
     bool m_needsFetch;  // Whether card needs data fetching
     bool m_is18Restricted;  // Whether anime is 18+ restricted
+    bool m_showSeriesArrow;  // Whether to show arrow to next in series
     QPixmap m_originalPoster;  // Store original poster for overlay
     
     // UI elements

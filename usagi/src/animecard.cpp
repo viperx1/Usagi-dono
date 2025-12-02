@@ -30,6 +30,7 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_isHidden(false)
     , m_needsFetch(false)
     , m_is18Restricted(false)
+    , m_showSeriesArrow(false)
     , m_posterOverlay(nullptr)
 {
     setupUI();
@@ -696,7 +697,30 @@ void AnimeCard::paintEvent(QPaintEvent *event)
     // Call base class paint event for frame drawing
     QFrame::paintEvent(event);
     
-    // Additional custom painting can be done here if needed
+    // Draw series chain arrow if enabled
+    if (m_showSeriesArrow && !m_isHidden) {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        
+        // Draw arrow on the right side of the card pointing to the next card
+        int arrowX = width() - 15;  // 15 pixels from right edge
+        int arrowY = height() / 2;   // Vertically centered
+        
+        // Set arrow color - use a visible color that stands out
+        painter.setPen(QPen(QColor(0, 120, 215), 3));  // Blue arrow, 3px thick
+        painter.setBrush(QColor(0, 120, 215));
+        
+        // Draw arrow shape: ──>
+        // Horizontal line
+        painter.drawLine(arrowX - 30, arrowY, arrowX - 5, arrowY);
+        
+        // Arrow head (triangle pointing right)
+        QPolygon arrowHead;
+        arrowHead << QPoint(arrowX - 5, arrowY - 8)   // Top point
+                  << QPoint(arrowX, arrowY)           // Tip point
+                  << QPoint(arrowX - 5, arrowY + 8);  // Bottom point
+        painter.drawPolygon(arrowHead);
+    }
 }
 
 void AnimeCard::mousePressEvent(QMouseEvent *event)
@@ -967,3 +991,10 @@ void AnimeCard::setIs18Restricted(bool restricted)
 {
     m_is18Restricted = restricted;
 }
+
+void AnimeCard::setShowSeriesArrow(bool show)
+{
+    m_showSeriesArrow = show;
+    update();  // Trigger repaint
+}
+

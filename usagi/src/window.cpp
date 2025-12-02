@@ -4566,6 +4566,7 @@ void Window::applyMylistFilters()
 	bool showMarkedForDeletion = filterSidebar->getShowMarkedForDeletion();
 	QString adultContentFilter = filterSidebar->getAdultContentFilter();
 	bool inMyListOnly = filterSidebar->getInMyListOnly();
+	bool showSeriesChain = filterSidebar->getShowSeriesChain();
 	
 	// Check if we need to handle MyList filter change
 	if (inMyListOnly != lastInMyListState) {
@@ -4804,6 +4805,84 @@ void Window::applyMylistFilters()
 		
 		if (visible) {
 			filteredAnimeIds.append(aid);
+		}
+	}
+	
+	// If series chain display is enabled and search text is provided, expand results to include full chains
+	if (showSeriesChain && !searchText.isEmpty() && watchSessionManager) {
+		QSet<int> expandedAnimeIds;  // Use a set to avoid duplicates
+		
+		// For each anime in filtered results, get its entire series chain
+		for (int aid : filteredAnimeIds) {
+			QList<int> seriesChain = watchSessionManager->getSeriesChain(aid);
+			
+			// Add all anime in the chain to the expanded set
+			for (int chainAid : seriesChain) {
+				// Only add if it's in the full list of available anime
+				if (allAnimeIds.contains(chainAid)) {
+					expandedAnimeIds.insert(chainAid);
+				}
+			}
+		}
+		
+		// Convert set back to list and replace filtered results
+		if (!expandedAnimeIds.isEmpty()) {
+			filteredAnimeIds.clear();
+			filteredAnimeIds = expandedAnimeIds.values();
+			
+			// Sort the expanded list to maintain chain order
+			// Group by series chain and sort within each chain
+			QMap<int, QList<int>> chainGroups;  // Map from first anime in chain -> list of anime in that chain
+			
+			for (int aid : filteredAnimeIds) {
+				QList<int> chain = watchSessionManager->getSeriesChain(aid);
+				if (!chain.isEmpty()) {
+					int firstAid = chain.first();  // Use first anime as group key
+					if (!chainGroups.contains(firstAid)) {
+						chainGroups[firstAid] = chain;
+					}
+				}
+			}
+			
+			// Rebuild the filtered list with chains grouped together
+			filteredAnimeIds.clear();
+			for (const QList<int>& chain : chainGroups) {
+				for (int aid : chain) {
+					if (!filteredAnimeIds.contains(aid) && allAnimeIds.contains(aid)) {
+						filteredAnimeIds.append(aid);
+					}
+				}
+			}
+		}
+	}
+	
+	// Update arrow indicators for series chain display
+	// First, clear all arrows
+	for (AnimeCard* card : cardManager->getAllCards()) {
+		card->setShowSeriesArrow(false);
+	}
+	
+	// If series chain display is enabled, set arrows for cards that have a sequel in the filtered list
+	if (showSeriesChain && watchSessionManager) {
+		for (int i = 0; i < filteredAnimeIds.size() - 1; ++i) {
+			int currentAid = filteredAnimeIds[i];
+			int nextAid = filteredAnimeIds[i + 1];
+			
+			// Check if nextAid is the sequel of currentAid
+			QList<int> chain = watchSessionManager->getSeriesChain(currentAid);
+			int currentIndex = chain.indexOf(currentAid);
+			
+			if (currentIndex >= 0 && currentIndex < chain.size() - 1) {
+				int sequelAid = chain[currentIndex + 1];
+				
+				// If the next card in the filtered list is the sequel, show arrow
+				if (nextAid == sequelAid) {
+					AnimeCard* card = cardManager->getCard(currentAid);
+					if (card) {
+						card->setShowSeriesArrow(true);
+					}
+				}
+			}
 		}
 	}
 	
