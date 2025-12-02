@@ -547,23 +547,21 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
-    // Check quality and resolution (if preference is enabled)
+    // Check quality (if preference is enabled)
+    // Quality is the file.quality field from AniDB (e.g., "very high", "high", "medium", "low")
     // Reuse existing database connection instead of creating a new one
     if (db.isOpen()) {
         QSqlQuery q2(db);
         q2.prepare("SELECT value FROM settings WHERE name = 'preferHighestQuality'");
         if (q2.exec() && q2.next() && q2.value(0).toString() == "1") {
             QString quality = getFileQuality(lid);
-            QString resolution = getFileResolution(lid);
-            
             int qualityScore = getQualityScore(quality);
-            int resolutionScore = getResolutionScore(resolution);
             
             // Compare with thresholds - files above threshold get bonus, below get penalty
-            if (qualityScore >= QUALITY_HIGH_THRESHOLD && resolutionScore >= RESOLUTION_HIGH_THRESHOLD) {
-                score += SCORE_HIGHER_QUALITY;  // High quality/resolution
-            } else if (qualityScore < QUALITY_LOW_THRESHOLD || resolutionScore < RESOLUTION_LOW_THRESHOLD) {
-                score += SCORE_LOWER_QUALITY;  // Low quality/resolution
+            if (qualityScore >= QUALITY_HIGH_THRESHOLD) {
+                score += SCORE_HIGHER_QUALITY;  // High quality
+            } else if (qualityScore < QUALITY_LOW_THRESHOLD) {
+                score += SCORE_LOWER_QUALITY;  // Low quality
             }
         }
     }
@@ -574,6 +572,19 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         score += SCORE_HIGH_RATING;  // Highly rated anime - keep longer
     } else if (rating > 0 && rating < RATING_LOW_THRESHOLD) {
         score += SCORE_LOW_RATING;  // Poorly rated anime - more eligible for deletion
+    }
+    
+    // Check group status
+    int gid = getFileGroupId(lid);
+    if (gid > 0) {
+        int groupStatus = getGroupStatus(gid);
+        if (groupStatus == 1) {  // Ongoing
+            score += SCORE_ACTIVE_GROUP;  // Active groups are preferred
+        } else if (groupStatus == 2) {  // Stalled
+            score += SCORE_STALLED_GROUP;  // Stalled groups get penalty
+        } else if (groupStatus == 3) {  // Disbanded
+            score += SCORE_DISBANDED_GROUP;  // Disbanded groups get larger penalty
+        }
     }
     
     // Calculate distance-based scoring across the series chain
@@ -1428,35 +1439,19 @@ bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
 
 int WatchSessionManager::getQualityScore(const QString& quality) const
 {
-    // Convert quality string to numeric score
+    // Convert AniDB quality string to numeric score
+    // AniDB quality values: "very high", "high", "medium", "low", "very low", "corrupted", "eyecancer"
     // Higher score = better quality (less likely to delete)
-    QString q = quality.toLower();
+    QString q = quality.toLower().trimmed();
     
-    if (q.contains("blu-ray") || q.contains("bluray")) return 100;
-    if (q.contains("dvd")) return 70;
-    if (q.contains("hdtv")) return 60;
-    if (q.contains("web")) return 50;
-    if (q.contains("tv")) return 40;
-    if (q.contains("vhs")) return 20;
+    if (q == "very high") return 100;
+    if (q == "high") return 80;
+    if (q == "medium") return 60;
+    if (q == "low") return 40;
+    if (q == "very low") return 20;
+    if (q == "corrupted" || q == "eyecancer") return 10;
     
-    return 30;  // Unknown/default quality
-}
-
-int WatchSessionManager::getResolutionScore(const QString& resolution) const
-{
-    // Convert resolution string to numeric score
-    // Higher score = better resolution (less likely to delete)
-    QString res = resolution.toLower();
-    
-    if (res.contains("3840") || res.contains("2160") || res.contains("4k")) return 100;
-    if (res.contains("2560") || res.contains("1440")) return 85;
-    if (res.contains("1920") || res.contains("1080")) return 80;
-    if (res.contains("1280") || res.contains("720")) return 60;
-    if (res.contains("854") || res.contains("480")) return 40;
-    if (res.contains("640") || res.contains("360")) return 30;
-    if (res.contains("426") || res.contains("240")) return 20;
-    
-    return 50;  // Unknown/default resolution
+    return 50;  // Unknown/default quality
 }
 
 QString WatchSessionManager::getFileQuality(int lid) const
@@ -1468,24 +1463,6 @@ QString WatchSessionManager::getFileQuality(int lid) const
     
     QSqlQuery q(db);
     q.prepare("SELECT f.quality FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
-    q.addBindValue(lid);
-    
-    if (q.exec() && q.next()) {
-        return q.value(0).toString();
-    }
-    
-    return QString();
-}
-
-QString WatchSessionManager::getFileResolution(int lid) const
-{
-    QSqlDatabase db = QSqlDatabase::database();
-    if (!db.isOpen()) {
-        return QString();
-    }
-    
-    QSqlQuery q(db);
-    q.prepare("SELECT f.resolution FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
     q.addBindValue(lid);
     
     if (q.exec() && q.next()) {
@@ -1554,5 +1531,44 @@ int WatchSessionManager::getFileRating(int lid) const
     }
     
     return 0;  // No rating available
+}
+
+int WatchSessionManager::getFileGroupId(int lid) const
+{
+    // Get group ID for this file
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.gid FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 0;  // No group ID available
+}
+
+int WatchSessionManager::getGroupStatus(int gid) const
+{
+    // Get group status from database
+    // Status values: 0=unknown, 1=ongoing, 2=stalled, 3=disbanded
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT status FROM `group` WHERE gid = ?");
+    q.addBindValue(gid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 0;  // Unknown status
 }
 

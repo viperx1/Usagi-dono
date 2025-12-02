@@ -502,6 +502,11 @@ public:
 	void checkCalendarIfNeeded();
 	/* Anime Titles End === */
 	
+	/* === Group Status Start */
+	// Request group status information from AniDB
+	void requestGroupStatus(int gid);
+	/* Group Status End === */
+	
 	/* === Duplicate Detection Start */
 	// Get list of local_files IDs with same ed2k_hash (duplicates)
 	QList<int> getDuplicateLocalFileIds(const QString& ed2k_hash);

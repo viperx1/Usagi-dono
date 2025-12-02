@@ -443,13 +443,13 @@ private:
     // Helper methods for new marking criteria
     bool matchesPreferredAudioLanguage(int lid) const;
     bool matchesPreferredSubtitleLanguage(int lid) const;
-    int getQualityScore(const QString& quality) const;  // Convert quality string to numeric score
-    int getResolutionScore(const QString& resolution) const;  // Convert resolution to numeric score
+    int getQualityScore(const QString& quality) const;  // Convert AniDB quality string to numeric score
     QString getFileQuality(int lid) const;
-    QString getFileResolution(int lid) const;
     QString getFileAudioLanguage(int lid) const;
     QString getFileSubtitleLanguage(int lid) const;
     int getFileRating(int lid) const;  // Get anime rating for this file
+    int getFileGroupId(int lid) const;  // Get group ID for this file
+    int getGroupStatus(int gid) const;  // Get group status (0=unknown, 1=ongoing, 2=stalled, 3=disbanded)
     
     // Helper method to find active session info across series chain
     // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
@@ -477,15 +477,18 @@ private:
     static const int SCORE_HIGH_RATING = 15;  // Bonus for highly rated anime (rating >= 800)
     static const int SCORE_LOW_RATING = -15;  // Penalty for poorly rated anime (rating < 600)
     
-    // Quality/resolution thresholds for scoring
-    static constexpr int QUALITY_HIGH_THRESHOLD = 60;  // Quality score above this is considered high
-    static constexpr int QUALITY_LOW_THRESHOLD = 40;   // Quality score below this is considered low
-    static constexpr int RESOLUTION_HIGH_THRESHOLD = 60;  // Resolution score above this is considered high
-    static constexpr int RESOLUTION_LOW_THRESHOLD = 40;   // Resolution score below this is considered low
+    // Quality thresholds for scoring (based on AniDB quality field)
+    static constexpr int QUALITY_HIGH_THRESHOLD = 60;  // Quality score above this is considered high (e.g., "high", "very high")
+    static constexpr int QUALITY_LOW_THRESHOLD = 40;   // Quality score below this is considered low (e.g., "low", "very low")
     
     // Rating thresholds (on 0-1000 scale)
     static constexpr int RATING_HIGH_THRESHOLD = 800;  // 8.0/10 - excellent anime
     static constexpr int RATING_LOW_THRESHOLD = 600;   // 6.0/10 - below average anime
+    
+    // Group status scores
+    static const int SCORE_ACTIVE_GROUP = 20;      // Bonus for files from active groups
+    static const int SCORE_STALLED_GROUP = -10;    // Penalty for files from stalled groups
+    static const int SCORE_DISBANDED_GROUP = -25;  // Penalty for files from disbanded groups
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;

@@ -164,6 +164,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// Add local_file column to mylist if it doesn't exist (references local_files.id)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");
+		// Add status column to group table (0=unknown, 1=ongoing, 2=stalled, 3=disbanded)
+		query.exec("ALTER TABLE `group` ADD COLUMN `status` INTEGER DEFAULT 0");
 		query.exec("CREATE TABLE IF NOT EXISTS `anime_titles`(`aid` INTEGER, `type` INTEGER, `language` TEXT, `title` TEXT, PRIMARY KEY(`aid`, `type`, `language`, `title`));");
 		// Create index on anime_titles for faster lookups by aid and type
 		query.exec("CREATE INDEX IF NOT EXISTS `idx_anime_titles_aid_type` ON `anime_titles`(`aid`, `type`);");
@@ -1367,6 +1369,42 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				{
 					int lid = match.captured(1).toInt();
 					emit notifyMylistDel(Tag, lid, false);
+				}
+			}
+		}
+	}
+	else if(ReplyID == "225"){ // 225 GROUP STATUS
+		// Response format: gid|aid|state|name|shortname|lastepisode
+		// State: 0=unknown, 1=ongoing, 2=stalled, 3=disbanded
+		Logger::log("[AniDB Response] 225 GROUP STATUS - Tag: " + Tag, __FILE__, __LINE__);
+		
+		QStringList token2 = Message.split("\n");
+		token2.pop_front();
+		if(token2.size() > 0)
+		{
+			QStringList fields = token2.first().split("|");
+			if(fields.size() >= 5)
+			{
+				QString gid = fields[0];
+				QString state = fields[2];
+				QString name = fields[3];
+				QString shortname = fields[4];
+				
+				// Store group information in database
+				QSqlQuery query(db);
+				query.prepare("INSERT OR REPLACE INTO `group` (`gid`, `name`, `shortname`, `status`) VALUES (?, ?, ?, ?)");
+				query.addBindValue(gid.toInt());
+				query.addBindValue(name);
+				query.addBindValue(shortname);
+				query.addBindValue(state.toInt());
+				
+				if(query.exec())
+				{
+					Logger::log(QString("[AniDB Response] 225 GROUP STATUS stored - GID: %1 Name: %2 Status: %3").arg(gid).arg(name).arg(state), __FILE__, __LINE__);
+				}
+				else
+				{
+					Logger::log(QString("[AniDB Error] Failed to store group status - GID: %1 Error: %2").arg(gid).arg(query.lastError().text()), __FILE__, __LINE__);
 				}
 			}
 		}
@@ -4279,6 +4317,29 @@ void AniDBApi::checkCalendarIfNeeded()
 	{
 		Logger::log("[AniDB Calendar] Failed to request calendar check", __FILE__, __LINE__);
 	}
+}
+
+void AniDBApi::requestGroupStatus(int gid)
+{
+	// Request group status from AniDB
+	if(gid <= 0)
+	{
+		Logger::log("[AniDB GroupStatus] Invalid GID provided", __FILE__, __LINE__);
+		return;
+	}
+	
+	// Only request if logged in
+	if(SID.length() == 0 || LoginStatus() == 0)
+	{
+		Logger::log("[AniDB GroupStatus] Not logged in, skipping group status request", __FILE__, __LINE__);
+		return;
+	}
+	
+	Logger::log(QString("[AniDB GroupStatus] Requesting group status for GID: %1").arg(gid), __FILE__, __LINE__);
+	
+	// Send GROUPSTATUS command
+	QString command = QString("GROUPSTATUS gid=%1").arg(gid);
+	Send(command, "", "");
 }
 
 void AniDBApi::saveExportQueueState()
