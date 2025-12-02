@@ -26,6 +26,7 @@
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include "../resource.h"  // Windows resource IDs
 #endif
 
 HasherThreadPool *hasherThreadPool = nullptr;
@@ -5201,24 +5202,16 @@ void Window::onToggleFilterBarClicked()
 QIcon Window::loadUsagiIcon()
 {
 #ifdef Q_OS_WIN
-    // On Windows, first try to load from embedded resources
-    // IDI_ICON1 is defined in usagi.rc and embedded in the executable
-    QIcon icon(":/usagi.png");  // Try Qt resource first
-    if (!icon.isNull()) {
-        LOG("Loaded icon from Qt resource");
-        return icon;
-    }
-    
-    // If Qt resource not available, try loading ICO from Windows native resource
-    // IDI_ICON1 is the resource ID defined in usagi.rc
-    // We need to use the string name since it's not defined as a numeric constant
+    // On Windows, first try to load from embedded Windows resource
+    // IDI_ICON1 is defined in resource.h and embedded via usagi.rc
     HICON hIcon = (HICON)LoadImageW(GetModuleHandleW(NULL), 
-                                     L"IDI_ICON1",  // Use the string name from .rc file
+                                     MAKEINTRESOURCEW(IDI_ICON1),  // Use numeric resource ID
                                      IMAGE_ICON,
                                      0, 0,
                                      LR_DEFAULTSIZE | LR_SHARED);
     if (hIcon) {
         QPixmap pixmap = QPixmap::fromWinHICON(hIcon);
+        // Note: With LR_SHARED flag, Windows manages the icon lifetime, so we don't call DestroyIcon
         if (!pixmap.isNull()) {
             LOG("Loaded icon from Windows resource (IDI_ICON1)");
             return QIcon(pixmap);
