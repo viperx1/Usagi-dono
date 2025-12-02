@@ -485,6 +485,13 @@ public:
 	bool shouldCheckCalendar();
 	void checkCalendarIfNeeded();
 	/* Anime Titles End === */
+	
+	/* === Duplicate Detection Start */
+	// Get list of local_files IDs with same ed2k_hash (duplicates)
+	QList<int> getDuplicateLocalFileIds(const QString& ed2k_hash);
+	// Get list of all ed2k_hash values that have duplicates
+	QStringList getAllDuplicateHashes();
+	/* Duplicate Detection End === */
 
 	QString GetSID();
 	QString GetRequestedExportTemplate(); // Get the template name that was requested for export

@@ -1570,3 +1570,50 @@ if(WIN32)
 endif()
 
 add_test(NAME test_watchsessionmanager COMMAND test_watchsessionmanager -v2)
+
+# ==========================================================
+# TEST: Duplicate Detection
+# ==========================================================
+set(DUPLICATE_DETECTION_TEST_SOURCES
+    test_duplicate_detection.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(DUPLICATE_DETECTION_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_duplicate_detection ${DUPLICATE_DETECTION_TEST_SOURCES} ${DUPLICATE_DETECTION_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_duplicate_detection)
+
+target_compile_definitions(test_duplicate_detection PRIVATE CRYPTOPP_DEBUG=0)
+
+target_link_libraries(test_duplicate_detection PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    z
+)
+
+target_include_directories(test_duplicate_detection PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_duplicate_detection PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_duplicate_detection COMMAND test_duplicate_detection -v2)
