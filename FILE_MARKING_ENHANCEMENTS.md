@@ -46,31 +46,38 @@ This document describes the enhanced file marking system for determining which f
 
 **Location:** Settings Tab → File Marking Preferences → Prefer highest quality
 
-**Description:** When enabled (default: on), files with higher quality sources and resolutions are prioritized for keeping.
+**Description:** When enabled (default: on), files with higher AniDB quality ratings are prioritized for keeping.
 
 **Implementation:**
 - Setting stored in database as `preferHighestQuality`
 - Default value: true (enabled)
-- Quality scoring (higher = better):
-  - Blu-ray/BluRay: 100
-  - DVD: 70
-  - HDTV: 60
-  - WEB: 50
-  - TV: 40
-  - VHS: 20
-  - Unknown: 30
-- Resolution scoring (higher = better):
-  - 4K (3840x2160): 100
-  - 1440p (2560x1440): 85
-  - 1080p (1920x1080): 80
-  - 720p (1280x720): 60
-  - 480p: 40
-  - 360p: 30
-  - 240p: 20
+- Quality scoring based on AniDB `file.quality` field (higher = better):
+  - "very high": 100
+  - "high": 80
+  - "medium": 60
+  - "low": 40
+  - "very low": 20
+  - "corrupted" / "eyecancer": 10
   - Unknown: 50
-- Score bonus: +25 for high quality/resolution, -35 for low quality/resolution
+- Score bonus: +25 for high quality (≥60), -35 for low quality (<40)
 
-### 5. Rating-Based Scoring
+**Note:** Quality is now defined solely by the AniDB quality field, not by source (Blu-ray, DVD, etc.) or resolution. This provides a more accurate quality assessment as rated by AniDB.
+
+### 5. Group Status Tracking
+
+**Description:** Files from active release groups receive a bonus, while files from stalled or disbanded groups receive penalties.
+
+**Implementation:**
+- Automatically fetched via GROUPSTATUS command when available
+- Group status stored in database with gid
+- Status values: 0=unknown, 1=ongoing, 2=stalled, 3=disbanded
+- Score adjustments:
+  - Active/ongoing groups: +20 bonus
+  - Stalled groups: -10 penalty
+  - Disbanded groups: -25 penalty
+- Method `requestGroupStatus(int gid)` available to fetch status for specific groups
+
+### 6. Rating-Based Scoring
 
 **Description:** Files from highly-rated anime (rating ≥ 8.0/10) receive a bonus to prioritize keeping them, while files from poorly-rated anime (rating < 6.0/10) receive a penalty.
 
@@ -99,12 +106,16 @@ The file marking system uses a comprehensive scoring algorithm to determine file
    - Non-preferred audio: -40
    - Preferred subtitles: +20
    - Non-preferred subtitles: -20
-6. **Quality scoring** (when enabled):
-   - High quality/resolution: +25
-   - Low quality/resolution: -35
-7. **Rating-based**:
-   - Highly rated anime: +15
-   - Poorly rated anime: -15
+6. **Quality scoring** (when enabled, based on AniDB quality field):
+   - High quality (≥60): +25
+   - Low quality (<40): -35
+7. **Group status**:
+   - Active/ongoing groups: +20
+   - Stalled groups: -10
+   - Disbanded groups: -25
+8. **Rating-based**:
+   - Highly rated anime (≥8.0): +15
+   - Poorly rated anime (<6.0): -15
 
 ### Session-Based Scoring
 
@@ -186,32 +197,38 @@ In `WatchSessionManager`:
 
 - `matchesPreferredAudioLanguage(int lid)` - Check if file matches audio preferences
 - `matchesPreferredSubtitleLanguage(int lid)` - Check if file matches subtitle preferences
-- `getQualityScore(const QString& quality)` - Convert quality string to numeric score
-- `getResolutionScore(const QString& resolution)` - Convert resolution to numeric score
+- `getQualityScore(const QString& quality)` - Convert AniDB quality string to numeric score
 - `getFileQuality(int lid)` - Retrieve file quality from database
-- `getFileResolution(int lid)` - Retrieve file resolution from database
 - `getFileAudioLanguage(int lid)` - Retrieve audio language from database
 - `getFileSubtitleLanguage(int lid)` - Retrieve subtitle language from database
 - `getFileRating(int lid)` - Retrieve anime rating for file
+- `getFileGroupId(int lid)` - Retrieve group ID for file
+- `getGroupStatus(int gid)` - Retrieve group status from database
+
+In `AniDBApi`:
+
+- `requestGroupStatus(int gid)` - Send GROUPSTATUS command to AniDB API
+
+## Completed Features
+
+All initially planned features have been implemented:
+
+1. ✅ **Audio language preferences** - User configurable with scoring
+2. ✅ **Subtitle language preferences** - User configurable with scoring
+3. ✅ **Version preference** - Highest version prioritized (exposed as setting)
+4. ✅ **Quality preference** - Uses AniDB quality field for accurate scoring
+5. ✅ **Group status tracking** - GROUPSTATUS command integration with scoring
+6. ✅ **Rating-based scoring** - Anime rating influence on file priority
 
 ## Future Enhancements
 
-The following features from the original issue remain to be implemented:
+The following additional features could be implemented:
 
-### 1. Group Status (GROUPSTATUS Command)
-
-**Description:** Track the release status of fansub groups and prioritize files from active groups over inactive ones.
-
-**Proposed Implementation:**
-- Add GROUPSTATUS command to AniDB API integration
-- Store group status in database (active, inactive, disbanded)
-- Add scoring bonus for files from active groups
-- Add scoring penalty for files from inactive/disbanded groups
-
-### 2. Additional Database/API Options
+### 1. Additional Database/API Options
 
 **Possible Features:**
-- **Source preference**: Prioritize specific sources (e.g., prefer Blu-ray > DVD > TV)
+- **Source preference**: Prioritize specific sources (e.g., prefer Blu-ray > DVD > TV) in addition to quality
+- **Resolution preference**: Add resolution-based scoring alongside quality
 - **Codec preference**: Prioritize modern codecs (H.265 > H.264)
 - **Audio codec preference**: Prioritize lossless audio (FLAC > AAC > MP3)
 - **Filesize efficiency**: Consider quality-to-size ratio
