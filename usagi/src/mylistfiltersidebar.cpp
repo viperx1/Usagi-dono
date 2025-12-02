@@ -290,6 +290,6 @@ void MyListFilterSidebar::resizeEvent(QResizeEvent *event)
         int buttonWidth = m_collapseButton->width();
         int buttonHeight = m_collapseButton->height();
         // Position at top-right corner with some margin
-        m_collapseButton->move(width() - buttonWidth - 10, 10);
+        m_collapseButton->move(width() - buttonWidth - 10, 0);
     }
 }
