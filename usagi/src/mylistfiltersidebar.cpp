@@ -19,22 +19,25 @@ void MyListFilterSidebar::setupUI()
     mainLayout->setContentsMargins(5, 5, 5, 5);
     mainLayout->setSpacing(10);
     
-    // Collapse button at the top
+    // Header with title and collapse button inline
+    QHBoxLayout *headerLayout = new QHBoxLayout();
+    
+    // Title
+    QLabel *titleLabel = new QLabel("<b>Search & Filter</b>");
+    titleLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    headerLayout->addWidget(titleLabel);
+    
+    headerLayout->addStretch();
+    
+    // Collapse button inline with title
     m_collapseButton = new QPushButton("◀");
     m_collapseButton->setMaximumWidth(30);
     m_collapseButton->setMaximumHeight(30);
     m_collapseButton->setToolTip("Hide filter sidebar");
     connect(m_collapseButton, &QPushButton::clicked, this, &MyListFilterSidebar::collapseRequested);
-    
-    QHBoxLayout *headerLayout = new QHBoxLayout();
-    headerLayout->addStretch();
     headerLayout->addWidget(m_collapseButton);
-    mainLayout->addLayout(headerLayout);
     
-    // Title
-    QLabel *titleLabel = new QLabel("<b>Search & Filter</b>");
-    titleLabel->setAlignment(Qt::AlignCenter);
-    mainLayout->addWidget(titleLabel);
+    mainLayout->addLayout(headerLayout);
     
     // Search group
     QGroupBox *searchGroup = new QGroupBox("Search");

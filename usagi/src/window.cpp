@@ -209,6 +209,9 @@ Window::Window()
 	// Initialize anime titles cache flag
 	animeTitlesCacheLoaded = false;
 	
+	// Initialize window state for tray restore
+	windowStateBeforeHide = Qt::WindowNoState;
+	
     safeclose = new QTimer;
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
@@ -452,13 +455,17 @@ Window::Window()
     mylistContentLayout->addWidget(filterSidebarScrollArea);
     
     // Create toggle button to show filter sidebar when collapsed
+    // Place it at the top by using a vertical layout with stretch
+    QVBoxLayout *expandButtonLayout = new QVBoxLayout();
     toggleFilterBarButton = new QPushButton("▶");
     toggleFilterBarButton->setMaximumWidth(30);
     toggleFilterBarButton->setMaximumHeight(30);
     toggleFilterBarButton->setToolTip("Show filter sidebar");
     toggleFilterBarButton->setVisible(false);  // Hidden by default
     connect(toggleFilterBarButton, &QPushButton::clicked, this, &Window::onToggleFilterBarClicked);
-    mylistContentLayout->addWidget(toggleFilterBarButton);
+    expandButtonLayout->addWidget(toggleFilterBarButton);
+    expandButtonLayout->addStretch();  // Push button to the top
+    mylistContentLayout->addLayout(expandButtonLayout);
     
     // Create a vertical layout for the card view
     QVBoxLayout *cardViewLayout = new QVBoxLayout();
@@ -5315,11 +5322,14 @@ void Window::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
 void Window::onTrayShowHideAction()
 {
     if (this->isVisible()) {
+        // Store the current window state before hiding
+        windowStateBeforeHide = this->windowState();
         this->hide();
         LOG("Window hidden to tray");
     } else {
-        // Restore window state before showing
-        this->showNormal();
+        // Restore the previous window state
+        this->setWindowState(windowStateBeforeHide);
+        this->show();
         this->activateWindow();
         this->raise();
         LOG("Window shown from tray");
