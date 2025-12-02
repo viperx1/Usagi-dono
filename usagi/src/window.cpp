@@ -221,6 +221,9 @@ Window::Window()
     safeclose->setInterval(100);
     connect(safeclose, SIGNAL(timeout()), this, SLOT(safeClose()));
 
+    // Connect to application aboutToQuit signal to handle external termination
+    connect(qApp, &QApplication::aboutToQuit, this, &Window::onApplicationAboutToQuit);
+
     // Timer for startup initialization (delayed to ensure UI is ready)
     startupTimer = new QTimer(this);
     startupTimer->setSingleShot(true);
@@ -2323,10 +2326,15 @@ void Window::closeEvent(QCloseEvent *event)
         safeclose->start();
         event->ignore();
 	}
-    if(!adbapi->LoggedIn() || waitforlogout.elapsed() > 5000)
+    else if(!adbapi->LoggedIn() || waitforlogout.elapsed() > LOGOUT_TIMEOUT_MS)
     {
         event->accept();
         LOG("Window close accepted, application exiting");
+    }
+    else
+    {
+        // Still waiting for logout to complete
+        event->ignore();
     }
 }
 
@@ -5399,8 +5407,36 @@ void Window::onTrayExitAction()
     // Don't modify the user's closeToTrayEnabled setting
     bool originalCloseToTray = closeToTrayEnabled;
     closeToTrayEnabled = false;
-    QApplication::quit();
+    
+    // Send logout command if logged in
+    if (adbapi->LoggedIn()) {
+        LOG("Tray exit requested while logged in, sending LOGOUT command");
+        adbapi->Logout();
+        waitforlogout.start();
+        safeclose->start();
+    } else {
+        // Not logged in, initiate close via timer for consistency
+        LOG("Tray exit requested while not logged in, initiating close via timer");
+        safeclose->start();
+    }
     // Note: Application will exit, so no need to restore the flag
+}
+
+void Window::onApplicationAboutToQuit()
+{
+    // This slot is called when the application is about to quit
+    // This handles external termination (e.g., Qt Creator stop button, kill signals)
+    // where closeEvent might be bypassed or ignored due to close-to-tray logic
+    
+    if (adbapi && adbapi->LoggedIn()) {
+        LOG("Application terminating while logged in, sending LOGOUT command");
+        adbapi->Logout();
+        
+        // Give a short time for the logout to be sent (event loop is still running)
+        QEventLoop loop;
+        QTimer::singleShot(200, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
 }
 
 // ========== Auto-start Implementation ==========
