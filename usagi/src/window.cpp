@@ -5333,8 +5333,10 @@ void Window::onTrayShowHideAction()
         this->activateWindow();
         this->raise();
         // Force layout update to ensure content fills the window
-        this->layout()->update();
-        this->layout()->activate();
+        if (this->layout()) {
+            this->layout()->update();
+            this->layout()->activate();
+        }
         LOG("Window shown from tray");
     }
 }
