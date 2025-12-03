@@ -657,6 +657,7 @@ public slots:
     void onPlayAnimeFromCard(int aid);
     void onResetWatchSession(int aid);
     void applyMylistFilters();
+    void checkAndRequestChainRelations(int aid);  // Check and request missing relation data for anime's chain
     
     // Poster download slots
     void onPosterDownloadFinished(QNetworkReply *reply);
