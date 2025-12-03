@@ -491,10 +491,6 @@ public:
 	QString getPreferredResolution();
 	void setPreferredResolution(const QString& resolution);
 	
-	// Bitrate calculation helpers
-	double calculateExpectedBitrate(const QString& resolution) const;
-	double calculateBitrateScore(double actualBitrate, const QString& resolution, int fileCount) const;
-	
 private:
 	// Helper method for saving settings to database
 	void saveSetting(const QString& name, const QString& value);

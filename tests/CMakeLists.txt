@@ -1630,6 +1630,8 @@ set(BITRATE_PREFERENCES_TEST_SOURCES
     ../usagi/src/anidbapi.cpp
     ../usagi/src/mask.cpp
     ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/watchsessionmanager.cpp
+    ../usagi/src/watchchunkmanager.cpp
     ../usagi/src/hash/ed2k.cpp
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
@@ -1639,6 +1641,8 @@ set(BITRATE_PREFERENCES_TEST_SOURCES
 set(BITRATE_PREFERENCES_TEST_HEADERS
     ../usagi/src/anidbapi.h
     ../usagi/src/mask.h
+    ../usagi/src/watchsessionmanager.h
+    ../usagi/src/watchchunkmanager.h
     ../usagi/src/hash/ed2k.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
