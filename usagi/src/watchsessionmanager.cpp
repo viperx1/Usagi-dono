@@ -19,7 +19,7 @@ WatchSessionManager::WatchSessionManager(QObject *parent)
     , m_forceDeletePermissions(false)        // Default: disabled for safety
     , m_initialScanComplete(false)
     , m_deletionInProgress(false)            // No deletion in progress initially
-    , m_deleteFromDisk(true)                 // Default to deleting from disk
+    , m_deleteFromDisk(false)                // Will be set by deleteMarkedFiles()
 {
     ensureTablesExist();
     loadSettings();
@@ -835,9 +835,11 @@ void WatchSessionManager::processNextDeletion()
         return;
     }
     
+    // Mark deletion as in progress before taking from queue
+    m_deletionInProgress = true;
+    
     // Get next file to delete
     int lid = m_deletionQueue.takeFirst();
-    m_deletionInProgress = true;
     
     LOG(QString("[WatchSessionManager] processNextDeletion: Processing lid=%1, %2 files remaining in queue")
         .arg(lid).arg(m_deletionQueue.size()));

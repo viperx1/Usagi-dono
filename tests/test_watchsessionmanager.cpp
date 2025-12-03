@@ -618,7 +618,7 @@ void TestWatchSessionManager::testSequentialDeletion()
     auto deleteRequestOrder = QSharedPointer<QList<int>>::create();
     
     // Connect to deleteFileRequested signal to track when deletions are requested
-    // Use Qt::QueuedConnection to ensure safe lambda capture
+    // Using QSharedPointer for lambda capture ensures safe lifetime management
     QMetaObject::Connection conn = connect(manager, &WatchSessionManager::deleteFileRequested, 
             [deleteRequestCount, deleteRequestOrder](int lid, bool deleteFromDisk) {
         Q_UNUSED(deleteFromDisk);
