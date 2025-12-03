@@ -1621,3 +1621,52 @@ if(WIN32)
 endif()
 
 add_test(NAME test_duplicate_detection COMMAND test_duplicate_detection -v2)
+
+# ==========================================================
+# TEST: Bitrate Preferences
+# ==========================================================
+set(BITRATE_PREFERENCES_TEST_SOURCES
+    test_bitrate_preferences.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(BITRATE_PREFERENCES_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/mask.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_bitrate_preferences ${BITRATE_PREFERENCES_TEST_SOURCES} ${BITRATE_PREFERENCES_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_bitrate_preferences)
+
+target_compile_definitions(test_bitrate_preferences PRIVATE CRYPTOPP_DEBUG=0)
+
+target_link_libraries(test_bitrate_preferences PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    z
+)
+
+target_include_directories(test_bitrate_preferences PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_bitrate_preferences PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_bitrate_preferences COMMAND test_bitrate_preferences -v2)
+
