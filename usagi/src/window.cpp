@@ -3010,6 +3010,13 @@ void Window::getNotifyAnimeUpdated(int aid)
 		if (!needsPosterDownload) {
 			sortMylistCards(filterSidebar->getSortIndex());
 		}
+		
+		// If series chain display is enabled, re-apply filters to check for newly available chains
+		// This continues building the chain as relation data arrives
+		if (filterSidebar && filterSidebar->getShowSeriesChain()) {
+			LOG(QString("[Window] Series chain display enabled - re-checking chains after anime %1 update").arg(aid));
+			applyMylistFilters();
+		}
 	}
 	
 	qint64 totalElapsed = timer.elapsed();
@@ -4846,28 +4853,61 @@ void Window::applyMylistFilters()
 		// Group anime by series chain and order them sequentially
 		if (!animeToProcess.isEmpty()) {
 			// Check for missing relation data and request it
+			// Only request data for anime that are referenced by other anime (i.e., they should have relations)
 			QSet<int> animeNeedingRelationData;
+			QSet<int> animeReferencedByOthers;  // Anime that appear in other anime's relation lists
 			QSqlDatabase db = QSqlDatabase::database();
 			if (db.isOpen()) {
 				QSqlQuery q(db);
-				// Check which anime in our list have empty or null relation data
+				
+				// First, find all anime that are referenced by others in the current set
 				for (int aid : std::as_const(animeToProcess)) {
 					q.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
 					q.addBindValue(aid);
 					if (q.exec() && q.next()) {
 						QString relaidlist = q.value(0).toString();
 						QString relaidtype = q.value(1).toString();
-						// If both are empty or null, this anime might have relations but they're not fetched yet
+						
+						// Parse the relation list to find referenced anime
+						if (!relaidlist.isEmpty() && !relaidtype.isEmpty()) {
+							QStringList aidList = relaidlist.split("'", Qt::SkipEmptyParts);
+							QStringList typeList = relaidtype.split("'", Qt::SkipEmptyParts);
+							
+							int count = qMin(aidList.size(), typeList.size());
+							for (int i = 0; i < count; i++) {
+								int relAid = aidList[i].toInt();
+								QString relType = typeList[i].toLower();
+								// Track anime that are prequels or sequels (part of the chain)
+								if (relAid > 0 && (relType == "1" || relType == "2" || 
+								                    relType.contains("prequel") || relType.contains("sequel"))) {
+									animeReferencedByOthers.insert(relAid);
+								}
+							}
+						}
+					}
+				}
+				
+				// Now check which of the referenced anime are missing their relation data
+				for (int aid : std::as_const(animeReferencedByOthers)) {
+					q.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
+					q.addBindValue(aid);
+					if (q.exec() && q.next()) {
+						QString relaidlist = q.value(0).toString();
+						QString relaidtype = q.value(1).toString();
+						// If relation data is missing, request it
 						if (relaidlist.isEmpty() || relaidtype.isEmpty()) {
 							animeNeedingRelationData.insert(aid);
 						}
+					} else {
+						// Anime is referenced but not in database at all - request it
+						animeNeedingRelationData.insert(aid);
 					}
 				}
 			}
 			
 			// Request anime metadata for those with missing relation data
 			if (!animeNeedingRelationData.isEmpty() && adbapi) {
-				LOG(QString("[Window] Requesting relation data for %1 anime in series chain").arg(animeNeedingRelationData.size()));
+				LOG(QString("[Window] Requesting relation data for %1 referenced anime in series chain").arg(animeNeedingRelationData.size()));
 				for (int aid : std::as_const(animeNeedingRelationData)) {
 					adbapi->Anime(aid);
 				}
