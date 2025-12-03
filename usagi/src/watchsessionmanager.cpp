@@ -943,6 +943,23 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         info.path = q.value(1).toString();
         info.size = q.value(2).toLongLong();
         info.animeName = q.value(3).toString();
+        
+        // Verify the file actually exists on disk before considering it for deletion
+        // This prevents marking stale database entries where files have been deleted externally
+        QFileInfo fileInfo(info.path);
+        if (!fileInfo.exists()) {
+            LOG(QString("[WatchSessionManager] Skipping file marked in database but missing on disk: %1 (lid=%2)")
+                .arg(info.path).arg(info.lid));
+            continue;
+        }
+        
+        // Verify it's actually a file (not a directory)
+        if (!fileInfo.isFile()) {
+            LOG(QString("[WatchSessionManager] Skipping non-file entry: %1 (lid=%2)")
+                .arg(info.path).arg(info.lid));
+            continue;
+        }
+        
         info.score = calculateMarkScore(info.lid);
         candidates.append(info);
     }

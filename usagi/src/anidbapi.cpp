@@ -3871,30 +3871,8 @@ QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
 	if (deleteFromDisk && !filePath.isEmpty())
 	{
 		QFile file(filePath);
-		
-		// Touch the file to verify it exists and is accessible before performing any operations
-		// "Touching" (opening) the file serves as a more thorough verification than exists() alone:
-		// - Confirms the file is physically present and accessible, not just a metadata entry
-		// - Verifies the filesystem can service I/O operations on this file
-		// - Detects if the file is corrupted or has filesystem-level access issues
-		// We continue with deletion even if opening fails, as delete permissions may differ from read permissions
 		if (file.exists())
 		{
-			// Attempt to open the file briefly to verify accessibility
-			// Use ReadOnly mode for minimal intrusion
-			if (!file.open(QIODevice::ReadOnly))
-			{
-				Logger::log(QString("[AniDB deleteFileFromMylist] File exists but cannot be accessed: %1 - Error: %2")
-				            .arg(filePath, file.errorString()), __FILE__, __LINE__);
-				// Continue with deletion attempt anyway - permissions might allow deletion
-			}
-			else
-			{
-				// Successfully touched/verified the file - close it immediately
-				file.close();
-				Logger::log(QString("[AniDB deleteFileFromMylist] File verified and accessible: %1").arg(filePath), __FILE__, __LINE__);
-			}
-			
 			bool deleted = false;
 			
 			// First attempt: try to remove normally
