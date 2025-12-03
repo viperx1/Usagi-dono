@@ -9,6 +9,9 @@
 #include <QTimer>
 #include <functional>
 
+// Forward declaration for overlay
+class ArrowOverlay;
+
 /**
  * VirtualFlowLayout - A virtual scrolling flow layout for efficiently displaying many cards
  * 
@@ -78,6 +81,9 @@ public:
     // Get total content height
     int contentHeight() const;
     
+    // Get visible widgets (for arrow overlay)
+    const QMap<int, QWidget*>& getVisibleWidgets() const { return m_visibleWidgets; }
+    
 signals:
     // Emitted when a visible item's widget is created
     void widgetCreated(int index, QWidget *widget);
@@ -146,6 +152,9 @@ private:
     // Visible range caching
     int m_cachedFirstVisible;
     int m_cachedLastVisible;
+    
+    // Arrow overlay widget for painting on top of all children
+    ArrowOverlay *m_arrowOverlay;
     
     // Deferred update timer to handle initialization timing
     QTimer *m_deferredUpdateTimer;
