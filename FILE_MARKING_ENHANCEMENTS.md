@@ -75,7 +75,7 @@ This document describes the enhanced file marking system for determining which f
 - Universal bitrate formula: `bitrate = baseline × (resolution_megapixels / 2.07)`
   - Where 2.07 is the megapixel count of 1080p (1920×1080)
 - Examples with 3.5 Mbps baseline:
-  - 480p (0.92 MP) → 1.6 Mbps
+  - 480p (0.41 MP) → 0.7 Mbps
   - 720p (0.92 MP) → 1.6 Mbps
   - 1080p (2.07 MP) → 3.5 Mbps
   - 1440p (3.69 MP) → 6.2 Mbps

@@ -252,7 +252,7 @@ double AniDBApi::calculateExpectedBitrate(const QString& resolution) const
 	
 	// Common named resolutions
 	if (resLower.contains("480p") || resLower.contains("480")) {
-		megapixels = 0.92;  // 720×480 or 854×480
+		megapixels = 0.41;  // 854×480
 	} else if (resLower.contains("720p") || resLower.contains("720")) {
 		megapixels = 0.92;  // 1280×720
 	} else if (resLower.contains("1080p") || resLower.contains("1080")) {
