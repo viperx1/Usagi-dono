@@ -417,6 +417,11 @@ private:
     // File markings (lid -> mark info)
     mutable QMap<int, FileMarkInfo> m_fileMarks;
     
+    // Deletion queue for sequential file deletion
+    QList<int> m_deletionQueue;                 // Queue of lids pending deletion
+    bool m_deletionInProgress;                  // True when a deletion is in progress
+    bool m_deleteFromDisk;                      // Whether to delete physical files
+    
     // Settings
     int m_aheadBuffer;                          // Episodes to keep ahead
     DeletionThresholdType m_thresholdType;      // Threshold type
@@ -439,6 +444,15 @@ private:
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
+    
+    /**
+     * @brief Process next file in deletion queue
+     * 
+     * Deletes one file at a time from the deletion queue. Called by deleteMarkedFiles()
+     * to start the deletion process and by onFileDeletionResult() to continue processing
+     * after API confirmation.
+     */
+    void processNextDeletion();
     
     // Helper methods for new marking criteria
     bool matchesPreferredAudioLanguage(int lid) const;

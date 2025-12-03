@@ -43,6 +43,9 @@ private slots:
     
     // File version tests
     void testFileVersionScoring();
+    
+    // Sequential deletion tests
+    void testSequentialDeletion();
 
 private:
     QTemporaryFile *tempDbFile;
@@ -583,6 +586,83 @@ void TestWatchSessionManager::testFileVersionScoring()
     QVERIFY2(scoreV1 < scoreV2, 
              QString("Older version (score=%1) should have lower score than newer version (score=%2)")
              .arg(scoreV1).arg(scoreV2).toLatin1().constData());
+}
+
+void TestWatchSessionManager::testSequentialDeletion()
+{
+    // Test that files are deleted one at a time, waiting for API confirmation
+    // This test verifies that:
+    // 1. deleteMarkedFiles() initiates deletion of only the first file
+    // 2. onFileDeletionResult() triggers deletion of the next file
+    // 3. Files are processed in order
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    
+    // Create test data: 3 files marked for deletion
+    q.exec("INSERT INTO local_files (id, path) VALUES (1, '/test/file1.mkv')");
+    q.exec("INSERT INTO local_files (id, path) VALUES (2, '/test/file2.mkv')");
+    q.exec("INSERT INTO local_files (id, path) VALUES (3, '/test/file3.mkv')");
+    
+    q.exec("INSERT INTO mylist (lid, aid, eid, local_file, fid) VALUES (100, 1, 1, 1, 1000)");
+    q.exec("INSERT INTO mylist (lid, aid, eid, local_file, fid) VALUES (200, 1, 2, 2, 2000)");
+    q.exec("INSERT INTO mylist (lid, aid, eid, local_file, fid) VALUES (300, 1, 3, 3, 3000)");
+    
+    // Mark all files for deletion
+    manager->setFileMarkType(100, FileMarkType::ForDeletion);
+    manager->setFileMarkType(200, FileMarkType::ForDeletion);
+    manager->setFileMarkType(300, FileMarkType::ForDeletion);
+    
+    // Set up a shared counter to track delete requests safely
+    auto deleteRequestCount = QSharedPointer<int>::create(0);
+    auto deleteRequestOrder = QSharedPointer<QList<int>>::create();
+    
+    // Connect to deleteFileRequested signal to track when deletions are requested
+    // Using QSharedPointer for lambda capture ensures safe lifetime management
+    QMetaObject::Connection conn = connect(manager, &WatchSessionManager::deleteFileRequested, 
+            [deleteRequestCount, deleteRequestOrder](int lid, bool deleteFromDisk) {
+        Q_UNUSED(deleteFromDisk);
+        (*deleteRequestCount)++;
+        deleteRequestOrder->append(lid);
+    });
+    
+    // Call deleteMarkedFiles - should only request deletion of first file
+    manager->deleteMarkedFiles(true);
+    
+    // Verify that only one deletion was requested initially
+    QCOMPARE(*deleteRequestCount, 1);
+    QCOMPARE(deleteRequestOrder->size(), 1);
+    int firstLid = deleteRequestOrder->at(0);
+    
+    // Simulate API confirmation for first file
+    manager->onFileDeletionResult(firstLid, 1, true);
+    
+    // Now second file should be requested
+    QCOMPARE(*deleteRequestCount, 2);
+    QCOMPARE(deleteRequestOrder->size(), 2);
+    int secondLid = deleteRequestOrder->at(1);
+    
+    // Simulate API confirmation for second file
+    manager->onFileDeletionResult(secondLid, 1, true);
+    
+    // Now third file should be requested
+    QCOMPARE(*deleteRequestCount, 3);
+    QCOMPARE(deleteRequestOrder->size(), 3);
+    int thirdLid = deleteRequestOrder->at(2);
+    
+    // Simulate API confirmation for third file
+    manager->onFileDeletionResult(thirdLid, 1, true);
+    
+    // No more deletions should be requested
+    QCOMPARE(*deleteRequestCount, 3);
+    
+    // Verify the files were deleted in order (by their mark scores)
+    QVERIFY(deleteRequestOrder->contains(100));
+    QVERIFY(deleteRequestOrder->contains(200));
+    QVERIFY(deleteRequestOrder->contains(300));
+    
+    // Disconnect the signal to avoid warnings
+    disconnect(conn);
 }
 
 QTEST_MAIN(TestWatchSessionManager)

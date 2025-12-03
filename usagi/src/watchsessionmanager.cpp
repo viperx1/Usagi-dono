@@ -11,6 +11,8 @@
 
 WatchSessionManager::WatchSessionManager(QObject *parent)
     : QObject(parent)
+    , m_deletionInProgress(false)            // No deletion in progress initially
+    , m_deleteFromDisk(false)                // Will be set by deleteMarkedFiles()
     , m_aheadBuffer(DEFAULT_AHEAD_BUFFER)
     , m_thresholdType(DeletionThresholdType::FixedGB)
     , m_thresholdValue(DEFAULT_THRESHOLD_VALUE)
@@ -796,9 +798,18 @@ void WatchSessionManager::deleteMarkedFiles(bool deleteFromDisk)
     
     LOG(QString("[WatchSessionManager] deleteMarkedFiles: %1 files to delete").arg(filesToDelete.size()));
     
-    for (int lid : filesToDelete) {
-        deleteFile(lid, deleteFromDisk);
+    // If already processing deletions, log warning and return
+    if (m_deletionInProgress) {
+        LOG("[WatchSessionManager] deleteMarkedFiles: Deletion already in progress, ignoring request");
+        return;
     }
+    
+    // Clear any existing queue and populate with new files
+    m_deletionQueue = std::move(filesToDelete);
+    m_deleteFromDisk = deleteFromDisk;
+    
+    // Start processing the queue
+    processNextDeletion();
 }
 
 void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
@@ -809,6 +820,31 @@ void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
     } else {
         LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - not emitting fileDeleted").arg(lid).arg(aid));
     }
+    
+    // Process next file in deletion queue (regardless of success/failure)
+    processNextDeletion();
+}
+
+void WatchSessionManager::processNextDeletion()
+{
+    // If queue is empty, mark deletion as complete
+    if (m_deletionQueue.isEmpty()) {
+        m_deletionInProgress = false;
+        LOG("[WatchSessionManager] processNextDeletion: Queue empty, deletion complete");
+        return;
+    }
+    
+    // Mark deletion as in progress before taking from queue
+    m_deletionInProgress = true;
+    
+    // Get next file to delete
+    int lid = m_deletionQueue.takeFirst();
+    
+    LOG(QString("[WatchSessionManager] processNextDeletion: Processing lid=%1, %2 files remaining in queue")
+        .arg(lid).arg(m_deletionQueue.size()));
+    
+    // Delete the file (this will trigger deleteFileRequested signal)
+    deleteFile(lid, m_deleteFromDisk);
 }
 
 void WatchSessionManager::autoMarkFilesForDeletion()
