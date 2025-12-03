@@ -477,6 +477,17 @@ private:
     std::tuple<int, int, int> findActiveSessionInSeriesChain(int aid) const;
     int getTotalEpisodesForAnime(int aid) const;
     
+    /**
+     * @brief Clean up database status for a file that no longer exists on disk
+     * 
+     * When a file is discovered to be missing from disk, this method triggers
+     * the cleanup process by emitting deleteFileRequested with deleteFromDisk=false.
+     * This ensures both local database and AniDB API are updated to reflect the file's absence.
+     * 
+     * @param lid MyList ID of the missing file
+     */
+    void cleanupMissingFileStatus(int lid);
+    
     // AniDB relation type codes
     static const int RELATION_SEQUEL = 1;
     static const int RELATION_PREQUEL = 2;
