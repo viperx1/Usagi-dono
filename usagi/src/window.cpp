@@ -4775,8 +4775,7 @@ void Window::applyMylistFilters()
 		if (!card) {
 			cachedData = cardManager->getCachedAnimeData(aid);
 			if (!cachedData.hasData) {
-				// No card and no cached data - include it anyway (can't filter)
-				filteredAnimeIds.append(aid);
+				// No card and no cached data - skip it (can't apply filters properly)
 				continue;
 			}
 		}
