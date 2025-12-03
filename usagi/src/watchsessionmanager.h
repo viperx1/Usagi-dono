@@ -61,6 +61,9 @@ class WatchSessionManager : public QObject
 {
     Q_OBJECT
     
+    // Allow test class to access private methods
+    friend class TestBitratePreferences;
+    
 public:
     explicit WatchSessionManager(QObject *parent = nullptr);
     virtual ~WatchSessionManager();
@@ -464,6 +467,10 @@ private:
     int getFileRating(int lid) const;  // Get anime rating for this file
     int getFileGroupId(int lid) const;  // Get group ID for this file
     int getGroupStatus(int gid) const;  // Get group status (0=unknown, 1=ongoing, 2=stalled, 3=disbanded)
+    int getFileBitrate(int lid) const;  // Get video bitrate for this file (in Kbps)
+    QString getFileResolution(int lid) const;  // Get resolution for this file
+    double calculateExpectedBitrate(const QString& resolution) const;  // Calculate expected bitrate for resolution
+    double calculateBitrateScore(double actualBitrate, const QString& resolution, int fileCount) const;  // Calculate bitrate distance penalty
     
     // Helper method to find active session info across series chain
     // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
@@ -503,6 +510,11 @@ private:
     static const int SCORE_ACTIVE_GROUP = 20;      // Bonus for files from active groups
     static const int SCORE_STALLED_GROUP = -10;    // Penalty for files from stalled groups
     static const int SCORE_DISBANDED_GROUP = -25;  // Penalty for files from disbanded groups
+    
+    // Bitrate distance penalties (only apply when fileCount > 1)
+    static const int SCORE_BITRATE_CLOSE = -10;       // 10-30% from expected bitrate
+    static const int SCORE_BITRATE_MODERATE = -25;    // 30-50% from expected bitrate
+    static const int SCORE_BITRATE_FAR = -40;         // 50%+ from expected bitrate
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;

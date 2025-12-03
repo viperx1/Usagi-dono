@@ -589,6 +589,14 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
+    // Check bitrate distance from expected (only applies when multiple files exist)
+    int bitrate = getFileBitrate(lid);
+    QString resolution = getFileResolution(lid);
+    if (bitrate > 0 && !resolution.isEmpty() && fileCount > 1) {
+        double bitrateScore = calculateBitrateScore(bitrate, resolution, fileCount);
+        score += static_cast<int>(bitrateScore);
+    }
+    
     // Calculate distance-based scoring across the series chain
     // Distance is the primary factor - episodes far from current position are more deletable
     if (aid > 0) {
@@ -1608,3 +1616,131 @@ int WatchSessionManager::getGroupStatus(int gid) const
     return 0;  // Unknown status
 }
 
+int WatchSessionManager::getFileBitrate(int lid) const
+{
+    // Get video bitrate for this file (in Kbps)
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.bitrate_video FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toInt();
+    }
+    
+    return 0;
+}
+
+QString WatchSessionManager::getFileResolution(int lid) const
+{
+    // Get resolution for this file
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.resolution FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+double WatchSessionManager::calculateExpectedBitrate(const QString& resolution) const
+{
+    // Get baseline bitrate from settings (in Mbps, default 3.5)
+    double baselineBitrate = 3.5;
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        q.prepare("SELECT value FROM settings WHERE name = 'preferredBitrate'");
+        if (q.exec() && q.next()) {
+            baselineBitrate = q.value(0).toDouble();
+            if (baselineBitrate <= 0) {
+                baselineBitrate = 3.5;  // Fallback to default
+            }
+        }
+    }
+    
+    // Parse resolution to get megapixels
+    double megapixels = 0.0;
+    QString resLower = resolution.toLower();
+    
+    // Common named resolutions
+    if (resLower.contains("480p") || resLower.contains("480")) {
+        megapixels = 0.41;  // 854×480
+    } else if (resLower.contains("720p") || resLower.contains("720")) {
+        megapixels = 0.92;  // 1280×720
+    } else if (resLower.contains("1080p") || resLower.contains("1080")) {
+        megapixels = 2.07;  // 1920×1080
+    } else if (resLower.contains("1440p") || resLower.contains("1440") || resLower.contains("2k")) {
+        megapixels = 3.69;  // 2560×1440
+    } else if (resLower.contains("2160p") || resLower.contains("2160") || resLower.contains("4k")) {
+        megapixels = 8.29;  // 3840×2160
+    } else if (resLower.contains("4320p") || resLower.contains("4320") || resLower.contains("8k")) {
+        megapixels = 33.18;  // 7680×4320
+    } else {
+        // Try to parse as WxH format
+        QRegularExpression widthHeightRegex(R"((\d+)\s*[x×]\s*(\d+))");
+        QRegularExpressionMatch match = widthHeightRegex.match(resolution);
+        if (match.hasMatch()) {
+            int width = match.captured(1).toInt();
+            int height = match.captured(2).toInt();
+            megapixels = (width * height) / 1000000.0;
+        } else {
+            // Default to 1080p if unable to parse
+            megapixels = 2.07;
+        }
+    }
+    
+    // Calculate expected bitrate using the formula
+    // bitrate = base_bitrate × (resolution_megapixels / 2.07)
+    double expectedBitrate = baselineBitrate * (megapixels / 2.07);
+    
+    return expectedBitrate;
+}
+
+double WatchSessionManager::calculateBitrateScore(double actualBitrate, const QString& resolution, int fileCount) const
+{
+    // Only apply bitrate penalty when there are multiple files
+    if (fileCount <= 1) {
+        return 0.0;
+    }
+    
+    // Convert actualBitrate from Kbps to Mbps
+    double actualBitrateMbps = actualBitrate / 1000.0;
+    
+    // Calculate expected bitrate based on resolution
+    double expectedBitrate = calculateExpectedBitrate(resolution);
+    
+    // Calculate percentage difference from expected
+    double percentDiff = 0.0;
+    if (expectedBitrate > 0) {
+        percentDiff = std::abs((actualBitrateMbps - expectedBitrate) / expectedBitrate) * 100.0;
+    }
+    
+    // Apply penalty based on percentage difference
+    // 0-10% difference: no penalty
+    // 10-30% difference: -10 penalty
+    // 30-50% difference: -25 penalty
+    // 50%+ difference: -40 penalty
+    double penalty = 0.0;
+    if (percentDiff > 50.0) {
+        penalty = SCORE_BITRATE_FAR;
+    } else if (percentDiff > 30.0) {
+        penalty = SCORE_BITRATE_MODERATE;
+    } else if (percentDiff > 10.0) {
+        penalty = SCORE_BITRATE_CLOSE;
+    }
+    
+    return penalty;
+}

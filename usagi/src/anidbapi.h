@@ -79,6 +79,8 @@ private:
 	QString preferredSubtitleLanguages;  // Comma-separated list of preferred subtitle languages (e.g., "english,none")
 	bool preferHighestVersion;  // Prefer highest version when marking files
 	bool preferHighestQuality;  // Prefer highest quality when marking files
+	double preferredBitrate;  // Preferred baseline bitrate in Mbps for 1080p (default: 3.5)
+	QString preferredResolution;  // Preferred resolution (e.g., "1080p", "1440p", "4K")
     /* Settings End === */
 
 	int protover; // AniDB API version = 3
@@ -484,6 +486,10 @@ public:
 	void setPreferHighestVersion(bool prefer);
 	bool getPreferHighestQuality();
 	void setPreferHighestQuality(bool prefer);
+	double getPreferredBitrate();
+	void setPreferredBitrate(double bitrate);
+	QString getPreferredResolution();
+	void setPreferredResolution(const QString& resolution);
 	
 private:
 	// Helper method for saving settings to database

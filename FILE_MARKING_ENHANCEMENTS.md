@@ -63,7 +63,51 @@ This document describes the enhanced file marking system for determining which f
 
 **Note:** Quality is now defined solely by the AniDB quality field, not by source (Blu-ray, DVD, etc.) or resolution. This provides a more accurate quality assessment as rated by AniDB.
 
-### 5. Group Status Tracking
+### 5. Bitrate Preference
+
+**Location:** Settings Tab → File Marking Preferences → Baseline Bitrate (Mbps)
+
+**Description:** Users can specify a baseline bitrate in Mbps for 1080p content (default: 3.5 Mbps). This setting enables automatic bitrate calculation for all resolutions using a resolution-agnostic formula that scales with pixel count.
+
+**Implementation:**
+- Setting stored in database as `preferredBitrate` (managed by `AniDBApi`)
+- Default value: 3.5 Mbps (for 1080p)
+- Scoring logic implemented in `WatchSessionManager::calculateMarkScore()`
+- Universal bitrate formula: `bitrate = baseline × (resolution_megapixels / 2.07)`
+  - Where 2.07 is the megapixel count of 1080p (1920×1080)
+- Examples with 3.5 Mbps baseline:
+  - 480p (0.41 MP) → 0.7 Mbps
+  - 720p (0.92 MP) → 1.6 Mbps
+  - 1080p (2.07 MP) → 3.5 Mbps
+  - 1440p (3.69 MP) → 6.2 Mbps
+  - 4K (8.29 MP) → 14.0 Mbps
+- Penalty system (only applies when multiple files exist):
+  - 0-10% difference from expected: no penalty
+  - 10-30% difference: -10 penalty
+  - 30-50% difference: -25 penalty
+  - 50%+ difference: -40 penalty
+- Supported resolution formats:
+  - Named resolutions: "480p", "720p", "1080p", "1440p", "2K", "4K", "8K"
+  - Numeric format: "WIDTHxHEIGHT" (e.g., "1920x1080")
+- File bitrate and resolution retrieved from database via `WatchSessionManager::getFileBitrate()` and `getFileResolution()`
+
+**Rationale:** This approach is perfect for anime content which typically features flat colors, sharp edges, simple motion, and repeated frames. Scaling bitrate by pixel count keeps quality consistent across different resolutions without manual adjustment.
+
+### 6. Resolution Preference
+
+**Location:** Settings Tab → File Marking Preferences → Preferred Resolution
+
+**Description:** Users can specify their preferred target resolution (default: "1080p"). This preference is used in conjunction with the bitrate calculator to determine the expected bitrate for file quality comparison.
+
+**Implementation:**
+- Setting stored in database as `preferredResolution` (managed by `AniDBApi`)
+- Default value: "1080p"
+- Available presets: 480p, 720p, 1080p, 1440p, 4K, 8K
+- Editable combo box allows custom resolutions
+- Used to calculate expected bitrate via the universal formula in `WatchSessionManager`
+- Files are scored based on how close their bitrate is to the expected value for their resolution
+
+### 7. Group Status Tracking
 
 **Description:** Files from active release groups receive a bonus, while files from stalled or disbanded groups receive penalties.
 
@@ -77,7 +121,7 @@ This document describes the enhanced file marking system for determining which f
   - Disbanded groups: -25 penalty
 - Method `requestGroupStatus(int gid)` available to fetch status for specific groups
 
-### 6. Rating-Based Scoring
+### 8. Rating-Based Scoring
 
 **Description:** Files from highly-rated anime (rating ≥ 8.0/10) receive a bonus to prioritize keeping them, while files from poorly-rated anime (rating < 6.0/10) receive a penalty.
 

@@ -211,3 +211,25 @@ void AniDBApi::setPreferHighestQuality(bool prefer)
 	AniDBApi::preferHighestQuality = prefer;
 	saveSetting("preferHighestQuality", prefer ? "1" : "0");
 }
+
+double AniDBApi::getPreferredBitrate()
+{
+	return AniDBApi::preferredBitrate;
+}
+
+void AniDBApi::setPreferredBitrate(double bitrate)
+{
+	AniDBApi::preferredBitrate = bitrate;
+	saveSetting("preferredBitrate", QString::number(bitrate, 'f', 2));
+}
+
+QString AniDBApi::getPreferredResolution()
+{
+	return AniDBApi::preferredResolution;
+}
+
+void AniDBApi::setPreferredResolution(const QString& resolution)
+{
+	AniDBApi::preferredResolution = resolution;
+	saveSetting("preferredResolution", resolution);
+}
