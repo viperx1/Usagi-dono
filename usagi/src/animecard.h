@@ -93,6 +93,12 @@ public:
     bool isHidden() const { return m_isHidden; }
     bool is18Restricted() const { return m_is18Restricted; }
     
+    // Get series chain connection points (in global coordinates)
+    QPoint getLeftConnectionPoint() const;   // Connection point for prequel arrow (left edge, centered)
+    QPoint getRightConnectionPoint() const;  // Connection point for sequel arrow (right edge, centered)
+    int getPrequelAid() const { return m_prequelAid; }
+    int getSequelAid() const { return m_sequelAid; }
+    
     // Sorting support
     bool operator<(const AnimeCard& other) const;
     
@@ -119,12 +125,6 @@ public slots:
     void setHidden(bool hidden);  // Set card hidden state
     void setIs18Restricted(bool restricted);  // Set 18+ restriction status
     void setSeriesChainInfo(int prequelAid, int sequelAid);  // Set prequel/sequel AIDs for arrow connections
-    
-    // Get series chain connection points (in global coordinates)
-    QPoint getLeftConnectionPoint() const;   // Connection point for prequel arrow (left edge, centered)
-    QPoint getRightConnectionPoint() const;  // Connection point for sequel arrow (right edge, centered)
-    int getPrequelAid() const { return m_prequelAid; }
-    int getSequelAid() const { return m_sequelAid; }
     
 signals:
     void episodeClicked(int lid);
