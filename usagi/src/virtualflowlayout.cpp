@@ -276,72 +276,8 @@ void VirtualFlowLayout::resizeEvent(QResizeEvent *event)
 
 void VirtualFlowLayout::paintEvent(QPaintEvent *event)
 {
-    // First, let the base class and children paint
+    // Paint the background/base widget
     QWidget::paintEvent(event);
-    
-    // Then draw arrows on top of everything
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    
-    // Arrow appearance constants
-    const int arrowLineThickness = 3;
-    const int arrowHeadSize = 10;
-    const QColor arrowColor(0, 120, 215);  // Blue color for visibility
-    
-    painter.setPen(QPen(arrowColor, arrowLineThickness));
-    painter.setBrush(arrowColor);
-    
-    // Iterate through visible widgets and draw arrows where appropriate
-    for (auto it = m_visibleWidgets.constBegin(); it != m_visibleWidgets.constEnd(); ++it) {
-        AnimeCard* card = qobject_cast<AnimeCard*>(it.value());
-        if (!card || card->isHidden()) {
-            continue;
-        }
-        
-        int sequelAid = card->getSequelAid();
-        if (sequelAid == 0) {
-            continue;  // No sequel, no arrow to draw
-        }
-        
-        // Find the sequel card in visible widgets
-        AnimeCard* sequelCard = nullptr;
-        for (auto seqIt = m_visibleWidgets.constBegin(); seqIt != m_visibleWidgets.constEnd(); ++seqIt) {
-            AnimeCard* candidateCard = qobject_cast<AnimeCard*>(seqIt.value());
-            if (candidateCard && candidateCard->getAnimeId() == sequelAid) {
-                sequelCard = candidateCard;
-                break;
-            }
-        }
-        
-        if (!sequelCard || sequelCard->isHidden()) {
-            continue;  // Sequel card not visible or hidden
-        }
-        
-        // Get connection points in this widget's coordinates
-        QPoint startPoint = card->getRightConnectionPoint();
-        QPoint endPoint = sequelCard->getLeftConnectionPoint();
-        
-        // Convert to this widget's coordinate system
-        startPoint = mapFromGlobal(startPoint);
-        endPoint = mapFromGlobal(endPoint);
-        
-        // Draw arrow line
-        painter.drawLine(startPoint, endPoint);
-        
-        // Draw arrow head at the end point
-        // Calculate arrow head direction
-        QLineF line(startPoint, endPoint);
-        double angle = line.angle() * M_PI / 180.0;
-        
-        QPointF arrowP1 = endPoint - QPointF(arrowHeadSize * cos(angle - M_PI / 6),
-                                              -arrowHeadSize * sin(angle - M_PI / 6));
-        QPointF arrowP2 = endPoint - QPointF(arrowHeadSize * cos(angle + M_PI / 6),
-                                              -arrowHeadSize * sin(angle + M_PI / 6));
-        
-        QPolygonF arrowHead;
-        arrowHead << endPoint << arrowP1 << arrowP2;
-        painter.drawPolygon(arrowHead);
-    }
 }
 
 void VirtualFlowLayout::showEvent(QShowEvent *event)
@@ -354,6 +290,78 @@ void VirtualFlowLayout::showEvent(QShowEvent *event)
 
 bool VirtualFlowLayout::event(QEvent *event)
 {
+    // Handle paint event specially to draw arrows after children
+    if (event->type() == QEvent::Paint) {
+        // Standard painting of widget and children
+        bool result = QWidget::event(event);
+        
+        // Now paint arrows on top using a separate painter
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        
+        // Arrow appearance constants
+        const int arrowLineThickness = 3;
+        const int arrowHeadSize = 10;
+        const QColor arrowColor(0, 120, 215);  // Blue color for visibility
+        
+        painter.setPen(QPen(arrowColor, arrowLineThickness));
+        painter.setBrush(arrowColor);
+        
+        // Iterate through visible widgets and draw arrows where appropriate
+        for (auto it = m_visibleWidgets.constBegin(); it != m_visibleWidgets.constEnd(); ++it) {
+            AnimeCard* card = qobject_cast<AnimeCard*>(it.value());
+            if (!card || card->isHidden()) {
+                continue;
+            }
+            
+            int sequelAid = card->getSequelAid();
+            if (sequelAid == 0) {
+                continue;  // No sequel, no arrow to draw
+            }
+            
+            // Find the sequel card in visible widgets
+            AnimeCard* sequelCard = nullptr;
+            for (auto seqIt = m_visibleWidgets.constBegin(); seqIt != m_visibleWidgets.constEnd(); ++seqIt) {
+                AnimeCard* candidateCard = qobject_cast<AnimeCard*>(seqIt.value());
+                if (candidateCard && candidateCard->getAnimeId() == sequelAid) {
+                    sequelCard = candidateCard;
+                    break;
+                }
+            }
+            
+            if (!sequelCard || sequelCard->isHidden()) {
+                continue;  // Sequel card not visible or hidden
+            }
+            
+            // Get connection points in this widget's coordinates
+            QPoint startPoint = card->getRightConnectionPoint();
+            QPoint endPoint = sequelCard->getLeftConnectionPoint();
+            
+            // Convert to this widget's coordinate system
+            startPoint = mapFromGlobal(startPoint);
+            endPoint = mapFromGlobal(endPoint);
+            
+            // Draw arrow line
+            painter.drawLine(startPoint, endPoint);
+            
+            // Draw arrow head at the end point
+            // Calculate arrow head direction
+            QLineF line(startPoint, endPoint);
+            double angle = line.angle() * M_PI / 180.0;
+            
+            QPointF arrowP1 = endPoint - QPointF(arrowHeadSize * cos(angle - M_PI / 6),
+                                                  -arrowHeadSize * sin(angle - M_PI / 6));
+            QPointF arrowP2 = endPoint - QPointF(arrowHeadSize * cos(angle + M_PI / 6),
+                                                  -arrowHeadSize * sin(angle + M_PI / 6));
+            
+            QPolygonF arrowHead;
+            arrowHead << endPoint << arrowP1 << arrowP2;
+            painter.drawPolygon(arrowHead);
+        }
+        
+        return result;
+    }
+    
     if (event->type() == QEvent::LayoutRequest) {
         // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
         calculateLayout();
