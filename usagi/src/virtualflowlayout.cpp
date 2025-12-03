@@ -276,9 +276,10 @@ void VirtualFlowLayout::resizeEvent(QResizeEvent *event)
 
 void VirtualFlowLayout::paintEvent(QPaintEvent *event)
 {
-    Q_UNUSED(event)
+    // First, let the base class and children paint
+    QWidget::paintEvent(event);
     
-    // Draw arrows between cards in series chains
+    // Then draw arrows on top of everything
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     

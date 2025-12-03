@@ -3996,6 +3996,12 @@ void Window::startPlaybackForFile(int lid)
 // Sort cards based on selected criterion
 void Window::sortMylistCards(int sortIndex)
 {
+	// If series chain display is enabled, skip sorting to preserve chain order
+	if (filterSidebar && filterSidebar->getShowSeriesChain()) {
+		LOG("[Window] Series chain display enabled - skipping sort to preserve chain order");
+		return;
+	}
+	
 	// Get the list of anime IDs from the card manager
 	QList<int> animeIds = cardManager->getAnimeIdList();
 	
