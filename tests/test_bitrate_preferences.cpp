@@ -32,9 +32,9 @@ void TestBitratePreferences::initTestCase()
     tempDir = new QTemporaryDir();
     QVERIFY(tempDir->isValid());
     
-    // Create test database
+    // Create test database with unique connection name
     QString dbPath = tempDir->filePath("test.db");
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "test_bitrate_connection");
     db.setDatabaseName(dbPath);
     QVERIFY(db.open());
     
@@ -50,7 +50,7 @@ void TestBitratePreferences::cleanupTestCase()
     delete watchManager;
     delete api;
     delete tempDir;
-    QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
+    QSqlDatabase::removeDatabase("test_bitrate_connection");
 }
 
 void TestBitratePreferences::testDefaultValues()

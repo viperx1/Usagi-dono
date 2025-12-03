@@ -70,8 +70,9 @@ This document describes the enhanced file marking system for determining which f
 **Description:** Users can specify a baseline bitrate in Mbps for 1080p content (default: 3.5 Mbps). This setting enables automatic bitrate calculation for all resolutions using a resolution-agnostic formula that scales with pixel count.
 
 **Implementation:**
-- Setting stored in database as `preferredBitrate`
+- Setting stored in database as `preferredBitrate` (managed by `AniDBApi`)
 - Default value: 3.5 Mbps (for 1080p)
+- Scoring logic implemented in `WatchSessionManager::calculateMarkScore()`
 - Universal bitrate formula: `bitrate = baseline × (resolution_megapixels / 2.07)`
   - Where 2.07 is the megapixel count of 1080p (1920×1080)
 - Examples with 3.5 Mbps baseline:
@@ -88,6 +89,7 @@ This document describes the enhanced file marking system for determining which f
 - Supported resolution formats:
   - Named resolutions: "480p", "720p", "1080p", "1440p", "2K", "4K", "8K"
   - Numeric format: "WIDTHxHEIGHT" (e.g., "1920x1080")
+- File bitrate and resolution retrieved from database via `WatchSessionManager::getFileBitrate()` and `getFileResolution()`
 
 **Rationale:** This approach is perfect for anime content which typically features flat colors, sharp edges, simple motion, and repeated frames. Scaling bitrate by pixel count keeps quality consistent across different resolutions without manual adjustment.
 
@@ -98,11 +100,11 @@ This document describes the enhanced file marking system for determining which f
 **Description:** Users can specify their preferred target resolution (default: "1080p"). This preference is used in conjunction with the bitrate calculator to determine the expected bitrate for file quality comparison.
 
 **Implementation:**
-- Setting stored in database as `preferredResolution`
+- Setting stored in database as `preferredResolution` (managed by `AniDBApi`)
 - Default value: "1080p"
 - Available presets: 480p, 720p, 1080p, 1440p, 4K, 8K
 - Editable combo box allows custom resolutions
-- Used to calculate expected bitrate via the universal formula
+- Used to calculate expected bitrate via the universal formula in `WatchSessionManager`
 - Files are scored based on how close their bitrate is to the expected value for their resolution
 
 ### 7. Group Status Tracking

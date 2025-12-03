@@ -1744,5 +1744,3 @@ double WatchSessionManager::calculateBitrateScore(double actualBitrate, const QS
     
     return penalty;
 }
-
-
