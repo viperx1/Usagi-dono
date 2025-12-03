@@ -444,7 +444,15 @@ private:
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
-    void processNextDeletion();  // Process next file in deletion queue
+    
+    /**
+     * @brief Process next file in deletion queue
+     * 
+     * Deletes one file at a time from the deletion queue. Called by deleteMarkedFiles()
+     * to start the deletion process and by onFileDeletionResult() to continue processing
+     * after API confirmation.
+     */
+    void processNextDeletion();
     
     // Helper methods for new marking criteria
     bool matchesPreferredAudioLanguage(int lid) const;

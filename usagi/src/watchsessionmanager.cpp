@@ -11,6 +11,8 @@
 
 WatchSessionManager::WatchSessionManager(QObject *parent)
     : QObject(parent)
+    , m_deletionInProgress(false)            // No deletion in progress initially
+    , m_deleteFromDisk(false)                // Will be set by deleteMarkedFiles()
     , m_aheadBuffer(DEFAULT_AHEAD_BUFFER)
     , m_thresholdType(DeletionThresholdType::FixedGB)
     , m_thresholdValue(DEFAULT_THRESHOLD_VALUE)
@@ -18,8 +20,6 @@ WatchSessionManager::WatchSessionManager(QObject *parent)
     , m_enableActualDeletion(false)          // Default: disabled for safety
     , m_forceDeletePermissions(false)        // Default: disabled for safety
     , m_initialScanComplete(false)
-    , m_deletionInProgress(false)            // No deletion in progress initially
-    , m_deleteFromDisk(false)                // Will be set by deleteMarkedFiles()
 {
     ensureTablesExist();
     loadSettings();
