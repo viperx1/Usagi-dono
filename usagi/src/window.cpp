@@ -4808,40 +4808,85 @@ void Window::applyMylistFilters()
 		}
 	}
 	
-	// If series chain display is enabled and search text is provided, expand results to include full chains
-	if (showSeriesChain && !searchText.isEmpty() && watchSessionManager) {
-		QSet<int> expandedAnimeIds;  // Use a set to avoid duplicates
+	// If series chain display is enabled, group and order anime by their series chains
+	if (showSeriesChain && watchSessionManager) {
+		QSet<int> animeToProcess;  // Anime IDs to process for chain grouping
 		QMap<int, QList<int>> chainCache;  // Cache series chains to avoid redundant lookups
 		QSet<int> allAnimeIdsSet = QSet<int>(allAnimeIds.constBegin(), allAnimeIds.constEnd());  // Convert once for O(1) lookups
 		
-		// For each anime in filtered results, get its entire series chain
-		for (int aid : filteredAnimeIds) {
-			QList<int> seriesChain;
-			if (!chainCache.contains(aid)) {
-				seriesChain = watchSessionManager->getSeriesChain(aid);
-				// Cache the chain for all anime in it
+		// If search text is provided, expand results to include full chains of matched anime
+		// Otherwise, just group the filtered results by their chains
+		if (!searchText.isEmpty()) {
+			// Expand search results to include entire series chains
+			for (int aid : filteredAnimeIds) {
+				QList<int> seriesChain;
+				if (!chainCache.contains(aid)) {
+					seriesChain = watchSessionManager->getSeriesChain(aid);
+					// Cache the chain for all anime in it
+					for (int chainAid : seriesChain) {
+						chainCache[chainAid] = seriesChain;
+					}
+				} else {
+					seriesChain = chainCache[aid];
+				}
+				
+				// Add all anime in the chain to the set
 				for (int chainAid : seriesChain) {
-					chainCache[chainAid] = seriesChain;
-				}
-			} else {
-				seriesChain = chainCache[aid];
-			}
-			
-			// Add all anime in the chain to the expanded set
-			for (int chainAid : seriesChain) {
-				// Only add if it's in the full list of available anime (O(1) lookup with set)
-				if (allAnimeIdsSet.contains(chainAid)) {
-					expandedAnimeIds.insert(chainAid);
+					// Only add if it's in the full list of available anime (O(1) lookup with set)
+					if (allAnimeIdsSet.contains(chainAid)) {
+						animeToProcess.insert(chainAid);
+					}
 				}
 			}
+		} else {
+			// No search text - just group the current filtered results
+			animeToProcess = QSet<int>(filteredAnimeIds.constBegin(), filteredAnimeIds.constEnd());
 		}
 		
-		// Convert set back to list and replace filtered results
-		if (!expandedAnimeIds.isEmpty()) {
-			// Group by series chain
-			QMap<int, QList<int>> chainGroups;  // Map from first anime in chain -> list of anime in that chain
+		// Group anime by series chain and order them sequentially
+		if (!animeToProcess.isEmpty()) {
+			// Check for missing relation data and request it
+			QSet<int> animeNeedingRelationData;
+			QSqlDatabase db = QSqlDatabase::database();
+			if (db.isOpen()) {
+				QSqlQuery q(db);
+				// Check which anime in our list have empty or null relation data
+				for (int aid : std::as_const(animeToProcess)) {
+					q.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
+					q.addBindValue(aid);
+					if (q.exec() && q.next()) {
+						QString relaidlist = q.value(0).toString();
+						QString relaidtype = q.value(1).toString();
+						// If both are empty or null, this anime might have relations but they're not fetched yet
+						if (relaidlist.isEmpty() || relaidtype.isEmpty()) {
+							animeNeedingRelationData.insert(aid);
+						}
+					}
+				}
+			}
 			
-			for (int aid : expandedAnimeIds) {
+			// Request anime metadata for those with missing relation data
+			if (!animeNeedingRelationData.isEmpty() && adbapi) {
+				LOG(QString("[Window] Requesting relation data for %1 anime in series chain").arg(animeNeedingRelationData.size()));
+				for (int aid : std::as_const(animeNeedingRelationData)) {
+					adbapi->Anime(aid);
+				}
+			}
+			
+			// Build chain cache for all anime we're processing
+			for (int aid : std::as_const(animeToProcess)) {
+				if (!chainCache.contains(aid)) {
+					QList<int> seriesChain = watchSessionManager->getSeriesChain(aid);
+					for (int chainAid : seriesChain) {
+						chainCache[chainAid] = seriesChain;
+					}
+				}
+			}
+			
+			// Group by series chain (map from first anime in chain -> list of anime in that chain)
+			QMap<int, QList<int>> chainGroups;
+			
+			for (int aid : std::as_const(animeToProcess)) {
 				QList<int> chain = chainCache.value(aid);
 				if (!chain.isEmpty()) {
 					int firstAid = chain.first();  // Use first anime as group key
@@ -4851,14 +4896,15 @@ void Window::applyMylistFilters()
 				}
 			}
 			
-			// Rebuild the filtered list with chains grouped together
+			// Rebuild the filtered list with chains grouped together in sequential order
 			// Use QSet for O(1) lookup instead of QList::contains which is O(n)
 			QSet<int> addedIds;
 			filteredAnimeIds.clear();
 			
 			for (const QList<int>& chain : std::as_const(chainGroups)) {
 				for (int aid : chain) {
-					if (!addedIds.contains(aid) && allAnimeIdsSet.contains(aid)) {
+					// Only add if in the anime to process set and not already added
+					if (animeToProcess.contains(aid) && !addedIds.contains(aid) && allAnimeIdsSet.contains(aid)) {
 						filteredAnimeIds.append(aid);
 						addedIds.insert(aid);
 					}
