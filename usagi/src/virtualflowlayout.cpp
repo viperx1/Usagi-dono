@@ -1,12 +1,121 @@
 #include "virtualflowlayout.h"
+#include "animecard.h"  // For accessing AnimeCard methods
 #include "logger.h"
 #include <QScrollBar>
 #include <QResizeEvent>
 #include <QShowEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QApplication>
 #include <QScopeGuard>
 #include <algorithm>
+#include <cmath>  // For M_PI
+
+// ArrowOverlay - A transparent widget that sits on top of everything to draw arrows
+class ArrowOverlay : public QWidget
+{
+public:
+    explicit ArrowOverlay(VirtualFlowLayout *parent) 
+        : QWidget(parent)
+        , m_layout(parent)
+    {
+        // Make this widget transparent to mouse events so cards underneath remain interactive
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        // Ensure this widget is always on top
+        raise();
+        // Make background transparent
+        setAttribute(Qt::WA_TranslucentBackground);
+        // Don't let this widget steal focus
+        setFocusPolicy(Qt::NoFocus);
+    }
+    
+    void updateGeometry()
+    {
+        // Match parent's geometry
+        if (m_layout) {
+            setGeometry(m_layout->rect());
+            raise();  // Ensure we stay on top
+        }
+    }
+    
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        Q_UNUSED(event);
+        
+        if (!m_layout) {
+            return;
+        }
+        
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        
+        // Arrow appearance constants
+        const int arrowLineThickness = 3;
+        const int arrowHeadSize = 10;
+        const QColor arrowColor(0, 120, 215);  // Blue color for visibility
+        
+        painter.setPen(QPen(arrowColor, arrowLineThickness));
+        painter.setBrush(arrowColor);
+        
+        // Get visible widgets from the layout
+        const QMap<int, QWidget*>& visibleWidgets = m_layout->getVisibleWidgets();
+        
+        // Iterate through visible widgets and draw arrows where appropriate
+        for (auto it = visibleWidgets.constBegin(); it != visibleWidgets.constEnd(); ++it) {
+            AnimeCard* card = qobject_cast<AnimeCard*>(it.value());
+            if (!card || card->isHidden()) {
+                continue;
+            }
+            
+            int sequelAid = card->getSequelAid();
+            if (sequelAid == 0) {
+                continue;  // No sequel, no arrow to draw
+            }
+            
+            // Find the sequel card in visible widgets
+            AnimeCard* sequelCard = nullptr;
+            for (auto seqIt = visibleWidgets.constBegin(); seqIt != visibleWidgets.constEnd(); ++seqIt) {
+                AnimeCard* candidateCard = qobject_cast<AnimeCard*>(seqIt.value());
+                if (candidateCard && candidateCard->getAnimeId() == sequelAid) {
+                    sequelCard = candidateCard;
+                    break;
+                }
+            }
+            
+            if (!sequelCard || sequelCard->isHidden()) {
+                continue;  // Sequel card not visible or hidden
+            }
+            
+            // Get connection points in parent's coordinates
+            QPoint startPoint = card->getRightConnectionPoint();
+            QPoint endPoint = sequelCard->getLeftConnectionPoint();
+            
+            // Convert to this overlay's coordinate system (same as parent)
+            startPoint = mapFromGlobal(startPoint);
+            endPoint = mapFromGlobal(endPoint);
+            
+            // Draw arrow line
+            painter.drawLine(startPoint, endPoint);
+            
+            // Draw arrow head at the end point
+            QLineF line(startPoint, endPoint);
+            double angle = line.angle() * M_PI / 180.0;
+            
+            QPointF arrowP1 = endPoint - QPointF(arrowHeadSize * cos(angle - M_PI / 6),
+                                                  -arrowHeadSize * sin(angle - M_PI / 6));
+            QPointF arrowP2 = endPoint - QPointF(arrowHeadSize * cos(angle + M_PI / 6),
+                                                  -arrowHeadSize * sin(angle + M_PI / 6));
+            
+            QPolygonF arrowHead;
+            arrowHead << endPoint << arrowP1 << arrowP2;
+            painter.drawPolygon(arrowHead);
+        }
+    }
+    
+private:
+    VirtualFlowLayout *m_layout;
+};
 
 VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     : QWidget(parent)
@@ -21,10 +130,16 @@ VirtualFlowLayout::VirtualFlowLayout(QWidget *parent)
     , m_scrollArea(nullptr)
     , m_cachedFirstVisible(-1)
     , m_cachedLastVisible(-1)
+    , m_arrowOverlay(nullptr)
     , m_deferredUpdateTimer(nullptr)
     , m_inLayoutUpdate(false)
 {
     setMinimumSize(m_itemSize);
+    
+    // Create arrow overlay that will paint on top of all children
+    m_arrowOverlay = new ArrowOverlay(this);
+    m_arrowOverlay->show();
+    m_arrowOverlay->updateGeometry();
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     // Create deferred update timer for handling initialization timing issues
@@ -266,6 +381,12 @@ int VirtualFlowLayout::contentHeight() const
 void VirtualFlowLayout::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    
+    // Update arrow overlay geometry
+    if (m_arrowOverlay) {
+        m_arrowOverlay->updateGeometry();
+    }
+    
     // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
     calculateLayout();
     updateVisibleItems();
@@ -273,8 +394,14 @@ void VirtualFlowLayout::resizeEvent(QResizeEvent *event)
 
 void VirtualFlowLayout::paintEvent(QPaintEvent *event)
 {
-    Q_UNUSED(event)
-    // No custom painting needed - widgets handle their own painting
+    // Paint the background/base widget
+    QWidget::paintEvent(event);
+    
+    // Arrows are now drawn by the overlay widget, so no arrow drawing here
+    // Trigger overlay repaint
+    if (m_arrowOverlay) {
+        m_arrowOverlay->update();
+    }
 }
 
 void VirtualFlowLayout::showEvent(QShowEvent *event)
@@ -283,6 +410,12 @@ void VirtualFlowLayout::showEvent(QShowEvent *event)
     // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
     calculateLayout();
     updateVisibleItems();
+    
+    // Update arrow overlay
+    if (m_arrowOverlay) {
+        m_arrowOverlay->updateGeometry();
+        m_arrowOverlay->raise();
+    }
 }
 
 bool VirtualFlowLayout::event(QEvent *event)

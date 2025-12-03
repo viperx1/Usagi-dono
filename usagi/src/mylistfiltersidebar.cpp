@@ -119,6 +119,18 @@ void MyListFilterSidebar::setupUI()
     mylistLayout->addWidget(m_inMyListCheckbox);
     mainLayout->addWidget(mylistGroup);
     
+    // Series chain filter group
+    QGroupBox *seriesChainGroup = new QGroupBox("Series Chain");
+    QVBoxLayout *seriesChainLayout = new QVBoxLayout(seriesChainGroup);
+    
+    m_showSeriesChainCheckbox = new QCheckBox("Display series chain");
+    m_showSeriesChainCheckbox->setToolTip("Show anime series (prequel/sequel) in sequence with visual arrows");
+    connect(m_showSeriesChainCheckbox, &QCheckBox::clicked,
+            this, &MyListFilterSidebar::onFilterChanged);
+    
+    seriesChainLayout->addWidget(m_showSeriesChainCheckbox);
+    mainLayout->addWidget(seriesChainGroup);
+    
     // Filter by completion status group
     QGroupBox *completionGroup = new QGroupBox("Completion");
     QVBoxLayout *completionLayout = new QVBoxLayout(completionGroup);
@@ -235,6 +247,11 @@ bool MyListFilterSidebar::getInMyListOnly() const
     return m_inMyListCheckbox->isChecked();
 }
 
+bool MyListFilterSidebar::getShowSeriesChain() const
+{
+    return m_showSeriesChainCheckbox->isChecked();
+}
+
 void MyListFilterSidebar::resetFilters()
 {
     m_searchField->clear();
@@ -246,6 +263,7 @@ void MyListFilterSidebar::resetFilters()
     m_showOnlyUnwatchedCheckbox->setChecked(false);
     m_showMarkedForDeletionCheckbox->setChecked(false);
     m_inMyListCheckbox->setChecked(true);  // Default to showing only mylist
+    m_showSeriesChainCheckbox->setChecked(false);  // Default to not showing series chain
     m_adultContentFilter->setCurrentIndex(1);  // Reset to "Hide 18+"
     
     emit sortChanged();

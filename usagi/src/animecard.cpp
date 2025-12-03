@@ -30,6 +30,8 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_isHidden(false)
     , m_needsFetch(false)
     , m_is18Restricted(false)
+    , m_prequelAid(0)
+    , m_sequelAid(0)
     , m_posterOverlay(nullptr)
 {
     setupUI();
@@ -696,7 +698,8 @@ void AnimeCard::paintEvent(QPaintEvent *event)
     // Call base class paint event for frame drawing
     QFrame::paintEvent(event);
     
-    // Additional custom painting can be done here if needed
+    // Note: Series chain arrows are now drawn by the parent layout (VirtualFlowLayout)
+    // to connect cards together, not inside each card
 }
 
 void AnimeCard::mousePressEvent(QMouseEvent *event)
@@ -967,3 +970,22 @@ void AnimeCard::setIs18Restricted(bool restricted)
 {
     m_is18Restricted = restricted;
 }
+
+void AnimeCard::setSeriesChainInfo(int prequelAid, int sequelAid)
+{
+    m_prequelAid = prequelAid;
+    m_sequelAid = sequelAid;
+}
+
+QPoint AnimeCard::getLeftConnectionPoint() const
+{
+    // Return the center point of the left edge in global coordinates
+    return mapToGlobal(QPoint(0, height() / 2));
+}
+
+QPoint AnimeCard::getRightConnectionPoint() const
+{
+    // Return the center point of the right edge in global coordinates
+    return mapToGlobal(QPoint(width(), height() / 2));
+}
+

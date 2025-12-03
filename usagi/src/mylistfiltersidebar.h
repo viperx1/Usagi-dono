@@ -40,6 +40,7 @@ public:
     bool getSortAscending() const;
     QString getAdultContentFilter() const;
     bool getInMyListOnly() const;
+    bool getShowSeriesChain() const;
     
     // Reset all filters
     void resetFilters();
@@ -76,6 +77,7 @@ private:
     QCheckBox *m_showOnlyUnwatchedCheckbox;
     QCheckBox *m_showMarkedForDeletionCheckbox;
     QCheckBox *m_inMyListCheckbox;
+    QCheckBox *m_showSeriesChainCheckbox;
     QComboBox *m_sortComboBox;
     QPushButton *m_sortOrderButton;
     QComboBox *m_adultContentFilter;
