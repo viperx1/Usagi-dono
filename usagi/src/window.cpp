@@ -753,12 +753,38 @@ Window::Window()
     preferHighestQualityCheckbox->setChecked(adbapi->getPreferHighestQuality());
     preferHighestQualityCheckbox->setToolTip("Prefer files with higher quality and resolution");
     
+    QLabel *bitrateLabel = new QLabel("Baseline Bitrate (Mbps):");
+    bitrateLabel->setToolTip("Baseline bitrate in Mbps for 1080p content (e.g., 3.5).\n"
+                             "Bitrate for other resolutions is automatically calculated:\n"
+                             "bitrate = baseline × (resolution_megapixels / 2.07)\n"
+                             "This ensures consistent quality across different resolutions.");
+    QDoubleSpinBox *preferredBitrateSpinBox = new QDoubleSpinBox();
+    preferredBitrateSpinBox->setObjectName("preferredBitrateSpinBox");
+    preferredBitrateSpinBox->setRange(0.5, 50.0);
+    preferredBitrateSpinBox->setSingleStep(0.5);
+    preferredBitrateSpinBox->setDecimals(1);
+    preferredBitrateSpinBox->setValue(adbapi->getPreferredBitrate());
+    preferredBitrateSpinBox->setSuffix(" Mbps");
+    
+    QLabel *resolutionLabel = new QLabel("Preferred Resolution:");
+    resolutionLabel->setToolTip("Preferred resolution for file selection (e.g., 1080p, 1440p, 4K).\n"
+                                "Files closer to this resolution will be prioritized when multiple files exist.");
+    QComboBox *preferredResolutionCombo = new QComboBox();
+    preferredResolutionCombo->setObjectName("preferredResolutionCombo");
+    preferredResolutionCombo->addItems({"480p", "720p", "1080p", "1440p", "4K", "8K"});
+    preferredResolutionCombo->setEditable(true);
+    preferredResolutionCombo->setCurrentText(adbapi->getPreferredResolution());
+    
     fileMarkingLayout->addWidget(audioLangLabel, 0, 0);
     fileMarkingLayout->addWidget(preferredAudioLanguagesEdit, 0, 1);
     fileMarkingLayout->addWidget(subLangLabel, 1, 0);
     fileMarkingLayout->addWidget(preferredSubtitleLanguagesEdit, 1, 1);
     fileMarkingLayout->addWidget(preferHighestVersionCheckbox, 2, 0, 1, 2);
     fileMarkingLayout->addWidget(preferHighestQualityCheckbox, 3, 0, 1, 2);
+    fileMarkingLayout->addWidget(bitrateLabel, 4, 0);
+    fileMarkingLayout->addWidget(preferredBitrateSpinBox, 4, 1);
+    fileMarkingLayout->addWidget(resolutionLabel, 5, 0);
+    fileMarkingLayout->addWidget(preferredResolutionCombo, 5, 1);
     
     settingsMainLayout->addWidget(fileMarkingGroup);
     
@@ -2453,6 +2479,16 @@ void Window::saveSettings()
 	QCheckBox *qualityCheckbox = this->findChild<QCheckBox*>("preferHighestQualityCheckbox");
 	if (qualityCheckbox) {
 		adbapi->setPreferHighestQuality(qualityCheckbox->isChecked());
+	}
+	
+	QDoubleSpinBox *bitrateSpinBox = this->findChild<QDoubleSpinBox*>("preferredBitrateSpinBox");
+	if (bitrateSpinBox) {
+		adbapi->setPreferredBitrate(bitrateSpinBox->value());
+	}
+	
+	QComboBox *resolutionCombo = this->findChild<QComboBox*>("preferredResolutionCombo");
+	if (resolutionCombo) {
+		adbapi->setPreferredResolution(resolutionCombo->currentText());
 	}
 	
 	LOG("Settings saved");
