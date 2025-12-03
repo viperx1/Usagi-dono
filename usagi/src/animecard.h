@@ -118,7 +118,13 @@ public slots:
     void updateNextEpisodeIndicator();  // Update which episode will play next
     void setHidden(bool hidden);  // Set card hidden state
     void setIs18Restricted(bool restricted);  // Set 18+ restriction status
-    void setShowSeriesArrow(bool show);  // Set whether to show arrow to next in series
+    void setSeriesChainInfo(int prequelAid, int sequelAid);  // Set prequel/sequel AIDs for arrow connections
+    
+    // Get series chain connection points (in global coordinates)
+    QPoint getLeftConnectionPoint() const;   // Connection point for prequel arrow (left edge, centered)
+    QPoint getRightConnectionPoint() const;  // Connection point for sequel arrow (right edge, centered)
+    int getPrequelAid() const { return m_prequelAid; }
+    int getSequelAid() const { return m_sequelAid; }
     
 signals:
     void episodeClicked(int lid);
@@ -166,7 +172,8 @@ private:
     bool m_isHidden;  // Hidden state of card
     bool m_needsFetch;  // Whether card needs data fetching
     bool m_is18Restricted;  // Whether anime is 18+ restricted
-    bool m_showSeriesArrow;  // Whether to show arrow to next in series
+    int m_prequelAid;  // Prequel anime ID (for arrow connection), 0 if none
+    int m_sequelAid;  // Sequel anime ID (for arrow connection), 0 if none
     QPixmap m_originalPoster;  // Store original poster for overlay
     
     // UI elements

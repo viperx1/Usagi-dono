@@ -30,7 +30,8 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_isHidden(false)
     , m_needsFetch(false)
     , m_is18Restricted(false)
-    , m_showSeriesArrow(false)
+    , m_prequelAid(0)
+    , m_sequelAid(0)
     , m_posterOverlay(nullptr)
 {
     setupUI();
@@ -697,39 +698,8 @@ void AnimeCard::paintEvent(QPaintEvent *event)
     // Call base class paint event for frame drawing
     QFrame::paintEvent(event);
     
-    // Draw series chain arrow if enabled
-    if (m_showSeriesArrow && !m_isHidden) {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        
-        // Constants for arrow positioning and appearance
-        const int arrowMarginRight = 15;  // Distance from right edge
-        const int arrowLineLength = 30;    // Length of horizontal line
-        const int arrowLineOffsetFromTip = 5;  // Distance from tip to start of line
-        const int arrowHeadHeight = 8;     // Half-height of arrow head triangle
-        const int arrowLineThickness = 3;  // Pen thickness
-        const QColor arrowColor(0, 120, 215);  // Blue color for visibility
-        
-        // Calculate arrow position
-        int arrowX = width() - arrowMarginRight;  // Right side of card
-        int arrowY = height() / 2;   // Vertically centered
-        
-        // Set arrow color
-        painter.setPen(QPen(arrowColor, arrowLineThickness));
-        painter.setBrush(arrowColor);
-        
-        // Draw arrow shape: ──>
-        // Horizontal line
-        painter.drawLine(arrowX - arrowLineLength, arrowY, 
-                        arrowX - arrowLineOffsetFromTip, arrowY);
-        
-        // Arrow head (triangle pointing right)
-        QPolygon arrowHead;
-        arrowHead << QPoint(arrowX - arrowLineOffsetFromTip, arrowY - arrowHeadHeight)  // Top point
-                  << QPoint(arrowX, arrowY)                                              // Tip point
-                  << QPoint(arrowX - arrowLineOffsetFromTip, arrowY + arrowHeadHeight); // Bottom point
-        painter.drawPolygon(arrowHead);
-    }
+    // Note: Series chain arrows are now drawn by the parent layout (VirtualFlowLayout)
+    // to connect cards together, not inside each card
 }
 
 void AnimeCard::mousePressEvent(QMouseEvent *event)
@@ -1001,9 +971,21 @@ void AnimeCard::setIs18Restricted(bool restricted)
     m_is18Restricted = restricted;
 }
 
-void AnimeCard::setShowSeriesArrow(bool show)
+void AnimeCard::setSeriesChainInfo(int prequelAid, int sequelAid)
 {
-    m_showSeriesArrow = show;
-    update();  // Trigger repaint
+    m_prequelAid = prequelAid;
+    m_sequelAid = sequelAid;
+}
+
+QPoint AnimeCard::getLeftConnectionPoint() const
+{
+    // Return the center point of the left edge in global coordinates
+    return mapToGlobal(QPoint(0, height() / 2));
+}
+
+QPoint AnimeCard::getRightConnectionPoint() const
+{
+    // Return the center point of the right edge in global coordinates
+    return mapToGlobal(QPoint(width(), height() / 2));
 }
 

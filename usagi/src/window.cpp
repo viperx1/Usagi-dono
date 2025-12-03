@@ -5031,20 +5031,19 @@ void Window::applyMylistFilters()
 		}
 	}
 	
-	// Update arrow indicators for series chain display
-	// First, clear all arrows
+	// Update series chain connection info for cards
+	// First, clear all chain info
 	for (AnimeCard* card : cardManager->getAllCards()) {
-		card->setShowSeriesArrow(false);
+		card->setSeriesChainInfo(0, 0);
 	}
 	
-	// If series chain display is enabled, set arrows for cards that have a sequel in the filtered list
+	// If series chain display is enabled, set prequel/sequel info for arrow connections
 	if (showSeriesChain && watchSessionManager) {
 		// Cache series chains to avoid redundant lookups
 		QMap<int, QList<int>> chainCache;
 		
-		for (int i = 0; i < filteredAnimeIds.size() - 1; ++i) {
+		for (int i = 0; i < filteredAnimeIds.size(); ++i) {
 			int currentAid = filteredAnimeIds[i];
-			int nextAid = filteredAnimeIds[i + 1];
 			
 			// Get cached chain or fetch and cache it
 			QList<int> chain;
@@ -5056,17 +5055,34 @@ void Window::applyMylistFilters()
 			}
 			
 			int currentIndex = chain.indexOf(currentAid);
+			if (currentIndex < 0) continue;
 			
-			if (currentIndex >= 0 && currentIndex < chain.size() - 1) {
-				int sequelAid = chain[currentIndex + 1];
-				
-				// If the next card in the filtered list is the sequel, show arrow
-				if (nextAid == sequelAid) {
-					AnimeCard* card = cardManager->getCard(currentAid);
-					if (card) {
-						card->setShowSeriesArrow(true);
-					}
+			// Determine prequel and sequel AIDs
+			int prequelAid = 0;
+			int sequelAid = 0;
+			
+			// Check if previous anime in filtered list is the prequel
+			if (i > 0 && currentIndex > 0) {
+				int prevAid = filteredAnimeIds[i - 1];
+				int prequelInChain = chain[currentIndex - 1];
+				if (prevAid == prequelInChain) {
+					prequelAid = prevAid;
 				}
+			}
+			
+			// Check if next anime in filtered list is the sequel
+			if (i < filteredAnimeIds.size() - 1 && currentIndex < chain.size() - 1) {
+				int nextAid = filteredAnimeIds[i + 1];
+				int sequelInChain = chain[currentIndex + 1];
+				if (nextAid == sequelInChain) {
+					sequelAid = nextAid;
+				}
+			}
+			
+			// Set the chain info on the card
+			AnimeCard* card = cardManager->getCard(currentAid);
+			if (card) {
+				card->setSeriesChainInfo(prequelAid, sequelAid);
 			}
 		}
 	}
@@ -5077,6 +5093,8 @@ void Window::applyMylistFilters()
 	// If using virtual scrolling, refresh the layout
 	if (mylistVirtualLayout) {
 		mylistVirtualLayout->refresh();
+		// Trigger repaint for arrow drawing
+		mylistVirtualLayout->update();
 	}
 	
 	// For backward compatibility with non-virtual scrolling
