@@ -805,8 +805,7 @@ void WatchSessionManager::deleteMarkedFiles(bool deleteFromDisk)
     }
     
     // Clear any existing queue and populate with new files
-    m_deletionQueue.clear();
-    m_deletionQueue = filesToDelete;
+    m_deletionQueue = std::move(filesToDelete);
     m_deleteFromDisk = deleteFromDisk;
     
     // Start processing the queue
