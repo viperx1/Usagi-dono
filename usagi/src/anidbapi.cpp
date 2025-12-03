@@ -3873,11 +3873,11 @@ QString AniDBApi::deleteFileFromMylist(int lid, bool deleteFromDisk)
 		QFile file(filePath);
 		
 		// Touch the file to verify it exists and is accessible before performing any operations
-		// This requirement ensures we actually access the file (not just check metadata) to confirm:
-		// 1. The file is physically present and not a stale filesystem cache entry
-		// 2. The filesystem is responsive and can service file operations
-		// 3. The file is accessible and not locked or corrupted at the filesystem level
-		// This provides better error reporting and catches edge cases that exists() alone might miss
+		// "Touching" (opening) the file serves as a more thorough verification than exists() alone:
+		// - Confirms the file is physically present and accessible, not just a metadata entry
+		// - Verifies the filesystem can service I/O operations on this file
+		// - Detects if the file is corrupted or has filesystem-level access issues
+		// We continue with deletion even if opening fails, as delete permissions may differ from read permissions
 		if (file.exists())
 		{
 			// Attempt to open the file briefly to verify accessibility
