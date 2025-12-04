@@ -9,6 +9,9 @@
 #include <QFileInfo>
 #include <algorithm>
 
+// Static regex for episode number extraction (shared across functions)
+const QRegularExpression WatchSessionManager::s_epnoNumericRegex(R"(\d+)");
+
 WatchSessionManager::WatchSessionManager(QObject *parent)
     : QObject(parent)
     , m_deletionInProgress(false)            // No deletion in progress initially
@@ -1971,9 +1974,8 @@ int WatchSessionManager::getEpisodeIdForFile(int lid) const
         QString epnoStr = q.value(1).toString();
         
         // Parse episode number from epno string (format: "1", "2", "S1", etc.)
-        // Extract just the numeric part
-        static QRegularExpression numRegex(R"(\d+)");
-        QRegularExpressionMatch match = numRegex.match(epnoStr);
+        // Extract just the numeric part using shared static regex
+        QRegularExpressionMatch match = s_epnoNumericRegex.match(epnoStr);
         if (match.hasMatch()) {
             int epno = match.captured(0).toInt();
             // Create a unique ID combining aid and episode number
@@ -2005,9 +2007,8 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     int aid = q.value(0).toInt();
     QString epnoStr = q.value(1).toString();
     
-    // Parse episode number from epno string
-    static QRegularExpression numRegex(R"(\d+)");
-    QRegularExpressionMatch match = numRegex.match(epnoStr);
+    // Parse episode number from epno string using shared static regex
+    QRegularExpressionMatch match = s_epnoNumericRegex.match(epnoStr);
     if (!match.hasMatch()) {
         return false;  // Can't parse episode number
     }
@@ -2025,8 +2026,10 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     }
     
     // Query for all episodes of this anime that have local files
-    // Note: Intentionally not sorting by epno here as we process results in a loop
-    // and extract episode numbers numerically
+    // Note: We don't use ORDER BY e.epno here because:
+    // 1. It would do string sorting which is incorrect for multi-digit episodes ("10" < "2")
+    // 2. We extract episode numbers numerically and process them in code anyway
+    // 3. This avoids the performance cost of sorting when we don't need it
     QSqlQuery q2(db);
     q2.prepare("SELECT DISTINCT e.epno FROM mylist m "
                "JOIN episode e ON m.eid = e.eid "
@@ -2042,7 +2045,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     QList<int> existingEpisodes;
     while (q2.next()) {
         QString existingEpnoStr = q2.value(0).toString();
-        QRegularExpressionMatch existingMatch = numRegex.match(existingEpnoStr);
+        QRegularExpressionMatch existingMatch = s_epnoNumericRegex.match(existingEpnoStr);
         if (existingMatch.hasMatch()) {
             int existingEpno = existingMatch.captured(0).toInt();
             int existingEpisodeId = aid * EPISODE_ID_MULTIPLIER + existingEpno;

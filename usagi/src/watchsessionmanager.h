@@ -405,6 +405,9 @@ private:
         SessionInfo() : aid(0), startAid(0), currentEpisode(0), isActive(false) {}
     };
     
+    // Static regex for episode number extraction (shared across functions)
+    static const QRegularExpression s_epnoNumericRegex;
+    
     // Cache for anime relations
     mutable QMap<int, QList<QPair<int, QString>>> m_relationsCache; // aid -> [(related_aid, relation_type), ...]
     
