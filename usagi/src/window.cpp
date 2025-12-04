@@ -2321,7 +2321,7 @@ unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
     setColumnWidth(0, 400);
     setColumnWidth(1, 300);
     setColumnWidth(2, 200);
-    setColumnWidth(3, 220);  // Increased to accommodate Re-check button
+    setColumnWidth(3, 290);  // Increased to accommodate Re-check and Delete buttons
     setMaximumHeight(200); // Limit height so it doesn't dominate the UI
 }
 
@@ -3173,9 +3173,16 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     recheckButton->setProperty("filepath", filepath);
     recheckButton->setToolTip("Re-validate this file against AniDB (in case it was added since last check)");
     
+    QPushButton *deleteButton = new QPushButton("Delete");
+    // Store filepath in button property for later lookup
+    deleteButton->setProperty("filepath", filepath);
+    deleteButton->setToolTip("Delete this file from the filesystem");
+    deleteButton->setStyleSheet("QPushButton { color: red; }");
+    
     actionLayout->addWidget(bindButton);
     actionLayout->addWidget(notAnimeButton);
     actionLayout->addWidget(recheckButton);
+    actionLayout->addWidget(deleteButton);
     actionContainer->setLayout(actionLayout);
     
     unknownFiles->setCellWidget(row, 3, actionContainer);
@@ -3315,6 +3322,30 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
         
         if(currentRow >= 0) {
             onUnknownFileRecheckClicked(currentRow);
+        } else {
+            LOG("ERROR: Could not find row for filepath");
+        }
+    });
+    
+    // Connect "Delete" button - use filepath to find current row dynamically
+    connect(deleteButton, &QPushButton::clicked, this, [this, deleteButton, filepath]() {
+        LOG("Delete button clicked");
+        LOG(QString("Delete button filepath: %1").arg(filepath));
+        
+        // Find current row by filepath
+        int currentRow = -1;
+        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
+            QTableWidgetItem *item = unknownFiles->item(i, 0);
+            if(item && item->toolTip() == filepath) {
+                currentRow = i;
+                break;
+            }
+        }
+        
+        LOG(QString("Delete button found row: %1").arg(currentRow));
+        
+        if(currentRow >= 0) {
+            onUnknownFileDeleteClicked(currentRow);
         } else {
             LOG("ERROR: Could not find row for filepath");
         }
@@ -5584,6 +5615,123 @@ void Window::onUnknownFileRecheckClicked(int row)
     }
     
     LOG(QString("Re-check initiated for file: %1").arg(fileData.filename));
+}
+
+void Window::onUnknownFileDeleteClicked(int row)
+{
+    if(!unknownFilesData.contains(row))
+    {
+        LOG(QString("Error: Unknown file data not found for row %1").arg(row));
+        return;
+    }
+    
+    UnknownFileData &fileData = unknownFilesData[row];
+    
+    LOG(QString("Delete button clicked for file: %1").arg(fileData.filename));
+    
+    // Show confirmation dialog to prevent accidental deletion
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, 
+        "Confirm File Deletion",
+        QString("Are you sure you want to permanently delete this file?\n\n"
+                "File: %1\n\n"
+                "This action cannot be undone!")
+            .arg(fileData.filename),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No  // Default to No for safety
+    );
+    
+    if(reply != QMessageBox::Yes)
+    {
+        LOG(QString("File deletion cancelled by user: %1").arg(fileData.filename));
+        return;
+    }
+    
+    // Attempt to delete the physical file
+    QFile file(fileData.filepath);
+    if(!file.exists())
+    {
+        LOG(QString("Error: File does not exist: %1").arg(fileData.filepath));
+        QMessageBox::warning(this, "File Not Found", 
+            QString("The file no longer exists:\n%1").arg(fileData.filepath));
+        
+        // Remove from UI anyway since file doesn't exist
+        unknownFiles->removeRow(row);
+        unknownFilesData.remove(row);
+        
+        // Update row indices in unknownFilesData map
+        QMap<int, UnknownFileData> newMap;
+        for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
+        {
+            int oldRow = it.key();
+            if(oldRow > row) {
+                newMap[oldRow - 1] = it.value();
+            } else {
+                newMap[oldRow] = it.value();
+            }
+        }
+        unknownFilesData = newMap;
+        
+        // Hide the widget if no more unknown files
+        if(unknownFiles->rowCount() == 0)
+        {
+            unknownFiles->hide();
+            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
+            if(unknownFilesLabel)
+            {
+                unknownFilesLabel->hide();
+            }
+        }
+        return;
+    }
+    
+    if(!file.remove())
+    {
+        LOG(QString("Error: Failed to delete file: %1").arg(file.errorString()));
+        QMessageBox::critical(this, "Delete Failed", 
+            QString("Failed to delete file:\n%1\n\nError: %2")
+                .arg(fileData.filepath, file.errorString()));
+        return;
+    }
+    
+    LOG(QString("Successfully deleted file: %1").arg(fileData.filepath));
+    
+    // Update database - remove from local_files table
+    adbapi->UpdateLocalFileBindingStatus(fileData.filepath, 3); // 3 = deleted
+    
+    // Remove from unknown files widget
+    unknownFiles->removeRow(row);
+    unknownFilesData.remove(row);
+    
+    // Update row indices in unknownFilesData map
+    QMap<int, UnknownFileData> newMap;
+    for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
+    {
+        int oldRow = it.key();
+        if(oldRow > row) {
+            newMap[oldRow - 1] = it.value();
+        } else {
+            newMap[oldRow] = it.value();
+        }
+    }
+    unknownFilesData = newMap;
+    
+    // Hide the widget if no more unknown files
+    if(unknownFiles->rowCount() == 0)
+    {
+        unknownFiles->hide();
+        QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
+        if(unknownFilesLabel)
+        {
+            unknownFilesLabel->hide();
+        }
+    }
+    
+    LOG(QString("Successfully removed deleted file from UI: %1").arg(fileData.filename));
+    
+    // Show success message
+    QMessageBox::information(this, "File Deleted", 
+        QString("File successfully deleted:\n%1").arg(fileData.filename));
 }
 
 // ========== Filter Bar Toggle Implementation ==========

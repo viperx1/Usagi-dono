@@ -687,6 +687,7 @@ public slots:
     void onUnknownFileBindClicked(int row, const QString& epno);
     void onUnknownFileNotAnimeClicked(int row);
     void onUnknownFileRecheckClicked(int row);
+    void onUnknownFileDeleteClicked(int row);
     
     // Filter bar toggle slot
     void onToggleFilterBarClicked();
