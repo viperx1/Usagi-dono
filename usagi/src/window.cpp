@@ -5728,10 +5728,6 @@ void Window::onUnknownFileDeleteClicked(int row)
     }
     
     LOG(QString("Successfully removed deleted file from UI: %1").arg(fileData.filename));
-    
-    // Show success message
-    QMessageBox::information(this, "File Deleted", 
-        QString("File successfully deleted:\n%1").arg(fileData.filename));
 }
 
 // ========== Filter Bar Toggle Implementation ==========
