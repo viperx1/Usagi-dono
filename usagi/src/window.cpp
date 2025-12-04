@@ -450,9 +450,13 @@ Window::Window()
         applyMylistFilters();
         // Re-apply sorting after filtering to preserve sort order
         sortMylistCards(filterSidebar->getSortIndex());
+        // Save filter settings
+        saveMylistSorting();
     });
     connect(filterSidebar, &MyListFilterSidebar::sortChanged, this, [this]() {
         sortMylistCards(filterSidebar->getSortIndex());
+        // Save sort settings
+        saveMylistSorting();
     });
     connect(filterSidebar, &MyListFilterSidebar::collapseRequested, this, &Window::onToggleFilterBarClicked);
     
@@ -2063,12 +2067,14 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Reload alternative titles for filtering
     loadAnimeAlternativeTitlesForFiltering();
     
-    // Apply current filters first, then sorting
+    // Restore filter settings first
+    restoreMylistSorting();
+    
+    // Apply current filters, then sorting
     // (sorting must happen after filtering to preserve sort order on filtered results)
     applyMylistFilters();
     
     // Apply sorting after filtering
-    restoreMylistSorting();
     sortMylistCards(filterSidebar->getSortIndex());
     
     mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
@@ -2124,33 +2130,129 @@ void Window::onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files)
 
 void Window::saveMylistSorting()
 {
-    // Card view sorting is handled by filterSidebar
-    // Save the current sort settings
+    // Save all filter sidebar settings (except search text)
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         return;
     }
     
-    int sortIndex = filterSidebar->getSortIndex();
-    
     QSqlQuery q(db);
+    
+    // Save sort settings
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_card_sort_index', ?)");
-    q.addBindValue(sortIndex);
+    q.addBindValue(filterSidebar->getSortIndex());
     q.exec();
     
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_card_sort_ascending', ?)");
     q.addBindValue(filterSidebar->getSortAscending() ? 1 : 0);
     q.exec();
     
-    LOG(QString("Saved mylist card sorting: index=%1, ascending=%2").arg(sortIndex).arg(filterSidebar->getSortAscending()));
+    // Save filter settings
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_type', ?)");
+    q.addBindValue(filterSidebar->getTypeFilter());
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_completion', ?)");
+    q.addBindValue(filterSidebar->getCompletionFilter());
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_unwatched', ?)");
+    q.addBindValue(filterSidebar->getShowOnlyUnwatched() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_deletion', ?)");
+    q.addBindValue(filterSidebar->getShowMarkedForDeletion() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_inmylist', ?)");
+    q.addBindValue(filterSidebar->getInMyListOnly() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_serieschain', ?)");
+    q.addBindValue(filterSidebar->getShowSeriesChain() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_adultcontent', ?)");
+    q.addBindValue(filterSidebar->getAdultContentFilter());
+    q.exec();
+    
+    LOG(QString("Saved mylist filter settings: sort=%1, ascending=%2, type=%3, completion=%4, unwatched=%5, deletion=%6, inmylist=%7, serieschain=%8, adult=%9")
+        .arg(filterSidebar->getSortIndex())
+        .arg(filterSidebar->getSortAscending())
+        .arg(filterSidebar->getTypeFilter())
+        .arg(filterSidebar->getCompletionFilter())
+        .arg(filterSidebar->getShowOnlyUnwatched())
+        .arg(filterSidebar->getShowMarkedForDeletion())
+        .arg(filterSidebar->getInMyListOnly())
+        .arg(filterSidebar->getShowSeriesChain())
+        .arg(filterSidebar->getAdultContentFilter()));
 }
 
 void Window::restoreMylistSorting()
 {
-    // Sorting is now handled by the filter sidebar
-    // This function is kept for backward compatibility but does nothing
-    // as the sidebar initializes with default values
-    LOG(QString("restoreMylistSorting: Sorting is now managed by filter sidebar"));
+    // Load all filter sidebar settings (except search text)
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("restoreMylistSorting: Database not open");
+        return;
+    }
+    
+    QSqlQuery q(db);
+    
+    // Load sort settings
+    q.prepare("SELECT value FROM settings WHERE name = ?");
+    
+    q.addBindValue("mylist_card_sort_index");
+    if (q.exec() && q.next()) {
+        int sortIndex = q.value(0).toInt();
+        filterSidebar->setSortIndex(sortIndex);
+        LOG(QString("Restored sort index: %1").arg(sortIndex));
+    }
+    
+    q.addBindValue("mylist_card_sort_ascending");
+    if (q.exec() && q.next()) {
+        bool sortAscending = q.value(0).toInt() != 0;
+        filterSidebar->setSortAscending(sortAscending);
+        LOG(QString("Restored sort ascending: %1").arg(sortAscending));
+    }
+    
+    // Load filter settings
+    q.addBindValue("mylist_filter_type");
+    if (q.exec() && q.next()) {
+        filterSidebar->setTypeFilter(q.value(0).toString());
+    }
+    
+    q.addBindValue("mylist_filter_completion");
+    if (q.exec() && q.next()) {
+        filterSidebar->setCompletionFilter(q.value(0).toString());
+    }
+    
+    q.addBindValue("mylist_filter_unwatched");
+    if (q.exec() && q.next()) {
+        filterSidebar->setShowOnlyUnwatched(q.value(0).toInt() != 0);
+    }
+    
+    q.addBindValue("mylist_filter_deletion");
+    if (q.exec() && q.next()) {
+        filterSidebar->setShowMarkedForDeletion(q.value(0).toInt() != 0);
+    }
+    
+    q.addBindValue("mylist_filter_inmylist");
+    if (q.exec() && q.next()) {
+        filterSidebar->setInMyListOnly(q.value(0).toInt() != 0);
+    }
+    
+    q.addBindValue("mylist_filter_serieschain");
+    if (q.exec() && q.next()) {
+        filterSidebar->setShowSeriesChain(q.value(0).toInt() != 0);
+    }
+    
+    q.addBindValue("mylist_filter_adultcontent");
+    if (q.exec() && q.next()) {
+        filterSidebar->setAdultContentFilter(q.value(0).toString());
+    }
+    
+    LOG("Restored mylist filter settings from database");
 }
 
 void Window::onMylistSortChanged(int column, Qt::SortOrder order)
@@ -4454,12 +4556,14 @@ void Window::loadMylistAsCards()
 	// Reload alternative titles for filtering
 	loadAnimeAlternativeTitlesForFiltering();
 	
-	// Apply current filters first, then sorting
+	// Restore filter settings first
+	restoreMylistSorting();
+	
+	// Apply current filters, then sorting
 	// (sorting must happen after filtering to preserve sort order on filtered results)
 	applyMylistFilters();
 	
 	// Apply sorting after filtering
-	restoreMylistSorting();
 	sortMylistCards(filterSidebar->getSortIndex());
 	
 	mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));

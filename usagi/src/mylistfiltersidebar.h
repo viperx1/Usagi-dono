@@ -42,6 +42,17 @@ public:
     bool getInMyListOnly() const;
     bool getShowSeriesChain() const;
     
+    // Set filter values (for loading from settings)
+    void setSortIndex(int index);
+    void setSortAscending(bool ascending);
+    void setTypeFilter(const QString& typeData);
+    void setCompletionFilter(const QString& completionData);
+    void setShowOnlyUnwatched(bool checked);
+    void setShowMarkedForDeletion(bool checked);
+    void setInMyListOnly(bool checked);
+    void setShowSeriesChain(bool checked);
+    void setAdultContentFilter(const QString& filterData);
+    
     // Reset all filters
     void resetFilters();
     
@@ -63,12 +74,14 @@ private slots:
     void onFilterChanged();
     void onSortChanged();
     void onSortOrderToggled();
+    void onSeriesChainToggled();
     
 protected:
     void resizeEvent(QResizeEvent *event) override;
     
 private:
     void setupUI();
+    void updateSortControlsState();
     
     // UI elements - Filters
     QLineEdit *m_searchField;

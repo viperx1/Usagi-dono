@@ -126,7 +126,7 @@ void MyListFilterSidebar::setupUI()
     m_showSeriesChainCheckbox = new QCheckBox("Display series chain");
     m_showSeriesChainCheckbox->setToolTip("Show anime series (prequel/sequel) in sequence with visual arrows");
     connect(m_showSeriesChainCheckbox, &QCheckBox::clicked,
-            this, &MyListFilterSidebar::onFilterChanged);
+            this, &MyListFilterSidebar::onSeriesChainToggled);
     
     seriesChainLayout->addWidget(m_showSeriesChainCheckbox);
     mainLayout->addWidget(seriesChainGroup);
@@ -200,6 +200,9 @@ void MyListFilterSidebar::setupUI()
     // Set minimum and maximum width for the sidebar
     setMinimumWidth(200);
     setMaximumWidth(300);
+    
+    // Initialize sort controls state
+    updateSortControlsState();
 }
 
 QString MyListFilterSidebar::getSearchText() const
@@ -252,6 +255,73 @@ bool MyListFilterSidebar::getShowSeriesChain() const
     return m_showSeriesChainCheckbox->isChecked();
 }
 
+void MyListFilterSidebar::setSortIndex(int index)
+{
+    if (index >= 0 && index < m_sortComboBox->count()) {
+        m_sortComboBox->setCurrentIndex(index);
+    }
+}
+
+void MyListFilterSidebar::setSortAscending(bool ascending)
+{
+    m_sortAscending = ascending;
+    m_sortOrderButton->setText(ascending ? "↑ Asc" : "↓ Desc");
+}
+
+void MyListFilterSidebar::setTypeFilter(const QString& typeData)
+{
+    // Find and set the item with matching data
+    for (int i = 0; i < m_typeFilter->count(); ++i) {
+        if (m_typeFilter->itemData(i).toString() == typeData) {
+            m_typeFilter->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
+void MyListFilterSidebar::setCompletionFilter(const QString& completionData)
+{
+    // Find and set the item with matching data
+    for (int i = 0; i < m_completionFilter->count(); ++i) {
+        if (m_completionFilter->itemData(i).toString() == completionData) {
+            m_completionFilter->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
+void MyListFilterSidebar::setShowOnlyUnwatched(bool checked)
+{
+    m_showOnlyUnwatchedCheckbox->setChecked(checked);
+}
+
+void MyListFilterSidebar::setShowMarkedForDeletion(bool checked)
+{
+    m_showMarkedForDeletionCheckbox->setChecked(checked);
+}
+
+void MyListFilterSidebar::setInMyListOnly(bool checked)
+{
+    m_inMyListCheckbox->setChecked(checked);
+}
+
+void MyListFilterSidebar::setShowSeriesChain(bool checked)
+{
+    m_showSeriesChainCheckbox->setChecked(checked);
+    updateSortControlsState();  // Update sort controls when series chain is set
+}
+
+void MyListFilterSidebar::setAdultContentFilter(const QString& filterData)
+{
+    // Find and set the item with matching data
+    for (int i = 0; i < m_adultContentFilter->count(); ++i) {
+        if (m_adultContentFilter->itemData(i).toString() == filterData) {
+            m_adultContentFilter->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
 void MyListFilterSidebar::resetFilters()
 {
     m_searchField->clear();
@@ -265,6 +335,9 @@ void MyListFilterSidebar::resetFilters()
     m_inMyListCheckbox->setChecked(true);  // Default to showing only mylist
     m_showSeriesChainCheckbox->setChecked(false);  // Default to not showing series chain
     m_adultContentFilter->setCurrentIndex(1);  // Reset to "Hide 18+"
+    
+    // Update sort controls state
+    updateSortControlsState();
     
     emit sortChanged();
     emit filterChanged();
@@ -297,6 +370,34 @@ void MyListFilterSidebar::onSortOrderToggled()
     }
     
     emit sortChanged();
+}
+
+void MyListFilterSidebar::onSeriesChainToggled()
+{
+    // Update sort controls state based on series chain checkbox
+    updateSortControlsState();
+    
+    // Emit filter changed to trigger re-filtering and re-sorting
+    emit filterChanged();
+}
+
+void MyListFilterSidebar::updateSortControlsState()
+{
+    // Disable sort controls when series chain display is enabled
+    bool seriesChainEnabled = m_showSeriesChainCheckbox->isChecked();
+    m_sortComboBox->setEnabled(!seriesChainEnabled);
+    m_sortOrderButton->setEnabled(!seriesChainEnabled);
+    
+    // Update tooltip to explain why controls are disabled
+    if (seriesChainEnabled) {
+        QString disabledTooltip = "Sorting is disabled while 'Display series chain' is enabled. "
+                                  "Anime are ordered by their series relationships instead.";
+        m_sortComboBox->setToolTip(disabledTooltip);
+        m_sortOrderButton->setToolTip(disabledTooltip);
+    } else {
+        m_sortComboBox->setToolTip("");
+        m_sortOrderButton->setToolTip("Toggle sort order (ascending/descending)");
+    }
 }
 
 void MyListFilterSidebar::resizeEvent(QResizeEvent *event)
