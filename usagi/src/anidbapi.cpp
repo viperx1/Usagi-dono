@@ -4186,20 +4186,24 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 		}
 		
 		// Format: aid|type|language|title
-		QStringList parts = line.split('|');
+		// Note: Title may contain pipe characters (e.g., "Shin Evangelion Gekijouban:||")
+		// So we split only on the first 3 pipes and keep the rest as the title
+		QStringList parts = line.split('|', Qt::KeepEmptyParts);
 		if(parts.size() >= 4)
 		{
 			QString aid = parts[0].trimmed();
 			QString type = parts[1].trimmed();
 			QString language = parts[2].trimmed();
-			QString title = parts[3].trimmed();
+			// Rejoin parts[3] onwards in case title contains pipes
+			QStringList titleParts = parts.mid(3);
+			QString title = titleParts.join('|').trimmed();
 			
 			// Escape single quotes for SQL
 			title = title.replace("'", "''");
 			language = language.replace("'", "''");
 			
 			QString q = QString("INSERT OR IGNORE INTO `anime_titles` (`aid`, `type`, `language`, `title`) VALUES ('%1', '%2', '%3', '%4')")
-						.arg(aid).arg(type).arg(language).arg(title);
+						.arg(aid, type, language, title);
 			query.exec(q);
 			count++;
 			

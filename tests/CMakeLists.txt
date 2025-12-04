@@ -418,6 +418,53 @@ endif()
 
 add_test(NAME test_anime_titles COMMAND test_anime_titles -v2)
 
+# Test: Pipe character in anime titles
+set(PIPE_IN_TITLE_TEST_SOURCES
+    test_pipe_in_title.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(PIPE_IN_TITLE_TEST_HEADERS
+    ../usagi/src/anidbapi.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_pipe_in_title ${PIPE_IN_TITLE_TEST_SOURCES} ${PIPE_IN_TITLE_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_pipe_in_title)
+
+target_compile_definitions(test_pipe_in_title PRIVATE CRYPTOPP_DEBUG=0)
+
+target_link_libraries(test_pipe_in_title PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_pipe_in_title PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_pipe_in_title PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_pipe_in_title COMMAND test_pipe_in_title -v2)
+
 # Test 5: URL extraction from notifications
 add_executable(test_url_extraction test_url_extraction.cpp)
 skip_automoc_for_usagi_sources(test_url_extraction)
