@@ -1685,40 +1685,10 @@ After first pass, [2][3][4][5][6][7][8][9] remain. Now:
 
 But we already passed them in the sorted list! If quota not met, need another pass.
 
-**Solution 1: Multi-Pass Loop**
-```cpp
-void autoMarkFilesForDeletion() {
-    QList<ScoredFile> files = getAllFilesWithScores();
-    std::sort(files.begin(), files.end());
-    
-    qint64 spaceFreed = 0;
-    QSet<int> deletedEpisodes;
-    bool deletedSomething = true;
-    
-    // Keep looping until quota met or no more deletions possible
-    while (spaceFreed < spaceNeeded && deletedSomething) {
-        deletedSomething = false;
-        
-        for (auto& file : files) {
-            if (spaceFreed >= spaceNeeded) break;
-            if (isAlreadyDeleted(file.lid, deletedEpisodes)) continue;
-            
-            if (wouldCreateGap(file.lid, deletedEpisodes)) continue;
-            if (isLastFileAndCreatesGap(file.lid, deletedEpisodes)) continue;
-            
-            markForDeletion(file.lid);
-            spaceFreed += file.size;
-            deletedSomething = true;
-            
-            if (isLastFileForEpisode(file.lid)) {
-                deletedEpisodes.insert(getEpisodeId(file.lid));
-            }
-        }
-    }
-}
-```
+**Recommended Implementation: Restart After Each Deletion**
 
-**Solution 2: Restart Loop After Each Deletion (User Suggestion)**
+This approach restarts the loop from the beginning after each deletion, ensuring we always process the lowest-scored available file first and strictly respect score order.
+
 ```cpp
 void autoMarkFilesForDeletion() {
     QList<ScoredFile> files = getAllFilesWithScores();
@@ -1731,142 +1701,31 @@ void autoMarkFilesForDeletion() {
     while (spaceFreed < spaceNeeded && index < files.size()) {
         auto& file = files[index];
         
+        // CONSTRAINT 1: Gap prevention
         if (wouldCreateGap(file.lid, deletedEpisodes)) {
             index++;  // Try next file
             continue;
         }
         
+        // CONSTRAINT 2: Last file protection
         if (isLastFileAndCreatesGap(file.lid, deletedEpisodes)) {
             index++;
             continue;
         }
         
+        // Mark for deletion
         markForDeletion(file.lid);
         spaceFreed += file.size;
         
+        // Track which episodes are fully deleted
         if (isLastFileForEpisode(file.lid)) {
             deletedEpisodes.insert(getEpisodeId(file.lid));
         }
         
         // CRITICAL: Restart from beginning after each deletion
         // This ensures we always check newly-available endpoints first
+        // and strictly maintain score ordering
         index = 0;
-    }
-}
-```
-
-**Comparison:**
-
-**Solution 1 (Multi-Pass):**
-- ✅ Simpler logic (just loop until no more deletions)
-- ✅ Respects score order within each pass
-- ⚠️ May delete files out of strict score order across passes
-- Example: Pass 1 deletes ep 10 (score 36), Pass 2 deletes ep 2 (score 30 < 36)
-
-**Solution 2 (Restart After Deletion):**
-- ✅ Always processes lowest-scored available file first
-- ✅ Strictly respects score order
-- ⚠️ More complex (manual index management)
-- ⚠️ **Critical insight from user:** Prevents accidentally deleting high-scored files
-
-**Example: Why Restart Matters**
-
-Scenario: [1][2][3][4][5][6][7][8][9][10], need to delete 5 files
-```
-Scores: ep1=38, ep2=30, ep3=26, ep4=22, ep5=20, ep6=24, ep7=28, ep8=32, ep9=34, ep10=36
-
-Without restart (multi-pass):
-Pass 1: Delete ep10 (36) → [1..9]
-Pass 2: Delete ep9 (34) → [1..8]  (ep2 now available at score 30)
-Pass 3: Delete ep8 (32) → [1..7]  (ep7 now available at score 28)
-Continue deleting high-scored endpoints...
-
-With restart:
-Delete ep10 (36) → restart → [1..9]
-Delete ep1 (38) → restart → [2..9]
-Delete ep9 (34) → restart → [2..8]
-Delete ep2 (30) → restart → [3..8]
-Delete ep8 (32) → restart → [3..7]
-```
-
-❌ **Problem with both approaches:** They delete higher-scored endpoints before lower-scored middle episodes become available!
-
-**Optimal Solution 3: Priority Queue with Dynamic Updates**
-```cpp
-void autoMarkFilesForDeletion() {
-    // Use priority queue that automatically reorders as deletions occur
-    auto cmp = [](const ScoredFile& a, const ScoredFile& b) { return a.score > b.score; };
-    std::priority_queue<ScoredFile, std::vector<ScoredFile>, decltype(cmp)> pq(cmp);
-    
-    // Initialize with all files
-    for (auto& file : getAllFilesWithScores()) {
-        pq.push(file);
-    }
-    
-    qint64 spaceFreed = 0;
-    QSet<int> deletedEpisodes;
-    QSet<int> deletedFiles;
-    
-    while (spaceFreed < spaceNeeded && !pq.empty()) {
-        auto file = pq.top();
-        pq.pop();
-        
-        if (deletedFiles.contains(file.lid)) continue;
-        
-        if (wouldCreateGap(file.lid, deletedEpisodes)) continue;
-        if (isLastFileAndCreatesGap(file.lid, deletedEpisodes)) continue;
-        
-        markForDeletion(file.lid);
-        spaceFreed += file.size;
-        deletedFiles.insert(file.lid);
-        
-        if (isLastFileForEpisode(file.lid)) {
-            deletedEpisodes.insert(getEpisodeId(file.lid));
-        }
-    }
-}
-```
-
-⚠️ **Still doesn't solve the core problem:** Scores are pre-calculated and don't change when gap status changes.
-
-**Best Solution: Accept Score Order Limitation**
-
-**User is correct:** The real concern is that we might delete high-scored files when lower-scored files become available later.
-
-**Reality check:** This is acceptable behavior because:
-1. **Gap protection is a hard constraint** - maintaining series continuity is more important than perfect score ordering
-2. **Endpoints naturally have higher scores** - they're farther from current position or already watched, so deleting them first is usually correct
-3. **Middle episodes are protected** - the most important files (current and nearby) are kept regardless
-
-**Recommended Approach: Multi-Pass with Score Awareness**
-```cpp
-void autoMarkFilesForDeletion() {
-    QList<ScoredFile> files = getAllFilesWithScores();
-    std::sort(files.begin(), files.end());
-    
-    qint64 spaceFreed = 0;
-    QSet<int> deletedEpisodes;
-    
-    // Multi-pass until quota met or no deletions possible
-    bool madeProgress = true;
-    while (spaceFreed < spaceNeeded && madeProgress) {
-        madeProgress = false;
-        
-        for (auto& file : files) {
-            if (spaceFreed >= spaceNeeded) break;
-            if (deletedEpisodes.contains(getEpisodeId(file.lid))) continue;
-            
-            if (wouldCreateGap(file.lid, deletedEpisodes)) continue;
-            if (isLastFileAndCreatesGap(file.lid, deletedEpisodes)) continue;
-            
-            markForDeletion(file.lid);
-            spaceFreed += file.size;
-            madeProgress = true;
-            
-            if (isLastFileForEpisode(file.lid)) {
-                deletedEpisodes.insert(getEpisodeId(file.lid));
-            }
-        }
     }
     
     // If quota not met, log warning (series continuity prevents further deletion)
@@ -1878,11 +1737,56 @@ void autoMarkFilesForDeletion() {
 }
 ```
 
-✅ **This approach:**
-- Respects score order within each pass
-- Handles dynamic gap status changes across passes
-- Terminates when no more deletions possible
-- Logs when series continuity prevents reaching quota
+**Why This Approach:**
+
+1. **Strictly Respects Score Order**: By restarting from index 0 after each deletion, we always process the lowest-scored file that's currently available for deletion. As new endpoints become available, they're immediately considered.
+
+2. **Dynamic Gap Detection**: The `deletedEpisodes` set tracks which episodes have been fully deleted, allowing `wouldCreateGap()` to dynamically determine gap status as the deletion progresses.
+
+3. **Simple and Correct**: While it may seem less efficient to restart the loop, in practice this ensures correctness. We never accidentally delete a high-scored file when a lower-scored file has become available.
+
+4. **Clear Termination**: The loop terminates when either:
+   - Space quota is met (`spaceFreed >= spaceNeeded`)
+   - We've checked all files without finding any deletable ones (`index >= files.size()`)
+
+**Example Walkthrough:**
+
+Scenario: [1][2][3][4][5][6][7][8][9][10], need to delete 5 files
+```
+Scores: ep1=38, ep2=30, ep3=26, ep4=22, ep5=20, ep6=24, ep7=28, ep8=32, ep9=34, ep10=36
+
+Deletion sequence with restart:
+1. Try ep5 (20): creates gap → skip, index++
+2. Try ep4 (22): creates gap → skip, index++
+3. Try ep6 (24): creates gap → skip, index++
+4. Try ep3 (26): creates gap → skip, index++
+5. Try ep7 (28): creates gap → skip, index++
+6. Try ep2 (30): creates gap → skip, index++
+7. Try ep8 (32): creates gap → skip, index++
+8. Try ep9 (34): creates gap → skip, index++
+9. Try ep10 (36): no gap (endpoint) → DELETE, index=0, spaceFreed updated
+10. Restart from ep5 (20): creates gap → skip
+... (skip middle episodes)
+17. Try ep1 (38): no gap (endpoint) → DELETE, index=0, spaceFreed updated
+18. Restart from ep5 (20): creates gap → skip
+... (skip middle episodes)
+25. Try ep9 (34): no gap (now endpoint after ep10 deleted) → DELETE, index=0
+... continue until quota met
+```
+
+**Key Implementation Details:**
+
+- `wouldCreateGap(lid, deletedEpisodes)`: Checks if deleting this file would create a gap, considering episodes already marked in `deletedEpisodes`
+- `isLastFileAndCreatesGap(lid, deletedEpisodes)`: Additional check for the last file of an episode
+- `isLastFileForEpisode(lid)`: Determines if this is the only remaining file for its episode
+- Index restart (`index = 0`) after each successful deletion ensures newly-available low-scored files are checked
+
+**Performance Consideration:**
+
+While restarting seems inefficient, in practice:
+- Most files will be skipped quickly (gap check is fast)
+- Deletions only happen at endpoints, which are a small fraction of total files
+- The clarity and correctness gained outweigh any minor performance cost
 
 2. **Less Predictable**
    - Deletion order depends on gap status, which changes dynamically
