@@ -5655,6 +5655,9 @@ void Window::onUnknownFileDeleteClicked(int row)
         QMessageBox::warning(this, "File Not Found", 
             QString("The file no longer exists:\n%1").arg(fileData.filepath));
         
+        // Save scroll position before removing row
+        int scrollPos = unknownFiles->verticalScrollBar()->value();
+        
         // Remove from UI anyway since file doesn't exist
         unknownFiles->removeRow(row);
         unknownFilesData.remove(row);
@@ -5671,6 +5674,9 @@ void Window::onUnknownFileDeleteClicked(int row)
             }
         }
         unknownFilesData = newMap;
+        
+        // Restore scroll position
+        unknownFiles->verticalScrollBar()->setValue(scrollPos);
         
         // Hide the widget if no more unknown files
         if(unknownFiles->rowCount() == 0)
@@ -5696,6 +5702,9 @@ void Window::onUnknownFileDeleteClicked(int row)
     
     LOG(QString("Successfully deleted file: %1").arg(fileData.filepath));
     
+    // Save scroll position before removing row
+    int scrollPos = unknownFiles->verticalScrollBar()->value();
+    
     // Update database - remove from local_files table
     adbapi->UpdateLocalFileBindingStatus(fileData.filepath, 3); // 3 = deleted
     
@@ -5715,6 +5724,9 @@ void Window::onUnknownFileDeleteClicked(int row)
         }
     }
     unknownFilesData = newMap;
+    
+    // Restore scroll position
+    unknownFiles->verticalScrollBar()->setValue(scrollPos);
     
     // Hide the widget if no more unknown files
     if(unknownFiles->rowCount() == 0)

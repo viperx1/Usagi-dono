@@ -29,6 +29,7 @@
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTreeWidget>
 #include <QtWidgets/QScrollArea>
+#include <QtWidgets/QScrollBar>
 #include <QtWidgets/QCompleter>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QSpinBox>
