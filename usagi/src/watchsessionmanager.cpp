@@ -800,6 +800,40 @@ bool WatchSessionManager::deleteFile(int lid, bool deleteFromDisk)
     return true;
 }
 
+void WatchSessionManager::cleanupMissingFileStatus(int lid)
+{
+    LOG(QString("[WatchSessionManager] cleanupMissingFileStatus called for lid=%1").arg(lid));
+    
+    // Get the aid for this file before cleanup
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[WatchSessionManager] Database not open, cannot cleanup file status");
+        return;
+    }
+    
+    // Query aid for the file
+    QSqlQuery aidQuery(db);
+    aidQuery.prepare("SELECT aid FROM mylist WHERE lid = ?");
+    aidQuery.addBindValue(lid);
+    int aid = 0;
+    if (aidQuery.exec() && aidQuery.next()) {
+        aid = aidQuery.value(0).toInt();
+    }
+    
+    // Remove from file marks if present
+    m_fileMarks.remove(lid);
+    
+    // Emit signal to request file status cleanup (Window will handle it with API access)
+    // deleteFromDisk=false because the file is already gone from disk
+    // This will update local database and AniDB API to reflect the file's absence
+    emit deleteFileRequested(lid, false);
+    
+    // Emit fileMarkChanged immediately since we've removed from marks
+    emit fileMarkChanged(lid, FileMarkType::None);
+    
+    LOG(QString("[WatchSessionManager] File status cleanup requested for lid=%1, aid=%2").arg(lid).arg(aid));
+}
+
 void WatchSessionManager::deleteMarkedFiles(bool deleteFromDisk)
 {
     QList<int> filesToDelete = getFilesForDeletion();
@@ -943,6 +977,27 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         info.path = q.value(1).toString();
         info.size = q.value(2).toLongLong();
         info.animeName = q.value(3).toString();
+        
+        // Verify the file actually exists on disk before considering it for deletion
+        // This prevents marking stale database entries where files have been deleted externally
+        QFileInfo fileInfo(info.path);
+        if (!fileInfo.exists()) {
+            LOG(QString("[WatchSessionManager] File marked in database but missing on disk: %1 (lid=%2) - cleaning up status")
+                .arg(info.path).arg(info.lid));
+            // Clean up the database status for this missing file (both locally and in API)
+            cleanupMissingFileStatus(info.lid);
+            continue;
+        }
+        
+        // Verify it's actually a file (not a directory)
+        if (!fileInfo.isFile()) {
+            LOG(QString("[WatchSessionManager] Non-file entry found: %1 (lid=%2) - cleaning up status")
+                .arg(info.path).arg(info.lid));
+            // Clean up the database status for this invalid entry
+            cleanupMissingFileStatus(info.lid);
+            continue;
+        }
+        
         info.score = calculateMarkScore(info.lid);
         candidates.append(info);
     }
