@@ -1972,13 +1972,12 @@ int WatchSessionManager::getEpisodeIdForFile(int lid) const
         
         // Parse episode number from epno string (format: "1", "2", "S1", etc.)
         // Extract just the numeric part
-        QRegularExpression numRegex(R"(\d+)");
+        static QRegularExpression numRegex(R"(\d+)");
         QRegularExpressionMatch match = numRegex.match(epnoStr);
         if (match.hasMatch()) {
             int epno = match.captured(0).toInt();
             // Create a unique ID combining aid and episode number
-            // Use a large multiplier to avoid collisions
-            return aid * 100000 + epno;
+            return aid * EPISODE_ID_MULTIPLIER + epno;
         }
     }
     
@@ -2007,7 +2006,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     QString epnoStr = q.value(1).toString();
     
     // Parse episode number from epno string
-    QRegularExpression numRegex(R"(\d+)");
+    static QRegularExpression numRegex(R"(\d+)");
     QRegularExpressionMatch match = numRegex.match(epnoStr);
     if (!match.hasMatch()) {
         return false;  // Can't parse episode number
@@ -2018,7 +2017,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     // creating a gap in the series
     
     // Create episode ID for this episode
-    int thisEpisodeId = aid * 100000 + epno;
+    int thisEpisodeId = aid * EPISODE_ID_MULTIPLIER + epno;
     
     // Check if this episode is already marked as deleted
     if (deletedEpisodes.contains(thisEpisodeId)) {
@@ -2026,12 +2025,13 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     }
     
     // Query for all episodes of this anime that have local files
+    // Note: Intentionally not sorting by epno here as we process results in a loop
+    // and extract episode numbers numerically
     QSqlQuery q2(db);
     q2.prepare("SELECT DISTINCT e.epno FROM mylist m "
                "JOIN episode e ON m.eid = e.eid "
                "JOIN local_files lf ON m.local_file = lf.id "
-               "WHERE m.aid = ? AND lf.path IS NOT NULL AND lf.path != '' "
-               "ORDER BY e.epno");
+               "WHERE m.aid = ? AND lf.path IS NOT NULL AND lf.path != ''");
     q2.addBindValue(aid);
     
     if (!q2.exec()) {
@@ -2045,7 +2045,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
         QRegularExpressionMatch existingMatch = numRegex.match(existingEpnoStr);
         if (existingMatch.hasMatch()) {
             int existingEpno = existingMatch.captured(0).toInt();
-            int existingEpisodeId = aid * 100000 + existingEpno;
+            int existingEpisodeId = aid * EPISODE_ID_MULTIPLIER + existingEpno;
             
             // Skip episodes already marked for deletion
             if (deletedEpisodes.contains(existingEpisodeId)) {

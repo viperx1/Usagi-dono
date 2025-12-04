@@ -495,6 +495,9 @@ private:
      */
     void cleanupMissingFileStatus(int lid);
     
+    // Episode ID multiplier for unique identification (aid * multiplier + epno)
+    static constexpr int EPISODE_ID_MULTIPLIER = 100000;
+    
     // AniDB relation type codes
     static const int RELATION_SEQUEL = 1;
     static const int RELATION_PREQUEL = 2;
