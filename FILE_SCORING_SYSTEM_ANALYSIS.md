@@ -1465,18 +1465,328 @@ Total: 1020
 ```
 ✅ Watched middle episodes still protected from deletion
 
+#### Alternative Approach: Gap Check as Deletion Condition
+
+**User Suggestion:** Instead of adding gap protection to the score, check for gaps as a **condition during the deletion loop**. Since scores are already calculated for all files, we can iterate through them in score order and skip files that would create gaps.
+
+**Conceptual Difference:**
+
+**Approach A: Gap Score (Current Proposal)**
+```cpp
+int calculateMarkScore(int lid) const {
+    int score = 50;
+    // ... existing scoring logic ...
+    
+    if (wouldCreateGap(lid)) {
+        score += 1000;  // Massive protection bonus
+    }
+    return score;
+}
+
+void autoMarkFilesForDeletion() {
+    // Calculate scores for all files
+    QList<ScoredFile> files = getAllFilesWithScores();
+    
+    // Sort by score (lowest first)
+    std::sort(files.begin(), files.end());
+    
+    // Mark files until space condition met
+    for (auto& file : files) {
+        if (spaceFreed >= spaceNeeded) break;
+        markForDeletion(file.lid);
+        spaceFreed += file.size;
+    }
+}
+```
+
+**Approach B: Gap Condition (User Suggestion)**
+```cpp
+int calculateMarkScore(int lid) const {
+    int score = 50;
+    // ... existing scoring logic ...
+    // NO gap protection in score
+    return score;
+}
+
+void autoMarkFilesForDeletion() {
+    // Calculate scores for all files
+    QList<ScoredFile> files = getAllFilesWithScores();
+    
+    // Sort by score (lowest first)
+    std::sort(files.begin(), files.end());
+    
+    // Mark files until space condition met
+    for (auto& file : files) {
+        if (spaceFreed >= spaceNeeded) break;
+        
+        // CHECK: Would deleting this file create a gap?
+        if (wouldCreateGap(file.lid)) {
+            continue;  // Skip this file, try next one
+        }
+        
+        markForDeletion(file.lid);
+        spaceFreed += file.size;
+    }
+}
+```
+
+#### Comparative Analysis
+
+**Advantages of Approach B (Gap as Condition):**
+
+1. **Cleaner Separation of Concerns**
+   - Scoring logic focuses on file quality/priority
+   - Gap prevention is a deletion constraint, not a quality metric
+   - More intuitive: "calculate quality, then enforce constraints"
+
+2. **More Flexible**
+   - Easy to add multiple constraints (gap prevention, last file protection, etc.)
+   - Can combine conditions with boolean logic
+   - Can disable constraint checking without recalculating scores
+
+3. **Better Performance**
+   - Gap check only runs for files being considered for deletion
+   - No need to check gaps for high-scored files that won't be deleted anyway
+   - Scores don't need recalculation when gap status changes
+
+4. **Simpler Score Interpretation**
+   - Score purely reflects file quality/priority
+   - No artificial inflation from protection bonuses
+   - Easier to debug and understand why files are kept/deleted
+
+5. **Dynamic Gap Detection**
+   - As files are deleted, gap status changes for remaining files
+   - With condition approach, this is automatically handled
+   - With score approach, would need to recalculate scores after each deletion
+
+**Example: Dynamic Gap Handling**
+
+**Scenario:** Episodes [1][2][3][4][5][6] exist, all watched, need to delete 3 files
+
+**Approach A (Gap Score):**
+```
+Initial scores:
+- Episode 1: 20 + 1000 = 1020 (gap protection)
+- Episode 2: 22 + 1000 = 1022 (gap protection)
+- Episode 3: 24 + 1000 = 1024 (gap protection)
+- Episode 4: 26 + 1000 = 1026 (gap protection)
+- Episode 5: 28 + 1000 = 1028 (gap protection)
+- Episode 6: 30 + 0 = 30 (endpoint, no gap)
+
+Deletion order: 6 → (need to recalculate scores)
+After deleting 6, episode 5 becomes endpoint:
+- Episode 5: 28 + 0 = 28 (no longer creates gap)
+
+Deletion order: 6 → 5 → (recalculate again)
+After deleting 5, episode 4 becomes endpoint:
+- Episode 4: 26 + 0 = 26
+
+Final: 6 → 5 → 4 deleted, [1][2][3] remain
+```
+⚠️ **Problem:** Requires score recalculation after each deletion
+
+**Approach B (Gap Condition):**
+```
+Initial scores (no gap protection):
+- Episode 1: 20
+- Episode 2: 22
+- Episode 3: 24
+- Episode 4: 26
+- Episode 5: 28
+- Episode 6: 30
+
+Deletion loop:
+1. Try episode 1: wouldCreateGap(1)? Yes (2 exists after) → SKIP
+2. Try episode 2: wouldCreateGap(2)? Yes (1 before, 3 after) → SKIP
+3. Try episode 3: wouldCreateGap(3)? Yes (2 before, 4 after) → SKIP
+4. Try episode 4: wouldCreateGap(4)? Yes (3 before, 5 after) → SKIP
+5. Try episode 5: wouldCreateGap(5)? Yes (4 before, 6 after) → SKIP
+6. Try episode 6: wouldCreateGap(6)? No (5 before, nothing after) → DELETE
+   (Now: [1][2][3][4][5])
+7. Try episode 1: wouldCreateGap(1)? Yes (2 exists after) → SKIP
+8. Try episode 2: wouldCreateGap(2)? Yes → SKIP
+9. Try episode 3: wouldCreateGap(3)? Yes → SKIP
+10. Try episode 4: wouldCreateGap(4)? Yes → SKIP
+11. Try episode 5: wouldCreateGap(5)? No (4 before, nothing after) → DELETE
+    (Now: [1][2][3][4])
+12. Try episode 1: wouldCreateGap(1)? Yes → SKIP
+13. Try episode 2: wouldCreateGap(2)? Yes → SKIP
+14. Try episode 3: wouldCreateGap(3)? Yes → SKIP
+15. Try episode 4: wouldCreateGap(4)? No (3 before, nothing after) → DELETE
+
+Final: 6 → 5 → 4 deleted, [1][2][3] remain
+```
+✅ **Better:** Gap detection is dynamic and automatic, no recalculation needed
+
+**Advantages of Approach A (Gap in Score):**
+
+1. **Single-Pass Sorting**
+   - Sort once by score, delete in order
+   - No need to skip files and try next ones
+   - More predictable deletion order
+
+2. **Explicit Priority**
+   - Gap protection visible in the score
+   - Can see exactly how much protection is applied
+   - Easier to tune protection levels
+
+3. **Simpler Loop Logic**
+   - Just iterate and delete until quota met
+   - No conditional skipping logic
+   - Fewer edge cases to handle
+
+**Disadvantages of Approach B (Gap as Condition):**
+
+1. **Potential Starvation**
+   - If all low-scored files create gaps, might not reach space target
+   - Need fallback logic to handle "no deletable files" scenario
+   - Could get stuck in a loop checking files that can't be deleted
+
+2. **Less Predictable**
+   - Deletion order depends on gap status, which changes dynamically
+   - Harder to explain to users why certain files weren't deleted
+   - Debug complexity: "file had low score but wasn't deleted because..."
+
+3. **Complexity in Edge Cases**
+   - What if no non-gap files exist and space is critical?
+   - How to handle partial series (episodes 5-10 only)?
+   - Need additional logic for emergency deletion
+
+**Hybrid Approach (Recommended):**
+
+Combine both approaches for optimal results:
+
+```cpp
+void autoMarkFilesForDeletion() {
+    QList<ScoredFile> files = getAllFilesWithScores();
+    std::sort(files.begin(), files.end());
+    
+    qint64 spaceFreed = 0;
+    QSet<int> deletedEpisodes;
+    
+    for (auto& file : files) {
+        if (spaceFreed >= spaceNeeded) break;
+        
+        // PRIMARY CHECK: Would this create a gap given current deletions?
+        if (wouldCreateGapAfterDeletions(file.lid, deletedEpisodes)) {
+            continue;  // Skip gap-creating files
+        }
+        
+        // SECONDARY CHECK: Is this the last file for the episode?
+        if (isLastFileForEpisode(file.lid, deletedEpisodes)) {
+            // Only delete last file if it's an endpoint
+            if (wouldCreateGapIfEpisodeDeleted(file.lid, deletedEpisodes)) {
+                continue;  // Protect last file of middle episode
+            }
+        }
+        
+        markForDeletion(file.lid);
+        spaceFreed += file.size;
+        
+        // Track which episodes are fully deleted
+        if (isLastFileForEpisode(file.lid, deletedEpisodes)) {
+            deletedEpisodes.insert(getEpisodeNumber(file.lid));
+        }
+    }
+    
+    // FALLBACK: If space target not met and all remaining files create gaps
+    if (spaceFreed < spaceNeeded && !deletedSomething) {
+        // Emergency mode: allow gap creation for hidden/low-priority anime
+        // Or: notify user that space target cannot be met without breaking series
+    }
+}
+```
+
+**Benefits of Hybrid:**
+- Uses scoring for quality/priority ranking
+- Uses conditions for hard constraints (gap prevention)
+- Handles dynamic gap status changes
+- Provides fallback for edge cases
+
+#### Recommendation
+
+**Use Approach B (Gap as Condition) with the hybrid implementation:**
+
+**Reasons:**
+1. ✅ Better separation of concerns (quality vs. constraints)
+2. ✅ Automatic dynamic gap detection as deletions occur
+3. ✅ More flexible and easier to extend with additional constraints
+4. ✅ Better performance (gap checks only on deletion candidates)
+5. ✅ Simpler scoring logic (no artificial protection bonuses)
+
+**Implementation:**
+```cpp
+// In watchsessionmanager.cpp
+void WatchSessionManager::autoMarkFilesForDeletion() {
+    // ... existing space calculation ...
+    
+    // Get all files with scores
+    QList<CandidateInfo> candidates = getAllCandidatesWithScores();
+    
+    // Sort by score (lowest = most deletable)
+    std::sort(candidates.begin(), candidates.end(),
+              [](const CandidateInfo& a, const CandidateInfo& b) {
+                  return a.score < b.score;
+              });
+    
+    qint64 accumulatedSpace = 0;
+    QSet<int> deletedEpisodes;  // Track fully deleted episodes
+    
+    for (const auto& candidate : candidates) {
+        if (accumulatedSpace >= spaceToFreeBytes) break;
+        
+        // CONSTRAINT 1: Gap prevention
+        if (wouldCreateGap(candidate.lid, deletedEpisodes)) {
+            LOG(QString("Skipping lid=%1: would create gap").arg(candidate.lid));
+            continue;
+        }
+        
+        // CONSTRAINT 2: Last file protection
+        if (isLastFileForEpisode(candidate.lid)) {
+            if (wouldCreateGapIfEpisodeDeleted(candidate.lid, deletedEpisodes)) {
+                LOG(QString("Skipping lid=%1: last file of middle episode").arg(candidate.lid));
+                continue;
+            }
+        }
+        
+        // Mark for deletion
+        markFileForDeletion(candidate.lid);
+        accumulatedSpace += candidate.size;
+        
+        // Update tracking
+        if (isLastFileForEpisode(candidate.lid)) {
+            deletedEpisodes.insert(getEpisodeId(candidate.lid));
+        }
+    }
+}
+```
+
+**Key Implementation Details:**
+- `wouldCreateGap(lid, deletedEpisodes)`: Check if deleting this file (given already-deleted episodes) would create a gap
+- `isLastFileForEpisode(lid)`: Check if this is the only remaining file for its episode
+- `deletedEpisodes`: Track which episodes are fully deleted to update gap detection dynamically
+
+This approach provides the best balance of simplicity, flexibility, and correctness for series continuity enforcement.
+
 #### Implementation Status
 
 **Currently NOT Implemented:** The system has no gap detection or prevention logic. Distance-based scoring can easily create gaps.
 
 **Critical Implementation Requirements:**
-1. Add `wouldCreateGap()` helper function
-2. Add `SCORE_MIDDLE_EPISODE_PROTECTION` constant (+1000 or higher)
-3. Apply gap protection in `calculateMarkScore()`
-4. Ensure gap check runs for every file before scoring
+1. Add `wouldCreateGap(lid, deletedEpisodes)` helper function
+2. Add `isLastFileForEpisode(lid)` helper function
+3. Modify `autoMarkFilesForDeletion()` to check conditions in deletion loop
+4. Track deleted episodes dynamically during deletion loop
 5. Add setting: "Maintain series continuity" (default: enabled)
+6. Add fallback logic for when no deletable files exist
 
-**Recommendation:** Gap prevention is **CRITICAL** for series continuity and should be the highest priority enhancement after codec awareness. Without it, the system can break series into unusable fragments.
+**Recommendation:** Gap prevention is **CRITICAL** for series continuity. The condition-based approach (Approach B with hybrid implementation) is superior to score-based approach for:
+- Dynamic gap detection
+- Separation of concerns
+- Flexibility and extensibility
+- Performance
+
+Without gap prevention, the system can break series into unusable fragments.
 
 ---
 
