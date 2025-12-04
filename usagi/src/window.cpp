@@ -2176,14 +2176,16 @@ void Window::saveMylistSorting()
     q.addBindValue(filterSidebar->getAdultContentFilter());
     q.exec();
     
-    // Note: Using chained .arg() calls as Qt6's multi-arg only supports up to 8 arguments
-    LOG(QString("Saved mylist filter settings: sort=%1, ascending=%2, type=%3, completion=%4, unwatched=%5, deletion=%6, inmylist=%7, serieschain=%8, adult=%9")
+    // Log saved settings for debugging
+    LOG(QString("Saved mylist sort settings: index=%1, ascending=%2")
         .arg(filterSidebar->getSortIndex())
-        .arg(filterSidebar->getSortAscending())
+        .arg(filterSidebar->getSortAscending()));
+    LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3, deletion=%4")
         .arg(filterSidebar->getTypeFilter())
         .arg(filterSidebar->getCompletionFilter())
         .arg(filterSidebar->getShowOnlyUnwatched())
-        .arg(filterSidebar->getShowMarkedForDeletion())
+        .arg(filterSidebar->getShowMarkedForDeletion()));
+    LOG(QString("Saved mylist view settings: inmylist=%1, serieschain=%2, adult=%3")
         .arg(filterSidebar->getInMyListOnly())
         .arg(filterSidebar->getShowSeriesChain())
         .arg(filterSidebar->getAdultContentFilter()));
@@ -2198,69 +2200,59 @@ void Window::restoreMylistSorting()
         return;
     }
     
-    // Helper lambda to load a setting by name
-    auto loadSetting = [&db](const QString& name) -> QString {
-        QSqlQuery q(db);
-        q.prepare("SELECT value FROM settings WHERE name = ?");
-        q.addBindValue(name);
-        if (q.exec() && q.next()) {
-            return q.value(0).toString();
+    // Batch load all settings in a single query for better performance
+    QMap<QString, QString> settings;
+    QSqlQuery q(db);
+    q.prepare("SELECT name, value FROM settings WHERE name LIKE 'mylist_%'");
+    if (q.exec()) {
+        while (q.next()) {
+            settings[q.value(0).toString()] = q.value(1).toString();
         }
-        return QString();
-    };
+    }
     
-    // Load sort settings
-    QString sortIndexStr = loadSetting("mylist_card_sort_index");
-    if (!sortIndexStr.isEmpty()) {
-        int sortIndex = sortIndexStr.toInt();
+    // Apply sort settings
+    if (settings.contains("mylist_card_sort_index")) {
+        int sortIndex = settings["mylist_card_sort_index"].toInt();
         filterSidebar->setSortIndex(sortIndex);
         LOG(QString("Restored sort index: %1").arg(sortIndex));
     }
     
-    QString sortAscendingStr = loadSetting("mylist_card_sort_ascending");
-    if (!sortAscendingStr.isEmpty()) {
-        bool sortAscending = sortAscendingStr.toInt() != 0;
+    if (settings.contains("mylist_card_sort_ascending")) {
+        bool sortAscending = settings["mylist_card_sort_ascending"].toInt() != 0;
         filterSidebar->setSortAscending(sortAscending);
         LOG(QString("Restored sort ascending: %1").arg(sortAscending));
     }
     
-    // Load filter settings
-    QString typeFilter = loadSetting("mylist_filter_type");
-    if (!typeFilter.isNull()) {  // Use isNull() to distinguish between empty string and not found
-        filterSidebar->setTypeFilter(typeFilter);
+    // Apply filter settings
+    if (settings.contains("mylist_filter_type")) {
+        filterSidebar->setTypeFilter(settings["mylist_filter_type"]);
     }
     
-    QString completionFilter = loadSetting("mylist_filter_completion");
-    if (!completionFilter.isNull()) {
-        filterSidebar->setCompletionFilter(completionFilter);
+    if (settings.contains("mylist_filter_completion")) {
+        filterSidebar->setCompletionFilter(settings["mylist_filter_completion"]);
     }
     
-    QString unwatchedStr = loadSetting("mylist_filter_unwatched");
-    if (!unwatchedStr.isEmpty()) {
-        filterSidebar->setShowOnlyUnwatched(unwatchedStr.toInt() != 0);
+    if (settings.contains("mylist_filter_unwatched")) {
+        filterSidebar->setShowOnlyUnwatched(settings["mylist_filter_unwatched"].toInt() != 0);
     }
     
-    QString deletionStr = loadSetting("mylist_filter_deletion");
-    if (!deletionStr.isEmpty()) {
-        filterSidebar->setShowMarkedForDeletion(deletionStr.toInt() != 0);
+    if (settings.contains("mylist_filter_deletion")) {
+        filterSidebar->setShowMarkedForDeletion(settings["mylist_filter_deletion"].toInt() != 0);
     }
     
-    QString inmylistStr = loadSetting("mylist_filter_inmylist");
-    if (!inmylistStr.isEmpty()) {
-        filterSidebar->setInMyListOnly(inmylistStr.toInt() != 0);
+    if (settings.contains("mylist_filter_inmylist")) {
+        filterSidebar->setInMyListOnly(settings["mylist_filter_inmylist"].toInt() != 0);
     }
     
-    QString seriesChainStr = loadSetting("mylist_filter_serieschain");
-    if (!seriesChainStr.isEmpty()) {
-        filterSidebar->setShowSeriesChain(seriesChainStr.toInt() != 0);
+    if (settings.contains("mylist_filter_serieschain")) {
+        filterSidebar->setShowSeriesChain(settings["mylist_filter_serieschain"].toInt() != 0);
     }
     
-    QString adultContentFilter = loadSetting("mylist_filter_adultcontent");
-    if (!adultContentFilter.isNull()) {
-        filterSidebar->setAdultContentFilter(adultContentFilter);
+    if (settings.contains("mylist_filter_adultcontent")) {
+        filterSidebar->setAdultContentFilter(settings["mylist_filter_adultcontent"]);
     }
     
-    LOG("Restored mylist filter settings from database");
+    LOG(QString("Restored %1 mylist filter settings from database").arg(settings.size()));
 }
 
 void Window::onMylistSortChanged(int column, Qt::SortOrder order)
