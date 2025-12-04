@@ -82,6 +82,7 @@ protected:
 private:
     void setupUI();
     void updateSortControlsState();
+    void setComboBoxByData(QComboBox* comboBox, const QString& data);
     
     // UI elements - Filters
     QLineEdit *m_searchField;

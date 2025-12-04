@@ -268,26 +268,25 @@ void MyListFilterSidebar::setSortAscending(bool ascending)
     m_sortOrderButton->setText(ascending ? "↑ Asc" : "↓ Desc");
 }
 
-void MyListFilterSidebar::setTypeFilter(const QString& typeData)
+// Helper method to find and set combo box item by data
+void MyListFilterSidebar::setComboBoxByData(QComboBox* comboBox, const QString& data)
 {
-    // Find and set the item with matching data
-    for (int i = 0; i < m_typeFilter->count(); ++i) {
-        if (m_typeFilter->itemData(i).toString() == typeData) {
-            m_typeFilter->setCurrentIndex(i);
+    for (int i = 0; i < comboBox->count(); ++i) {
+        if (comboBox->itemData(i).toString() == data) {
+            comboBox->setCurrentIndex(i);
             return;
         }
     }
 }
 
+void MyListFilterSidebar::setTypeFilter(const QString& typeData)
+{
+    setComboBoxByData(m_typeFilter, typeData);
+}
+
 void MyListFilterSidebar::setCompletionFilter(const QString& completionData)
 {
-    // Find and set the item with matching data
-    for (int i = 0; i < m_completionFilter->count(); ++i) {
-        if (m_completionFilter->itemData(i).toString() == completionData) {
-            m_completionFilter->setCurrentIndex(i);
-            return;
-        }
-    }
+    setComboBoxByData(m_completionFilter, completionData);
 }
 
 void MyListFilterSidebar::setShowOnlyUnwatched(bool checked)
@@ -313,13 +312,7 @@ void MyListFilterSidebar::setShowSeriesChain(bool checked)
 
 void MyListFilterSidebar::setAdultContentFilter(const QString& filterData)
 {
-    // Find and set the item with matching data
-    for (int i = 0; i < m_adultContentFilter->count(); ++i) {
-        if (m_adultContentFilter->itemData(i).toString() == filterData) {
-            m_adultContentFilter->setCurrentIndex(i);
-            return;
-        }
-    }
+    setComboBoxByData(m_adultContentFilter, filterData);
 }
 
 void MyListFilterSidebar::resetFilters()

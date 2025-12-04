@@ -2198,59 +2198,66 @@ void Window::restoreMylistSorting()
         return;
     }
     
-    QSqlQuery q(db);
+    // Helper lambda to load a setting by name
+    auto loadSetting = [&db](const QString& name) -> QString {
+        QSqlQuery q(db);
+        q.prepare("SELECT value FROM settings WHERE name = ?");
+        q.addBindValue(name);
+        if (q.exec() && q.next()) {
+            return q.value(0).toString();
+        }
+        return QString();
+    };
     
     // Load sort settings
-    q.prepare("SELECT value FROM settings WHERE name = ?");
-    
-    q.addBindValue("mylist_card_sort_index");
-    if (q.exec() && q.next()) {
-        int sortIndex = q.value(0).toInt();
+    QString sortIndexStr = loadSetting("mylist_card_sort_index");
+    if (!sortIndexStr.isEmpty()) {
+        int sortIndex = sortIndexStr.toInt();
         filterSidebar->setSortIndex(sortIndex);
         LOG(QString("Restored sort index: %1").arg(sortIndex));
     }
     
-    q.addBindValue("mylist_card_sort_ascending");
-    if (q.exec() && q.next()) {
-        bool sortAscending = q.value(0).toInt() != 0;
+    QString sortAscendingStr = loadSetting("mylist_card_sort_ascending");
+    if (!sortAscendingStr.isEmpty()) {
+        bool sortAscending = sortAscendingStr.toInt() != 0;
         filterSidebar->setSortAscending(sortAscending);
         LOG(QString("Restored sort ascending: %1").arg(sortAscending));
     }
     
     // Load filter settings
-    q.addBindValue("mylist_filter_type");
-    if (q.exec() && q.next()) {
-        filterSidebar->setTypeFilter(q.value(0).toString());
+    QString typeFilter = loadSetting("mylist_filter_type");
+    if (!typeFilter.isNull()) {  // Use isNull() to distinguish between empty string and not found
+        filterSidebar->setTypeFilter(typeFilter);
     }
     
-    q.addBindValue("mylist_filter_completion");
-    if (q.exec() && q.next()) {
-        filterSidebar->setCompletionFilter(q.value(0).toString());
+    QString completionFilter = loadSetting("mylist_filter_completion");
+    if (!completionFilter.isNull()) {
+        filterSidebar->setCompletionFilter(completionFilter);
     }
     
-    q.addBindValue("mylist_filter_unwatched");
-    if (q.exec() && q.next()) {
-        filterSidebar->setShowOnlyUnwatched(q.value(0).toInt() != 0);
+    QString unwatchedStr = loadSetting("mylist_filter_unwatched");
+    if (!unwatchedStr.isEmpty()) {
+        filterSidebar->setShowOnlyUnwatched(unwatchedStr.toInt() != 0);
     }
     
-    q.addBindValue("mylist_filter_deletion");
-    if (q.exec() && q.next()) {
-        filterSidebar->setShowMarkedForDeletion(q.value(0).toInt() != 0);
+    QString deletionStr = loadSetting("mylist_filter_deletion");
+    if (!deletionStr.isEmpty()) {
+        filterSidebar->setShowMarkedForDeletion(deletionStr.toInt() != 0);
     }
     
-    q.addBindValue("mylist_filter_inmylist");
-    if (q.exec() && q.next()) {
-        filterSidebar->setInMyListOnly(q.value(0).toInt() != 0);
+    QString inmylistStr = loadSetting("mylist_filter_inmylist");
+    if (!inmylistStr.isEmpty()) {
+        filterSidebar->setInMyListOnly(inmylistStr.toInt() != 0);
     }
     
-    q.addBindValue("mylist_filter_serieschain");
-    if (q.exec() && q.next()) {
-        filterSidebar->setShowSeriesChain(q.value(0).toInt() != 0);
+    QString seriesChainStr = loadSetting("mylist_filter_serieschain");
+    if (!seriesChainStr.isEmpty()) {
+        filterSidebar->setShowSeriesChain(seriesChainStr.toInt() != 0);
     }
     
-    q.addBindValue("mylist_filter_adultcontent");
-    if (q.exec() && q.next()) {
-        filterSidebar->setAdultContentFilter(q.value(0).toString());
+    QString adultContentFilter = loadSetting("mylist_filter_adultcontent");
+    if (!adultContentFilter.isNull()) {
+        filterSidebar->setAdultContentFilter(adultContentFilter);
     }
     
     LOG("Restored mylist filter settings from database");
