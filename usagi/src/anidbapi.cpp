@@ -4186,13 +4186,21 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 		}
 		
 		// Format: aid|type|language|title
-		QStringList parts = line.split('|');
-		if(parts.size() >= 4)
+		// Split only on the first 3 pipes to preserve any '|' characters in the title
+		int firstPipe = line.indexOf('|');
+		if(firstPipe == -1) continue;
+		int secondPipe = line.indexOf('|', firstPipe + 1);
+		if(secondPipe == -1) continue;
+		int thirdPipe = line.indexOf('|', secondPipe + 1);
+		if(thirdPipe == -1) continue;
+		
+		QString aid = line.mid(0, firstPipe).trimmed();
+		QString type = line.mid(firstPipe + 1, secondPipe - firstPipe - 1).trimmed();
+		QString language = line.mid(secondPipe + 1, thirdPipe - secondPipe - 1).trimmed();
+		QString title = line.mid(thirdPipe + 1).trimmed();
+		
+		if(!aid.isEmpty() && !type.isEmpty() && !language.isEmpty())
 		{
-			QString aid = parts[0].trimmed();
-			QString type = parts[1].trimmed();
-			QString language = parts[2].trimmed();
-			QString title = parts[3].trimmed();
 			
 			// Escape single quotes for SQL
 			title = title.replace("'", "''");
