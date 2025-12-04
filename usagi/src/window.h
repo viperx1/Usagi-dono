@@ -29,6 +29,7 @@
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTreeWidget>
 #include <QtWidgets/QScrollArea>
+#include <QtWidgets/QScrollBar>
 #include <QtWidgets/QCompleter>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QSpinBox>
@@ -687,6 +688,7 @@ public slots:
     void onUnknownFileBindClicked(int row, const QString& epno);
     void onUnknownFileNotAnimeClicked(int row);
     void onUnknownFileRecheckClicked(int row);
+    void onUnknownFileDeleteClicked(int row);
     
     // Filter bar toggle slot
     void onToggleFilterBarClicked();
