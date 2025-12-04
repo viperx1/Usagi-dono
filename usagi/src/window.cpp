@@ -4174,12 +4174,6 @@ void Window::startPlaybackForFile(int lid)
 // Sort cards based on selected criterion
 void Window::sortMylistCards(int sortIndex)
 {
-	// If series chain display is enabled, skip sorting to preserve chain order
-	if (filterSidebar && filterSidebar->getShowSeriesChain()) {
-		LOG("[Window] Series chain display enabled - skipping sort to preserve chain order");
-		return;
-	}
-	
 	// Get the list of anime IDs from the card manager
 	QList<int> animeIds = cardManager->getAnimeIdList();
 	
@@ -4195,6 +4189,12 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	bool sortAscending = filterSidebar->getSortAscending();
+	bool seriesChainEnabled = filterSidebar && filterSidebar->getShowSeriesChain();
+	
+	// When series chain is enabled, we apply nested sorting:
+	// - Sort the series chains by the selected criterion (using first anime in chain as representative)
+	// - Within each chain, maintain sequential order (prequel -> sequel)
+	// This happens in applyMylistFilters(), but sortMylistCards() needs to re-sort when user changes criteria
 	
 	// For sorting, we need to access card data. Build a combined map from all sources.
 	QMap<int, AnimeCard*> cardsMap;
@@ -4217,6 +4217,202 @@ void Window::sortMylistCards(int sortIndex)
 		return cardManager->getCachedAnimeData(aid);
 	};
 	
+	// Handle nested sorting when series chain is enabled
+	if (seriesChainEnabled && watchSessionManager) {
+		LOG("[Window] Series chain enabled - applying nested sorting (sort chains, preserve internal order)");
+		
+		// Build chain groups from current anime list
+		QMap<int, QList<int>> chainGroups;
+		QSet<int> processedIds;
+		
+		for (int aid : std::as_const(animeIds)) {
+			if (processedIds.contains(aid)) {
+				continue;
+			}
+			
+			// Get the full chain for this anime
+			QList<int> chain = watchSessionManager->getSeriesChain(aid);
+			if (!chain.isEmpty()) {
+				// Use first anime in chain as the key
+				int chainKey = chain.first();
+				
+				// Only add anime that are in our current list
+				QList<int> filteredChain;
+				for (int chainAid : chain) {
+					if (animeIds.contains(chainAid)) {
+						filteredChain.append(chainAid);
+						processedIds.insert(chainAid);
+					}
+				}
+				
+				if (!filteredChain.isEmpty()) {
+					chainGroups[chainKey] = filteredChain;
+				}
+			} else {
+				// Anime not in any chain - treat as single-item chain
+				chainGroups[aid] = QList<int>() << aid;
+				processedIds.insert(aid);
+			}
+		}
+		
+		// Get chain keys for sorting
+		QList<int> chainKeys = chainGroups.keys();
+		
+		// Define comparison lambda that will be used for sorting chains
+		auto compareChains = [&cardsMap, &getCachedData, sortAscending, sortIndex](int chainKeyA, int chainKeyB) -> bool {
+			// Use the first anime in each chain as the representative for sorting
+			int aidA = chainKeyA;
+			int aidB = chainKeyB;
+			
+			AnimeCard* a = cardsMap.value(aidA);
+			AnimeCard* b = cardsMap.value(aidB);
+			
+			// Common hidden check for all sort types
+			bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+			bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+			
+			// Hidden cards always go to the bottom
+			if (hiddenA != hiddenB) {
+				return hiddenB;  // non-hidden comes before hidden
+			}
+			
+			// Apply specific sort criterion
+			switch (sortIndex) {
+				case 0: { // Anime Title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return sortAscending ? (titleA < titleB) : (titleA > titleB);
+				}
+				case 1: { // Type
+					QString typeA = a ? a->getAnimeType() : getCachedData(aidA).typeName;
+					QString typeB = b ? b->getAnimeType() : getCachedData(aidB).typeName;
+					if (typeA != typeB) {
+						return sortAscending ? (typeA < typeB) : (typeA > typeB);
+					}
+					// Fallback to title for same type
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				case 2: { // Aired Date
+					aired airedA, airedB;
+					if (a) {
+						airedA = a->getAired();
+					} else {
+						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+						airedA = aired(cachedA.startDate, cachedA.endDate);
+					}
+					if (b) {
+						airedB = b->getAired();
+					} else {
+						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+						airedB = aired(cachedB.startDate, cachedB.endDate);
+					}
+					
+					if (airedA == airedB) {
+						// Fallback to title
+						QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+						QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+						return titleA < titleB;
+					}
+					return sortAscending ? (airedA < airedB) : (airedA > airedB);
+				}
+				case 3: { // Episodes (Count)
+					int episodesA, episodesB;
+					if (a) {
+						episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+					} else {
+						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+						episodesA = cachedA.stats.normalEpisodes + cachedA.stats.otherEpisodes;
+					}
+					if (b) {
+						episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+					} else {
+						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+						episodesB = cachedB.stats.normalEpisodes + cachedB.stats.otherEpisodes;
+					}
+					if (episodesA != episodesB) {
+						return sortAscending ? (episodesA < episodesB) : (episodesA > episodesB);
+					}
+					// Fallback to title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				case 4: { // Completion %
+					int totalEpisodesA, totalEpisodesB, viewedA, viewedB;
+					if (a) {
+						totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+						viewedA = a->getNormalViewed() + a->getOtherViewed();
+					} else {
+						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+						totalEpisodesA = cachedA.stats.normalEpisodes + cachedA.stats.otherEpisodes;
+						viewedA = cachedA.stats.normalViewed + cachedA.stats.otherViewed;
+					}
+					if (b) {
+						totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+						viewedB = b->getNormalViewed() + b->getOtherViewed();
+					} else {
+						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+						totalEpisodesB = cachedB.stats.normalEpisodes + cachedB.stats.otherEpisodes;
+						viewedB = cachedB.stats.normalViewed + cachedB.stats.otherViewed;
+					}
+					
+					double percentA = (totalEpisodesA > 0) ? (static_cast<double>(viewedA) / totalEpisodesA) : 0.0;
+					double percentB = (totalEpisodesB > 0) ? (static_cast<double>(viewedB) / totalEpisodesB) : 0.0;
+					
+					if (percentA != percentB) {
+						return sortAscending ? (percentA < percentB) : (percentA > percentB);
+					}
+					// Fallback to title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				case 5: { // Last Played
+					qint64 lastPlayedA = a ? a->getLastPlayed() : getCachedData(aidA).lastPlayed;
+					qint64 lastPlayedB = b ? b->getLastPlayed() : getCachedData(aidB).lastPlayed;
+					
+					// Never played items go to end (timestamp is 0)
+					if (lastPlayedA == 0 && lastPlayedB == 0) {
+						return false;
+					}
+					if (lastPlayedA == 0) {
+						return false;  // Never played goes to end
+					}
+					if (lastPlayedB == 0) {
+						return true;
+					}
+					
+					if (lastPlayedA != lastPlayedB) {
+						return sortAscending ? (lastPlayedA < lastPlayedB) : (lastPlayedA > lastPlayedB);
+					}
+					// Fallback to title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				default:
+					return false;
+			}
+		};
+		
+		// Sort the chain keys using the comparison function
+		std::sort(chainKeys.begin(), chainKeys.end(), compareChains);
+		
+		// Rebuild animeIds with sorted chains (preserving internal chain order)
+		animeIds.clear();
+		for (int chainKey : chainKeys) {
+			const QList<int>& chain = chainGroups[chainKey];
+			animeIds.append(chain);
+		}
+		
+		// Update the card manager with the new order
+		cardManager->setAnimeIdList(animeIds);
+		return;  // Done with nested sorting
+	}
+	
+	// Regular sorting (no series chain grouping)
 	// Sort based on criterion
 	// Use cached data when card widgets don't exist (virtual scrolling)
 	switch (sortIndex) {

@@ -74,14 +74,12 @@ private slots:
     void onFilterChanged();
     void onSortChanged();
     void onSortOrderToggled();
-    void onSeriesChainToggled();
     
 protected:
     void resizeEvent(QResizeEvent *event) override;
     
 private:
     void setupUI();
-    void updateSortControlsState();
     void setComboBoxByData(QComboBox* comboBox, const QString& data);
     
     // UI elements - Filters
