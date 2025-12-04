@@ -643,21 +643,6 @@ int WatchSessionManager::calculateMarkScore(int lid) const
         }
     }
     
-    // CRITICAL: Last file protection for series continuity
-    // Prevent deleting the last file of an episode to maintain series integrity
-    if (fileCount == 1) {
-        // This is the last (or only) file for this episode
-        // Check if deleting it would create a gap in the series
-        QSet<int> emptySet;  // No episodes deleted yet in this context
-        if (wouldCreateGap(lid, emptySet)) {
-            // This is the last file of a middle episode - maximum protection
-            score += SCORE_LAST_FILE_WITH_GAP;
-        } else {
-            // This is the last file of an endpoint episode (first or last) - strong protection but deletable if needed
-            score += SCORE_LAST_FILE_NO_GAP;
-        }
-    }
-    
     return score;
 }
 

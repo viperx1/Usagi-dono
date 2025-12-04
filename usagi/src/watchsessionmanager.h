@@ -540,11 +540,6 @@ private:
     static const int SCORE_BITRATE_MODERATE = -25;    // 30-50% from expected bitrate
     static const int SCORE_BITRATE_FAR = -40;         // 50%+ from expected bitrate
     
-    // Gap prevention and last file protection scores (Critical for series continuity)
-    static const int SCORE_LAST_FILE_WITH_GAP = 2000;      // Maximum protection - last file that would create a gap
-    static const int SCORE_LAST_FILE_NO_GAP = 500;         // Strong protection - last file at series endpoint
-    static const int SCORE_MIDDLE_EPISODE_PROTECTION = 1000; // Prevent deletion of middle episodes that would create gaps
-    
     // Codec quality tier bonuses
     static const int SCORE_MODERN_CODEC = 10;         // Bonus for modern efficient codecs (H.265, AV1)
     static const int SCORE_OLD_CODEC = -15;           // Penalty for old inefficient codecs (MPEG-4, XviD)
