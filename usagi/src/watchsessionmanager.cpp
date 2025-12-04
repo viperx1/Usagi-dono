@@ -9,6 +9,9 @@
 #include <QFileInfo>
 #include <algorithm>
 
+// Static regex for episode number extraction (shared across functions)
+const QRegularExpression WatchSessionManager::s_epnoNumericRegex(R"(\d+)");
+
 WatchSessionManager::WatchSessionManager(QObject *parent)
     : QObject(parent)
     , m_deletionInProgress(false)            // No deletion in progress initially
@@ -592,8 +595,9 @@ int WatchSessionManager::calculateMarkScore(int lid) const
     // Check bitrate distance from expected (only applies when multiple files exist)
     int bitrate = getFileBitrate(lid);
     QString resolution = getFileResolution(lid);
+    QString codec = getFileCodec(lid);
     if (bitrate > 0 && !resolution.isEmpty() && fileCount > 1) {
-        double bitrateScore = calculateBitrateScore(bitrate, resolution, fileCount);
+        double bitrateScore = calculateBitrateScore(bitrate, resolution, codec, fileCount);
         score += static_cast<int>(bitrateScore);
     }
     
@@ -1009,14 +1013,36 @@ void WatchSessionManager::autoMarkFilesForDeletion()
               });
     
     // Mark files for deletion until we've accumulated enough space to free
+    // Using "Approach B: Gap as Condition" with "Restart After Each Deletion"
+    // This ensures we always process the lowest-scored available file and maintain score ordering
     qint64 accumulatedSpace = 0;
+    QSet<int> deletedEpisodeIds;  // Track fully deleted episodes for gap detection
     
-    for (const auto& candidate : candidates) {
-        // Stop if we've already marked enough files to free the required space
-        if (accumulatedSpace >= spaceToFreeBytes) {
-            break;
+    size_t index = 0;
+    while (accumulatedSpace < spaceToFreeBytes && index < candidates.size()) {
+        const auto& candidate = candidates[index];
+        
+        // CONSTRAINT 1: Gap prevention - skip files that would create gaps
+        if (wouldCreateGap(candidate.lid, deletedEpisodeIds)) {
+            LOG(QString("[WatchSessionManager] Skipping lid=%1 (score=%2, anime=%3): would create gap in series")
+                .arg(candidate.lid).arg(candidate.score).arg(candidate.animeName));
+            index++;
+            continue;
         }
         
+        // CONSTRAINT 2: Last file protection - additional check for last file of episode
+        if (isLastFileForEpisode(candidate.lid)) {
+            // This is the last file for its episode
+            // Double-check gap condition with current deletion state
+            if (wouldCreateGap(candidate.lid, deletedEpisodeIds)) {
+                LOG(QString("[WatchSessionManager] Skipping lid=%1 (score=%2, anime=%3): last file that would create gap")
+                    .arg(candidate.lid).arg(candidate.score).arg(candidate.animeName));
+                index++;
+                continue;
+            }
+        }
+        
+        // Mark this file for deletion
         FileMarkInfo& markInfo = m_fileMarks[candidate.lid];
         markInfo.lid = candidate.lid;
         markInfo.markType = FileMarkType::ForDeletion;
@@ -1036,6 +1062,27 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         
         updatedLids.insert(candidate.lid);
         emit fileMarkChanged(candidate.lid, FileMarkType::ForDeletion);
+        
+        // Track which episodes are fully deleted for gap detection
+        if (isLastFileForEpisode(candidate.lid)) {
+            int episodeId = getEpisodeIdForFile(candidate.lid);
+            if (episodeId > 0) {
+                deletedEpisodeIds.insert(episodeId);
+            }
+        }
+        
+        // CRITICAL: Restart from beginning after each deletion
+        // This ensures we always check newly-available endpoints first
+        // and strictly maintain score ordering
+        index = 0;
+    }
+    
+    // Log if quota not met due to series continuity constraints
+    if (accumulatedSpace < spaceToFreeBytes) {
+        LOG(QString("[WatchSessionManager] Could not meet space quota (%1 MB freed of %2 MB needed) - "
+                    "remaining files protected by series continuity")
+            .arg(accumulatedSpace / 1024.0 / 1024.0, 0, 'f', 2)
+            .arg(spaceToFreeBytes / 1024.0 / 1024.0, 0, 'f', 2));
     }
     
     if (!updatedLids.isEmpty()) {
@@ -1709,9 +1756,69 @@ QString WatchSessionManager::getFileResolution(int lid) const
     return QString();
 }
 
-double WatchSessionManager::calculateExpectedBitrate(const QString& resolution) const
+QString WatchSessionManager::getFileCodec(int lid) const
 {
-    // Get baseline bitrate from settings (in Mbps, default 3.5)
+    // Get video codec for this file
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return QString();
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT f.codec_video FROM mylist m JOIN file f ON m.fid = f.fid WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        return q.value(0).toString();
+    }
+    
+    return QString();
+}
+
+double WatchSessionManager::getCodecEfficiency(const QString& codec) const
+{
+    QString codecLower = codec.toLower().trimmed();
+    
+    // H.265/HEVC family - 50% of H.264 bitrate for same quality
+    if (codecLower.contains("hevc") || codecLower.contains("h265") || 
+        codecLower.contains("h.265") || codecLower.contains("x265")) {
+        return 0.5;
+    }
+    
+    // AV1 family - 35% of H.264 bitrate for same quality
+    if (codecLower.contains("av1") || codecLower.contains("av01")) {
+        return 0.35;
+    }
+    
+    // VP9 - 60% of H.264 bitrate for same quality
+    if (codecLower.contains("vp9") || codecLower.contains("vp09")) {
+        return 0.6;
+    }
+    
+    // H.264/AVC family (baseline) - 100% reference bitrate
+    if (codecLower.contains("avc") || codecLower.contains("h264") || 
+        codecLower.contains("h.264") || codecLower.contains("x264")) {
+        return 1.0;
+    }
+    
+    // Older/inefficient codecs - 150% of H.264 bitrate needed
+    if (codecLower.contains("xvid") || codecLower.contains("divx") || 
+        codecLower.contains("mpeg4") || codecLower.contains("h263")) {
+        return 1.5;
+    }
+    
+    // Very old codecs - 200% of H.264 bitrate needed
+    if (codecLower.contains("mpeg2") || codecLower.contains("mpeg-2")) {
+        return 2.0;
+    }
+    
+    // Unknown codec: assume H.264 efficiency
+    return 1.0;
+}
+
+double WatchSessionManager::calculateExpectedBitrate(const QString& resolution, const QString& codec) const
+{
+    // Get baseline bitrate from settings (in Mbps, default 3.5 for H.264 at 1080p)
     double baselineBitrate = 3.5;
     
     QSqlDatabase db = QSqlDatabase::database();
@@ -1759,12 +1866,16 @@ double WatchSessionManager::calculateExpectedBitrate(const QString& resolution) 
     
     // Calculate expected bitrate using the formula
     // bitrate = base_bitrate × (resolution_megapixels / 2.07)
-    double expectedBitrate = baselineBitrate * (megapixels / 2.07);
+    double resolutionScaled = baselineBitrate * (megapixels / 2.07);
+    
+    // Apply codec efficiency multiplier
+    double codecEfficiency = getCodecEfficiency(codec);
+    double expectedBitrate = resolutionScaled * codecEfficiency;
     
     return expectedBitrate;
 }
 
-double WatchSessionManager::calculateBitrateScore(double actualBitrate, const QString& resolution, int fileCount) const
+double WatchSessionManager::calculateBitrateScore(double actualBitrate, const QString& resolution, const QString& codec, int fileCount) const
 {
     // Only apply bitrate penalty when there are multiple files
     if (fileCount <= 1) {
@@ -1774,8 +1885,8 @@ double WatchSessionManager::calculateBitrateScore(double actualBitrate, const QS
     // Convert actualBitrate from Kbps to Mbps
     double actualBitrateMbps = actualBitrate / 1000.0;
     
-    // Calculate expected bitrate based on resolution
-    double expectedBitrate = calculateExpectedBitrate(resolution);
+    // Calculate expected bitrate based on resolution and codec
+    double expectedBitrate = calculateExpectedBitrate(resolution, codec);
     
     // Calculate percentage difference from expected
     double percentDiff = 0.0;
@@ -1797,5 +1908,164 @@ double WatchSessionManager::calculateBitrateScore(double actualBitrate, const QS
         penalty = SCORE_BITRATE_CLOSE;
     }
     
+    // Add codec tier bonus/penalty
+    QString codecLower = codec.toLower().trimmed();
+    
+    // Tier 1 (Excellent): AV1, H.265/HEVC
+    if (codecLower.contains("hevc") || codecLower.contains("h265") || 
+        codecLower.contains("h.265") || codecLower.contains("x265") ||
+        codecLower.contains("av1") || codecLower.contains("av01")) {
+        penalty += SCORE_MODERN_CODEC;  // +10 bonus
+    }
+    // Tier 3 (Acceptable): MPEG-4, XviD, DivX
+    else if (codecLower.contains("xvid") || codecLower.contains("divx") || 
+             codecLower.contains("mpeg4")) {
+        penalty += SCORE_OLD_CODEC;  // -15 penalty
+    }
+    // Tier 4 (Poor): MPEG-2, H.263
+    else if (codecLower.contains("mpeg2") || codecLower.contains("mpeg-2") ||
+             codecLower.contains("h263") || codecLower.contains("h.263")) {
+        penalty += SCORE_ANCIENT_CODEC;  // -30 penalty
+    }
+    // Tier 2 (Good): H.264/AVC, VP9 - no bonus/penalty (neutral)
+    
     return penalty;
+}
+
+bool WatchSessionManager::isLastFileForEpisode(int lid) const
+{
+    // Check if this is the only remaining file for its episode
+    int fileCount = getFileCountForEpisode(lid);
+    return fileCount == 1;
+}
+
+int WatchSessionManager::getEpisodeIdForFile(int lid) const
+{
+    // Get a unique episode identifier (aid + episode number)
+    // Used for gap tracking across deletions
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return 0;
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT m.aid, e.epno FROM mylist m "
+              "JOIN episode e ON m.eid = e.eid "
+              "WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (q.exec() && q.next()) {
+        int aid = q.value(0).toInt();
+        QString epnoStr = q.value(1).toString();
+        
+        // Parse episode number from epno string (format: "1", "2", "S1", etc.)
+        // Extract just the numeric part using shared static regex
+        QRegularExpressionMatch match = s_epnoNumericRegex.match(epnoStr);
+        if (match.hasMatch()) {
+            int epno = match.captured(0).toInt();
+            // Create a unique ID combining aid and episode number
+            return aid * EPISODE_ID_MULTIPLIER + epno;
+        }
+    }
+    
+    return 0;
+}
+
+bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisodes) const
+{
+    // Get anime ID and episode number for this file
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        return false;  // Can't determine, assume no gap
+    }
+    
+    QSqlQuery q(db);
+    q.prepare("SELECT m.aid, e.epno FROM mylist m "
+              "JOIN episode e ON m.eid = e.eid "
+              "WHERE m.lid = ?");
+    q.addBindValue(lid);
+    
+    if (!q.exec() || !q.next()) {
+        return false;  // Can't determine, assume no gap
+    }
+    
+    int aid = q.value(0).toInt();
+    QString epnoStr = q.value(1).toString();
+    
+    // Parse episode number from epno string using shared static regex
+    QRegularExpressionMatch match = s_epnoNumericRegex.match(epnoStr);
+    if (!match.hasMatch()) {
+        return false;  // Can't parse episode number
+    }
+    int epno = match.captured(0).toInt();
+    
+    // Check if this file, when deleted, would leave episodes on both sides
+    // creating a gap in the series
+    
+    // Create episode ID for this episode
+    int thisEpisodeId = aid * EPISODE_ID_MULTIPLIER + epno;
+    
+    // Check if this episode is already marked as deleted
+    if (deletedEpisodes.contains(thisEpisodeId)) {
+        return false;  // Already being deleted, not creating new gap
+    }
+    
+    // Query for all episodes of this anime that have local files
+    // Note: We don't use ORDER BY e.epno here because:
+    // 1. It would do string sorting which is incorrect for multi-digit episodes ("10" < "2")
+    // 2. We extract episode numbers numerically and process them in code anyway
+    // 3. This avoids the performance cost of sorting when we don't need it
+    QSqlQuery q2(db);
+    q2.prepare("SELECT DISTINCT e.epno FROM mylist m "
+               "JOIN episode e ON m.eid = e.eid "
+               "JOIN local_files lf ON m.local_file = lf.id "
+               "WHERE m.aid = ? AND lf.path IS NOT NULL AND lf.path != ''");
+    q2.addBindValue(aid);
+    
+    if (!q2.exec()) {
+        return false;  // Query failed, assume no gap
+    }
+    
+    // Build list of existing episode numbers (excluding those marked for deletion)
+    QList<int> existingEpisodes;
+    while (q2.next()) {
+        QString existingEpnoStr = q2.value(0).toString();
+        QRegularExpressionMatch existingMatch = s_epnoNumericRegex.match(existingEpnoStr);
+        if (existingMatch.hasMatch()) {
+            int existingEpno = existingMatch.captured(0).toInt();
+            int existingEpisodeId = aid * EPISODE_ID_MULTIPLIER + existingEpno;
+            
+            // Skip episodes already marked for deletion
+            if (deletedEpisodes.contains(existingEpisodeId)) {
+                continue;
+            }
+            
+            existingEpisodes.append(existingEpno);
+        }
+    }
+    
+    // If this is the only episode, deleting it won't create a gap
+    if (existingEpisodes.size() <= 1) {
+        return false;
+    }
+    
+    // Check if there are episodes both before and after this one
+    bool hasEpisodeBefore = false;
+    bool hasEpisodeAfter = false;
+    
+    for (int existingEpno : existingEpisodes) {
+        if (existingEpno == epno) {
+            continue;  // Skip this episode itself
+        }
+        
+        if (existingEpno < epno) {
+            hasEpisodeBefore = true;
+        }
+        if (existingEpno > epno) {
+            hasEpisodeAfter = true;
+        }
+    }
+    
+    // If there are episodes on both sides, deleting this would create a gap
+    return hasEpisodeBefore && hasEpisodeAfter;
 }

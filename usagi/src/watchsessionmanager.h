@@ -405,6 +405,9 @@ private:
         SessionInfo() : aid(0), startAid(0), currentEpisode(0), isActive(false) {}
     };
     
+    // Static regex for episode number extraction (shared across functions)
+    static const QRegularExpression s_epnoNumericRegex;
+    
     // Cache for anime relations
     mutable QMap<int, QList<QPair<int, QString>>> m_relationsCache; // aid -> [(related_aid, relation_type), ...]
     
@@ -469,8 +472,15 @@ private:
     int getGroupStatus(int gid) const;  // Get group status (0=unknown, 1=ongoing, 2=stalled, 3=disbanded)
     int getFileBitrate(int lid) const;  // Get video bitrate for this file (in Kbps)
     QString getFileResolution(int lid) const;  // Get resolution for this file
-    double calculateExpectedBitrate(const QString& resolution) const;  // Calculate expected bitrate for resolution
-    double calculateBitrateScore(double actualBitrate, const QString& resolution, int fileCount) const;  // Calculate bitrate distance penalty
+    QString getFileCodec(int lid) const;  // Get video codec for this file (e.g., "H.264", "H.265", "AV1")
+    double getCodecEfficiency(const QString& codec) const;  // Get codec compression efficiency (H.264=1.0, H.265=0.5, AV1=0.35)
+    double calculateExpectedBitrate(const QString& resolution, const QString& codec) const;  // Calculate expected bitrate for resolution and codec
+    double calculateBitrateScore(double actualBitrate, const QString& resolution, const QString& codec, int fileCount) const;  // Calculate bitrate distance penalty
+    
+    // Gap detection and series continuity helpers
+    bool wouldCreateGap(int lid, const QSet<int>& deletedEpisodes) const;  // Check if deleting this file would create an episode gap
+    bool isLastFileForEpisode(int lid) const;  // Check if this is the only remaining file for its episode
+    int getEpisodeIdForFile(int lid) const;  // Get episode ID (aid+epno combination) for gap tracking
     
     // Helper method to find active session info across series chain
     // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
@@ -487,6 +497,9 @@ private:
      * @param lid MyList ID of the missing file
      */
     void cleanupMissingFileStatus(int lid);
+    
+    // Episode ID multiplier for unique identification (aid * multiplier + epno)
+    static constexpr int EPISODE_ID_MULTIPLIER = 100000;
     
     // AniDB relation type codes
     static const int RELATION_SEQUEL = 1;
@@ -526,6 +539,11 @@ private:
     static const int SCORE_BITRATE_CLOSE = -10;       // 10-30% from expected bitrate
     static const int SCORE_BITRATE_MODERATE = -25;    // 30-50% from expected bitrate
     static const int SCORE_BITRATE_FAR = -40;         // 50%+ from expected bitrate
+    
+    // Codec quality tier bonuses
+    static const int SCORE_MODERN_CODEC = 10;         // Bonus for modern efficient codecs (H.265, AV1)
+    static const int SCORE_OLD_CODEC = -15;           // Penalty for old inefficient codecs (MPEG-4, XviD)
+    static const int SCORE_ANCIENT_CODEC = -30;       // Penalty for very old codecs (MPEG-2, H.263)
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
