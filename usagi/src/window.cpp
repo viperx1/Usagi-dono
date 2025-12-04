@@ -2176,6 +2176,7 @@ void Window::saveMylistSorting()
     q.addBindValue(filterSidebar->getAdultContentFilter());
     q.exec();
     
+    // Note: Using chained .arg() calls as Qt6's multi-arg only supports up to 8 arguments
     LOG(QString("Saved mylist filter settings: sort=%1, ascending=%2, type=%3, completion=%4, unwatched=%5, deletion=%6, inmylist=%7, serieschain=%8, adult=%9")
         .arg(filterSidebar->getSortIndex())
         .arg(filterSidebar->getSortAscending())
@@ -2633,6 +2634,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 // Update only the specific mylist entry instead of reloading entire tree
                 if(lid > 0)
                 {
+                    LOG(QString("Updating anime card for lid=%1 after successful mylist add (code 310)").arg(lid));
                     updateOrAddMylistEntry(lid);
                     
                     // Trigger deletion mechanism as file was updated (space may have changed)
@@ -2642,12 +2644,14 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 }
                 else
                 {
+                    LOG(QString("WARNING: UpdateLocalPath returned lid=%1 for path=%2 (code 310 - already in mylist). Card may not be created/updated.")
+                        .arg(lid).arg(localPath));
+                    
                     // Even if we couldn't find the mylist entry in the local database,
                     // we know the file is in AniDB's mylist (310 response), so update binding_status
                     // to prevent the file from reappearing in unknown files list on restart
                     adbapi->UpdateLocalFileBindingStatus(localPath, 1); // 1 = bound_to_anime
                     adbapi->UpdateLocalFileStatus(localPath, 2); // 2 = in anidb
-                    LOG(QString("Updated binding_status directly for path=%1 (mylist entry not found locally)").arg(localPath));
                 }
                 
                 // Remove from unknown files widget if present (re-check succeeded)
@@ -2752,12 +2756,18 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 				// Update only the specific mylist entry instead of reloading entire tree
 				if(lid > 0)
 				{
+					LOG(QString("Updating anime card for lid=%1 after successful mylist add (code %2)").arg(lid).arg(code));
 					updateOrAddMylistEntry(lid);
 					
 					// Trigger deletion mechanism as new files were added (space may have decreased)
 					if (watchSessionManager && watchSessionManager->isAutoMarkDeletionEnabled()) {
 						watchSessionManager->autoMarkFilesForDeletion();
 					}
+				}
+				else
+				{
+					LOG(QString("WARNING: UpdateLocalPath returned lid=%1 for path=%2 (code %3 - newly added). Card may not be created/updated.")
+						.arg(lid).arg(localPath).arg(code));
 				}
 				
 				// Remove from unknown files widget if present (re-check succeeded)
