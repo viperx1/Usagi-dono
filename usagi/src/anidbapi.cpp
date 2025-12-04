@@ -4195,8 +4195,7 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 			QString type = parts[1].trimmed();
 			QString language = parts[2].trimmed();
 			// Rejoin parts[3] onwards in case title contains pipes
-			QStringList titleParts = parts.mid(3);
-			QString title = titleParts.join('|').trimmed();
+			QString title = parts.mid(3).join('|').trimmed();
 			
 			// Escape single quotes for SQL
 			title = title.replace("'", "''");
