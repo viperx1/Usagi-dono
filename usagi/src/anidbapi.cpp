@@ -4199,6 +4199,7 @@ void AniDBApi::parseAndStoreAnimeTitles(const QByteArray &data)
 		QString language = line.mid(secondPipe + 1, thirdPipe - secondPipe - 1).trimmed();
 		QString title = line.mid(thirdPipe + 1).trimmed();
 		
+		// Validate that we have the required fields (title can be empty, though unusual)
 		if(!aid.isEmpty() && !type.isEmpty() && !language.isEmpty())
 		{
 			
