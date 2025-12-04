@@ -1250,7 +1250,7 @@ if (animeRating >= 850) {  // Raise threshold (only truly exceptional anime)
 
 ---
 
-### 2. Series Continuity and Sequential Deletion
+### 2. Series Continuity: Preventing Gap Creation
 
 #### Current Implementation
 
@@ -1266,107 +1266,217 @@ score += distance * SCORE_DISTANCE_FACTOR;  // -1 per episode away
 - Episode 5 ahead (distance = 5): -5 penalty
 - Episode 10 behind (distance = -10): +10 bonus (!)
 
-**Problem Identified:** Episodes **behind** the current position get a **positive distance modifier**, which partially offsets the "already watched" penalty. This means:
-- Episode just watched (1 behind): score boost of +10 - 30 = -20
-- Episode watched long ago (10 behind): score boost of +1 - 30 = -29
+**Problem Identified:** Episodes **behind** the current position get a **positive distance modifier**, which partially offsets the "already watched" penalty. This can lead to deletion patterns that create **gaps in the middle of the series**, breaking continuity.
 
-This creates a **gradient that favors keeping recently watched episodes**, which is counterproductive for maintaining series continuity.
+#### Series Continuity Principle (Clarified)
 
-#### Series Continuity Principle
+**Goal:** When deleting files from a series, **never create gaps in the middle** by deleting episodes that have unwatched episodes on both sides.
 
-**Goal:** When deleting files from an active session, delete from the **end (last episodes)** first, not from the beginning.
+**Critical Principle:** Series continuity means maintaining a **contiguous sequence** of episodes from episode 1 onwards. Deleting episode 5 when episodes 1-4 and 6-12 exist creates a gap that breaks the viewing experience.
 
-**Rationale:**
-1. **Forward viewing is common**: Users typically watch episodes in order (1→2→3→...)
-2. **Rewatching is sequential**: If user rewatches, they start from episode 1
-3. **Completion continuity**: Keeping episodes 1-8 and deleting 9-12 maintains more value than keeping episodes 5-12 and deleting 1-4
-4. **New viewers**: If user recommends anime to a friend, episodes 1-N are essential
+**Deletion Priority (from highest to lowest priority for deletion):**
+1. **Duplicate files per episode** - Always delete duplicates first (keep best version only)
+2. **Watched episodes** - Already viewed, less critical to keep
+3. **Last episodes** - Farthest from the beginning, delete from the end backwards
+4. **NEVER delete middle episodes** - Episodes that create gaps should have maximum protection
 
-#### Proposed Fix: Invert Distance Calculation for Behind Episodes
+**Key Insight:** Rewatching is mostly irrelevant in this scenario. The goal is to maintain a **watchable sequence** from episode 1 onwards for the current/future first-time viewing, not to preserve the ability to rewatch.
 
-**Current behavior:**
-```cpp
-// Episode behind current position gets POSITIVE adjustment
-int distance = -5;  // 5 episodes behind
-score += distance * -1;  // score += +5 (helps keep it)
+#### The Gap Problem
+
+**Bad Deletion Pattern (Creates Gap):**
 ```
+Start:     [1][2][3][4][5][6][7][8][9][10][11][12]
+Delete 5:  [1][2][3][4][ ][6][7][8][9][10][11][12]  ❌ GAP!
+```
+User cannot watch continuously from episode 1. The series is now broken.
 
-**Proposed behavior:**
+**Good Deletion Pattern (No Gaps):**
+```
+Start:     [1][2][3][4][5][6][7][8][9][10][11][12]
+Delete 12: [1][2][3][4][5][6][7][8][9][10][11][ ]  ✅ No gap
+Delete 11: [1][2][3][4][5][6][7][8][9][10][ ][ ]   ✅ No gap
+Delete 10: [1][2][3][4][5][6][7][8][9][ ][ ][ ]    ✅ No gap
+```
+User can still watch continuously from episode 1 through 9.
+
+#### Proposed Solution: Gap-Aware Scoring
+
+**Core Algorithm:**
+1. For each episode, determine if deleting it would create a gap
+2. If it would create a gap, apply massive protection bonus
+3. Prioritize deleting from the ends (watched episodes from beginning, unwatched from end)
+
+**Gap Detection:**
 ```cpp
-// Episodes behind should have LARGER negative scores (more deletable)
-// Episodes ahead should have SMALLER negative scores (less deletable)
-if (distance < 0) {
-    // Behind current position: use absolute distance as penalty
-    score += abs(distance) * SCORE_DISTANCE_FACTOR;  // -1, -2, -3...
-} else {
-    // Ahead of current position: smaller penalty or even bonus for far ahead
-    // This prioritizes keeping unwatched content
-    score += distance * SCORE_DISTANCE_FACTOR;  // -1, -2, -3...
+bool wouldCreateGap(int lid) const {
+    int aid = getAnimeIdForFile(lid);
+    int episodeNum = getEpisodeNumber(lid);
+    
+    // Check if there are episodes before and after this one
+    bool hasEpisodesBefore = hasLocalFileForEpisode(aid, episodeNum - 1);
+    bool hasEpisodesAfter = hasLocalFileForEpisode(aid, episodeNum + 1);
+    
+    // If episodes exist on both sides, deleting this creates a gap
+    return hasEpisodesBefore && hasEpisodesAfter;
 }
 ```
 
-**Even Better: Asymmetric Penalties**
-
+**Modified Scoring Logic:**
 ```cpp
-if (distance < 0) {
-    // Behind current: stronger penalty for farther episodes
-    // Episode 1 behind: -2, Episode 5 behind: -10, Episode 10 behind: -20
-    score += distance * 2;  // Multiply by 2 for stronger effect
-} else if (distance <= aheadBuffer) {
-    // Within ahead buffer: strong protection
-    score += SCORE_IN_AHEAD_BUFFER;  // Already implemented: +75
-} else {
-    // Beyond ahead buffer: gentle penalty
-    score += (distance - aheadBuffer) * -0.5;  // Half penalty
+int WatchSessionManager::calculateMarkScore(int lid) const {
+    int score = 50;
+    // ... existing scoring logic ...
+    
+    // GAP PROTECTION: Massive bonus for middle episodes
+    if (wouldCreateGap(lid)) {
+        score += SCORE_MIDDLE_EPISODE_PROTECTION;  // e.g., +1000
+        // This makes middle episodes nearly impossible to delete
+    }
+    
+    return score;
 }
 ```
+
+#### Revised Deletion Priority System
+
+**Priority 1: Duplicate Files (Highest Priority for Deletion)**
+- When multiple files exist for the same episode, delete all but the best
+- Version penalties already handle this: `-1000` per higher version
+- **No gap creation** since episode still has one file remaining
+
+**Priority 2: Watched Episodes**
+- Episodes marked as watched are eligible for deletion
+- But still protected from creating gaps
+- Delete from **oldest watched first** (farthest from current position)
+
+**Priority 3: Last Episodes (Unwatched)**
+- When no watched episodes remain or all would create gaps
+- Delete from the **end backwards** (episode 12 → 11 → 10 → ...)
+- This maintains continuity from episode 1
+
+**Priority 4: Middle Episodes (NEVER)**
+- Episodes that would create gaps receive maximum protection
+- Only deleted in extreme cases (hidden anime, explicit user deletion)
 
 #### Workflow Example: Current vs. Proposed
 
 **Scenario:** 12-episode series, currently at episode 7, ahead buffer = 3
+- Episodes 1-6: watched
+- Episodes 7-10: unwatched, local files exist
+- Episodes 11-12: unwatched, local files exist
 
-**Current Scoring:**
-- Episode 1 (6 behind): distance = -6, adjustment = +6, watched = -30, **total ≈ +26**
-- Episode 4 (3 behind): distance = -3, adjustment = +3, watched = -30, **total ≈ +23**
-- Episode 6 (1 behind): distance = -1, adjustment = +1, watched = -30, **total ≈ +21**
-- Episode 7 (current): distance = 0, adjustment = 0, **total ≈ +50** (not watched yet)
-- Episode 8 (1 ahead): distance = +1, adjustment = -1, buffer = +75, **total ≈ +124**
-- Episode 10 (3 ahead): distance = +3, adjustment = -3, buffer = +75, **total ≈ +122**
-- Episode 11 (4 ahead): distance = +4, adjustment = -4, **total ≈ +46**
-- Episode 12 (5 ahead): distance = +5, adjustment = -5, **total ≈ +45**
+**Current System Behavior:**
+```
+Score calculations:
+- Episode 1: +26 (watched, far behind)
+- Episode 4: +23 (watched, behind)
+- Episode 6: +21 (watched, just behind)
+- Episode 7: +50 (current)
+- Episode 8: +124 (ahead buffer)
+- Episode 10: +122 (ahead buffer)
+- Episode 11: +46 (beyond buffer)
+- Episode 12: +45 (beyond buffer)
 
-**Deletion order:** Episode 6 → Episode 4 → Episode 1 → Episode 12 → Episode 11 → ...
+Deletion order: 6 → 4 → 1 → 12 → 11 → 7 → ...
+Result: [x][x][3][x][5][x][7][8][9][10][x][x]
+```
+❌ **Creates multiple gaps** (missing 1, 2, 4, 6)
 
-❌ **Problem:** System deletes from the beginning (episodes 1-6) before deleting from the end (episodes 11-12). This breaks continuity if user wants to rewatch.
+**Proposed System Behavior:**
+```
+Gap protection applied:
+- Episode 1: +26 + 1000 = 1026 (would create gap before 2-3)
+- Episode 4: +23 + 1000 = 1023 (would create gap between 3 and 5)
+- Episode 6: +21 + 1000 = 1021 (would create gap between 5 and 7)
+- Episode 7: +50 + 1000 = 1050 (would create gap)
+- Episode 8: +124 + 1000 = 1124 (would create gap)
+- Episode 10: +122 + 1000 = 1122 (would create gap)
+- Episode 11: +46 + 1000 = 1046 (would create gap between 10 and 12)
+- Episode 12: +45 (LAST episode, no gap created)
 
-**Proposed Scoring (Asymmetric):**
-- Episode 1 (6 behind): distance = -6, adjustment = -12, watched = -30, **total ≈ +8**
-- Episode 4 (3 behind): distance = -3, adjustment = -6, watched = -30, **total ≈ +14**
-- Episode 6 (1 behind): distance = -1, adjustment = -2, watched = -30, **total ≈ +18**
-- Episode 7 (current): distance = 0, adjustment = 0, **total ≈ +50**
-- Episode 8 (1 ahead): distance = +1, buffer = +75, **total ≈ +124**
-- Episode 10 (3 ahead): distance = +3, buffer = +75, **total ≈ +122**
-- Episode 11 (4 ahead): distance = +4, adjustment = -0.5, **total ≈ +49.5**
-- Episode 12 (5 ahead): distance = +5, adjustment = -1.0, **total ≈ +49.0**
+Deletion order: 12 → 11 → 10 → 9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → 1
+Result: [1][2][3][4][5][6][ ][ ][ ][ ][ ][ ]
+```
+✅ **No gaps created** - Contiguous sequence maintained from episode 1-6
 
-**Deletion order:** Episode 1 → Episode 4 → Episode 6 → Episode 12 → Episode 11 → ...
+#### Special Case: All Episodes Watched
 
-✅ **Better:** System still prioritizes deleting watched episodes, but **maintains continuity** by deleting the oldest watched episodes first, and far-ahead episodes before near-ahead episodes.
+When all episodes in a series are watched:
+```
+[1✓][2✓][3✓][4✓][5✓][6✓][7✓][8✓][9✓][10✓][11✓][12✓]
+```
 
-#### Special Case: Completed Series
+**Deletion order:**
+1. Delete duplicates first (if any)
+2. Delete from the end backwards: 12 → 11 → 10 → 9 → ...
+3. Preserve episode 1 as long as possible (entry point to series)
 
-For series where **all episodes are watched**, the system should:
-1. Keep episode 1 (essential for rewatching)
-2. Delete from the end backwards (12 → 11 → 10 → ... → 2)
-3. Never delete the last remaining episode (episode 1)
+**Gap protection still applies:**
+- Deleting episode 6 when 1-5 and 7-12 exist: still creates a gap
+- Must delete from ends only: 12, then 11, then 10, etc.
 
-This is automatically handled by the asymmetric penalty: episode 1 would have the smallest penalty among watched episodes.
+#### Edge Cases
+
+**Case 1: Partial Series (Episodes 5-10 only)**
+```
+Missing 1-4: [ ][ ][ ][ ][5][6][7][8][9][10]
+```
+- Episode 5 is the "first" episode (no episodes before it)
+- Deleting 5 creates no gap (it's an endpoint)
+- Deletion order: 10 → 9 → 8 → 7 → 6 → 5
+
+**Case 2: Already Has Gaps**
+```
+Existing state: [1][2][ ][4][5][ ][ ][8][9][10][ ][12]
+```
+- Episode 4: already has gap before it (3 missing), deleting creates no new gap
+- Episode 8: already has gaps before it, deleting creates no new gap
+- Protected episodes: 2 (would create gap 1-4), 5 (would create gap 4-8), 9 (would create gap 8-10), 10 (would create gap 9-12)
+
+**Case 3: Single Episode Remaining per Anime**
+```
+After extensive deletion: [1][2][3][ ][ ][ ][ ][ ][ ][ ][ ][ ]
+```
+- Episode 3 is now the "last" episode (no episodes after it)
+- Can be safely deleted without creating a gap
+- Minimum retention policy (section 4) would protect these
+
+#### Integration with Other Factors
+
+**Duplicate Files + Gap Protection:**
+```cpp
+// Episode 5 has 3 files: v1, v2, v3
+v3: base_score + 0 (no version penalty) + 1000 (gap protection) = 1050
+v2: base_score - 1000 (version penalty) + 1000 (gap protection) = 50
+v1: base_score - 2000 (version penalty) + 1000 (gap protection) = -950
+
+Deletion order: v1 → v2 → keep v3
+```
+✅ Duplicates deleted first, best version protected by gap protection
+
+**Watched Episodes + Gap Protection:**
+```cpp
+// Episode 3 (watched, middle episode)
+base: 50
+watched: -30
+gap protection: +1000
+Total: 1020
+```
+✅ Watched middle episodes still protected from deletion
 
 #### Implementation Status
 
-**Currently NOT Implemented:** The system uses symmetric distance penalties which break series continuity.
+**Currently NOT Implemented:** The system has no gap detection or prevention logic. Distance-based scoring can easily create gaps.
 
-**Recommendation:** Implement asymmetric distance penalties with stronger penalties for episodes behind the current position.
+**Critical Implementation Requirements:**
+1. Add `wouldCreateGap()` helper function
+2. Add `SCORE_MIDDLE_EPISODE_PROTECTION` constant (+1000 or higher)
+3. Apply gap protection in `calculateMarkScore()`
+4. Ensure gap check runs for every file before scoring
+5. Add setting: "Maintain series continuity" (default: enabled)
+
+**Recommendation:** Gap prevention is **CRITICAL** for series continuity and should be the highest priority enhancement after codec awareness. Without it, the system can break series into unusable fragments.
 
 ---
 
@@ -1383,111 +1493,224 @@ When multiple files exist for the same episode, the system:
 
 However, there is **NO EXPLICIT GUARANTEE** that at least one file per episode will be kept.
 
+#### Critical Importance for Series Continuity
+
+**Keeping at least one file per episode is CRITICAL for series continuity** as defined in Section 2. If all files for an episode are deleted, it creates a **permanent gap** that cannot be filled without re-downloading.
+
+**Gap Creation Through Complete Episode Deletion:**
+```
+Start:     [1][2][3][4][5][6][7][8][9][10][11][12]
+Delete all v1,v2,v3 of episode 5: [1][2][3][4][ ][6][7][8][9][10][11][12]
+```
+❌ **CRITICAL FAILURE:** Series now has a permanent gap at episode 5
+
+**Enforcement Priority for In-Series Deletion:**
+
+As specified by the user, the deletion priority MUST be:
+
+1. **Duplicate files per episode** (HIGHEST PRIORITY)
+   - Delete all but the best version of each episode
+   - Version penalties handle this: `-1000` per higher version
+   - **CRITICAL:** This must happen BEFORE any episode-level deletion
+
+2. **Watched episodes** (SECOND PRIORITY)
+   - Episodes marked as watched are eligible for deletion
+   - Delete from oldest watched first
+   - BUT: Still maintain gap protection (Section 2)
+
+3. **Last episodes** (THIRD PRIORITY)
+   - When no watched episodes remain
+   - Delete from the **end backwards** (12 → 11 → 10 → ...)
+   - This maintains continuity from episode 1
+
+4. **Middle episodes** (NEVER DELETE)
+   - Episodes that would create gaps receive maximum protection
+   - See Section 2 for gap detection logic
+
 #### Problem Scenarios
 
 **Scenario 1: All Files Have Low Scores**
-- Episode 1 has 3 files: v1, v2, v3 (all japanese audio, good quality)
-- User watched episode 1 long ago
-- Episode 1 is far behind current watching position (episode 50)
+- Episode 5 has 3 files: v1, v2, v3 (all same quality)
+- User watched episode 5 long ago
+- Episode 5 is in the middle of the series (episodes 1-4 and 6-12 exist)
 - Disk space critically low
 
 **Current scoring:**
-- v3 (best): base 50 + watched -30 + distance -49 + session +100 = **71**
-- v2: base 50 + watched -30 + distance -49 + session +100 + version -1000 = **-929**
-- v1: base 50 + watched -30 + distance -49 + session +100 + version -2000 = **-1929**
+- v3 (best): base 50 + watched -30 + session +100 = **120**
+- v2: base 50 + watched -30 + session +100 + version -1000 = **-880**
+- v1: base 50 + watched -30 + session +100 + version -2000 = **-1880**
 
 **Deletion order:** v1 → v2 → v3
 
-**Risk:** If disk space is extremely low and deletion threshold is high, the system could delete v3, leaving **no files for episode 1**.
+**Risk:** If system deletes v3 after v1 and v2, episode 5 completely disappears, creating a gap.
 
-**Scenario 2: Duplicate Files, All Similar Quality**
-- Episode 5 has 2 files: FileA (720p, v1) and FileB (1080p, v1)
-- Both unwatched, similar scores except bitrate penalty
-- FileA: score ≈ 200
-- FileB: score ≈ 180 (bitrate penalty for being bloated)
+**Scenario 2: Episode at End of Series**
+- Episode 12 (last episode) has 3 files: v1, v2, v3
+- Episodes 1-11 exist locally
+- Episode 12 can be safely deleted (no gap created)
 
-**Current behavior:** System could delete FileB, but there's no guarantee it keeps at least one.
+**Current scoring:** Same as Scenario 1
 
-#### Proposed Solution: Minimum Episode Retention
+**Deletion order:** v1 → v2 → v3
 
-**Principle:** For each episode in an anime, **at least one file should be kept** unless:
-1. The entire anime is marked for deletion (e.g., hidden card)
-2. The episode is explicitly targeted for removal
-3. The episode is the last in a completed series with severe penalties
+**Acceptable:** Episode 12 can be deleted without creating a gap (it's an endpoint).
 
-**Implementation Approach:**
+#### Proposed Solution: Hierarchical Protection System
 
-**Option A: Post-Processing Filter**
+**Principle:** Combine multiple protection mechanisms to enforce the deletion priority.
+
+**Protection Level 1: Duplicate Elimination (Highest Priority for Deletion)**
 ```cpp
-void WatchSessionManager::autoMarkFilesForDeletion() {
-    // ... existing marking logic ...
-    
-    // Post-processing: ensure at least one file per episode
-    QMap<int, QList<int>> episodeFiles;  // eid -> list of lids
-    
-    // Group files by episode
-    for (int lid : markedForDeletion) {
-        int eid = getEpisodeId(lid);
-        episodeFiles[eid].append(lid);
-    }
-    
-    // For each episode, keep the highest-scored file
-    for (auto it = episodeFiles.begin(); it != episodeFiles.end(); ++it) {
-        int eid = it.key();
-        QList<int> lids = it.value();
-        
-        // Count total files for this episode (including unmarked)
-        int totalFiles = getFileCountForEpisode(lids.first());
-        
-        if (totalFiles <= lids.size()) {
-            // Would delete ALL files for this episode
-            // Keep the one with highest score
-            int bestLid = lids.first();
-            int bestScore = calculateMarkScore(bestLid);
-            
-            for (int lid : lids) {
-                int score = calculateMarkScore(lid);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestLid = lid;
-                }
-            }
-            
-            // Unmark the best file
-            unmarkFileForDeletion(bestLid);
-            LOG(QString("Protected lid=%1 (score=%2) as last file for eid=%3")
-                .arg(bestLid).arg(bestScore).arg(eid));
-        }
-    }
+// Version penalty already ensures duplicates are deleted first
+if (higherVersionCount > 0) {
+    score += higherVersionCount * SCORE_OLDER_REVISION;  // -1000 each
 }
 ```
+✅ Already implemented correctly
 
-**Option B: Score Boost for Last Remaining File**
+**Protection Level 2: Last File Protection (CRITICAL)**
 ```cpp
 int WatchSessionManager::calculateMarkScore(int lid) const {
     int score = 50;
     // ... existing scoring logic ...
     
-    // Boost score if this is the only file for the episode
+    // CRITICAL: Boost score if this is the only file for the episode
     int fileCount = getFileCountForEpisode(lid);
     if (fileCount == 1) {
-        score += SCORE_LAST_EPISODE_FILE;  // e.g., +500 (strong protection)
+        // Check if deleting this would create a gap
+        if (wouldCreateGap(lid)) {
+            score += SCORE_LAST_FILE_WITH_GAP;  // e.g., +2000 (maximum protection)
+        } else {
+            score += SCORE_LAST_FILE_NO_GAP;  // e.g., +500 (strong protection)
+        }
     }
     
     return score;
 }
 ```
 
-**Recommendation:** Use **Option B** (score boost) as it's simpler, more transparent, and integrates naturally with the scoring system.
+**Protection Level 3: Gap Prevention**
+```cpp
+// From Section 2: prevent middle episode deletion
+if (wouldCreateGap(lid) && fileCount > 1) {
+    score += SCORE_MIDDLE_EPISODE_PROTECTION;  // +1000
+}
+```
+
+**Combined Protection Example:**
+
+**Episode 5 (middle episode, last file):**
+- Base: 50
+- Watched: -30
+- **Last file**: +500
+- **Would create gap**: +2000
+- **Total: 2520** ← Very high, unlikely to be deleted
+
+**Episode 12 (last episode, last file):**
+- Base: 50
+- Watched: -30
+- **Last file**: +500
+- **No gap created**: (endpoint)
+- **Total: 520** ← Protected, but deletable if needed
+
+**Episode 5 v2 (middle episode, duplicate):**
+- Base: 50
+- Watched: -30
+- Version penalty: -1000
+- **Would create gap**: +1000 (if v3 is last file)
+- **Total: 20** ← Can be deleted (duplicate, v3 remains)
+
+#### Implementation Approach
+
+**Recommended: Multi-Level Score Boost**
+```cpp
+int WatchSessionManager::calculateMarkScore(int lid) const {
+    int score = 50;
+    // ... existing scoring logic ...
+    
+    int fileCount = getFileCountForEpisode(lid);
+    
+    // Protection for last file of an episode
+    if (fileCount == 1) {
+        bool isHidden = isCardHidden(getAnimeIdForFile(lid));
+        int animeRating = getFileRating(lid);
+        
+        // Only protect if not explicitly marked for deletion
+        if (!isHidden && animeRating >= 400) {
+            if (wouldCreateGap(lid)) {
+                // CRITICAL: Last file of middle episode
+                score += SCORE_LAST_FILE_WITH_GAP;  // +2000
+            } else {
+                // Last file of endpoint episode (can be deleted if needed)
+                score += SCORE_LAST_FILE_NO_GAP;  // +500
+            }
+        }
+    }
+    
+    // Protection for middle episodes (even with duplicates)
+    if (wouldCreateGap(lid) && fileCount > 1) {
+        score += SCORE_MIDDLE_EPISODE_PROTECTION;  // +1000
+    }
+    
+    return score;
+}
+```
+
+**Key Constants:**
+```cpp
+static const int SCORE_LAST_FILE_WITH_GAP = 2000;      // Maximum protection
+static const int SCORE_LAST_FILE_NO_GAP = 500;         // Strong protection
+static const int SCORE_MIDDLE_EPISODE_PROTECTION = 1000; // Prevent gaps
+static const int SCORE_OLDER_REVISION = -1000;          // Delete duplicates first
+```
+
+#### Workflow Example: Enforced Priority
+
+**Scenario:** 12-episode series, episodes 1-6 watched, episodes 5 and 10 have duplicates
+
+**Files:**
+- Episode 1: single file, watched
+- Episode 5: v1, v2, v3 (watched, middle episode)
+- Episode 6: single file, watched
+- Episode 10: v1, v2 (unwatched, middle episode)
+- Episode 12: single file, unwatched
+
+**Scoring:**
+```
+Episode 5 v1: base 50 + watched -30 + version -2000 + gap protection +1000 = -980
+Episode 5 v2: base 50 + watched -30 + version -1000 + gap protection +1000 = 20
+Episode 5 v3: base 50 + watched -30 + last file +2000 (creates gap) = 2020
+
+Episode 10 v1: base 50 + not watched +50 + version -1000 + gap protection +1000 = 1100
+Episode 10 v2: base 50 + not watched +50 + last file +2000 (creates gap) = 2100
+
+Episode 1: base 50 + watched -30 + last file +500 (no gap, endpoint) = 520
+Episode 6: base 50 + watched -30 + last file +2000 (creates gap) = 2020
+Episode 12: base 50 + not watched +50 + last file +500 (no gap, endpoint) = 600
+```
+
+**Deletion Order:**
+1. **Episode 5 v1** (-980) ← Duplicate, oldest version
+2. **Episode 5 v2** (20) ← Duplicate, middle version
+3. **Episode 1** (520) ← Watched, endpoint, can delete without gap
+4. **Episode 12** (600) ← Unwatched, endpoint, delete from end
+5. **Episode 10 v1** (1100) ← Duplicate, but protected by gap detection
+6. Episodes 5 v3, 6, 10 v2 have scores > 2000 ← **NEVER DELETED** (would create gaps)
+
+✅ **Priority enforced correctly:**
+1. Duplicates deleted first (5 v1, 5 v2, then 10 v1)
+2. Watched episodes at endpoints (1)
+3. Last episodes (12)
+4. Middle episodes never deleted (5 v3, 6, 10 v2 protected)
 
 #### Exception: Justified Deletion
 
-There are cases where deleting all files for an episode is acceptable:
-1. **Hidden anime**: User explicitly wants it gone
-2. **Very low-rated anime + poor group**: Multiple severe penalties
-3. **Duplicate episodes across versions**: If anime has multiple versions (TV vs BD), keeping one version's episode is sufficient
+There are LIMITED cases where deleting all files for an episode is acceptable:
+1. **Hidden anime + explicit user deletion**: User wants entire anime gone
+2. **Storage emergency**: Disk space < 5% and no other options
+3. **User override**: Manual deletion command
 
-For these cases, the protection threshold can be conditional:
+For normal auto-deletion, **at least one file per episode MUST be maintained** to preserve series continuity.
 ```cpp
 if (fileCount == 1) {
     bool isHidden = isCardHidden(aid);
@@ -1991,35 +2214,72 @@ if (codecLower.contains("vvc") || codecLower.contains("h266")) {
 
 **Recommendations:**
 
-**Critical (High Impact):**
-1. **Implement codec awareness** - Prevents incorrect deletion of high-quality H.265/AV1 files
-2. **Fix series continuity** - Asymmetric distance penalties to delete from end backwards
-3. **Add minimum episode retention** - Protect early episodes for future sampling
+**Critical (Highest Impact - MUST IMPLEMENT):**
+1. **Gap prevention for series continuity** - Prevent deletion of middle episodes that would create unwatchable gaps
+2. **Last file per episode protection** - CRITICAL for continuity, ensures every episode has at least one file
+3. **Implement codec awareness** - Prevents incorrect deletion of high-quality H.265/AV1 files
 
-**Important (Medium Impact):**
-4. **Switch to group rating** - Better quality assessment than anime rating
-5. **Guarantee last file per episode** - Prevent complete episode deletion
+**Important (High Impact):**
+4. **Minimum anime retention** - Keep at least 3-5 early episodes per anime for future sampling
+5. **Switch to group rating** - Better quality assessment than anime rating
 6. **Add favorites/protection system** - Allow users to explicitly protect content
 
-**Enhancements (Lower Impact):**
+**Enhancements (Medium Impact):**
 7. **Clarify double-penalty behavior** - Document or fix watched episode double-counting
 8. **Add edge case tests** - Improve test coverage for language matching, quality, ratings
 9. **Optimize for large collections** - Batch queries and caching for 10,000+ files
 10. **Add rewatch tracking** - Distinguish between "watched once" and "rewatched frequently"
 
-**Priority Order:**
-1. Codec awareness (Phase 1)
-2. Series continuity fix
-3. Minimum episode retention
-4. Group rating implementation
-5. Last file protection
+**Priority Order (Revised Based on Clarifications):**
+1. **Gap prevention + Last file protection** (Phase 1) - CRITICAL for series continuity
+2. **Codec awareness** (Phase 1) - Prevents incorrect modern file deletion
+3. **Minimum anime retention** (Phase 2)
+4. **Group rating implementation** (Phase 2)
+5. **Favorites/protection system** (Phase 3)
 
-**Conclusion:** The file scoring system is well-designed, functionally correct, and accomplishes its intended purpose. It provides a sophisticated, multi-factor approach to file prioritization that balances user preferences, technical quality, and viewing behavior. However, the extended analysis reveals **five critical design considerations** that, if addressed, would significantly improve the system's correctness and user experience:
+**Clarified Understanding of Series Continuity:**
 
-1. **Codec awareness** prevents deletion of correctly-encoded modern files
-2. **Series continuity** maintains rewatchability by deleting from the end
-3. **Minimum retention** preserves sampling capability for all anime
-4. **Group rating** provides better quality assessment than anime ratings
-5. **Duplicate protection** ensures at least one file remains per episode
+Based on user feedback, series continuity is NOT about rewatching or preserving episode 1. Instead, it's about:
 
-While the current implementation is production-ready, implementing these enhancements would elevate it from "good" to "excellent" and better align with user expectations for an intelligent file management system.
+1. **Never creating gaps in the middle of a series** - Deleting episode 5 when episodes 1-4 and 6-12 exist breaks the viewing experience
+2. **Enforced deletion priority:**
+   - **First:** Duplicate files per episode (keep best version only)
+   - **Second:** Watched episodes (but only if no gap created)
+   - **Third:** Last episodes (delete from end backwards: 12 → 11 → 10 → ...)
+   - **NEVER:** Middle episodes that would create gaps
+
+3. **At least one file per episode is CRITICAL** - Complete episode deletion creates permanent gaps that require re-downloading
+
+**Implementation Requirements:**
+
+**Phase 1 (CRITICAL - Must implement together):**
+```cpp
+// 1. Gap detection
+bool wouldCreateGap(int lid) const;
+
+// 2. Gap-aware scoring
+static const int SCORE_MIDDLE_EPISODE_PROTECTION = 1000;  // Prevent gaps
+static const int SCORE_LAST_FILE_WITH_GAP = 2000;         // Maximum protection
+static const int SCORE_LAST_FILE_NO_GAP = 500;            // Strong protection
+
+// 3. Hierarchical protection in calculateMarkScore()
+if (wouldCreateGap(lid)) {
+    score += SCORE_MIDDLE_EPISODE_PROTECTION;
+}
+if (fileCount == 1) {
+    score += wouldCreateGap(lid) ? SCORE_LAST_FILE_WITH_GAP : SCORE_LAST_FILE_NO_GAP;
+}
+```
+
+**Phase 2 (High Priority):**
+- Codec efficiency multipliers (H.265=0.5×, AV1=0.35×)
+- Minimum episode retention (3-5 early episodes per anime)
+- Group rating instead of anime rating
+
+**Conclusion:** The file scoring system is well-designed and functionally correct for its core purpose. However, **series continuity is fundamentally broken** without gap prevention and last-file protection. The extended analysis reveals that these are not optional enhancements but **critical requirements** for the system to function correctly. Without them, the system can:
+
+1. ❌ Create unwatchable gaps by deleting middle episodes
+2. ❌ Delete all versions of an episode, creating permanent gaps
+3. ❌ Break the viewing experience for partially-watched series
+
+**The current implementation is NOT production-ready for series continuity.** Gap prevention and last-file protection must be implemented before the deletion system can be safely enabled. Once these are in place, the additional enhancements (codec awareness, group rating, minimum retention) would elevate the system from "functional" to "excellent."
