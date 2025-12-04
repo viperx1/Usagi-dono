@@ -36,6 +36,7 @@ private slots:
     void testParseAnimeTitlesFormat();
     void testParseAnimeTitlesWithSpecialCharacters();
     void testParseAnimeTitlesSkipsComments();
+    void testParseAnimeTitlesWithPipeInTitle();
 
 private:
     AniDBApi* api;
@@ -214,6 +215,41 @@ void TestAnimeTitles::testParseAnimeTitlesSkipsComments()
     
     int count = getAnimeTitlesCount();
     QCOMPARE(count, 2);
+}
+
+void TestAnimeTitles::testParseAnimeTitlesWithPipeInTitle()
+{
+    // Test parsing titles containing pipe characters (special case)
+    // This is the specific issue reported: aid 8895 "Shin Evangelion Gekijouban:||"
+    QByteArray testData = 
+        "8895|1|x-jat|Shin Evangelion Gekijouban:||\n"
+        "1|1|en|Title with | pipe in middle\n"
+        "2|1|en|Normal Title\n";
+    
+    api->parseAndStoreAnimeTitles(testData);
+    
+    int count = getAnimeTitlesCount();
+    QCOMPARE(count, 3);
+    
+    // Verify the title with pipes at the end was stored correctly
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
+    query.exec("SELECT `title` FROM `anime_titles` WHERE `aid` = 8895");
+    if (query.next()) {
+        QString title = query.value(0).toString();
+        QCOMPARE(title, QString("Shin Evangelion Gekijouban:||"));
+    } else {
+        QFAIL("Should find title for aid 8895");
+    }
+    
+    // Verify the title with pipe in the middle was stored correctly
+    query.exec("SELECT `title` FROM `anime_titles` WHERE `aid` = 1");
+    if (query.next()) {
+        QString title = query.value(0).toString();
+        QCOMPARE(title, QString("Title with | pipe in middle"));
+    } else {
+        QFAIL("Should find title for aid 1");
+    }
 }
 
 QTEST_MAIN(TestAnimeTitles)
