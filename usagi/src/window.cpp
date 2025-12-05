@@ -1388,7 +1388,12 @@ void Window::updateFilterCache()
 		QString trimmedMask = mask.trimmed();
 		if (!trimmedMask.isEmpty()) {
 			QRegularExpression regex(QRegularExpression::wildcardToRegularExpression(trimmedMask));
-			cachedFilterRegexes.append(regex);
+			// Validate the regex pattern before adding to cache
+			if (regex.isValid()) {
+				cachedFilterRegexes.append(regex);
+			} else {
+				LOG(QString("Warning: Invalid filter mask pattern '%1', skipping").arg(trimmedMask));
+			}
 		}
 	}
 }

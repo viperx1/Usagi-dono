@@ -319,11 +319,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		{
 			preferredBitrate = query.value(1).toDouble();
 		}
-		if(query.value(0).toString() == "preferredResolution")
+		else if(query.value(0).toString() == "preferredResolution")
 		{
 			preferredResolution = query.value(1).toString();
 		}
-		if(query.value(0).toString() == "hasherFilterMasks")
+		else if(query.value(0).toString() == "hasherFilterMasks")
 		{
 			hasherFilterMasks = query.value(1).toString();
 		}
