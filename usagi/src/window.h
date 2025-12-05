@@ -52,6 +52,7 @@
 #include "mylistfiltersidebar.h"
 #include "watchsessionmanager.h"
 #include "uicolors.h"
+#include "localfileinfo.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -366,13 +367,9 @@ private:
     QString m_dbName;
 };
 
-// Data structure for unbound file information
-struct UnboundFileData {
-    QString filename;
-    QString filepath;
-    QString hash;
-    qint64 size;
-};
+// Use LocalFileInfo class for unbound file information
+// (replaced UnboundFileData struct with proper class)
+using UnboundFileData = LocalFileInfo;
 
 // Worker thread for loading unbound files
 class UnboundFilesLoaderWorker : public QObject
@@ -384,7 +381,7 @@ public:
     void doWork();
 
 signals:
-    void finished(const QList<UnboundFileData> &files);
+    void finished(const QList<LocalFileInfo> &files);
 
 private:
     QString m_dbName;
@@ -713,7 +710,7 @@ private slots:
 	// Background loading completion handlers
 	void onMylistLoadingFinished(const QList<int> &aids);
 	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
-	void onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files);
+	void onUnboundFilesLoadingFinished(const QList<LocalFileInfo> &files);
 	
 	// Timer-based processing handlers
 	void processPendingHashedFiles();

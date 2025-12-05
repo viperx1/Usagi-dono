@@ -127,7 +127,7 @@ void UnboundFilesLoaderWorker::doWork()
 {
     LOG("Background thread: Loading unbound files...");
     
-    QList<UnboundFileData> tempUnboundFiles;
+    QList<LocalFileInfo> tempUnboundFiles;
     
     {
         // Create separate database connection for this thread
@@ -137,7 +137,7 @@ void UnboundFilesLoaderWorker::doWork()
         if (!db.open()) {
             LOG("Background thread: Failed to open database for unbound files");
             QSqlDatabase::removeDatabase("UnboundFilesThread");
-            emit finished(QList<UnboundFileData>());
+            emit finished(QList<LocalFileInfo>());
             return;
         }
         
@@ -150,23 +150,26 @@ void UnboundFilesLoaderWorker::doWork()
             LOG(QString("Background thread: Failed to query unbound files: %1").arg(query.lastError().text()));
         } else {
             while (query.next()) {
-                UnboundFileData fileData;
-                fileData.filepath = query.value(0).toString();
-                fileData.filename = query.value(1).toString();
-                if (fileData.filename.isEmpty()) {
-                    QFileInfo qFileInfo(fileData.filepath);
-                    fileData.filename = qFileInfo.fileName();
+                QString filepath = query.value(0).toString();
+                QString filename = query.value(1).toString();
+                QString hash = query.value(2).toString();
+                
+                // Use QFileInfo to get filename if not in database
+                if (filename.isEmpty()) {
+                    QFileInfo qFileInfo(filepath);
+                    filename = qFileInfo.fileName();
                 }
-                fileData.hash = query.value(2).toString();
+                
+                // LocalFileInfo constructor will get size if file exists
+                LocalFileInfo fileInfo(filename, filepath, hash, 0);
                 
                 // Get file size if file exists
-                QFileInfo qFileInfo(fileData.filepath);
-                fileData.size = 0;
+                QFileInfo qFileInfo(filepath);
                 if (qFileInfo.exists()) {
-                    fileData.size = qFileInfo.size();
+                    fileInfo.setSize(qFileInfo.size());
                 }
                 
-                tempUnboundFiles.append(fileData);
+                tempUnboundFiles.append(fileInfo);
             }
         }
         
@@ -2194,7 +2197,7 @@ void Window::onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<
 }
 
 // Called when unbound files loading finishes (in UI thread)
-void Window::onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files)
+void Window::onUnboundFilesLoadingFinished(const QList<LocalFileInfo> &files)
 {
     LOG(QString("Background loading: Unbound files loaded, adding %1 files to UI...").arg(files.size()));
     
@@ -2207,8 +2210,8 @@ void Window::onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files)
     unknownFiles->setUpdatesEnabled(false);
     
     // Add each unbound file to the unknown files widget
-    for (const UnboundFileData& fileData : std::as_const(files)) {
-        unknownFilesInsertRow(fileData.filename, fileData.filepath, fileData.hash, fileData.size);
+    for (const LocalFileInfo& fileInfo : std::as_const(files)) {
+        unknownFilesInsertRow(fileInfo.filename(), fileInfo.filepath(), fileInfo.hash(), fileInfo.size());
     }
     
     // Re-enable updates after bulk insertion
