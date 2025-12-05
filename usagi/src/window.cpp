@@ -1366,34 +1366,52 @@ void Window::debugPrintDatabaseInfoForLid(int lid)
 	LOG("=================================================================");
 }
 
-bool Window::shouldFilterFile(const QString &filePath)
+void Window::updateFilterCache()
 {
-	// Get the filter masks from settings
 	QString filterMasks = adbapi->getHasherFilterMasks();
 	
-	// If no filter masks are set, don't filter anything
-	if (filterMasks.isEmpty()) {
-		return false;
+	// Only update cache if masks have changed
+	if (cachedFilterMasks == filterMasks) {
+		return;
 	}
 	
-	// Split the masks by comma
+	cachedFilterMasks = filterMasks;
+	cachedFilterRegexes.clear();
+	
+	if (filterMasks.isEmpty()) {
+		return;
+	}
+	
+	// Pre-compile all regex patterns
 	QStringList masks = filterMasks.split(',', Qt::SkipEmptyParts);
+	for (const QString &mask : masks) {
+		QString trimmedMask = mask.trimmed();
+		if (!trimmedMask.isEmpty()) {
+			QRegularExpression regex(QRegularExpression::wildcardToRegularExpression(trimmedMask));
+			cachedFilterRegexes.append(regex);
+		}
+	}
+}
+
+bool Window::shouldFilterFile(const QString &filePath)
+{
+	// Update cache if needed (checks internally if update is required)
+	updateFilterCache();
+	
+	// If no filter patterns, don't filter anything
+	if (cachedFilterRegexes.isEmpty()) {
+		return false;
+	}
 	
 	// Get the file name from the path
 	QFileInfo fileInfo(filePath);
 	QString fileName = fileInfo.fileName();
 	
-	// Check if the file matches any of the masks
-	for (const QString &mask : masks) {
-		QString trimmedMask = mask.trimmed();
-		if (trimmedMask.isEmpty()) {
-			continue;
-		}
-		
-		// Convert wildcard pattern to regex
-		QRegularExpression regex(QRegularExpression::wildcardToRegularExpression(trimmedMask));
+	// Check if the file matches any of the cached patterns
+	for (const QRegularExpression &regex : cachedFilterRegexes) {
 		if (regex.match(fileName).hasMatch()) {
-			LOG(QString("File '%1' matches filter mask '%2', skipping").arg(fileName, trimmedMask));
+			// Extract the mask pattern for logging (use the cached masks string)
+			LOG(QString("File '%1' matches filter pattern, skipping").arg(fileName));
 			return true; // File should be filtered
 		}
 	}
