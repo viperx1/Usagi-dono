@@ -208,6 +208,7 @@ Window::Window()
 	isCheckingNotifications = false;
 	
 	// Initialize hashing progress tracking
+	m_hashingProgress = ProgressTracker(0);  // Will set total when hashing starts
 	totalHashParts = 0;
 	completedHashParts = 0;
 	
@@ -1541,13 +1542,15 @@ void Window::setupHashingProgress(const QStringList &files)
 	totalHashParts = calculateTotalHashParts(files);
 	completedHashParts = 0;
 	lastThreadProgress.clear(); // Reset per-thread progress tracking
-	progressHistory.clear(); // Reset progress history for ETA calculation
+	
+	// Initialize ProgressTracker with total parts and start tracking
+	m_hashingProgress.reset(totalHashParts);
+	m_hashingProgress.start();
+	
 	progressTotal->setValue(0);
 	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
 	progressTotal->setFormat("ETA: calculating...");
 	progressTotalLabel->setText("0%");
-	hashingTimer.start();
-	lastEtaUpdate.start();
 }
 
 QStringList Window::getFilesNeedingHash()
@@ -1785,6 +1788,9 @@ void Window::getNotifyPartsDone(int threadId, int total, int done)
 	// Update completed parts by the actual delta (not just +1)
 	completedHashParts += delta;
 	
+	// Update ProgressTracker with current progress
+	m_hashingProgress.updateProgress(completedHashParts);
+	
 	// Update the specific thread's progress bar
 	if (threadId >= 0 && threadId < threadProgressBars.size()) {
 		threadProgressBars[threadId]->setMaximum(total);
@@ -1793,69 +1799,20 @@ void Window::getNotifyPartsDone(int threadId, int total, int done)
 	
 	progressTotal->setValue(completedHashParts);
 	
-	// Update percentage label
-	int percentage = totalHashParts > 0 ? (completedHashParts * 100 / totalHashParts) : 0;
+	// Update percentage label using ProgressTracker
+	int percentage = static_cast<int>(m_hashingProgress.getProgressPercent());
 	progressTotalLabel->setText(QString("%1%").arg(percentage));
 	
-	// Calculate and display ETA - throttled to once per second to prevent UI freeze
-	// Note: Progress updates from hasher are throttled by HASHER_PROGRESS_UPDATE_INTERVAL,
-	// but we track actual delta in completedHashParts, so rate calculation is accurate
-	if (completedHashParts > 0 && totalHashParts > 0 && lastEtaUpdate.elapsed() >= 1000) {
-		qint64 currentTime = hashingTimer.elapsed();
-		
-		// Add current progress snapshot to history
-		ProgressSnapshot snapshot;
-		snapshot.timestamp = currentTime;
-		snapshot.completedParts = completedHashParts;
-		progressHistory.append(snapshot);
-		
-		// Keep only snapshots from the last 30 seconds for moving average
-		const qint64 WINDOW_SIZE_MS = 30000;
-		while (!progressHistory.isEmpty() && (currentTime - progressHistory.first().timestamp) > WINDOW_SIZE_MS) {
-			progressHistory.removeFirst();
-		}
-		
-		// Calculate rate based on recent progress (moving average)
-		double partsPerMs = 0.0;
-		if (progressHistory.size() >= 2) {
-			// Use the earliest and latest snapshots in the window
-			const ProgressSnapshot &oldest = progressHistory.first();
-			const ProgressSnapshot &newest = progressHistory.last();
-			qint64 timeWindow = newest.timestamp - oldest.timestamp;
-			int partsInWindow = newest.completedParts - oldest.completedParts;
-			
-			if (timeWindow > 0 && partsInWindow > 0) {
-				partsPerMs = static_cast<double>(partsInWindow) / timeWindow;
-			}
-		}
-		
-		// If we don't have enough history yet, fall back to average from start
-		if (partsPerMs == 0.0 && currentTime > 0) {
-			partsPerMs = static_cast<double>(completedHashParts) / currentTime;
-		}
-		
-		int remainingParts = totalHashParts - completedHashParts;
-		
-		if (remainingParts > 0 && partsPerMs > 0) {
-			qint64 etaMs = static_cast<qint64>(remainingParts / partsPerMs);
-			int etaSec = etaMs / 1000;
-			int etaMin = etaSec / 60;
-			int etaHour = etaMin / 60;
-			
-			QString etaStr;
-			if (etaHour > 0) {
-				etaStr = QString("%1h %2m").arg(etaHour).arg(etaMin % 60);
-			} else if (etaMin > 0) {
-				etaStr = QString("%1m %2s").arg(etaMin).arg(etaSec % 60);
-			} else {
-				etaStr = QString("%1s").arg(etaSec);
-			}
-			
-			progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
-		} else {
+	// Calculate and display ETA using ProgressTracker - throttled to once per second
+	if (m_hashingProgress.shouldUpdateETA(1000)) {
+		QString etaStr = m_hashingProgress.getETAString();
+		if (etaStr == "Calculating...") {
 			progressTotal->setFormat("ETA: calculating...");
+		} else if (etaStr == "Complete") {
+			progressTotal->setFormat("Complete");
+		} else {
+			progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
 		}
-		lastEtaUpdate.restart();
 	}
 }
 

@@ -53,6 +53,7 @@
 #include "watchsessionmanager.h"
 #include "uicolors.h"
 #include "localfileinfo.h"
+#include "progresstracker.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -397,20 +398,12 @@ private:
     QTimer *safeclose;
     QTimer *startupTimer;
     QElapsedTimer waitforlogout;
-    QElapsedTimer hashingTimer;
-    QElapsedTimer lastEtaUpdate;
-    int totalHashParts;
-    int completedHashParts;
+    
+    // Hashing progress tracking using ProgressTracker utility class
+    ProgressTracker m_hashingProgress;
     
     // Track last progress per thread to calculate deltas with throttled updates
     QMap<int, int> lastThreadProgress;
-    
-    // Track progress history for ETA calculation using moving average
-    struct ProgressSnapshot {
-        qint64 timestamp;  // Time in milliseconds
-        int completedParts;
-    };
-    QList<ProgressSnapshot> progressHistory;
     
     // Mutex to protect file assignment from concurrent thread requests
     QMutex fileRequestMutex;
