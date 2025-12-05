@@ -4409,6 +4409,33 @@ void Window::sortMylistCards(int sortIndex)
 		
 		// Update the card manager with the new order
 		cardManager->setAnimeIdList(animeIds);
+		
+		// If using virtual scrolling, refresh the layout
+		if (mylistVirtualLayout) {
+			mylistVirtualLayout->refresh();
+		}
+		
+		// Also update the legacy animeCards list order for backward compatibility
+		animeCards.clear();
+		for (int aid : animeIds) {
+			AnimeCard* card = cardManager->getCard(aid);
+			if (card) {
+				animeCards.append(card);
+			}
+		}
+		
+		// If not using virtual scrolling (backward compatibility), update the regular flow layout
+		if (!mylistVirtualLayout && mylistCardLayout) {
+			// Remove all cards from layout
+			for (AnimeCard* const card : std::as_const(animeCards)) {
+				mylistCardLayout->removeWidget(card);
+			}
+			// Re-add cards to layout in sorted order
+			for (AnimeCard* const card : std::as_const(animeCards)) {
+				mylistCardLayout->addWidget(card);
+			}
+		}
+		
 		return;  // Done with nested sorting
 	}
 	
