@@ -233,3 +233,15 @@ void AniDBApi::setPreferredResolution(const QString& resolution)
 	AniDBApi::preferredResolution = resolution;
 	saveSetting("preferredResolution", resolution);
 }
+
+// Hasher filter settings
+QString AniDBApi::getHasherFilterMasks()
+{
+	return AniDBApi::hasherFilterMasks;
+}
+
+void AniDBApi::setHasherFilterMasks(const QString& masks)
+{
+	AniDBApi::hasherFilterMasks = masks;
+	saveSetting("hasherFilterMasks", masks);
+}

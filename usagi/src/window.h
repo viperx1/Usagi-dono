@@ -605,6 +605,11 @@ private:
 	
 	// Mutex for protecting shared data between threads
 	QMutex backgroundLoadingMutex;
+	
+	// Cache for hasher filter patterns (for performance)
+	QString cachedFilterMasks;
+	QList<QRegularExpression> cachedFilterRegexes;
+	void updateFilterCache();
 
 
 public slots:
@@ -749,6 +754,9 @@ private:
     void loadAnimeAlternativeTitlesForFiltering();
     bool matchesSearchFilter(AnimeCard *card, const QString &searchText);
     bool matchesSearchFilter(int aid, const QString &animeName, const QString &searchText);
+    
+    // Helper method for hasher file filtering
+    bool shouldFilterFile(const QString &filePath);
     
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
