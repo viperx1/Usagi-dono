@@ -792,6 +792,25 @@ Window::Window()
     
     settingsMainLayout->addWidget(fileMarkingGroup);
     
+    // Hasher Filter Group
+    QGroupBox *hasherFilterGroup = new QGroupBox("Hasher File Filter");
+    QVBoxLayout *hasherFilterLayout = new QVBoxLayout(hasherFilterGroup);
+    
+    QLabel *hasherFilterLabel = new QLabel("File masks to ignore (comma-separated):");
+    hasherFilterLabel->setToolTip("Files matching these patterns will be ignored when adding for hashing.\n"
+                                   "Use wildcards like *.!qB for incomplete downloads, *.tmp for temporary files.\n"
+                                   "Examples: *.!qB,*.tmp,*.part");
+    
+    QLineEdit *hasherFilterMasksEdit = new QLineEdit();
+    hasherFilterMasksEdit->setObjectName("hasherFilterMasksEdit");
+    hasherFilterMasksEdit->setText(adbapi->getHasherFilterMasks());
+    hasherFilterMasksEdit->setPlaceholderText("*.!qB,*.tmp,*.part");
+    
+    hasherFilterLayout->addWidget(hasherFilterLabel);
+    hasherFilterLayout->addWidget(hasherFilterMasksEdit);
+    
+    settingsMainLayout->addWidget(hasherFilterGroup);
+    
     // Action Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonSaveSettings = new QPushButton("Save Settings");
@@ -1347,6 +1366,41 @@ void Window::debugPrintDatabaseInfoForLid(int lid)
 	LOG("=================================================================");
 }
 
+bool Window::shouldFilterFile(const QString &filePath)
+{
+	// Get the filter masks from settings
+	QString filterMasks = adbapi->getHasherFilterMasks();
+	
+	// If no filter masks are set, don't filter anything
+	if (filterMasks.isEmpty()) {
+		return false;
+	}
+	
+	// Split the masks by comma
+	QStringList masks = filterMasks.split(',', Qt::SkipEmptyParts);
+	
+	// Get the file name from the path
+	QFileInfo fileInfo(filePath);
+	QString fileName = fileInfo.fileName();
+	
+	// Check if the file matches any of the masks
+	for (const QString &mask : masks) {
+		QString trimmedMask = mask.trimmed();
+		if (trimmedMask.isEmpty()) {
+			continue;
+		}
+		
+		// Convert wildcard pattern to regex
+		QRegularExpression regex(QRegularExpression::wildcardToRegularExpression(trimmedMask));
+		if (regex.match(fileName).hasMatch()) {
+			LOG(QString("File '%1' matches filter mask '%2', skipping").arg(fileName, trimmedMask));
+			return true; // File should be filtered
+		}
+	}
+	
+	return false; // File should not be filtered
+}
+
 void Window::Button1Click() // add files
 {
     QStringList files = QFileDialog::getOpenFileNames(0, 0, adbapi->getLastDirectory());
@@ -1360,7 +1414,11 @@ void Window::Button1Click() // add files
 //            QFileInfo file = files.first();
             QFileInfo file = QFileInfo(files.first());
             files.pop_front();
-            hashesinsertrow(file, renameto->checkState());
+            
+            // Check if file should be filtered
+            if (!shouldFilterFile(file.absoluteFilePath())) {
+                hashesinsertrow(file, renameto->checkState());
+            }
     //		delete item1, item2, item3;
         }
     }
@@ -1399,7 +1457,11 @@ void Window::Button2Click() // add directories
 			while(directory_walker.hasNext())
             {
                 QFileInfo file = QFileInfo(directory_walker.next());
-				hashesinsertrow(file, renameto->checkState());
+                
+                // Check if file should be filtered
+                if (!shouldFilterFile(file.absoluteFilePath())) {
+                    hashesinsertrow(file, renameto->checkState());
+                }
 //				adbapi.ed2khash(file.absoluteFilePath());
 		    }
 		}
@@ -1422,7 +1484,11 @@ void Window::Button3Click()
             while(directory_walker.hasNext())
             {
                 QFileInfo file = QFileInfo(directory_walker.next());
-                hashesinsertrow(file, renameto->checkState());
+                
+                // Check if file should be filtered
+                if (!shouldFilterFile(file.absoluteFilePath())) {
+                    hashesinsertrow(file, renameto->checkState());
+                }
             }
         }
     }
@@ -2591,6 +2657,12 @@ void Window::saveSettings()
 	QComboBox *resolutionCombo = this->findChild<QComboBox*>("preferredResolutionCombo");
 	if (resolutionCombo) {
 		adbapi->setPreferredResolution(resolutionCombo->currentText());
+	}
+	
+	// Save hasher filter masks
+	QLineEdit *hasherFilterMasksEdit = this->findChild<QLineEdit*>("hasherFilterMasksEdit");
+	if (hasherFilterMasksEdit) {
+		adbapi->setHasherFilterMasks(hasherFilterMasksEdit->text());
 	}
 	
 	LOG("Settings saved");
@@ -3885,6 +3957,12 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	insertTimer.start();
 	for (const QString &filePath : filePaths) {
 		QFileInfo fileInfo(filePath);
+		
+		// Check if file should be filtered
+		if (shouldFilterFile(filePath)) {
+			continue; // Skip this file
+		}
+		
 		QString preloadedHash = hashInfoMap.contains(filePath) ? hashInfoMap[filePath].hash : QString();
 		hashesinsertrow(fileInfo, Qt::Unchecked, preloadedHash);
 	}

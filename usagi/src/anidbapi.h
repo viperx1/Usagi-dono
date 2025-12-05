@@ -81,6 +81,9 @@ private:
 	bool preferHighestQuality;  // Prefer highest quality when marking files
 	double preferredBitrate;  // Preferred baseline bitrate in Mbps for 1080p (default: 3.5)
 	QString preferredResolution;  // Preferred resolution (e.g., "1080p", "1440p", "4K")
+	
+	// Hasher filter settings
+	QString hasherFilterMasks;  // Comma-separated list of file masks to ignore when hashing (e.g., "*.!qB,*.tmp")
     /* Settings End === */
 
 	int protover; // AniDB API version = 3
@@ -490,6 +493,10 @@ public:
 	void setPreferredBitrate(double bitrate);
 	QString getPreferredResolution();
 	void setPreferredResolution(const QString& resolution);
+	
+	// Hasher filter settings
+	QString getHasherFilterMasks();
+	void setHasherFilterMasks(const QString& masks);
 	
 private:
 	// Helper method for saving settings to database

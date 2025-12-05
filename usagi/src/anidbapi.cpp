@@ -243,6 +243,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	preferHighestQuality = true;  // Default to preferring highest quality
 	preferredBitrate = 3.5;  // Default baseline bitrate of 3.5 Mbps for 1080p
 	preferredResolution = "1080p";  // Default to 1080p resolution
+	hasherFilterMasks = "*.!qB,*.tmp";  // Default masks for incomplete downloads
 	
 	while(query.next())
 	{
@@ -321,6 +322,10 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		if(query.value(0).toString() == "preferredResolution")
 		{
 			preferredResolution = query.value(1).toString();
+		}
+		if(query.value(0).toString() == "hasherFilterMasks")
+		{
+			hasherFilterMasks = query.value(1).toString();
 		}
 	}
 
