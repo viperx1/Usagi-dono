@@ -402,6 +402,10 @@ private:
     // Hashing progress tracking using ProgressTracker utility class
     ProgressTracker m_hashingProgress;
     
+    // Legacy progress tracking fields (kept for backward compatibility during transition)
+    int totalHashParts;
+    int completedHashParts;
+    
     // Track last progress per thread to calculate deltas with throttled updates
     QMap<int, int> lastThreadProgress;
     

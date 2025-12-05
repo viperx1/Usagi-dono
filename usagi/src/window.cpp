@@ -208,7 +208,7 @@ Window::Window()
 	isCheckingNotifications = false;
 	
 	// Initialize hashing progress tracking
-	m_hashingProgress = ProgressTracker(0);  // Will set total when hashing starts
+	// m_hashingProgress is default-constructed, will be reset when hashing starts
 	totalHashParts = 0;
 	completedHashParts = 0;
 	
