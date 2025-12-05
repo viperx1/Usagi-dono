@@ -19,14 +19,16 @@ void AniDBApi::setUsername(QString username)
 {
 	// Log only once when first settings method is called
 	if (!s_settingsLogged) {
-		LOG("AniDB settings system initialized [anidbapi_settings.cpp]");
+		LOG("AniDB settings system initialized [anidbapi_settings.cpp] - delegating to ApplicationSettings");
 		s_settingsLogged = true;
 	}
 	
 	if(username.length() > 0)
 	{
+		// Delegate to ApplicationSettings (which auto-saves)
+		m_settings.setUsername(username);
+		// Keep legacy field in sync for backward compatibility
 		AniDBApi::username = username;
-		saveSetting("username", username);
 	}
 }
 
@@ -34,8 +36,10 @@ void AniDBApi::setPassword(QString password)
 {
 	if(password.length() > 0)
 	{
+		// Delegate to ApplicationSettings (which auto-saves)
+		m_settings.setPassword(password);
+		// Keep legacy field in sync for backward compatibility
 		AniDBApi::password = password;
-		saveSetting("password", password);
 	}
 }
 
@@ -43,58 +47,72 @@ void AniDBApi::setLastDirectory(QString directory)
 {
 	if(directory.length() > 0)
 	{
+		// Delegate to ApplicationSettings (which auto-saves)
+		m_settings.setLastDirectory(directory);
+		// Keep legacy field in sync for backward compatibility
 		AniDBApi::lastdirectory = directory;
-		saveSetting("lastdirectory", directory);
 	}
 }
 
 QString AniDBApi::getUsername()
 {
-	return AniDBApi::username;
+	// Delegate to ApplicationSettings
+	return m_settings.getUsername();
 }
 
 QString AniDBApi::getPassword()
 {
-	return AniDBApi::password;
+	// Delegate to ApplicationSettings
+	return m_settings.getPassword();
 }
 
 QString AniDBApi::getLastDirectory()
 {
-	return AniDBApi::lastdirectory;
+	// Delegate to ApplicationSettings
+	return m_settings.getLastDirectory();
 }
 
 // Directory watcher settings
 bool AniDBApi::getWatcherEnabled()
 {
-	return AniDBApi::watcherEnabled;
+	// Delegate to ApplicationSettings
+	return m_settings.getWatcherEnabled();
 }
 
 QString AniDBApi::getWatcherDirectory()
 {
-	return AniDBApi::watcherDirectory;
+	// Delegate to ApplicationSettings
+	return m_settings.getWatcherDirectory();
 }
 
 bool AniDBApi::getWatcherAutoStart()
 {
-	return AniDBApi::watcherAutoStart;
+	// Delegate to ApplicationSettings
+	return m_settings.getWatcherAutoStart();
 }
 
 void AniDBApi::setWatcherEnabled(bool enabled)
 {
+	// Delegate to ApplicationSettings (which auto-saves)
+	m_settings.setWatcherEnabled(enabled);
+	// Keep legacy field in sync for backward compatibility
 	AniDBApi::watcherEnabled = enabled;
-	saveSetting("watcherEnabled", enabled ? "1" : "0");
 }
 
 void AniDBApi::setWatcherDirectory(QString directory)
 {
+	// Delegate to ApplicationSettings (which auto-saves)
+	m_settings.setWatcherDirectory(directory);
+	// Keep legacy field in sync for backward compatibility
 	AniDBApi::watcherDirectory = directory;
-	saveSetting("watcherDirectory", directory);
 }
 
 void AniDBApi::setWatcherAutoStart(bool autoStart)
 {
+	// Delegate to ApplicationSettings (which auto-saves)
+	m_settings.setWatcherAutoStart(autoStart);
+	// Keep legacy field in sync for backward compatibility
 	AniDBApi::watcherAutoStart = autoStart;
-	saveSetting("watcherAutoStart", autoStart ? "1" : "0");
 }
 
 // Auto-fetch settings
@@ -237,11 +255,14 @@ void AniDBApi::setPreferredResolution(const QString& resolution)
 // Hasher filter settings
 QString AniDBApi::getHasherFilterMasks()
 {
-	return AniDBApi::hasherFilterMasks;
+	// Delegate to ApplicationSettings
+	return m_settings.getHasherFilterMasks();
 }
 
 void AniDBApi::setHasherFilterMasks(const QString& masks)
 {
+	// Delegate to ApplicationSettings (which auto-saves)
+	m_settings.setHasherFilterMasks(masks);
+	// Keep legacy field in sync for backward compatibility
 	AniDBApi::hasherFilterMasks = masks;
-	saveSetting("hasherFilterMasks", masks);
 }

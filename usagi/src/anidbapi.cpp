@@ -18,6 +18,7 @@
 myAniDBApi *adbapi = nullptr;
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
+	: m_settings()  // Initialize ApplicationSettings (will set database later)
 {
 	Logger::log("[AniDB Init] Constructor started", __FILE__, __LINE__);
 	protover = 3;
@@ -244,6 +245,12 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	preferredBitrate = 3.5;  // Default baseline bitrate of 3.5 Mbps for 1080p
 	preferredResolution = "1080p";  // Default to 1080p resolution
 	hasherFilterMasks = "*.!qB,*.tmp";  // Default masks for incomplete downloads
+	
+	// Initialize ApplicationSettings with database connection and load settings
+	Logger::log("[AniDB Init] Initializing ApplicationSettings", __FILE__, __LINE__);
+	m_settings = ApplicationSettings(db);
+	m_settings.load();
+	Logger::log("[AniDB Init] ApplicationSettings loaded", __FILE__, __LINE__);
 	
 	while(query.next())
 	{
