@@ -43,6 +43,7 @@ set(SOURCES
     src/watchchunkmanager.cpp
     src/virtualflowlayout.cpp
     src/watchsessionmanager.cpp
+    src/applicationsettings.cpp
 )
 
 # Header files
@@ -72,6 +73,7 @@ set(HEADERS
     src/uicolors.h
     src/virtualflowlayout.h
     src/watchsessionmanager.h
+    src/applicationsettings.h
 )
 
 # Create executable
