@@ -450,9 +450,13 @@ Window::Window()
         applyMylistFilters();
         // Re-apply sorting after filtering to preserve sort order
         sortMylistCards(filterSidebar->getSortIndex());
+        // Save filter settings
+        saveMylistSorting();
     });
     connect(filterSidebar, &MyListFilterSidebar::sortChanged, this, [this]() {
         sortMylistCards(filterSidebar->getSortIndex());
+        // Save sort settings
+        saveMylistSorting();
     });
     connect(filterSidebar, &MyListFilterSidebar::collapseRequested, this, &Window::onToggleFilterBarClicked);
     
@@ -2063,12 +2067,14 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     // Reload alternative titles for filtering
     loadAnimeAlternativeTitlesForFiltering();
     
-    // Apply current filters first, then sorting
+    // Restore filter settings first
+    restoreMylistSorting();
+    
+    // Apply current filters, then sorting
     // (sorting must happen after filtering to preserve sort order on filtered results)
     applyMylistFilters();
     
     // Apply sorting after filtering
-    restoreMylistSorting();
     sortMylistCards(filterSidebar->getSortIndex());
     
     mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
@@ -2124,33 +2130,129 @@ void Window::onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files)
 
 void Window::saveMylistSorting()
 {
-    // Card view sorting is handled by filterSidebar
-    // Save the current sort settings
+    // Save all filter sidebar settings (except search text)
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         return;
     }
     
-    int sortIndex = filterSidebar->getSortIndex();
-    
     QSqlQuery q(db);
+    
+    // Save sort settings
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_card_sort_index', ?)");
-    q.addBindValue(sortIndex);
+    q.addBindValue(filterSidebar->getSortIndex());
     q.exec();
     
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_card_sort_ascending', ?)");
     q.addBindValue(filterSidebar->getSortAscending() ? 1 : 0);
     q.exec();
     
-    LOG(QString("Saved mylist card sorting: index=%1, ascending=%2").arg(sortIndex).arg(filterSidebar->getSortAscending()));
+    // Save filter settings
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_type', ?)");
+    q.addBindValue(filterSidebar->getTypeFilter());
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_completion', ?)");
+    q.addBindValue(filterSidebar->getCompletionFilter());
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_unwatched', ?)");
+    q.addBindValue(filterSidebar->getShowOnlyUnwatched() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_deletion', ?)");
+    q.addBindValue(filterSidebar->getShowMarkedForDeletion() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_inmylist', ?)");
+    q.addBindValue(filterSidebar->getInMyListOnly() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_serieschain', ?)");
+    q.addBindValue(filterSidebar->getShowSeriesChain() ? 1 : 0);
+    q.exec();
+    
+    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_adultcontent', ?)");
+    q.addBindValue(filterSidebar->getAdultContentFilter());
+    q.exec();
+    
+    // Log saved settings for debugging
+    LOG(QString("Saved mylist sort settings: index=%1, ascending=%2")
+        .arg(filterSidebar->getSortIndex())
+        .arg(filterSidebar->getSortAscending()));
+    LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3, deletion=%4")
+        .arg(filterSidebar->getTypeFilter())
+        .arg(filterSidebar->getCompletionFilter())
+        .arg(filterSidebar->getShowOnlyUnwatched())
+        .arg(filterSidebar->getShowMarkedForDeletion()));
+    LOG(QString("Saved mylist view settings: inmylist=%1, serieschain=%2, adult=%3")
+        .arg(filterSidebar->getInMyListOnly())
+        .arg(filterSidebar->getShowSeriesChain())
+        .arg(filterSidebar->getAdultContentFilter()));
 }
 
 void Window::restoreMylistSorting()
 {
-    // Sorting is now handled by the filter sidebar
-    // This function is kept for backward compatibility but does nothing
-    // as the sidebar initializes with default values
-    LOG(QString("restoreMylistSorting: Sorting is now managed by filter sidebar"));
+    // Load all filter sidebar settings (except search text)
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("restoreMylistSorting: Database not open");
+        return;
+    }
+    
+    // Batch load all settings in a single query for better performance
+    QMap<QString, QString> settings;
+    QSqlQuery q(db);
+    q.prepare("SELECT name, value FROM settings WHERE name LIKE 'mylist_%'");
+    if (q.exec()) {
+        while (q.next()) {
+            settings[q.value(0).toString()] = q.value(1).toString();
+        }
+    }
+    
+    // Apply sort settings
+    if (settings.contains("mylist_card_sort_index")) {
+        int sortIndex = settings["mylist_card_sort_index"].toInt();
+        filterSidebar->setSortIndex(sortIndex);
+        LOG(QString("Restored sort index: %1").arg(sortIndex));
+    }
+    
+    if (settings.contains("mylist_card_sort_ascending")) {
+        bool sortAscending = settings["mylist_card_sort_ascending"].toInt() != 0;
+        filterSidebar->setSortAscending(sortAscending);
+        LOG(QString("Restored sort ascending: %1").arg(sortAscending));
+    }
+    
+    // Apply filter settings
+    if (settings.contains("mylist_filter_type")) {
+        filterSidebar->setTypeFilter(settings["mylist_filter_type"]);
+    }
+    
+    if (settings.contains("mylist_filter_completion")) {
+        filterSidebar->setCompletionFilter(settings["mylist_filter_completion"]);
+    }
+    
+    if (settings.contains("mylist_filter_unwatched")) {
+        filterSidebar->setShowOnlyUnwatched(settings["mylist_filter_unwatched"].toInt() != 0);
+    }
+    
+    if (settings.contains("mylist_filter_deletion")) {
+        filterSidebar->setShowMarkedForDeletion(settings["mylist_filter_deletion"].toInt() != 0);
+    }
+    
+    if (settings.contains("mylist_filter_inmylist")) {
+        filterSidebar->setInMyListOnly(settings["mylist_filter_inmylist"].toInt() != 0);
+    }
+    
+    if (settings.contains("mylist_filter_serieschain")) {
+        filterSidebar->setShowSeriesChain(settings["mylist_filter_serieschain"].toInt() != 0);
+    }
+    
+    if (settings.contains("mylist_filter_adultcontent")) {
+        filterSidebar->setAdultContentFilter(settings["mylist_filter_adultcontent"]);
+    }
+    
+    LOG(QString("Restored %1 mylist filter settings from database").arg(settings.size()));
 }
 
 void Window::onMylistSortChanged(int column, Qt::SortOrder order)
@@ -2531,6 +2633,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 // Update only the specific mylist entry instead of reloading entire tree
                 if(lid > 0)
                 {
+                    LOG(QString("Updating anime card for lid=%1 after successful mylist add (code 310)").arg(lid));
                     updateOrAddMylistEntry(lid);
                     
                     // Trigger deletion mechanism as file was updated (space may have changed)
@@ -2540,12 +2643,14 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 }
                 else
                 {
+                    LOG(QString("WARNING: UpdateLocalPath returned lid=%1 for path=%2 (code 310 - already in mylist). Card may not be created/updated.")
+                        .arg(lid).arg(localPath));
+                    
                     // Even if we couldn't find the mylist entry in the local database,
                     // we know the file is in AniDB's mylist (310 response), so update binding_status
                     // to prevent the file from reappearing in unknown files list on restart
                     adbapi->UpdateLocalFileBindingStatus(localPath, 1); // 1 = bound_to_anime
                     adbapi->UpdateLocalFileStatus(localPath, 2); // 2 = in anidb
-                    LOG(QString("Updated binding_status directly for path=%1 (mylist entry not found locally)").arg(localPath));
                 }
                 
                 // Remove from unknown files widget if present (re-check succeeded)
@@ -2650,12 +2755,18 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 				// Update only the specific mylist entry instead of reloading entire tree
 				if(lid > 0)
 				{
+					LOG(QString("Updating anime card for lid=%1 after successful mylist add (code %2)").arg(lid).arg(code));
 					updateOrAddMylistEntry(lid);
 					
 					// Trigger deletion mechanism as new files were added (space may have decreased)
 					if (watchSessionManager && watchSessionManager->isAutoMarkDeletionEnabled()) {
 						watchSessionManager->autoMarkFilesForDeletion();
 					}
+				}
+				else
+				{
+					LOG(QString("WARNING: UpdateLocalPath returned lid=%1 for path=%2 (code %3 - newly added). Card may not be created/updated.")
+						.arg(lid).arg(localPath).arg(code));
 				}
 				
 				// Remove from unknown files widget if present (re-check succeeded)
@@ -4063,12 +4174,6 @@ void Window::startPlaybackForFile(int lid)
 // Sort cards based on selected criterion
 void Window::sortMylistCards(int sortIndex)
 {
-	// If series chain display is enabled, skip sorting to preserve chain order
-	if (filterSidebar && filterSidebar->getShowSeriesChain()) {
-		LOG("[Window] Series chain display enabled - skipping sort to preserve chain order");
-		return;
-	}
-	
 	// Get the list of anime IDs from the card manager
 	QList<int> animeIds = cardManager->getAnimeIdList();
 	
@@ -4084,6 +4189,12 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	bool sortAscending = filterSidebar->getSortAscending();
+	bool seriesChainEnabled = filterSidebar && filterSidebar->getShowSeriesChain();
+	
+	// When series chain is enabled, we apply nested sorting:
+	// - Sort the series chains by the selected criterion (using first anime in chain as representative)
+	// - Within each chain, maintain sequential order (prequel -> sequel)
+	// This happens in applyMylistFilters(), but sortMylistCards() needs to re-sort when user changes criteria
 	
 	// For sorting, we need to access card data. Build a combined map from all sources.
 	QMap<int, AnimeCard*> cardsMap;
@@ -4106,6 +4217,229 @@ void Window::sortMylistCards(int sortIndex)
 		return cardManager->getCachedAnimeData(aid);
 	};
 	
+	// Handle nested sorting when series chain is enabled
+	if (seriesChainEnabled && watchSessionManager) {
+		LOG("[Window] Series chain enabled - applying nested sorting (sort chains, preserve internal order)");
+		
+		// Build chain groups from current anime list
+		QMap<int, QList<int>> chainGroups;
+		QSet<int> processedIds;
+		
+		for (int aid : std::as_const(animeIds)) {
+			if (processedIds.contains(aid)) {
+				continue;
+			}
+			
+			// Get the full chain for this anime
+			QList<int> chain = watchSessionManager->getSeriesChain(aid);
+			if (!chain.isEmpty()) {
+				// Use first anime in chain as the key
+				int chainKey = chain.first();
+				
+				// Only add anime that are in our current list
+				QList<int> filteredChain;
+				for (int chainAid : chain) {
+					if (animeIds.contains(chainAid)) {
+						filteredChain.append(chainAid);
+						processedIds.insert(chainAid);
+					}
+				}
+				
+				if (!filteredChain.isEmpty()) {
+					chainGroups[chainKey] = filteredChain;
+				}
+			} else {
+				// Anime not in any chain - treat as single-item chain
+				chainGroups[aid] = QList<int>() << aid;
+				processedIds.insert(aid);
+			}
+		}
+		
+		// Get chain keys for sorting
+		QList<int> chainKeys = chainGroups.keys();
+		
+		// Define comparison lambda that will be used for sorting chains
+		auto compareChains = [&cardsMap, &getCachedData, sortAscending, sortIndex](int chainKeyA, int chainKeyB) -> bool {
+			// Use the first anime in each chain as the representative for sorting
+			int aidA = chainKeyA;
+			int aidB = chainKeyB;
+			
+			AnimeCard* a = cardsMap.value(aidA);
+			AnimeCard* b = cardsMap.value(aidB);
+			
+			// Common hidden check for all sort types
+			bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden;
+			bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden;
+			
+			// Hidden cards always go to the bottom
+			if (hiddenA != hiddenB) {
+				return hiddenB;  // non-hidden comes before hidden
+			}
+			
+			// Apply specific sort criterion
+			switch (sortIndex) {
+				case 0: { // Anime Title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return sortAscending ? (titleA < titleB) : (titleA > titleB);
+				}
+				case 1: { // Type
+					QString typeA = a ? a->getAnimeType() : getCachedData(aidA).typeName;
+					QString typeB = b ? b->getAnimeType() : getCachedData(aidB).typeName;
+					if (typeA != typeB) {
+						return sortAscending ? (typeA < typeB) : (typeA > typeB);
+					}
+					// Fallback to title for same type
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				case 2: { // Aired Date
+					aired airedA, airedB;
+					if (a) {
+						airedA = a->getAired();
+					} else {
+						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+						airedA = aired(cachedA.startDate, cachedA.endDate);
+					}
+					if (b) {
+						airedB = b->getAired();
+					} else {
+						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+						airedB = aired(cachedB.startDate, cachedB.endDate);
+					}
+					
+					if (airedA == airedB) {
+						// Fallback to title
+						QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+						QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+						return titleA < titleB;
+					}
+					return sortAscending ? (airedA < airedB) : (airedA > airedB);
+				}
+				case 3: { // Episodes (Count)
+					int episodesA, episodesB;
+					if (a) {
+						episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+					} else {
+						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+						episodesA = cachedA.stats.normalEpisodes + cachedA.stats.otherEpisodes;
+					}
+					if (b) {
+						episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+					} else {
+						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+						episodesB = cachedB.stats.normalEpisodes + cachedB.stats.otherEpisodes;
+					}
+					if (episodesA != episodesB) {
+						return sortAscending ? (episodesA < episodesB) : (episodesA > episodesB);
+					}
+					// Fallback to title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				case 4: { // Completion %
+					int totalEpisodesA, totalEpisodesB, viewedA, viewedB;
+					if (a) {
+						totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
+						viewedA = a->getNormalViewed() + a->getOtherViewed();
+					} else {
+						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+						totalEpisodesA = cachedA.stats.normalEpisodes + cachedA.stats.otherEpisodes;
+						viewedA = cachedA.stats.normalViewed + cachedA.stats.otherViewed;
+					}
+					if (b) {
+						totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
+						viewedB = b->getNormalViewed() + b->getOtherViewed();
+					} else {
+						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+						totalEpisodesB = cachedB.stats.normalEpisodes + cachedB.stats.otherEpisodes;
+						viewedB = cachedB.stats.normalViewed + cachedB.stats.otherViewed;
+					}
+					
+					double percentA = (totalEpisodesA > 0) ? (static_cast<double>(viewedA) / totalEpisodesA) : 0.0;
+					double percentB = (totalEpisodesB > 0) ? (static_cast<double>(viewedB) / totalEpisodesB) : 0.0;
+					
+					if (percentA != percentB) {
+						return sortAscending ? (percentA < percentB) : (percentA > percentB);
+					}
+					// Fallback to title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				case 5: { // Last Played
+					qint64 lastPlayedA = a ? a->getLastPlayed() : getCachedData(aidA).lastPlayed;
+					qint64 lastPlayedB = b ? b->getLastPlayed() : getCachedData(aidB).lastPlayed;
+					
+					// Never played items go to end (timestamp is 0)
+					if (lastPlayedA == 0 && lastPlayedB == 0) {
+						return false;
+					}
+					if (lastPlayedA == 0) {
+						return false;  // Never played goes to end
+					}
+					if (lastPlayedB == 0) {
+						return true;
+					}
+					
+					if (lastPlayedA != lastPlayedB) {
+						return sortAscending ? (lastPlayedA < lastPlayedB) : (lastPlayedA > lastPlayedB);
+					}
+					// Fallback to title
+					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName;
+					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName;
+					return titleA < titleB;
+				}
+				default:
+					return false;
+			}
+		};
+		
+		// Sort the chain keys using the comparison function
+		std::sort(chainKeys.begin(), chainKeys.end(), compareChains);
+		
+		// Rebuild animeIds with sorted chains (preserving internal chain order)
+		animeIds.clear();
+		for (int chainKey : chainKeys) {
+			const QList<int>& chain = chainGroups[chainKey];
+			animeIds.append(chain);
+		}
+		
+		// Update the card manager with the new order
+		cardManager->setAnimeIdList(animeIds);
+		
+		// If using virtual scrolling, refresh the layout
+		if (mylistVirtualLayout) {
+			mylistVirtualLayout->refresh();
+		}
+		
+		// Also update the legacy animeCards list order for backward compatibility
+		animeCards.clear();
+		for (int aid : animeIds) {
+			AnimeCard* card = cardManager->getCard(aid);
+			if (card) {
+				animeCards.append(card);
+			}
+		}
+		
+		// If not using virtual scrolling (backward compatibility), update the regular flow layout
+		if (!mylistVirtualLayout && mylistCardLayout) {
+			// Remove all cards from layout
+			for (AnimeCard* const card : std::as_const(animeCards)) {
+				mylistCardLayout->removeWidget(card);
+			}
+			// Re-add cards to layout in sorted order
+			for (AnimeCard* const card : std::as_const(animeCards)) {
+				mylistCardLayout->addWidget(card);
+			}
+		}
+		
+		return;  // Done with nested sorting
+	}
+	
+	// Regular sorting (no series chain grouping)
 	// Sort based on criterion
 	// Use cached data when card widgets don't exist (virtual scrolling)
 	switch (sortIndex) {
@@ -4454,12 +4788,14 @@ void Window::loadMylistAsCards()
 	// Reload alternative titles for filtering
 	loadAnimeAlternativeTitlesForFiltering();
 	
-	// Apply current filters first, then sorting
+	// Restore filter settings first
+	restoreMylistSorting();
+	
+	// Apply current filters, then sorting
 	// (sorting must happen after filtering to preserve sort order on filtered results)
 	applyMylistFilters();
 	
 	// Apply sorting after filtering
-	restoreMylistSorting();
 	sortMylistCards(filterSidebar->getSortIndex());
 	
 	mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));

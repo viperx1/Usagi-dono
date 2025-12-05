@@ -42,6 +42,17 @@ public:
     bool getInMyListOnly() const;
     bool getShowSeriesChain() const;
     
+    // Set filter values (for loading from settings)
+    void setSortIndex(int index);
+    void setSortAscending(bool ascending);
+    void setTypeFilter(const QString& typeData);
+    void setCompletionFilter(const QString& completionData);
+    void setShowOnlyUnwatched(bool checked);
+    void setShowMarkedForDeletion(bool checked);
+    void setInMyListOnly(bool checked);
+    void setShowSeriesChain(bool checked);
+    void setAdultContentFilter(const QString& filterData);
+    
     // Reset all filters
     void resetFilters();
     
@@ -69,6 +80,7 @@ protected:
     
 private:
     void setupUI();
+    void setComboBoxByData(QComboBox* comboBox, const QString& data);
     
     // UI elements - Filters
     QLineEdit *m_searchField;

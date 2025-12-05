@@ -252,6 +252,65 @@ bool MyListFilterSidebar::getShowSeriesChain() const
     return m_showSeriesChainCheckbox->isChecked();
 }
 
+void MyListFilterSidebar::setSortIndex(int index)
+{
+    if (index >= 0 && index < m_sortComboBox->count()) {
+        m_sortComboBox->setCurrentIndex(index);
+    }
+}
+
+void MyListFilterSidebar::setSortAscending(bool ascending)
+{
+    m_sortAscending = ascending;
+    m_sortOrderButton->setText(ascending ? "↑ Asc" : "↓ Desc");
+}
+
+// Helper method to find and set combo box item by data
+void MyListFilterSidebar::setComboBoxByData(QComboBox* comboBox, const QString& data)
+{
+    for (int i = 0; i < comboBox->count(); ++i) {
+        if (comboBox->itemData(i).toString() == data) {
+            comboBox->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
+void MyListFilterSidebar::setTypeFilter(const QString& typeData)
+{
+    setComboBoxByData(m_typeFilter, typeData);
+}
+
+void MyListFilterSidebar::setCompletionFilter(const QString& completionData)
+{
+    setComboBoxByData(m_completionFilter, completionData);
+}
+
+void MyListFilterSidebar::setShowOnlyUnwatched(bool checked)
+{
+    m_showOnlyUnwatchedCheckbox->setChecked(checked);
+}
+
+void MyListFilterSidebar::setShowMarkedForDeletion(bool checked)
+{
+    m_showMarkedForDeletionCheckbox->setChecked(checked);
+}
+
+void MyListFilterSidebar::setInMyListOnly(bool checked)
+{
+    m_inMyListCheckbox->setChecked(checked);
+}
+
+void MyListFilterSidebar::setShowSeriesChain(bool checked)
+{
+    m_showSeriesChainCheckbox->setChecked(checked);
+}
+
+void MyListFilterSidebar::setAdultContentFilter(const QString& filterData)
+{
+    setComboBoxByData(m_adultContentFilter, filterData);
+}
+
 void MyListFilterSidebar::resetFilters()
 {
     m_searchField->clear();
