@@ -3,6 +3,7 @@
 
 #include <QElapsedTimer>
 #include <QList>
+#include <QMap>
 #include <QMutex>
 #include <QPair>
 
