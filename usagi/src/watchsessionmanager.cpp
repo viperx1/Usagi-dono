@@ -1980,6 +1980,8 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
         return false;  // Can't determine, assume no gap
     }
     
+    // Note: We also retrieve m.eid here (in addition to aid and epno) to use later
+    // for checking if multiple files exist for the same episode
     QSqlQuery q(db);
     q.prepare("SELECT m.aid, e.epno, m.eid FROM mylist m "
               "JOIN episode e ON m.eid = e.eid "
