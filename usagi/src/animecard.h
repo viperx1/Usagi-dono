@@ -104,9 +104,6 @@ signals:
     void markEpisodeWatchedRequested(int eid);  // Mark episode as watched
     void markFileWatchedRequested(int lid);  // Mark file as watched
     void startSessionFromEpisodeRequested(int lid);  // Start session from specific episode/file
-    void markFileForDownloadRequested(int lid);  // Mark file for download
-    void markFileForDeletionRequested(int lid);  // Mark file for deletion
-    void clearFileMarkRequested(int lid);  // Clear file marking
     void deleteFileRequested(int lid);  // Delete file completely (from disk and mylist)
     
 protected:

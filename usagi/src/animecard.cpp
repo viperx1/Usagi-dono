@@ -272,22 +272,7 @@ void AnimeCard::setupUI()
                 
                 contextMenu.addSeparator();
                 
-                // File marking options
-                QAction *markDownloadAction = contextMenu.addAction("Mark for download");
-                connect(markDownloadAction, &QAction::triggered, this, [this, lid]() {
-                    emit markFileForDownloadRequested(lid);
-                });
-                
-                QAction *markDeletionAction = contextMenu.addAction("Mark for deletion");
-                connect(markDeletionAction, &QAction::triggered, this, [this, lid]() {
-                    emit markFileForDeletionRequested(lid);
-                });
-                
-                QAction *clearMarkAction = contextMenu.addAction("Clear marking");
-                connect(clearMarkAction, &QAction::triggered, this, [this, lid]() {
-                    emit clearFileMarkRequested(lid);
-                });
-                
+
                 contextMenu.addSeparator();
                 
                 // Destructive action - delete file completely

@@ -1031,13 +1031,6 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, c
         fileInfo.setQuality(entry.quality);
         fileInfo.setGroupName(entry.groupName);
         
-        // Skip marking - marking system eliminated in Phase 1
-        // TODO Phase 2: Remove setMarkType from CardFileInfo entirely
-        if (m_watchSessionManager) {
-        } else {
-        }
-        
-        // Assign version number
         episodeFileCount[eid]++;
         fileInfo.setVersion(episodeFileCount[eid]);
         

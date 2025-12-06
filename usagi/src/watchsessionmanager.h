@@ -167,7 +167,7 @@ public:
     void autoMarkFilesForDeletion();
     
     /**
-     * @brief Placeholder for download marking (removed - marking system eliminated)
+     * @brief Placeholder for download marking (removed)
      * 
      * This method is now a no-op. Download management should be handled elsewhere.
      */

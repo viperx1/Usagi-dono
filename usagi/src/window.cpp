@@ -366,18 +366,6 @@ Window::Window()
                 watchSessionManager->startSessionFromFile(lid);
             }
         });
-        connect(card, &AnimeCard::markFileForDownloadRequested, this, [this](int lid) {
-            LOG(QString("[Window] Marking file lid=%1 for download - DISABLED (marking system removed)").arg(lid));
-            // TODO Phase 2: Remove this signal connection entirely
-        });
-        connect(card, &AnimeCard::markFileForDeletionRequested, this, [this](int lid) {
-            LOG(QString("[Window] Marking file lid=%1 for deletion - DISABLED (marking system removed)").arg(lid));
-            // TODO Phase 2: Remove this signal connection entirely
-        });
-        connect(card, &AnimeCard::clearFileMarkRequested, this, [this](int lid) {
-            LOG(QString("[Window] Clearing file mark for lid=%1 - DISABLED (marking system removed)").arg(lid));
-            // TODO Phase 2: Remove this signal connection entirely
-        });
         connect(card, &AnimeCard::deleteFileRequested, this, [this](int lid) {
             LOG(QString("[Window] Delete file requested for lid=%1").arg(lid));
             // Show confirmation dialog
@@ -951,8 +939,6 @@ Window::Window()
     sessionEnableAutoDeletionCheckbox->blockSignals(false);
     sessionForceDeletePermissionsCheckbox->blockSignals(false);
     
-    // Note: markingsUpdated signal removed - marking system eliminated in Phase 1
-    // TODO Phase 2: Clean up any UI that depended on marking indicators
     
     // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion
     connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
@@ -5210,7 +5196,6 @@ void Window::applyMylistFilters()
 					q.addBindValue(aid);
 					if (q.exec()) {
 						while (q.next()) {
-							// TODO Phase 2: Remove marking check entirely - marking system eliminated
 						}
 					}
 				}
