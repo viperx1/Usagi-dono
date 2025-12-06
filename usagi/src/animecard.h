@@ -12,6 +12,9 @@
 #include "epno.h"
 #include "aired.h"
 #include "watchsessionmanager.h"  // For FileMarkType enum
+#include "taginfo.h"
+#include "cardfileinfo.h"
+#include "cardepisodeinfo.h"
 
 // Forward declaration
 class PlayButtonDelegate;
@@ -38,45 +41,10 @@ public:
     explicit AnimeCard(QWidget *parent = nullptr);
     virtual ~AnimeCard();
     
-    // Tag structure for storing tag data
-    struct TagInfo {
-        QString name;
-        int id;
-        int weight;
-        
-        // For sorting by weight (highest first)
-        bool operator<(const TagInfo& other) const {
-            return weight > other.weight;
-        }
-    };
-    
-    // File and Episode management structures
-    struct FileInfo {
-        int lid;
-        int fid;
-        QString fileName;
-        QString state;
-        bool viewed;        // AniDB API watch status (synced from server)
-        bool localWatched;  // Local watch status (chunk-based playback tracking)
-        QString storage;
-        QString localFilePath;  // Path to local file if tracked
-        qint64 lastPlayed;  // Timestamp of last playback session (for resume)
-        QString resolution;
-        QString quality;
-        QString groupName;
-        int version;  // File version (1, 2, 3, etc.)
-        FileMarkType markType;  // File marking for download/deletion
-        
-        FileInfo() : lid(0), fid(0), viewed(false), localWatched(false), 
-                     lastPlayed(0), version(0), markType(FileMarkType::None) {}
-    };
-    
-    struct EpisodeInfo {
-        int eid;
-        epno episodeNumber;
-        QString episodeTitle;
-        QList<FileInfo> files;  // Multiple files per episode
-    };
+    // Type aliases for new classes (for backward compatibility during migration)
+    using TagInfo = ::TagInfo;
+    using FileInfo = ::CardFileInfo;
+    using EpisodeInfo = ::CardEpisodeInfo;
     
     // Getters
     int getAnimeId() const { return m_animeId; }

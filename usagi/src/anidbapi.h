@@ -24,6 +24,9 @@
 #include "anidbanimeinfo.h"
 #include "anidbepisodeinfo.h"
 #include "anidbgroupinfo.h"
+#include "truncatedresponseinfo.h"
+#include "filehashinfo.h"
+#include "replywaiter.h"
 
 // Forward declaration for myAniDBApi (defined in main.h)
 // and extern declaration for the global adbapi pointer
@@ -116,16 +119,8 @@ private:
 	QString lastSentPacket;
 	QString currentTag; // Track the tag of the currently pending request
 	
-	// Truncated response handling
-	struct TruncatedResponseInfo {
-		bool isTruncated;
-		QString tag;
-		QString command;
-		int fieldsParsed;
-		unsigned int fmaskReceived;
-		unsigned int amaskReceived;
-		TruncatedResponseInfo() : isTruncated(false), fieldsParsed(0), fmaskReceived(0), amaskReceived(0) {}
-	} truncatedResponse;
+	// Truncated response handling - manages state for multi-part AniDB API responses
+	TruncatedResponseInfo truncatedResponse;
 	
 	// Anime titles download and management
 	QNetworkAccessManager *networkManager;
@@ -399,12 +394,6 @@ public:
 	 */
 	QString deleteFileFromMylist(int lid, bool deleteFromDisk = true);
 	
-	struct FileHashInfo {
-		QString path;
-		QString hash;
-		int status;
-		int bindingStatus;
-	};
 	QMap<QString, FileHashInfo> batchGetLocalFileHashes(const QStringList& filePaths);
 	QList<FileHashInfo> getUnboundFiles();
 
@@ -412,11 +401,7 @@ public:
 	int CreateSocket();
 	QString ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg, bool isTruncated = false);
 	int Send(QString, QString, QString);
-    struct _waitingForReply
-    {
-        bool isWaiting;
-        QElapsedTimer start;
-    }waitingForReply;
+	ReplyWaiter waitingForReply;  // Manages network reply timeout detection
 
 	/* Socket End === */
 

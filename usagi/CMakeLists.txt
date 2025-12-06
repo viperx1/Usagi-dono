@@ -54,6 +54,14 @@ set(SOURCES
     src/animemetadatacache.cpp
     src/filemarkinfo.cpp
     src/sessioninfo.cpp
+    src/truncatedresponseinfo.cpp
+    src/filehashinfo.cpp
+    src/replywaiter.cpp
+    src/taginfo.cpp
+    src/cardfileinfo.cpp
+    src/cardepisodeinfo.cpp
+    src/animestats.cpp
+    src/cachedanimedata.cpp
 )
 
 # Header files
@@ -94,6 +102,14 @@ set(HEADERS
     src/animemetadatacache.h
     src/filemarkinfo.h
     src/sessioninfo.h
+    src/truncatedresponseinfo.h
+    src/filehashinfo.h
+    src/replywaiter.h
+    src/taginfo.h
+    src/cardfileinfo.h
+    src/cardepisodeinfo.h
+    src/animestats.h
+    src/cachedanimedata.h
 )
 
 # Create executable
