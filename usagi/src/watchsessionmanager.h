@@ -158,6 +158,21 @@ public:
      * @return true if space is below threshold and deletion is needed
      */
     bool isDeletionNeeded() const;
+
+    /**
+     * @brief Trigger file deletion when space is low (simplified from marking system)
+     * 
+     * Checks if space is below threshold and triggers deleteNextEligibleFile() if needed.
+     * This replaces the complex marking logic with simple on-demand deletion triggering.
+     */
+    void autoMarkFilesForDeletion();
+    
+    /**
+     * @brief Placeholder for download marking (removed - marking system eliminated)
+     * 
+     * This method is now a no-op. Download management should be handled elsewhere.
+     */
+    void autoMarkFilesForDownload();
     
     /**
      * @brief Auto-start sessions for existing anime with local files

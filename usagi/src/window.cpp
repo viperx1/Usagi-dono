@@ -367,22 +367,16 @@ Window::Window()
             }
         });
         connect(card, &AnimeCard::markFileForDownloadRequested, this, [this](int lid) {
-            LOG(QString("[Window] Marking file lid=%1 for download").arg(lid));
-            if (watchSessionManager) {
-                watchSessionManager->setFileMarkType(lid, FileMarkType::ForDownload);
-            }
+            LOG(QString("[Window] Marking file lid=%1 for download - DISABLED (marking system removed)").arg(lid));
+            // TODO Phase 2: Remove this signal connection entirely
         });
         connect(card, &AnimeCard::markFileForDeletionRequested, this, [this](int lid) {
-            LOG(QString("[Window] Marking file lid=%1 for deletion").arg(lid));
-            if (watchSessionManager) {
-                watchSessionManager->setFileMarkType(lid, FileMarkType::ForDeletion);
-            }
+            LOG(QString("[Window] Marking file lid=%1 for deletion - DISABLED (marking system removed)").arg(lid));
+            // TODO Phase 2: Remove this signal connection entirely
         });
         connect(card, &AnimeCard::clearFileMarkRequested, this, [this](int lid) {
-            LOG(QString("[Window] Clearing file mark for lid=%1").arg(lid));
-            if (watchSessionManager) {
-                watchSessionManager->setFileMarkType(lid, FileMarkType::None);
-            }
+            LOG(QString("[Window] Clearing file mark for lid=%1 - DISABLED (marking system removed)").arg(lid));
+            // TODO Phase 2: Remove this signal connection entirely
         });
         connect(card, &AnimeCard::deleteFileRequested, this, [this](int lid) {
             LOG(QString("[Window] Delete file requested for lid=%1").arg(lid));
@@ -957,20 +951,8 @@ Window::Window()
     sessionEnableAutoDeletionCheckbox->blockSignals(false);
     sessionForceDeletePermissionsCheckbox->blockSignals(false);
     
-    // Connect WatchSessionManager signals to refresh cards when markings change
-    connect(watchSessionManager, &WatchSessionManager::markingsUpdated, this, [this](const QSet<int>& updatedLids) {
-        LOG(QString("[Window] File markings updated for %1 files, refreshing affected cards").arg(updatedLids.size()));
-        // Trigger targeted card refresh to show updated markings
-        if (cardManager) {
-            if (updatedLids.isEmpty()) {
-                // Fallback: if no specific lids provided, refresh all (shouldn't happen normally)
-                cardManager->refreshAllCards();
-            } else {
-                // Only refresh cards containing the updated lids
-                cardManager->refreshCardsForLids(updatedLids);
-            }
-        }
-    });
+    // Note: markingsUpdated signal removed - marking system eliminated in Phase 1
+    // TODO Phase 2: Clean up any UI that depended on marking indicators
     
     // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion
     connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
@@ -2682,7 +2664,8 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                     LOG(QString("Updating anime card for lid=%1 after successful mylist add (code 310)").arg(lid));
                     updateOrAddMylistEntry(lid);
                     
-                    // Trigger deletion mechanism as file was updated (space may have changed)
+                    // Note: Deletion mechanism now uses on-demand file selection
+                    // autoMarkFilesForDeletion() is simplified to just trigger deletion when space is low
                     if (watchSessionManager && watchSessionManager->isAutoMarkDeletionEnabled()) {
                         watchSessionManager->autoMarkFilesForDeletion();
                     }
@@ -2804,7 +2787,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 					LOG(QString("Updating anime card for lid=%1 after successful mylist add (code %2)").arg(lid).arg(code));
 					updateOrAddMylistEntry(lid);
 					
-					// Trigger deletion mechanism as new files were added (space may have decreased)
+					// Note: Deletion mechanism now uses on-demand file selection
 					if (watchSessionManager && watchSessionManager->isAutoMarkDeletionEnabled()) {
 						watchSessionManager->autoMarkFilesForDeletion();
 					}
@@ -5227,12 +5210,7 @@ void Window::applyMylistFilters()
 					q.addBindValue(aid);
 					if (q.exec()) {
 						while (q.next()) {
-							int lid = q.value(0).toInt();
-							FileMarkType markType = watchSessionManager->getFileMarkType(lid);
-							if (markType == FileMarkType::ForDeletion) {
-								hasMarkedFiles = true;
-								break;
-							}
+							// TODO Phase 2: Remove marking check entirely - marking system eliminated
 						}
 					}
 				}
