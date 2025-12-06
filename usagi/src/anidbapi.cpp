@@ -886,7 +886,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			}
 			else
 			{
-				LOG(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid).arg(QString(token2.at(0))));
+				LOG(QString("Successfully stored mylist entry - lid=%1, fid=%2").arg(lid, QString(token2.at(0))));
 			}
 		}
 		else if(lid.isEmpty())
