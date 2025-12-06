@@ -46,6 +46,10 @@ set(SOURCES
     src/applicationsettings.cpp
     src/progresstracker.cpp
     src/localfileinfo.cpp
+    src/anidbfileinfo.cpp
+    src/anidbanimeinfo.cpp
+    src/anidbepisodeinfo.cpp
+    src/anidbgroupinfo.cpp
 )
 
 # Header files
@@ -78,6 +82,10 @@ set(HEADERS
     src/applicationsettings.h
     src/progresstracker.h
     src/localfileinfo.h
+    src/anidbfileinfo.h
+    src/anidbanimeinfo.h
+    src/anidbepisodeinfo.h
+    src/anidbgroupinfo.h
 )
 
 # Create executable

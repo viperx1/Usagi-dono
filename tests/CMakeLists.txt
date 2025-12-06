@@ -1674,3 +1674,29 @@ endif()
 
 add_test(NAME test_bitrate_preferences COMMAND test_bitrate_preferences -v2)
 
+# ==========================================================
+# test_anidbfileinfo - AniDBFileInfo class tests
+# ==========================================================
+add_executable(test_anidbfileinfo
+    test_anidbfileinfo.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/anidbfileinfo.cpp
+)
+
+target_link_libraries(test_anidbfileinfo PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_anidbfileinfo PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_anidbfileinfo PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_anidbfileinfo COMMAND test_anidbfileinfo -v2)
+

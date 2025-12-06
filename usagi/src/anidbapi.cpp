@@ -753,37 +753,54 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// FID is always the first field in FILE responses
 		int index = 1;  // Start parsing after FID
 		
-		// Parse file data using fmask
-		FileData fileData = parseFileMask(token2, fmask, index);
+		// Parse file data using fmask (now returns AniDBFileInfo)
+		AniDBFileInfo fileInfo = parseFileMask(token2, fmask, index);
+		// Set FID which is returned separately
+		fileInfo.setFileId(token2.value(0).toInt());
 		
 		// Parse anime data using amask
-		AnimeData animeData = parseFileAmaskAnimeData(token2, amask, index);
+		AniDBAnimeInfo animeInfo = parseFileAmaskAnimeData(token2, amask, index);
 		
 		// Parse episode data using amask
-		EpisodeData episodeData = parseFileAmaskEpisodeData(token2, amask, index);
+		AniDBEpisodeInfo episodeInfo = parseFileAmaskEpisodeData(token2, amask, index);
 		
 		// Parse group data using amask
-		GroupData groupData = parseFileAmaskGroupData(token2, amask, index);
+		AniDBGroupInfo groupInfo = parseFileAmaskGroupData(token2, amask, index);
 		
 		// Store all parsed data
-		storeFileData(fileData);
+		storeFileData(fileInfo);
 		
-		if(!animeData.aid.isEmpty())
+		if(animeInfo.isValid() || fileInfo.animeId() > 0)
 		{
-			animeData.aid = fileData.aid;  // Ensure aid is set from file data
-			storeAnimeData(animeData);
+			// Ensure AID is set from file data
+			if(!animeInfo.isValid()) {
+				animeInfo.setAnimeId(fileInfo.animeId());
+			} else if(animeInfo.animeId() == 0) {
+				animeInfo.setAnimeId(fileInfo.animeId());
+			}
+			storeAnimeData(animeInfo);
 		}
 		
-		if(!episodeData.eid.isEmpty())
+		if(episodeInfo.isValid() || fileInfo.episodeId() > 0)
 		{
-			episodeData.eid = fileData.eid;  // Ensure eid is set from file data
-			storeEpisodeData(episodeData);
+			// Ensure EID is set from file data
+			if(!episodeInfo.isValid()) {
+				episodeInfo.setEpisodeId(fileInfo.episodeId());
+			} else if(episodeInfo.episodeId() == 0) {
+				episodeInfo.setEpisodeId(fileInfo.episodeId());
+			}
+			storeEpisodeData(episodeInfo);
 		}
 		
-		if(!groupData.gid.isEmpty())
+		if(groupInfo.isValid() || fileInfo.groupId() > 0)
 		{
-			groupData.gid = fileData.gid;  // Ensure gid is set from file data
-			storeGroupData(groupData);
+			// Ensure GID is set from file data
+			if(!groupInfo.isValid()) {
+				groupInfo.setGroupId(fileInfo.groupId());
+			} else if(groupInfo.groupId() == 0) {
+				groupInfo.setGroupId(fileInfo.groupId());
+			}
+			storeGroupData(groupInfo);
 		}
 		
 		// Handle truncated response - log warning about incomplete data
@@ -794,17 +811,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 		
 		// Always queue EPISODE API request after FILE reply to ensure complete episode data
-		if(!fileData.eid.isEmpty() && fileData.eid != QLatin1String("0"))
+		if(fileInfo.episodeId() > 0)
 		{
-			LOG(QString("Queuing EPISODE API request for EID %1").arg(fileData.eid));
-			Episode(fileData.eid.toInt());
+			LOG(QString("Queuing EPISODE API request for EID %1").arg(fileInfo.episodeId()));
+			Episode(fileInfo.episodeId());
 		}
 		
 		// Always queue ANIME API request after FILE reply to ensure complete anime data
-		if(!fileData.aid.isEmpty() && fileData.aid != QLatin1String("0"))
+		if(fileInfo.animeId() > 0)
 		{
-			LOG(QString("Queuing ANIME API request for AID %1").arg(fileData.aid));
-			Anime(fileData.aid.toInt());
+			LOG(QString("Queuing ANIME API request for AID %1").arg(fileInfo.animeId()));
+			Anime(fileInfo.animeId());
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
@@ -1044,11 +1061,11 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Parse anime data using amask string for proper 7-byte handling
 			// Track which fields were successfully parsed for re-request logic
 			QByteArray parsedMaskBytes;
-			AnimeData animeData = parseMaskFromString(token2, amaskString, index, parsedMaskBytes);
-			animeData.aid = aid;  // Ensure aid is set
+			AniDBAnimeInfo animeInfo = parseMaskFromString(token2, amaskString, index, parsedMaskBytes);
+			animeInfo.setAnimeId(aid.toInt());  // Ensure aid is set
 			
 			Logger::log("[AniDB Response] 230 ANIME parsed " + QString::number(index - startIndex) + " fields (index: " + QString::number(startIndex) + " -> " + QString::number(index) + ")", __FILE__, __LINE__);
-			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + animeData.year + "' Type: '" + animeData.type + "'", __FILE__, __LINE__);
+			Logger::log("[AniDB Response] 230 ANIME parsed - AID: " + aid + " Year: '" + animeInfo.year() + "' Type: '" + animeInfo.type() + "'", __FILE__, __LINE__);
 			
 			// Handle truncated response - calculate missing fields and re-request
 			if(isTruncated)
@@ -1089,9 +1106,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Store all anime data to database
 			if(!aid.isEmpty())
 			{
-				animeData.aid = aid;  // Ensure aid is set
-				storeAnimeData(animeData);
-				Logger::log("[AniDB Response] 230 ANIME metadata saved to database - AID: " + aid + " Type: " + animeData.type, __FILE__, __LINE__);
+				animeInfo.setAnimeId(aid.toInt());  // Ensure aid is set
+				storeAnimeData(animeInfo);
+				Logger::log("[AniDB Response] 230 ANIME metadata saved to database - AID: " + aid + " Type: " + animeInfo.type(), __FILE__, __LINE__);
 				// Emit signal to notify UI that anime data was updated
 				emit notifyAnimeUpdated(aid.toInt());
 			}
@@ -4486,72 +4503,22 @@ void AniDBApi::checkForExistingExport()
 
 /**
  * Parse FILE command response using fmask to determine which fields are present.
- * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
+ * Uses AniDBFileInfo class for type-safe parsing.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param fmask File mask indicating which fields are present
  * @param index Current index in tokens array (updated as fields are consumed)
- * @return FileData structure with parsed fields
+ * @return AniDBFileInfo object with parsed fields
  */
-AniDBApi::FileData AniDBApi::parseFileMask(const QStringList& tokens, unsigned int fmask, int& index)
+AniDBFileInfo AniDBApi::parseFileMask(const QStringList& tokens, unsigned int fmask, int& index)
 {
-	FileData data;
+	// Use AniDBFileInfo's factory method for type-safe parsing
+	AniDBFileInfo fileInfo = AniDBFileInfo::fromApiResponse(tokens, fmask, index);
 	
-	// FID is always returned first in FILE responses, regardless of mask
-	// It's not part of the fmask-controlled fields
-	data.fid = tokens.value(0);
+	// FID is always returned first in FILE responses (tokens[0])
+	// It's handled separately in the calling code
 	
-	// Process fmask bits from MSB (bit 30) to LSB (bit 0) in strict order using a loop
-	// This ensures correctness even if individual if-statements are reordered
-	
-	// Define all mask bits in MSB to LSB order
-	struct MaskBit {
-		unsigned int bit;
-		QString* field;
-	};
-	
-	MaskBit maskBits[] = {
-		{fAID,            &data.aid},              // Bit 30
-		{fEID,            &data.eid},              // Bit 29
-		{fGID,            &data.gid},              // Bit 28
-		{fLID,            &data.lid},              // Bit 27
-		{fOTHEREPS,       &data.othereps},         // Bit 26
-		{fISDEPR,         &data.isdepr},           // Bit 25
-		{fSTATE,          &data.state},            // Bit 24
-		{fSIZE,           &data.size},             // Bit 23
-		{fED2K,           &data.ed2k},             // Bit 22
-		{fMD5,            &data.md5},              // Bit 21
-		{fSHA1,           &data.sha1},             // Bit 20
-		{fCRC32,          &data.crc},              // Bit 19
-		// Bits 18-16 reserved
-		{fQUALITY,        &data.quality},          // Bit 15
-		{fSOURCE,         &data.source},           // Bit 14
-		{fCODEC_AUDIO,    &data.codec_audio},      // Bit 13
-		{fBITRATE_AUDIO,  &data.bitrate_audio},    // Bit 12
-		{fCODEC_VIDEO,    &data.codec_video},      // Bit 11
-		{fBITRATE_VIDEO,  &data.bitrate_video},    // Bit 10
-		{fRESOLUTION,     &data.resolution},       // Bit 9
-		{fFILETYPE,       &data.filetype},         // Bit 8
-		{fLANG_DUB,       &data.lang_dub},         // Bit 7
-		{fLANG_SUB,       &data.lang_sub},         // Bit 6
-		{fLENGTH,         &data.length},           // Bit 5
-		{fDESCRIPTION,    &data.description},      // Bit 4
-		{fAIRDATE,        &data.airdate},          // Bit 3
-		// Bits 2-1 reserved
-		{fFILENAME,       &data.filename}          // Bit 0
-	};
-	
-	// Process mask bits in order using a loop
-	// This ensures fields are extracted in the correct sequence
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		if (fmask & maskBits[i].bit)
-		{
-			*(maskBits[i].field) = tokens.value(index++);
-		}
-	}
-	
-	return data;
+	return fileInfo;
 }
 
 /**
@@ -4561,49 +4528,32 @@ AniDBApi::FileData AniDBApi::parseFileMask(const QStringList& tokens, unsigned i
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which anime fields are present
  * @param index Current index in tokens array (updated as fields are consumed)
- * @return AnimeData structure with parsed anime fields
+ * @return AniDBAnimeInfo object with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index)
+AniDBAnimeInfo AniDBApi::parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index)
 {
-	AnimeData data;
+	AniDBAnimeInfo animeInfo;
 	
-	// Process file_amask bits from MSB to LSB for anime data using a loop
-	// This ensures correctness even if individual if-statements are reordered
+	// Parse fields based on file_amask bits
+	// Process from MSB to LSB using the defined masks
 	
-	// Define all mask bits in MSB to LSB order
-	struct MaskBit {
-		unsigned int bit;
-		QString* field;
-	};
+	if (amask & aEPISODE_TOTAL) animeInfo.setEptotal(tokens.value(index++));
+	if (amask & aEPISODE_LAST) animeInfo.setEplast(tokens.value(index++));
+	if (amask & aANIME_YEAR) animeInfo.setYear(tokens.value(index++));
+	if (amask & aANIME_TYPE) animeInfo.setType(tokens.value(index++));
+	if (amask & aANIME_RELATED_LIST) animeInfo.setRelatedAnimeIds(tokens.value(index++));
+	if (amask & aANIME_RELATED_TYPE) animeInfo.setRelatedAnimeTypes(tokens.value(index++));
+	if (amask & aANIME_CATAGORY) animeInfo.setCategory(tokens.value(index++));
+	// Bit 24 reserved
+	if (amask & aANIME_NAME_ROMAJI) animeInfo.setNameRomaji(tokens.value(index++));
+	if (amask & aANIME_NAME_KANJI) animeInfo.setNameKanji(tokens.value(index++));
+	if (amask & aANIME_NAME_ENGLISH) animeInfo.setNameEnglish(tokens.value(index++));
+	if (amask & aANIME_NAME_OTHER) animeInfo.setNameOther(tokens.value(index++));
+	if (amask & aANIME_NAME_SHORT) animeInfo.setNameShort(tokens.value(index++));
+	if (amask & aANIME_SYNONYMS) animeInfo.setSynonyms(tokens.value(index++));
+	// Bits 17-14 reserved
 	
-	MaskBit maskBits[] = {
-		{aEPISODE_TOTAL,      &data.eptotal},      // Bit 31
-		{aEPISODE_LAST,       &data.eplast},       // Bit 30
-		{aANIME_YEAR,         &data.year},         // Bit 29
-		{aANIME_TYPE,         &data.type},         // Bit 28
-		{aANIME_RELATED_LIST, &data.relaidlist},   // Bit 27
-		{aANIME_RELATED_TYPE, &data.relaidtype},   // Bit 26
-		{aANIME_CATAGORY,     &data.category},     // Bit 25
-		// Bit 24 reserved
-		{aANIME_NAME_ROMAJI,  &data.nameromaji},   // Bit 23
-		{aANIME_NAME_KANJI,   &data.namekanji},    // Bit 22
-		{aANIME_NAME_ENGLISH, &data.nameenglish},  // Bit 21
-		{aANIME_NAME_OTHER,   &data.nameother},    // Bit 20
-		{aANIME_NAME_SHORT,   &data.nameshort},    // Bit 19
-		{aANIME_SYNONYMS,     &data.synonyms}      // Bit 18
-		// Bits 17-14 reserved
-	};
-	
-	// Process mask bits in order using a loop
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		if (amask & maskBits[i].bit)
-		{
-			*(maskBits[i].field) = tokens.value(index++);
-		}
-	}
-	
-	return data;
+	return animeInfo;
 }
 
 /**
@@ -4615,85 +4565,54 @@ AniDBApi::AnimeData AniDBApi::parseFileAmaskAnimeData(const QStringList& tokens,
  * @param index Current index in tokens array (updated as fields are consumed)
  * @return EpisodeData structure with parsed episode fields
  */
-AniDBApi::EpisodeData AniDBApi::parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index)
+/**
+ * Parse episode data from FILE command response using file_amask.
+ * Processes mask bits in strict MSB to LSB order.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amask Anime mask indicating which episode fields are present
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return AniDBEpisodeInfo object with parsed episode fields
+ */
+AniDBEpisodeInfo AniDBApi::parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index)
 {
-	EpisodeData data;
+	AniDBEpisodeInfo episodeInfo;
 	
-	// Process file_amask bits for episode data using a loop
-	// This ensures correctness even if individual if-statements are reordered
+	// Parse fields based on file_amask bits (MSB to LSB order)
+	if (amask & aEPISODE_NUMBER) episodeInfo.setEpisodeNumber(tokens.value(index++));
+	if (amask & aEPISODE_NAME) episodeInfo.setName(tokens.value(index++));
+	if (amask & aEPISODE_NAME_ROMAJI) episodeInfo.setNameRomaji(tokens.value(index++));
+	if (amask & aEPISODE_NAME_KANJI) episodeInfo.setNameKanji(tokens.value(index++));
+	if (amask & aEPISODE_RATING) episodeInfo.setRating(tokens.value(index++));
+	if (amask & aEPISODE_VOTE_COUNT) episodeInfo.setVoteCount(tokens.value(index++).toInt());
+	// Bits 9-8 reserved
 	
-	// Define all mask bits in MSB to LSB order
-	struct MaskBit {
-		unsigned int bit;
-		QString* field;
-	};
-	
-	MaskBit maskBits[] = {
-		{aEPISODE_NUMBER,      &data.epno},         // Bit 15
-		{aEPISODE_NAME,        &data.epname},       // Bit 14
-		{aEPISODE_NAME_ROMAJI, &data.epnameromaji}, // Bit 13
-		{aEPISODE_NAME_KANJI,  &data.epnamekanji},  // Bit 12
-		{aEPISODE_RATING,      &data.eprating},     // Bit 11
-		{aEPISODE_VOTE_COUNT,  &data.epvotecount}   // Bit 10
-		// Bits 9-8 reserved
-	};
-	
-	// Process mask bits in order using a loop
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		if (amask & maskBits[i].bit)
-		{
-			*(maskBits[i].field) = tokens.value(index++);
-		}
-	}
-	
-	return data;
+	return episodeInfo;
 }
 
 /**
  * Parse group data from FILE command response using file_amask.
- * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
+ * Processes mask bits in strict MSB to LSB order.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which group fields are present
  * @param index Current index in tokens array (updated as fields are consumed)
- * @return GroupData structure with parsed group fields
+ * @return AniDBGroupInfo object with parsed group fields
  */
-AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index)
+AniDBGroupInfo AniDBApi::parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index)
 {
-	GroupData data;
+	AniDBGroupInfo groupInfo;
 	
-	// Process file_amask bits for group data using a loop
-	// This ensures correctness even if individual if-statements are reordered
-	
-	// Define all mask bits in MSB to LSB order
-	struct MaskBit {
-		unsigned int bit;
-		QString* field;
-	};
-	
-	MaskBit maskBits[] = {
-		{aGROUP_NAME,              &data.groupname},      // Bit 7
-		{aGROUP_NAME_SHORT,        &data.groupshortname}, // Bit 6
-		// Bits 5-1 reserved
-		{aDATE_AID_RECORD_UPDATED, nullptr}              // Bit 0 - Not stored
-	};
-	
-	// Process mask bits in order using a loop
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		if (amask & maskBits[i].bit)
-		{
-			QString value = tokens.value(index++);
-			if (maskBits[i].field != nullptr)
-			{
-				*(maskBits[i].field) = value;
-			}
-			// else: field is not stored (marked with nullptr)
-		}
+	// Parse fields based on file_amask bits (MSB to LSB order)
+	if (amask & aGROUP_NAME) groupInfo.setGroupName(tokens.value(index++));
+	if (amask & aGROUP_NAME_SHORT) groupInfo.setGroupShortName(tokens.value(index++));
+	// Bits 5-1 reserved
+	if (amask & aDATE_AID_RECORD_UPDATED) {
+		// Skip this field - not stored
+		index++;
 	}
 	
-	return data;
+	return groupInfo;
 }
 
 /**
@@ -4703,11 +4622,11 @@ AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens,
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which anime fields are present
  * @param index Current index in tokens array (updated as fields are consumed)
- * @return AnimeData structure with parsed anime fields
+ * @return AniDBAnimeInfo object with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseMask(const QStringList& tokens, uint64_t amask, int& index)
+AniDBAnimeInfo AniDBApi::parseMask(const QStringList& tokens, uint64_t amask, int& index)
 {
-	AnimeData data;
+	AniDBAnimeInfo::LegacyAnimeData data;
 	
 	// Note: The ANIME command response order is determined by the amask bits
 	// Process from highest bit to lowest bit (MSB to LSB) in strict order
@@ -4888,7 +4807,7 @@ AniDBApi::AnimeData AniDBApi::parseMask(const QStringList& tokens, uint64_t amas
 	data.eptotal = data.episodes;  // episodes (Byte 3, bit 7)
 	data.eplast = data.highest_episode;  // highest episode (Byte 3, bit 6)
 	
-	return data;
+	return AniDBAnimeInfo::fromLegacyStruct(data);
 }
 
 /**
@@ -4903,164 +4822,11 @@ AniDBApi::AnimeData AniDBApi::parseMask(const QStringList& tokens, uint64_t amas
  * @param index Current index in tokens array (updated as fields are consumed)
  * @return AnimeData structure with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index)
+AniDBAnimeInfo AniDBApi::parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index)
 {
-	AnimeData data;
-	
-	// Parse the hex string into bytes (pad to 14 hex chars = 7 bytes if shorter)
-	// The hex string represents bytes 1-7 from left to right, e.g., "fffffcfc" = FF FF FC FC (bytes 1-4), then 00 00 00 (bytes 5-7)
-	QString paddedMask = amaskHexString.leftJustified(14, '0');
-	QByteArray maskBytes;
-	for (int i = 0; i < paddedMask.length(); i += 2)
-	{
-		bool ok;
-		unsigned char byte = paddedMask.mid(i, 2).toUInt(&ok, 16);
-		if (ok)
-			maskBytes.append(byte);
-	}
-	
-	// Ensure we have 7 bytes
-	while (maskBytes.size() < 7)
-		maskBytes.append((char)0);
-	
-	Logger::log(QString("[AniDB parseMaskFromString] Mask string: %1 -> %2 bytes")
-		.arg(amaskHexString)
-		.arg(maskBytes.size()), __FILE__, __LINE__);
-	
-	// Define all mask bits in MSB to LSB order with their byte positions
-	struct MaskBit {
-		int byteIndex;     // 0-6 for bytes 1-7
-		unsigned char bitMask;  // Bit mask within the byte (0x80, 0x40, etc.)
-		QString* field;
-		const char* name;
-	};
-	
-	MaskBit maskBits[] = {
-		// Byte 1 (byte 0 in array) - bits 7-0
-		{0, 0x80, &data.aid,                  "AID"},
-		{0, 0x40, &data.dateflags,            "DATEFLAGS"},
-		{0, 0x20, &data.year,                 "YEAR"},
-		{0, 0x10, &data.type,                 "TYPE"},
-		{0, 0x08, &data.relaidlist,           "RELATED_AID_LIST"},
-		{0, 0x04, &data.relaidtype,           "RELATED_AID_TYPE"},
-		{0, 0x02, nullptr,                    "RETIRED_BYTE1_BIT1"},  // Retired
-		{0, 0x01, nullptr,                    "RETIRED_BYTE1_BIT0"},  // Retired
-		
-		// Byte 2 (byte 1 in array) - bits 7-0
-		{1, 0x80, &data.nameromaji,           "ROMAJI_NAME"},
-		{1, 0x40, &data.namekanji,            "KANJI_NAME"},
-		{1, 0x20, &data.nameenglish,          "ENGLISH_NAME"},
-		{1, 0x10, &data.nameother,            "OTHER_NAME"},
-		{1, 0x08, &data.nameshort,            "SHORT_NAME_LIST"},
-		{1, 0x04, &data.synonyms,             "SYNONYM_LIST"},
-		{1, 0x02, nullptr,                    "RETIRED_BYTE2_BIT1"},  // Retired
-		{1, 0x01, nullptr,                    "RETIRED_BYTE2_BIT0"},  // Retired
-		
-		// Byte 3 (byte 2 in array) - bits 7-0
-		{2, 0x80, &data.episodes,             "EPISODES"},
-		{2, 0x40, &data.highest_episode,      "HIGHEST_EPISODE"},
-		{2, 0x20, &data.special_ep_count,     "SPECIAL_EP_COUNT"},
-		{2, 0x10, &data.air_date,             "AIR_DATE"},
-		{2, 0x08, &data.end_date,             "END_DATE"},
-		{2, 0x04, &data.url,                  "URL"},
-		{2, 0x02, &data.picname,              "PICNAME"},
-		{2, 0x01, nullptr,                    "RETIRED_BYTE3_BIT0"},  // Retired
-		
-		// Byte 4 (byte 3 in array) - bits 7-0
-		{3, 0x80, &data.rating,               "RATING"},
-		{3, 0x40, &data.vote_count,           "VOTE_COUNT"},
-		{3, 0x20, &data.temp_rating,          "TEMP_RATING"},
-		{3, 0x10, &data.temp_vote_count,      "TEMP_VOTE_COUNT"},
-		{3, 0x08, &data.avg_review_rating,    "AVG_REVIEW_RATING"},
-		{3, 0x04, &data.review_count,         "REVIEW_COUNT"},
-		{3, 0x02, &data.award_list,           "AWARD_LIST"},
-		{3, 0x01, &data.is_18_restricted,     "IS_18_RESTRICTED"},
-		
-		// Byte 5 (byte 4 in array) - bits 7-0
-		{4, 0x80, nullptr,                    "RETIRED_BYTE5_BIT7"},  // Retired
-		{4, 0x40, &data.ann_id,               "ANN_ID"},
-		{4, 0x20, &data.allcinema_id,         "ALLCINEMA_ID"},
-		{4, 0x10, &data.animenfo_id,          "ANIMENFO_ID"},
-		{4, 0x08, &data.tag_name_list,        "TAG_NAME_LIST"},
-		{4, 0x04, &data.tag_id_list,          "TAG_ID_LIST"},
-		{4, 0x02, &data.tag_weight_list,      "TAG_WEIGHT_LIST"},
-		{4, 0x01, &data.date_record_updated,  "DATE_RECORD_UPDATED"},
-		
-		// Byte 6 (byte 5 in array) - bits 7-0
-		{5, 0x80, &data.character_id_list,    "CHARACTER_ID_LIST"},
-		{5, 0x40, nullptr,                    "RETIRED_BYTE6_BIT6"},  // Retired
-		{5, 0x20, nullptr,                    "RETIRED_BYTE6_BIT5"},  // Retired
-		{5, 0x10, nullptr,                    "RETIRED_BYTE6_BIT4"},  // Retired
-		{5, 0x08, nullptr,                    "UNUSED_BYTE6_BIT3"},   // Unused
-		{5, 0x04, nullptr,                    "UNUSED_BYTE6_BIT2"},   // Unused
-		{5, 0x02, nullptr,                    "UNUSED_BYTE6_BIT1"},   // Unused
-		{5, 0x01, nullptr,                    "UNUSED_BYTE6_BIT0"},   // Unused
-		
-		// Byte 7 (byte 6 in array) - bits 7-0
-		{6, 0x80, &data.specials_count,       "SPECIALS_COUNT"},
-		{6, 0x40, &data.credits_count,        "CREDITS_COUNT"},
-		{6, 0x20, &data.other_count,          "OTHER_COUNT"},
-		{6, 0x10, &data.trailer_count,        "TRAILER_COUNT"},
-		{6, 0x08, &data.parody_count,         "PARODY_COUNT"},
-		{6, 0x04, nullptr,                    "UNUSED_BYTE7_BIT2"},   // Unused
-		{6, 0x02, nullptr,                    "UNUSED_BYTE7_BIT1"},   // Unused
-		{6, 0x01, nullptr,                    "UNUSED_BYTE7_BIT0"}    // Unused
-	};
-	
-	// Process each bit in order
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		int byteIdx = maskBits[i].byteIndex;
-		if (byteIdx >= maskBytes.size())
-			continue;
-			
-		unsigned char byte = (unsigned char)maskBytes[byteIdx];
-		
-		// Check if this bit is set in the mask
-		if (byte & maskBits[i].bitMask)
-		{
-			// Skip ANIME_AID bit - it's already extracted by the caller at token[0]
-			if (byteIdx == 0 && maskBits[i].bitMask == 0x80)
-			{
-				Logger::log(QString("[AniDB parseMaskFromString] Skipping AID bit (already extracted by caller)"), __FILE__, __LINE__);
-				continue;
-			}
-			
-			QString value = tokens.value(index);
-			
-			if (maskBits[i].field != nullptr)
-			{
-				// This is a defined field - store it
-				Logger::log(QString("[AniDB parseMaskFromString] Bit match: %1 (byte %2, bit 0x%3) -> token[%4] = '%5'")
-					.arg(maskBits[i].name)
-					.arg(byteIdx + 1)
-					.arg(maskBits[i].bitMask, 0, 16)
-					.arg(index)
-					.arg(value.left(80)), __FILE__, __LINE__);
-				
-				*(maskBits[i].field) = value;
-			}
-			else
-			{
-				// Retired/unused bit - consume the token but don't store
-				Logger::log(QString("[AniDB parseMaskFromString] Retired/unused: %1 (byte %2, bit 0x%3) -> token[%4] = '%5' (skipped)")
-					.arg(maskBits[i].name)
-					.arg(byteIdx + 1)
-					.arg(maskBits[i].bitMask, 0, 16)
-					.arg(index)
-					.arg(value.left(80)), __FILE__, __LINE__);
-			}
-			
-			// Always increment index for any bit set in the mask
-			index++;
-		}
-	}
-	
-	// Set legacy fields for backward compatibility
-	data.eptotal = data.episodes;
-	data.eplast = data.highest_episode;
-	
-	return data;
+	// Call the version with parsedMaskBytes
+	QByteArray unusedBytes;
+	return parseMaskFromString(tokens, amaskHexString, index, unusedBytes);
 }
 
 /**
@@ -5071,11 +4837,12 @@ AniDBApi::AnimeData AniDBApi::parseMaskFromString(const QStringList& tokens, con
  * @param amaskHexString The anime mask as a hex string (e.g., "fffffcfc")
  * @param index Current index in tokens array (updated as fields are consumed)
  * @param parsedMaskBytes Output: 7-byte array marking which bits were successfully parsed
- * @return AnimeData structure with parsed anime fields
+ * @return AniDBAnimeInfo object with parsed anime fields
  */
-AniDBApi::AnimeData AniDBApi::parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
+AniDBAnimeInfo AniDBApi::parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
 {
-	AnimeData data;
+	// Use legacy struct internally (complex parsing logic)
+	AniDBAnimeInfo::LegacyAnimeData data;
 	
 	// Parse the hex string into bytes
 	QString paddedMask = amaskHexString.leftJustified(14, '0');
@@ -5251,7 +5018,7 @@ AniDBApi::AnimeData AniDBApi::parseMaskFromString(const QStringList& tokens, con
 	data.eptotal = data.episodes;
 	data.eplast = data.highest_episode;
 	
-	return data;
+	return AniDBAnimeInfo::fromLegacyStruct(data);
 }
 
 /**
@@ -5284,8 +5051,9 @@ Mask AniDBApi::calculateReducedMask(const Mask& originalMask, const QByteArray& 
 
 /**
  * Store file data in the database.
+ * Uses AniDBFileInfo type-safe fields directly.
  */
-void AniDBApi::storeFileData(const FileData& data)
+void AniDBApi::storeFileData(const AniDBFileInfo& fileInfo)
 {
 	QString q = QString("INSERT OR REPLACE INTO `file` "
 		"(`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, "
@@ -5298,33 +5066,33 @@ void AniDBApi::storeFileData(const FileData& data)
 		"'%16', '%17', '%18', '%19', "
 		"'%20', '%21', '%22', '%23', '%24', "
 		"'%25', '%26', '%27')")
-		.arg(QString(data.fid).replace("'", "''"))
-		.arg(QString(data.aid).replace("'", "''"))
-		.arg(QString(data.eid).replace("'", "''"))
-		.arg(QString(data.gid).replace("'", "''"))
-		.arg(QString(data.lid).replace("'", "''"))
-		.arg(QString(data.othereps).replace("'", "''"))
-		.arg(QString(data.isdepr).replace("'", "''"))
-		.arg(QString(data.state).replace("'", "''"))
-		.arg(QString(data.size).replace("'", "''"))
-		.arg(QString(data.ed2k).replace("'", "''"))
-		.arg(QString(data.md5).replace("'", "''"))
-		.arg(QString(data.sha1).replace("'", "''"))
-		.arg(QString(data.crc).replace("'", "''"))
-		.arg(QString(data.quality).replace("'", "''"))
-		.arg(QString(data.source).replace("'", "''"))
-		.arg(QString(data.codec_audio).replace("'", "''"))
-		.arg(QString(data.bitrate_audio).replace("'", "''"))
-		.arg(QString(data.codec_video).replace("'", "''"))
-		.arg(QString(data.bitrate_video).replace("'", "''"))
-		.arg(QString(data.resolution).replace("'", "''"))
-		.arg(QString(data.filetype).replace("'", "''"))
-		.arg(QString(data.lang_dub).replace("'", "''"))
-		.arg(QString(data.lang_sub).replace("'", "''"))
-		.arg(QString(data.length).replace("'", "''"))
-		.arg(QString(data.description).replace("'", "''"))
-		.arg(QString(data.airdate).replace("'", "''"))
-		.arg(QString(data.filename).replace("'", "''"));
+		.arg(fileInfo.fileId())
+		.arg(fileInfo.animeId())
+		.arg(fileInfo.episodeId())
+		.arg(fileInfo.groupId())
+		.arg(fileInfo.mylistId())
+		.arg(QString(fileInfo.otherEpisodes()).replace("'", "''"))
+		.arg(fileInfo.isDeprecated() ? "1" : "0")
+		.arg(fileInfo.state())
+		.arg(fileInfo.size())
+		.arg(QString(fileInfo.ed2kHash()).replace("'", "''"))
+		.arg(QString(fileInfo.md5Hash()).replace("'", "''"))
+		.arg(QString(fileInfo.sha1Hash()).replace("'", "''"))
+		.arg(QString(fileInfo.crc32()).replace("'", "''"))
+		.arg(QString(fileInfo.quality()).replace("'", "''"))
+		.arg(QString(fileInfo.source()).replace("'", "''"))
+		.arg(QString(fileInfo.audioCodec()).replace("'", "''"))
+		.arg(fileInfo.audioBitrate())
+		.arg(QString(fileInfo.videoCodec()).replace("'", "''"))
+		.arg(fileInfo.videoBitrate())
+		.arg(QString(fileInfo.resolution()).replace("'", "''"))
+		.arg(QString(fileInfo.fileType()).replace("'", "''"))
+		.arg(fileInfo.audioLanguages().join("'").replace("'", "''"))
+		.arg(fileInfo.subtitleLanguages().join("'").replace("'", "''"))
+		.arg(fileInfo.length())
+		.arg(QString(fileInfo.description()).replace("'", "''"))
+		.arg(QString(fileInfo.airDate().toString("yyyy-MM-dd")).replace("'", "''"))
+		.arg(QString(fileInfo.filename()).replace("'", "''"));
 		
 	QSqlQuery query(db);
 	if(!query.exec(q))
@@ -5583,16 +5351,16 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 
 /**
  * Store anime data in the database.
+ * Uses AniDBAnimeInfo type-safe fields directly.
  */
-void AniDBApi::storeAnimeData(const AnimeData& data)
+void AniDBApi::storeAnimeData(const AniDBAnimeInfo& animeInfo)
 {
-	if(data.aid.isEmpty())
+	if(!animeInfo.isValid())
 		return;
 	
-	// Convert Unix timestamps to YYYY-MM-DDZ format for consistency with mylist export
-	// This enforces the date format at the fundamental level before database storage
-	QString startdate = convertToISODate(data.air_date);
-	QString enddate = convertToISODate(data.end_date);
+	// Convert dates to ISO format for consistency
+	QString startdate = convertToISODate(animeInfo.airDate());
+	QString enddate = convertToISODate(animeInfo.endDate());
 	
 	// Use INSERT with ON CONFLICT DO UPDATE (UPSERT) to merge data from multiple responses
 	// COALESCE preserves existing non-empty values when new value is empty
@@ -5660,52 +5428,52 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 	QSqlQuery query(db);
 	query.prepare(q);
 	
-	query.bindValue(":aid", data.aid.toInt());
-	query.bindValue(":eptotal", data.eptotal);
-	query.bindValue(":eplast", data.eplast);
-	query.bindValue(":year", data.year);
-	query.bindValue(":type", data.type);
-	query.bindValue(":relaidlist", data.relaidlist);
-	query.bindValue(":relaidtype", data.relaidtype);
-	query.bindValue(":category", data.category);
-	query.bindValue(":nameromaji", data.nameromaji);
-	query.bindValue(":namekanji", data.namekanji);
-	query.bindValue(":nameenglish", data.nameenglish);
-	query.bindValue(":nameother", data.nameother);
-	query.bindValue(":nameshort", data.nameshort);
-	query.bindValue(":synonyms", data.synonyms);
-	query.bindValue(":typename", data.type);  // typename mirrors type
+	query.bindValue(":aid", animeInfo.animeId());
+	query.bindValue(":eptotal", animeInfo.eptotal());
+	query.bindValue(":eplast", animeInfo.eplast());
+	query.bindValue(":year", animeInfo.year());
+	query.bindValue(":type", animeInfo.type());
+	query.bindValue(":relaidlist", animeInfo.relatedAnimeIds());
+	query.bindValue(":relaidtype", animeInfo.relatedAnimeTypes());
+	query.bindValue(":category", animeInfo.category());
+	query.bindValue(":nameromaji", animeInfo.nameRomaji());
+	query.bindValue(":namekanji", animeInfo.nameKanji());
+	query.bindValue(":nameenglish", animeInfo.nameEnglish());
+	query.bindValue(":nameother", animeInfo.nameOther());
+	query.bindValue(":nameshort", animeInfo.nameShort());
+	query.bindValue(":synonyms", animeInfo.synonyms());
+	query.bindValue(":typename", animeInfo.type());  // typename mirrors type
 	query.bindValue(":startdate", startdate);
 	query.bindValue(":enddate", enddate);
-	query.bindValue(":picname", data.picname);
+	query.bindValue(":picname", animeInfo.pictureName());
 	
-	// Bind new fields from Byte 1-7
-	query.bindValue(":dateflags", data.dateflags);
-	query.bindValue(":episodes", data.episodes.isEmpty() ? QVariant() : data.episodes.toInt());
-	query.bindValue(":highest_episode", data.highest_episode);
-	query.bindValue(":special_ep_count", data.special_ep_count.isEmpty() ? QVariant() : data.special_ep_count.toInt());
-	query.bindValue(":url", data.url);
-	query.bindValue(":rating", data.rating);
-	query.bindValue(":vote_count", data.vote_count.isEmpty() ? QVariant() : data.vote_count.toInt());
-	query.bindValue(":temp_rating", data.temp_rating);
-	query.bindValue(":temp_vote_count", data.temp_vote_count.isEmpty() ? QVariant() : data.temp_vote_count.toInt());
-	query.bindValue(":avg_review_rating", data.avg_review_rating);
-	query.bindValue(":review_count", data.review_count.isEmpty() ? QVariant() : data.review_count.toInt());
-	query.bindValue(":award_list", data.award_list);
-	query.bindValue(":is_18_restricted", data.is_18_restricted.isEmpty() ? QVariant() : data.is_18_restricted.toInt());
-	query.bindValue(":ann_id", data.ann_id.isEmpty() ? QVariant() : data.ann_id.toInt());
-	query.bindValue(":allcinema_id", data.allcinema_id.isEmpty() ? QVariant() : data.allcinema_id.toInt());
-	query.bindValue(":animenfo_id", data.animenfo_id);
-	query.bindValue(":tag_name_list", data.tag_name_list);
-	query.bindValue(":tag_id_list", data.tag_id_list);
-	query.bindValue(":tag_weight_list", data.tag_weight_list);
-	query.bindValue(":date_record_updated", data.date_record_updated.isEmpty() ? QVariant() : data.date_record_updated.toLongLong());
-	query.bindValue(":character_id_list", data.character_id_list);
-	query.bindValue(":specials_count", data.specials_count.isEmpty() ? QVariant() : data.specials_count.toInt());
-	query.bindValue(":credits_count", data.credits_count.isEmpty() ? QVariant() : data.credits_count.toInt());
-	query.bindValue(":other_count", data.other_count.isEmpty() ? QVariant() : data.other_count.toInt());
-	query.bindValue(":trailer_count", data.trailer_count.isEmpty() ? QVariant() : data.trailer_count.toInt());
-	query.bindValue(":parody_count", data.parody_count.isEmpty() ? QVariant() : data.parody_count.toInt());
+	// Bind fields from Byte 1-7 (all type-safe now)
+	query.bindValue(":dateflags", animeInfo.dateFlags());
+	query.bindValue(":episodes", animeInfo.episodeCount() > 0 ? animeInfo.episodeCount() : QVariant());
+	query.bindValue(":highest_episode", animeInfo.highestEpisode());
+	query.bindValue(":special_ep_count", animeInfo.specialEpisodeCount() > 0 ? animeInfo.specialEpisodeCount() : QVariant());
+	query.bindValue(":url", animeInfo.url());
+	query.bindValue(":rating", animeInfo.rating());
+	query.bindValue(":vote_count", animeInfo.voteCount() > 0 ? animeInfo.voteCount() : QVariant());
+	query.bindValue(":temp_rating", animeInfo.tempRating());
+	query.bindValue(":temp_vote_count", animeInfo.tempVoteCount() > 0 ? animeInfo.tempVoteCount() : QVariant());
+	query.bindValue(":avg_review_rating", animeInfo.avgReviewRating());
+	query.bindValue(":review_count", animeInfo.reviewCount() > 0 ? animeInfo.reviewCount() : QVariant());
+	query.bindValue(":award_list", animeInfo.awardList());
+	query.bindValue(":is_18_restricted", animeInfo.is18Restricted() ? 1 : QVariant());
+	query.bindValue(":ann_id", animeInfo.annId() > 0 ? animeInfo.annId() : QVariant());
+	query.bindValue(":allcinema_id", animeInfo.allCinemaId() > 0 ? animeInfo.allCinemaId() : QVariant());
+	query.bindValue(":animenfo_id", animeInfo.animeNfoId());
+	query.bindValue(":tag_name_list", animeInfo.tagNameList());
+	query.bindValue(":tag_id_list", animeInfo.tagIdList());
+	query.bindValue(":tag_weight_list", animeInfo.tagWeightList());
+	query.bindValue(":date_record_updated", animeInfo.dateRecordUpdated() > 0 ? animeInfo.dateRecordUpdated() : QVariant());
+	query.bindValue(":character_id_list", animeInfo.characterIdList());
+	query.bindValue(":specials_count", animeInfo.specialsCount() > 0 ? animeInfo.specialsCount() : QVariant());
+	query.bindValue(":credits_count", animeInfo.creditsCount() > 0 ? animeInfo.creditsCount() : QVariant());
+	query.bindValue(":other_count", animeInfo.otherCount() > 0 ? animeInfo.otherCount() : QVariant());
+	query.bindValue(":trailer_count", animeInfo.trailerCount() > 0 ? animeInfo.trailerCount() : QVariant());
+	query.bindValue(":parody_count", animeInfo.parodyCount() > 0 ? animeInfo.parodyCount() : QVariant());
 	
 	if(!query.exec())
 	{
@@ -5715,22 +5483,23 @@ void AniDBApi::storeAnimeData(const AnimeData& data)
 
 /**
  * Store episode data in the database.
+ * Uses AniDBEpisodeInfo type-safe fields directly.
  */
-void AniDBApi::storeEpisodeData(const EpisodeData& data)
+void AniDBApi::storeEpisodeData(const AniDBEpisodeInfo& episodeInfo)
 {
-	if(data.eid.isEmpty())
+	if(!episodeInfo.isValid())
 		return;
 		
 	QString q = QString("INSERT OR REPLACE INTO `episode` "
 		"(`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) "
 		"VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
-		.arg(QString(data.eid).replace("'", "''"))
-		.arg(QString(data.epname).replace("'", "''"))
-		.arg(QString(data.epnameromaji).replace("'", "''"))
-		.arg(QString(data.epnamekanji).replace("'", "''"))
-		.arg(QString(data.eprating).replace("'", "''"))
-		.arg(QString(data.epvotecount).replace("'", "''"))
-		.arg(QString(data.epno).replace("'", "''"));
+		.arg(episodeInfo.episodeId())
+		.arg(QString(episodeInfo.name()).replace("'", "''"))
+		.arg(QString(episodeInfo.nameRomaji()).replace("'", "''"))
+		.arg(QString(episodeInfo.nameKanji()).replace("'", "''"))
+		.arg(QString(episodeInfo.rating()).replace("'", "''"))
+		.arg(episodeInfo.voteCount())
+		.arg(QString(episodeInfo.episodeNumber()).replace("'", "''"));
 		
 	QSqlQuery query(db);
 	if(!query.exec(q))
@@ -5741,20 +5510,21 @@ void AniDBApi::storeEpisodeData(const EpisodeData& data)
 
 /**
  * Store group data in the database.
+ * Uses AniDBGroupInfo type-safe fields directly.
  */
-void AniDBApi::storeGroupData(const GroupData& data)
+void AniDBApi::storeGroupData(const AniDBGroupInfo& groupInfo)
 {
-	if(data.gid.isEmpty() || data.gid == "0")
+	if(!groupInfo.isValid())
 		return;
-	if(data.groupname.isEmpty() && data.groupshortname.isEmpty())
+	if(!groupInfo.hasName())
 		return;
 		
 	QString q = QString("INSERT OR REPLACE INTO `group` "
 		"(`gid`, `name`, `shortname`) "
 		"VALUES ('%1', '%2', '%3')")
-		.arg(QString(data.gid).replace("'", "''"))
-		.arg(QString(data.groupname).replace("'", "''"))
-		.arg(QString(data.groupshortname).replace("'", "''"));
+		.arg(groupInfo.groupId())
+		.arg(QString(groupInfo.groupName()).replace("'", "''"))
+		.arg(QString(groupInfo.groupShortName()).replace("'", "''"));
 		
 	QSqlQuery query(db);
 	if(!query.exec(q))
