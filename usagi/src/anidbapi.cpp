@@ -1918,7 +1918,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
     {
         Logger::log("[AniDB Error] ParseMessage - UNSUPPORTED ReplyID: " + ReplyID + " Tag: " + Tag, __FILE__, __LINE__);
     }
-    waitingForReply.isWaiting = false;
+    waitingForReply.stopWaiting();
     currentTag = ""; // Reset current tag when response is received
 	return ReplyID;
 }
@@ -2963,8 +2963,7 @@ int AniDBApi::Send(QString str, QString msgtype, QString tag)
 //	const char *ptr = bytes.data();
 //	Socket->write(ptr);
     Socket->write(a.toUtf8().constData());
-    waitingForReply.isWaiting = true;
-    waitingForReply.start.start();
+    waitingForReply.startWaiting();
     currentTag = tag; // Track the current tag
 
 	lastSentPacket = a;
@@ -3032,9 +3031,9 @@ bool AniDBApi::LoggedIn()
 int AniDBApi::SendPacket()
 {
     // Check for timeout and handle retry logic
-    if(waitingForReply.isWaiting && waitingForReply.start.elapsed() > 10000)
+    if(waitingForReply.hasTimedOut(10000))
     {
-        qint64 elapsed = waitingForReply.start.elapsed();
+        qint64 elapsed = waitingForReply.elapsedMs();
         Logger::log("[AniDB Timeout] Waited for reply for more than 10 seconds - Elapsed: " + QString::number(elapsed) + " ms", __FILE__, __LINE__);
         
         // Get retry count for the current packet
@@ -3069,7 +3068,7 @@ int AniDBApi::SendPacket()
             }
             
             // Reset waiting state to allow resend
-            waitingForReply.isWaiting = false;
+            waitingForReply.stopWaiting();
             currentTag = "";
         }
         else
@@ -3086,12 +3085,12 @@ int AniDBApi::SendPacket()
             }
             
             // Reset waiting state to continue processing queue
-            waitingForReply.isWaiting = false;
+            waitingForReply.stopWaiting();
             currentTag = "";
         }
     }
     
-    if(!waitingForReply.isWaiting)
+    if(!waitingForReply.isWaiting())
     {
         // Check if banned - if so, stop all communication until app restart
         if(banned == true)
@@ -3800,12 +3799,12 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	while (query.next())
 	{
 		FileHashInfo info;
-		info.path = query.value(0).toString();
-		info.hash = query.value(1).toString();
-		info.status = query.value(2).toInt();
-		info.bindingStatus = query.value(3).toInt();
+		info.setPath(query.value(0).toString());
+		info.setHash(query.value(1).toString());
+		info.setStatus(query.value(2).toInt());
+		info.setBindingStatus(query.value(3).toInt());
 		
-		results[info.path] = info;
+		results[info.path()] = info;
 	}
 	qint64 processTime = processTimer.elapsed();
 	LOG(QString("[TIMING] Query result processing: %1 ms [anidbapi.cpp]").arg(processTime));
@@ -3841,16 +3840,16 @@ QList<AniDBApi::FileHashInfo> AniDBApi::getUnboundFiles()
 	while (query.next())
 	{
 		FileHashInfo info;
-		info.path = query.value(0).toString();
+		info.setPath(query.value(0).toString());
 		// Use filename field if available, otherwise extract from path
 		QString filename = query.value(1).toString();
 		if (filename.isEmpty()) {
-			QFileInfo fileInfo(info.path);
+			QFileInfo fileInfo(info.path());
 			filename = fileInfo.fileName();
 		}
-		info.hash = query.value(2).toString();
-		info.status = query.value(3).toInt();
-		info.bindingStatus = query.value(4).toInt();
+		info.setHash(query.value(2).toString());
+		info.setStatus(query.value(3).toInt());
+		info.setBindingStatus(query.value(4).toInt());
 		
 		results.append(info);
 	}
