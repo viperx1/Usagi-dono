@@ -217,10 +217,10 @@ void WatchSessionManager::saveToDatabase()
         
         q.prepare("INSERT OR REPLACE INTO watch_sessions (aid, start_aid, current_episode, is_active) "
                   "VALUES (?, ?, ?, ?)");
-        q.addBindValue(session.aid);
-        q.addBindValue(session.startAid);
-        q.addBindValue(session.currentEpisode);
-        q.addBindValue(session.isActive ? 1 : 0);
+        q.addBindValue(session.aid());
+        q.addBindValue(session.startAid());
+        q.addBindValue(session.currentEpisode());
+        q.addBindValue(session.isActive() ? 1 : 0);
         q.exec();
         
         // Save watched episodes
@@ -701,7 +701,7 @@ int WatchSessionManager::getTotalEpisodesForAnime(int aid) const
 FileMarkType WatchSessionManager::getFileMarkType(int lid) const
 {
     if (m_fileMarks.contains(lid)) {
-        return m_fileMarks[lid].markType;
+        return m_fileMarks[lid].markType();
     }
     return FileMarkType::None;
 }
@@ -1109,7 +1109,7 @@ void WatchSessionManager::autoMarkFilesForDownload()
     for (auto it = m_sessions.constBegin(); it != m_sessions.constEnd(); ++it) {
         const SessionInfo& session = it.value();
         
-        if (!session.isActive) {
+        if (!session.isActive()) {
             continue;
         }
         
@@ -1117,7 +1117,7 @@ void WatchSessionManager::autoMarkFilesForDownload()
         int aheadBuffer = m_aheadBuffer;
         
         // Find files for episodes in the ahead buffer
-        for (int ep = session.currentEpisode; ep <= session.currentEpisode + aheadBuffer; ep++) {
+        for (int ep = session.currentEpisode(); ep <= session.currentEpisode() + aheadBuffer; ep++) {
             // Query for files that match this episode and don't have a local file
             QSqlQuery q(db);
             q.prepare("SELECT m.lid FROM mylist m "
@@ -1125,7 +1125,7 @@ void WatchSessionManager::autoMarkFilesForDownload()
                       "LEFT JOIN local_files lf ON m.lid = lf.lid "
                       "WHERE m.aid = ? AND e.epno LIKE ? "
                       "AND (lf.local_path IS NULL OR lf.local_path = '')");
-            q.addBindValue(session.aid);
+            q.addBindValue(session.aid());
             q.addBindValue(QString::number(ep) + "%"); // Match episode number
             
             if (q.exec()) {
