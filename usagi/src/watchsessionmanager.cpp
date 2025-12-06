@@ -2008,7 +2008,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     fileCountQuery.prepare(
         "SELECT COUNT(*) FROM mylist m "
         "JOIN local_files lf ON m.local_file = lf.id "
-        "WHERE m.eid = ? AND lf.path IS NOT NULL"
+        "WHERE m.eid = ? AND lf.path IS NOT NULL AND lf.path != ''"
     );
     fileCountQuery.addBindValue(eid);
     
