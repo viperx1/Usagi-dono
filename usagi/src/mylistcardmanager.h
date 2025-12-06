@@ -10,6 +10,8 @@
 #include <QtNetwork/QNetworkReply>
 #include "animecard.h"
 #include "flowlayout.h"
+#include "animestats.h"
+#include "cachedanimedata.h"
 
 // Forward declarations
 class VirtualFlowLayout;
@@ -35,33 +37,9 @@ class MyListCardManager : public QObject
     Q_OBJECT
     
 public:
-    // Helper to store statistics for an anime
-    struct AnimeStats {
-        int normalEpisodes;
-        int totalNormalEpisodes;
-        int normalViewed;
-        int otherEpisodes;
-        int otherViewed;
-        
-        AnimeStats() : normalEpisodes(0), totalNormalEpisodes(0), normalViewed(0), otherEpisodes(0), otherViewed(0) {}
-    };
-    
-    // Data structure for filtering and sorting without card widgets
-    // This mirrors the CardCreationData but is publicly accessible
-    struct CachedAnimeData {
-        QString animeName;      // The resolved display name
-        QString typeName;
-        QString startDate;
-        QString endDate;
-        bool isHidden;
-        bool is18Restricted;
-        int eptotal;
-        AnimeStats stats;
-        qint64 lastPlayed;      // Most recent play timestamp from episodes
-        bool hasData;
-        
-        CachedAnimeData() : isHidden(false), is18Restricted(false), eptotal(0), lastPlayed(0), hasData(false) {}
-    };
+    // Type aliases for new classes (for backward compatibility during migration)
+    using AnimeStats = ::AnimeStats;
+    using CachedAnimeData = ::CachedAnimeData;
     
     explicit MyListCardManager(QObject *parent = nullptr);
     virtual ~MyListCardManager();
