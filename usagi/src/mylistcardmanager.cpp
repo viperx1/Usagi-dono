@@ -204,7 +204,7 @@ MyListCardManager::CachedAnimeData MyListCardManager::getCachedAnimeData(int aid
 bool MyListCardManager::hasCachedData(int aid) const
 {
     QMutexLocker locker(&m_mutex);
-    return m_cardCreationDataCache.contains(aid) && m_cardCreationDataCache[aid].hasData();
+    return m_cardCreationDataCache.contains(aid) && m_cardCreationDataCache[aid].hasData;
 }
 
 void MyListCardManager::updateCardAnimeInfo(int aid)
