@@ -336,7 +336,7 @@ void TestAnimeMaskParsing::testByte5Fields()
     QCOMPARE(data.tagNameList(), QString("action,comedy"));
     QCOMPARE(data.tagIdList(), QString("100,200"));
     QCOMPARE(data.tagWeightList(), QString("50,75"));
-    QCOMPARE(data.dateRecordUpdated(), (qint64)1762811997);
+    QCOMPARE(data.dateRecordUpdated(), static_cast<qint64>(1762811997));
     QCOMPARE(index, 8);
 }
 
