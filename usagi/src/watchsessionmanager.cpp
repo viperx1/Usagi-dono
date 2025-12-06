@@ -228,7 +228,7 @@ void WatchSessionManager::saveToDatabase()
         q.addBindValue(session.aid());
         q.exec();
         
-        const QSet<int>& watchedEps = session.watchedEpisodes();
+        const auto& watchedEps = session.watchedEpisodes();
         for (int ep : watchedEps) {
             q.prepare("INSERT INTO session_watched_episodes (aid, episode_number) VALUES (?, ?)");
             q.addBindValue(session.aid());
@@ -2008,7 +2008,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     fileCountQuery.prepare(
         "SELECT COUNT(*) FROM mylist m "
         "JOIN local_files lf ON m.local_file = lf.id "
-        "WHERE m.eid = ? AND lf.path IS NOT NULL AND lf.path != ''"
+        "WHERE m.eid = ? AND lf.path IS NOT NULL"
     );
     fileCountQuery.addBindValue(eid);
     

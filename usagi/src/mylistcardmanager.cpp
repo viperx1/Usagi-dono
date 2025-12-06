@@ -391,8 +391,7 @@ void MyListCardManager::updateOrAddMylistEntry(int lid)
     if (isNewAnime) {
         // Card doesn't exist, create it
         // First, preload the card creation data to avoid race conditions
-        QList<int> aidList;
-        aidList.append(aid);
+        QList<int> aidList{aid};
         preloadCardCreationData(aidList);
         
         AnimeCard *card = createCard(aid);
