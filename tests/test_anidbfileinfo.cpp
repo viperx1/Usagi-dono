@@ -78,9 +78,21 @@ void TestAniDBFileInfo::testHashValidation()
     info.setEd2kHash("invalidhash");
     QCOMPARE(info.ed2kHash(), QString("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));  // unchanged
     
+    // Invalid hash (non-hex characters, right length) - should be rejected
+    info.setEd2kHash("################################");
+    QCOMPARE(info.ed2kHash(), QString("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));  // unchanged
+    
+    // Invalid hash (spaces in hash) - should be rejected
+    info.setEd2kHash("a1b2 c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
+    QCOMPARE(info.ed2kHash(), QString("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));  // unchanged
+    
     // Empty hash is valid (clears the hash)
     info.setEd2kHash("");
     QVERIFY(!info.hasHash());
+    
+    // Test uppercase gets converted to lowercase
+    info.setEd2kHash("A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4");
+    QCOMPARE(info.ed2kHash(), QString("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
 }
 
 void TestAniDBFileInfo::testFormatting()

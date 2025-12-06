@@ -11,6 +11,21 @@ static constexpr int STATE_ISV5 = 0x20;
 static constexpr int STATE_UNC = 0x40;
 static constexpr int STATE_CEN = 0x80;
 
+// AniDB API protocol constant - language list delimiter
+static const QChar ANIDB_LANGUAGE_DELIMITER = '\'';
+
+// Helper function to validate hexadecimal hash strings
+static bool isValidHexHash(const QString& hash, int expectedLength)
+{
+    if (hash.length() != expectedLength) {
+        return false;
+    }
+    
+    // Check that all characters are valid hex digits [0-9a-fA-F]
+    static const QRegularExpression hexRegex("^[0-9a-fA-F]+$");
+    return hexRegex.match(hash).hasMatch();
+}
+
 AniDBFileInfo::AniDBFileInfo()
     : m_fid(0)
     , m_aid(0)
@@ -72,22 +87,24 @@ AniDBFileInfo AniDBFileInfo::fromApiResponse(const QStringList& tokens,
 
 void AniDBFileInfo::setEd2kHash(const QString& hash)
 {
-    // Validate ED2K hash format (32 hex characters)
-    if (hash.isEmpty() || hash.length() == 32) {
+    // Validate ED2K hash format (32 hexadecimal characters)
+    if (hash.isEmpty() || isValidHexHash(hash, 32)) {
         m_ed2k = hash.toLower();
     }
 }
 
 void AniDBFileInfo::setMd5Hash(const QString& hash)
 {
-    if (hash.isEmpty() || hash.length() == 32) {
+    // Validate MD5 hash format (32 hexadecimal characters)
+    if (hash.isEmpty() || isValidHexHash(hash, 32)) {
         m_md5 = hash.toLower();
     }
 }
 
 void AniDBFileInfo::setSha1Hash(const QString& hash)
 {
-    if (hash.isEmpty() || hash.length() == 40) {
+    // Validate SHA1 hash format (40 hexadecimal characters)
+    if (hash.isEmpty() || isValidHexHash(hash, 40)) {
         m_sha1 = hash.toLower();
     }
 }
@@ -102,14 +119,14 @@ void AniDBFileInfo::setAirDateFromUnix(qint64 timestamp)
 void AniDBFileInfo::setAudioLanguagesFromString(const QString& langStr)
 {
     if (!langStr.isEmpty()) {
-        m_lang_dub = langStr.split('\'', Qt::SkipEmptyParts);
+        m_lang_dub = langStr.split(ANIDB_LANGUAGE_DELIMITER, Qt::SkipEmptyParts);
     }
 }
 
 void AniDBFileInfo::setSubtitleLanguagesFromString(const QString& langStr)
 {
     if (!langStr.isEmpty()) {
-        m_lang_sub = langStr.split('\'', Qt::SkipEmptyParts);
+        m_lang_sub = langStr.split(ANIDB_LANGUAGE_DELIMITER, Qt::SkipEmptyParts);
     }
 }
 
