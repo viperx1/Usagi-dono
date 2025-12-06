@@ -50,6 +50,10 @@ set(SOURCES
     src/anidbanimeinfo.cpp
     src/anidbepisodeinfo.cpp
     src/anidbgroupinfo.cpp
+    src/hashingtask.cpp
+    src/animemetadatacache.cpp
+    src/filemarkinfo.cpp
+    src/sessioninfo.cpp
 )
 
 # Header files
@@ -86,6 +90,10 @@ set(HEADERS
     src/anidbanimeinfo.h
     src/anidbepisodeinfo.h
     src/anidbgroupinfo.h
+    src/hashingtask.h
+    src/animemetadatacache.h
+    src/filemarkinfo.h
+    src/sessioninfo.h
 )
 
 # Create executable
