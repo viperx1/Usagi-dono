@@ -173,12 +173,12 @@ void WatchSessionManager::loadFromDatabase()
     q.exec("SELECT aid, start_aid, current_episode, is_active FROM watch_sessions");
     while (q.next()) {
         SessionInfo session;
-        session.aid = q.value(0).toInt();
-        session.startAid = q.value(1).toInt();
-        session.currentEpisode = q.value(2).toInt();
-        session.isActive = q.value(3).toInt() != 0;
+        session.setAid(q.value(0).toInt());
+        session.setStartAid(q.value(1).toInt());
+        session.setCurrentEpisode(q.value(2).toInt());
+        session.setActive(q.value(3).toInt() != 0);
         
-        m_sessions[session.aid] = session;
+        m_sessions[session.aid()] = session;
     }
     
     // Load watched episodes for each session
@@ -188,7 +188,7 @@ void WatchSessionManager::loadFromDatabase()
         epQuery.addBindValue(it.key());
         if (epQuery.exec()) {
             while (epQuery.next()) {
-                it.value().watchedEpisodes.insert(epQuery.value(0).toInt());
+                it.value().markEpisodeWatched(epQuery.value(0).toInt());
             }
         }
     }
@@ -225,12 +225,12 @@ void WatchSessionManager::saveToDatabase()
         
         // Save watched episodes
         q.prepare("DELETE FROM session_watched_episodes WHERE aid = ?");
-        q.addBindValue(session.aid);
+        q.addBindValue(session.aid());
         q.exec();
         
-        for (int ep : session.watchedEpisodes) {
+        for (int ep : session.watchedEpisodes()) {
             q.prepare("INSERT INTO session_watched_episodes (aid, episode_number) VALUES (?, ?)");
-            q.addBindValue(session.aid);
+            q.addBindValue(session.aid());
             q.addBindValue(ep);
             q.exec();
         }
@@ -256,10 +256,10 @@ bool WatchSessionManager::startSession(int aid, int startEpisode)
     int originalAid = getOriginalPrequel(aid);
     
     SessionInfo session;
-    session.aid = aid;
-    session.startAid = originalAid;
-    session.currentEpisode = startEpisode > 0 ? startEpisode : 1;
-    session.isActive = true;
+    session.setAid(aid);
+    session.setStartAid(originalAid);
+    session.setCurrentEpisode(startEpisode > 0 ? startEpisode : 1);
+    session.setActive(true);
     
     m_sessions[aid] = session;
     
@@ -289,20 +289,20 @@ bool WatchSessionManager::startSessionFromFile(int lid)
 void WatchSessionManager::endSession(int aid)
 {
     if (m_sessions.contains(aid)) {
-        m_sessions[aid].isActive = false;
+        m_sessions[aid].setActive(false);
         emit sessionStateChanged(aid, false);
     }
 }
 
 bool WatchSessionManager::hasActiveSession(int aid) const
 {
-    return m_sessions.contains(aid) && m_sessions[aid].isActive;
+    return m_sessions.contains(aid) && m_sessions[aid].isActive();
 }
 
 int WatchSessionManager::getCurrentSessionEpisode(int aid) const
 {
     if (m_sessions.contains(aid)) {
-        return m_sessions[aid].currentEpisode;
+        return m_sessions[aid].currentEpisode();
     }
     return 0;
 }
@@ -315,11 +315,11 @@ void WatchSessionManager::markEpisodeWatched(int aid, int episodeNumber)
     }
     
     SessionInfo& session = m_sessions[aid];
-    session.watchedEpisodes.insert(episodeNumber);
+    session.markEpisodeWatched(episodeNumber);
     
     // Advance current episode if this was the current one
-    if (episodeNumber >= session.currentEpisode) {
-        session.currentEpisode = episodeNumber + 1;
+    if (episodeNumber >= session.currentEpisode()) {
+        session.setCurrentEpisode(episodeNumber + 1);
     }
     
     // Trigger auto-marking updates
@@ -637,7 +637,7 @@ int WatchSessionManager::calculateMarkScore(int lid) const
             score += distance * SCORE_DISTANCE_FACTOR;
             
             // Already watched in session gets penalty (more deletable)
-            if (m_sessions.contains(aid) && m_sessions[aid].watchedEpisodes.contains(episodeNumber)) {
+            if (m_sessions.contains(aid) && m_sessions[aid].isEpisodeWatched(episodeNumber)) {
                 score += SCORE_ALREADY_WATCHED;
             }
         }
@@ -709,9 +709,9 @@ FileMarkType WatchSessionManager::getFileMarkType(int lid) const
 void WatchSessionManager::setFileMarkType(int lid, FileMarkType markType)
 {
     FileMarkInfo& info = m_fileMarks[lid];
-    info.lid = lid;
-    info.markType = markType;
-    info.markScore = calculateMarkScore(lid);
+    info.setLid(lid);
+    info.setMarkType(markType);
+    info.setMarkScore(calculateMarkScore(lid));
     
     emit fileMarkChanged(lid, markType);
 }
@@ -720,15 +720,15 @@ FileMarkInfo WatchSessionManager::getFileMarkInfo(int lid) const
 {
     if (m_fileMarks.contains(lid)) {
         FileMarkInfo info = m_fileMarks[lid];
-        info.markScore = calculateMarkScore(lid);
+        info.setMarkScore(calculateMarkScore(lid));
         return info;
     }
     
     FileMarkInfo info;
-    info.lid = lid;
-    info.aid = getAnimeIdForFile(lid);
-    info.markScore = calculateMarkScore(lid);
-    info.isInActiveSession = info.aid > 0 && hasActiveSession(info.aid);
+    info.setLid(lid);
+    info.setAid(getAnimeIdForFile(lid));
+    info.setMarkScore(calculateMarkScore(lid));
+    info.setIsInActiveSession(info.aid() > 0 && hasActiveSession(info.aid()));
     
     return info;
 }
@@ -738,7 +738,7 @@ QList<int> WatchSessionManager::getFilesForDeletion() const
     QList<QPair<int, int>> scoredFiles; // (lid, score)
     
     for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
-        if (it.value().markType == FileMarkType::ForDeletion) {
+        if (it.value().markType() == FileMarkType::ForDeletion) {
             scoredFiles.append(qMakePair(it.key(), calculateMarkScore(it.key())));
         }
     }
@@ -762,7 +762,7 @@ QList<int> WatchSessionManager::getFilesForDownload() const
     QList<int> result;
     
     for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
-        if (it.value().markType == FileMarkType::ForDownload) {
+        if (it.value().markType() == FileMarkType::ForDownload) {
             result.append(it.key());
         }
     }
@@ -927,8 +927,8 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     // If we're above threshold, clear deletion marks
     if (availableGB >= threshold) {
         for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
-            if (it.value().markType == FileMarkType::ForDeletion) {
-                it.value().markType = FileMarkType::None;
+            if (it.value().markType() == FileMarkType::ForDeletion) {
+                it.value().setMarkType(FileMarkType::None);
                 updatedLids.insert(it.key());
                 emit fileMarkChanged(it.key(), FileMarkType::None);
             }
@@ -944,8 +944,8 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     
     // First, clear all existing deletion marks before calculating new ones
     for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
-        if (it.value().markType == FileMarkType::ForDeletion) {
-            it.value().markType = FileMarkType::None;
+        if (it.value().markType() == FileMarkType::ForDeletion) {
+            it.value().setMarkType(FileMarkType::None);
             emit fileMarkChanged(it.key(), FileMarkType::None);
         }
     }
@@ -1044,9 +1044,9 @@ void WatchSessionManager::autoMarkFilesForDeletion()
         
         // Mark this file for deletion
         FileMarkInfo& markInfo = m_fileMarks[candidate.lid];
-        markInfo.lid = candidate.lid;
-        markInfo.markType = FileMarkType::ForDeletion;
-        markInfo.markScore = candidate.score;
+        markInfo.setLid(candidate.lid);
+        markInfo.setMarkType(FileMarkType::ForDeletion);
+        markInfo.setMarkScore(candidate.score);
         
         accumulatedSpace += candidate.size;
         
@@ -1134,11 +1134,11 @@ void WatchSessionManager::autoMarkFilesForDownload()
                     
                     // Only mark if not already marked for something else
                     if (!m_fileMarks.contains(lid) || 
-                        m_fileMarks[lid].markType == FileMarkType::None) {
+                        m_fileMarks[lid].markType() == FileMarkType::None) {
                         FileMarkInfo& info = m_fileMarks[lid];
-                        info.lid = lid;
-                        info.markType = FileMarkType::ForDownload;
-                        info.markScore = calculateMarkScore(lid);
+                        info.setLid(lid);
+                        info.setMarkType(FileMarkType::ForDownload);
+                        info.setMarkScore(calculateMarkScore(lid));
                         
                         updatedLids.insert(lid);
                         emit fileMarkChanged(lid, FileMarkType::ForDownload);
@@ -1271,14 +1271,14 @@ void WatchSessionManager::autoStartSessionsForExistingAnime()
         if (!hasActiveSession(aid)) {
             // Start session at episode 1 for anime without an active session
             SessionInfo session;
-            session.aid = aid;
+            session.setAid(aid);
             
             // Get the original prequel, falling back to current aid if not found
             int startAid = getOriginalPrequel(aid);
-            session.startAid = (startAid > 0) ? startAid : aid;
+            session.setStartAid((startAid > 0) ? startAid : aid);
             
-            session.currentEpisode = 1;
-            session.isActive = true;
+            session.setCurrentEpisode(1);
+            session.setActive(true);
             
             m_sessions[aid] = session;
             
