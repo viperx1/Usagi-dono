@@ -600,7 +600,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         }
         
         // Add marking info to tooltip
-        switch (file.markType) {
+        switch (file.markType()) {
             case FileMarkType::ForDownload:
                 tooltip += "\nMarking: For Download";
                 break;
@@ -611,13 +611,13 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
                 break;
         }
         
-        if (file.lastPlayed > 0) {
-            QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(file.lastPlayed);
+        if (file.lastPlayed() > 0) {
+            QDateTime lastPlayedTime = QDateTime::fromSecsSinceEpoch(file.lastPlayed());
             tooltip += QString("\nLast Played: %1").arg(lastPlayedTime.toString("yyyy-MM-dd hh:mm"));
             
             // Track most recent last played time for this anime
-            if (file.lastPlayed > m_lastPlayed) {
-                m_lastPlayed = file.lastPlayed;
+            if (file.lastPlayed() > m_lastPlayed) {
+                m_lastPlayed = file.lastPlayed();
             }
         }
         
