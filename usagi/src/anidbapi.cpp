@@ -765,7 +765,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		AniDBEpisodeInfo episodeInfo = parseFileAmaskEpisodeData(token2, amask, index);
 		
 		// Parse group data using amask
-		GroupData groupData = parseFileAmaskGroupData(token2, amask, index);
+		AniDBGroupInfo groupInfo = parseFileAmaskGroupData(token2, amask, index);
 		
 		// Store all parsed data
 		storeFileData(fileInfo);
@@ -792,10 +792,15 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			storeEpisodeData(episodeInfo);
 		}
 		
-		if(!groupData.gid.isEmpty())
+		if(groupInfo.isValid() || fileInfo.groupId() > 0)
 		{
-			groupData.gid = QString::number(fileInfo.groupId());  // Ensure gid is set from file data
-			storeGroupData(groupData);
+			// Ensure GID is set from file data
+			if(!groupInfo.isValid()) {
+				groupInfo.setGroupId(fileInfo.groupId());
+			} else if(groupInfo.groupId() == 0) {
+				groupInfo.setGroupId(fileInfo.groupId());
+			}
+			storeGroupData(groupInfo);
 		}
 		
 		// Handle truncated response - log warning about incomplete data
@@ -4587,48 +4592,27 @@ AniDBEpisodeInfo AniDBApi::parseFileAmaskEpisodeData(const QStringList& tokens, 
 
 /**
  * Parse group data from FILE command response using file_amask.
- * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
+ * Processes mask bits in strict MSB to LSB order.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which group fields are present
  * @param index Current index in tokens array (updated as fields are consumed)
- * @return GroupData structure with parsed group fields
+ * @return AniDBGroupInfo object with parsed group fields
  */
-AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index)
+AniDBGroupInfo AniDBApi::parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index)
 {
-	GroupData data;
+	AniDBGroupInfo groupInfo;
 	
-	// Process file_amask bits for group data using a loop
-	// This ensures correctness even if individual if-statements are reordered
-	
-	// Define all mask bits in MSB to LSB order
-	struct MaskBit {
-		unsigned int bit;
-		QString* field;
-	};
-	
-	MaskBit maskBits[] = {
-		{aGROUP_NAME,              &data.groupname},      // Bit 7
-		{aGROUP_NAME_SHORT,        &data.groupshortname}, // Bit 6
-		// Bits 5-1 reserved
-		{aDATE_AID_RECORD_UPDATED, nullptr}              // Bit 0 - Not stored
-	};
-	
-	// Process mask bits in order using a loop
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		if (amask & maskBits[i].bit)
-		{
-			QString value = tokens.value(index++);
-			if (maskBits[i].field != nullptr)
-			{
-				*(maskBits[i].field) = value;
-			}
-			// else: field is not stored (marked with nullptr)
-		}
+	// Parse fields based on file_amask bits (MSB to LSB order)
+	if (amask & aGROUP_NAME) groupInfo.setGroupName(tokens.value(index++));
+	if (amask & aGROUP_NAME_SHORT) groupInfo.setGroupShortName(tokens.value(index++));
+	// Bits 5-1 reserved
+	if (amask & aDATE_AID_RECORD_UPDATED) {
+		// Skip this field - not stored
+		index++;
 	}
 	
-	return data;
+	return groupInfo;
 }
 
 /**
@@ -5526,20 +5510,21 @@ void AniDBApi::storeEpisodeData(const AniDBEpisodeInfo& episodeInfo)
 
 /**
  * Store group data in the database.
+ * Uses AniDBGroupInfo type-safe fields directly.
  */
-void AniDBApi::storeGroupData(const GroupData& data)
+void AniDBApi::storeGroupData(const AniDBGroupInfo& groupInfo)
 {
-	if(data.gid.isEmpty() || data.gid == "0")
+	if(!groupInfo.isValid())
 		return;
-	if(data.groupname.isEmpty() && data.groupshortname.isEmpty())
+	if(!groupInfo.hasName())
 		return;
 		
 	QString q = QString("INSERT OR REPLACE INTO `group` "
 		"(`gid`, `name`, `shortname`) "
 		"VALUES ('%1', '%2', '%3')")
-		.arg(QString(data.gid).replace("'", "''"))
-		.arg(QString(data.groupname).replace("'", "''"))
-		.arg(QString(data.groupshortname).replace("'", "''"));
+		.arg(groupInfo.groupId())
+		.arg(QString(groupInfo.groupName()).replace("'", "''"))
+		.arg(QString(groupInfo.groupShortName()).replace("'", "''"));
 		
 	QSqlQuery query(db);
 	if(!query.exec(q))

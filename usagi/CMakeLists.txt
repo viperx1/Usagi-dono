@@ -49,6 +49,7 @@ set(SOURCES
     src/anidbfileinfo.cpp
     src/anidbanimeinfo.cpp
     src/anidbepisodeinfo.cpp
+    src/anidbgroupinfo.cpp
 )
 
 # Header files
@@ -84,6 +85,7 @@ set(HEADERS
     src/anidbfileinfo.h
     src/anidbanimeinfo.h
     src/anidbepisodeinfo.h
+    src/anidbgroupinfo.h
 )
 
 # Create executable

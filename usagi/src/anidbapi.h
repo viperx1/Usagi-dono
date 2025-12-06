@@ -23,6 +23,7 @@
 #include "anidbfileinfo.h"
 #include "anidbanimeinfo.h"
 #include "anidbepisodeinfo.h"
+#include "anidbgroupinfo.h"
 
 // Forward declaration for myAniDBApi (defined in main.h)
 // and extern declaration for the global adbapi pointer
@@ -280,16 +281,13 @@ private:
 	// FileData has been replaced by AniDBFileInfo class (see anidbfileinfo.h)
 	// AnimeData has been replaced by AniDBAnimeInfo class (see anidbanimeinfo.h)
 	// EpisodeData has been replaced by AniDBEpisodeInfo class (see anidbepisodeinfo.h)
-	
-	struct GroupData {
-		QString gid, groupname, groupshortname;
-	};
+	// GroupData has been replaced by AniDBGroupInfo class (see anidbgroupinfo.h)
 
 	// Helper methods for mask processing
 	AniDBFileInfo parseFileMask(const QStringList& tokens, unsigned int fmask, int& index);
 	AniDBAnimeInfo parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index);
 	AniDBEpisodeInfo parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index);
-	GroupData parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
+	AniDBGroupInfo parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
 	AniDBAnimeInfo parseMask(const QStringList& tokens, uint64_t amask, int& index);
 	AniDBAnimeInfo parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
 	AniDBAnimeInfo parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
@@ -298,7 +296,7 @@ private:
 	void storeFileData(const AniDBFileInfo& data);
 	void storeAnimeData(const AniDBAnimeInfo& data);
 	void storeEpisodeData(const AniDBEpisodeInfo& data);
-	void storeGroupData(const GroupData& data);
+	void storeGroupData(const AniDBGroupInfo& data);
 	
 	// Date format conversion helper - enforces YYYY-MM-DDZ format at fundamental level
 	QString convertToISODate(const QString& dateStr);
