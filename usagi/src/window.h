@@ -478,7 +478,7 @@ private:
     FlowLayout *mylistCardLayout;
     VirtualFlowLayout *mylistVirtualLayout;  // Virtual scrolling layout for efficient rendering
     QLabel *mylistStatusLabel;
-    bool mylistSortAscending;  // Deprecated: moved to MyListFilterSidebar::getSortAscending() (migration incomplete)
+    bool mylistSortAscending;  // Deprecated: moved to MyListFilterSidebar::getSortAscending() - still used at window.cpp:334 (migration incomplete)
     bool lastInMyListState;  // Track previous "In MyList" filter state for reload detection
     QSet<int> mylistAnimeIdSet;  // Set of anime IDs that are in the user's mylist (for fast filtering)
     QList<int> allAnimeIdsList;  // Full unfiltered list of anime IDs for filtering (populated by onMylistLoadingFinished/loadMylistAsCards, never modified by filters)
