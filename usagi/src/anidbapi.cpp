@@ -762,7 +762,7 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		AniDBAnimeInfo animeInfo = parseFileAmaskAnimeData(token2, amask, index);
 		
 		// Parse episode data using amask
-		EpisodeData episodeData = parseFileAmaskEpisodeData(token2, amask, index);
+		AniDBEpisodeInfo episodeInfo = parseFileAmaskEpisodeData(token2, amask, index);
 		
 		// Parse group data using amask
 		GroupData groupData = parseFileAmaskGroupData(token2, amask, index);
@@ -781,10 +781,15 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			storeAnimeData(animeInfo);
 		}
 		
-		if(!episodeData.eid.isEmpty())
+		if(episodeInfo.isValid() || fileInfo.episodeId() > 0)
 		{
-			episodeData.eid = QString::number(fileInfo.episodeId());  // Ensure eid is set from file data
-			storeEpisodeData(episodeData);
+			// Ensure EID is set from file data
+			if(!episodeInfo.isValid()) {
+				episodeInfo.setEpisodeId(fileInfo.episodeId());
+			} else if(episodeInfo.episodeId() == 0) {
+				episodeInfo.setEpisodeId(fileInfo.episodeId());
+			}
+			storeEpisodeData(episodeInfo);
 		}
 		
 		if(!groupData.gid.isEmpty())
@@ -4555,39 +4560,29 @@ AniDBAnimeInfo AniDBApi::parseFileAmaskAnimeData(const QStringList& tokens, unsi
  * @param index Current index in tokens array (updated as fields are consumed)
  * @return EpisodeData structure with parsed episode fields
  */
-AniDBApi::EpisodeData AniDBApi::parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index)
+/**
+ * Parse episode data from FILE command response using file_amask.
+ * Processes mask bits in strict MSB to LSB order.
+ * 
+ * @param tokens Pipe-delimited response tokens
+ * @param amask Anime mask indicating which episode fields are present
+ * @param index Current index in tokens array (updated as fields are consumed)
+ * @return AniDBEpisodeInfo object with parsed episode fields
+ */
+AniDBEpisodeInfo AniDBApi::parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index)
 {
-	EpisodeData data;
+	AniDBEpisodeInfo episodeInfo;
 	
-	// Process file_amask bits for episode data using a loop
-	// This ensures correctness even if individual if-statements are reordered
+	// Parse fields based on file_amask bits (MSB to LSB order)
+	if (amask & aEPISODE_NUMBER) episodeInfo.setEpisodeNumber(tokens.value(index++));
+	if (amask & aEPISODE_NAME) episodeInfo.setName(tokens.value(index++));
+	if (amask & aEPISODE_NAME_ROMAJI) episodeInfo.setNameRomaji(tokens.value(index++));
+	if (amask & aEPISODE_NAME_KANJI) episodeInfo.setNameKanji(tokens.value(index++));
+	if (amask & aEPISODE_RATING) episodeInfo.setRating(tokens.value(index++));
+	if (amask & aEPISODE_VOTE_COUNT) episodeInfo.setVoteCount(tokens.value(index++).toInt());
+	// Bits 9-8 reserved
 	
-	// Define all mask bits in MSB to LSB order
-	struct MaskBit {
-		unsigned int bit;
-		QString* field;
-	};
-	
-	MaskBit maskBits[] = {
-		{aEPISODE_NUMBER,      &data.epno},         // Bit 15
-		{aEPISODE_NAME,        &data.epname},       // Bit 14
-		{aEPISODE_NAME_ROMAJI, &data.epnameromaji}, // Bit 13
-		{aEPISODE_NAME_KANJI,  &data.epnamekanji},  // Bit 12
-		{aEPISODE_RATING,      &data.eprating},     // Bit 11
-		{aEPISODE_VOTE_COUNT,  &data.epvotecount}   // Bit 10
-		// Bits 9-8 reserved
-	};
-	
-	// Process mask bits in order using a loop
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		if (amask & maskBits[i].bit)
-		{
-			*(maskBits[i].field) = tokens.value(index++);
-		}
-	}
-	
-	return data;
+	return episodeInfo;
 }
 
 /**
@@ -5504,22 +5499,23 @@ void AniDBApi::storeAnimeData(const AniDBAnimeInfo& animeInfo)
 
 /**
  * Store episode data in the database.
+ * Uses AniDBEpisodeInfo type-safe fields directly.
  */
-void AniDBApi::storeEpisodeData(const EpisodeData& data)
+void AniDBApi::storeEpisodeData(const AniDBEpisodeInfo& episodeInfo)
 {
-	if(data.eid.isEmpty())
+	if(!episodeInfo.isValid())
 		return;
 		
 	QString q = QString("INSERT OR REPLACE INTO `episode` "
 		"(`eid`, `name`, `nameromaji`, `namekanji`, `rating`, `votecount`, `epno`) "
 		"VALUES ('%1', '%2', '%3', '%4', '%5', '%6', '%7')")
-		.arg(QString(data.eid).replace("'", "''"))
-		.arg(QString(data.epname).replace("'", "''"))
-		.arg(QString(data.epnameromaji).replace("'", "''"))
-		.arg(QString(data.epnamekanji).replace("'", "''"))
-		.arg(QString(data.eprating).replace("'", "''"))
-		.arg(QString(data.epvotecount).replace("'", "''"))
-		.arg(QString(data.epno).replace("'", "''"));
+		.arg(episodeInfo.episodeId())
+		.arg(QString(episodeInfo.name()).replace("'", "''"))
+		.arg(QString(episodeInfo.nameRomaji()).replace("'", "''"))
+		.arg(QString(episodeInfo.nameKanji()).replace("'", "''"))
+		.arg(QString(episodeInfo.rating()).replace("'", "''"))
+		.arg(episodeInfo.voteCount())
+		.arg(QString(episodeInfo.episodeNumber()).replace("'", "''"));
 		
 	QSqlQuery query(db);
 	if(!query.exec(q))
