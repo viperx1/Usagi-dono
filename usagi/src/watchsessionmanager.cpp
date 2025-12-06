@@ -846,23 +846,14 @@ bool WatchSessionManager::deleteNextMarkedFile(bool deleteFromDisk)
         return false;
     }
     
-    // Build set of episodes that would be deleted if we processed all marked files
-    // This is needed for proper gap detection
-    QSet<int> potentiallyDeletedEpisodes;
-    for (int lid : filesToDelete) {
-        if (isLastFileForEpisode(lid)) {
-            int episodeId = getEpisodeIdForFile(lid);
-            if (episodeId > 0) {
-                potentiallyDeletedEpisodes.insert(episodeId);
-            }
-        }
-    }
-    
     // Find the first file that can be safely deleted (doesn't create a gap)
     // Process files in score order (lowest score = highest deletion priority)
+    QSet<int> emptyDeletedSet;  // Empty set since we're only deleting one file at a time
+    
     for (int lid : filesToDelete) {
         // Check if deleting this file would create a gap
-        if (wouldCreateGap(lid, potentiallyDeletedEpisodes)) {
+        // Pass empty set since we're checking current state, not batch state
+        if (wouldCreateGap(lid, emptyDeletedSet)) {
             LOG(QString("[WatchSessionManager] deleteNextMarkedFile: Skipping lid=%1 - would create gap in series")
                 .arg(lid));
             continue;
