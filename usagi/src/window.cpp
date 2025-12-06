@@ -1623,18 +1623,14 @@ void Window::ButtonHasherStartClick()
 		QFileInfo fileInfo(filePath);
 		qint64 fileSize = fileInfo.size();
 		
-		// Queue for deferred processing
-		HashedFileInfo info;
-		info.rowIndex = rowIndex;
-		info.filePath = filePath;
-		info.filename = filename;
-		info.hexdigest = hexdigest;
-		info.fileSize = fileSize;
-		info.useUserSettings = true;
-		info.addToMylist = (addtomylist->checkState() > 0);
-		info.markWatchedState = markwatched->checkState();
-		info.fileState = hasherFileState->currentIndex();
-		pendingHashedFilesQueue.append(info);
+		// Queue for deferred processing using new HashingTask class
+		HashingTask task(filePath, filename, hexdigest, fileSize);
+		task.setRowIndex(rowIndex);
+		task.setUseUserSettings(true);
+		task.setAddToMylist(addtomylist->checkState() > 0);
+		task.setMarkWatchedState(markwatched->checkState());
+		task.setFileState(hasherFileState->currentIndex());
+		pendingHashedFilesQueue.append(task);
 	}
 	
 	// Start timer to process queued files in batches (keeps UI responsive)
@@ -2337,54 +2333,54 @@ void Window::processPendingHashedFiles()
 	int processed = 0;
 	
 	while (!pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
-		HashedFileInfo info = pendingHashedFilesQueue.takeFirst();
+		HashingTask task = pendingHashedFilesQueue.takeFirst();
 		processed++;
 		
 		// Mark as hashed in UI (use pre-allocated color object)
-		hashes->item(info.rowIndex, 0)->setBackground(m_hashedFileColor);
-		hashes->item(info.rowIndex, 1)->setText("1");
+		hashes->item(task.rowIndex(), 0)->setBackground(m_hashedFileColor);
+		hashes->item(task.rowIndex(), 1)->setText("1");
 		
 		// Update hash in database with status=1
-		adbapi->updateLocalFileHash(info.filePath, info.hexdigest, 1);
+		adbapi->updateLocalFileHash(task.filePath(), task.hash(), 1);
 		
 		// If adding to mylist and logged in, perform API calls
-		if (info.addToMylist && adbapi->LoggedIn()) {
+		if (task.addToMylist() && adbapi->LoggedIn()) {
 			// Perform LocalIdentify
-			std::bitset<2> li = adbapi->LocalIdentify(info.fileSize, info.hexdigest);
+			std::bitset<2> li = adbapi->LocalIdentify(task.fileSize(), task.hash());
 			
 			// Update UI with LocalIdentify results
-			hashes->item(info.rowIndex, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0"));
+			hashes->item(task.rowIndex(), 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0"));
 			
 			QString tag;
 			if(li[AniDBApi::LI_FILE_IN_DB] == 0) {
-				tag = adbapi->File(info.fileSize, info.hexdigest);
-				hashes->item(info.rowIndex, 5)->setText(tag);
+				tag = adbapi->File(task.fileSize(), task.hash());
+				hashes->item(task.rowIndex(), 5)->setText(tag);
 				// File info not in local DB yet - File() API call queued to fetch from AniDB
 				// Status will be updated to 2 when subsequent MylistAdd completes (via UpdateLocalPath)
 			} else {
-				hashes->item(info.rowIndex, 5)->setText("0");
+				hashes->item(task.rowIndex(), 5)->setText("0");
 				// File is in local DB (previously fetched from AniDB)
 				// Update status to 2 (in anidb) to prevent re-detection
-				adbapi->UpdateLocalFileStatus(info.filePath, 2);
+				adbapi->UpdateLocalFileStatus(task.filePath(), 2);
 			}
 
-			hashes->item(info.rowIndex, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0"));
+			hashes->item(task.rowIndex(), 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0"));
 			if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0) {
-				// Use settings from the info struct
-				int markWatched = info.useUserSettings ? info.markWatchedState : Qt::Unchecked;
-				int fileState = info.useUserSettings ? info.fileState : 1;
-				tag = adbapi->MylistAdd(info.fileSize, info.hexdigest, markWatched, fileState, storage->text());
-				hashes->item(info.rowIndex, 6)->setText(tag);
+				// Use settings from the task
+				int markWatched = task.useUserSettings() ? task.markWatchedState() : Qt::Unchecked;
+				int fileState = task.useUserSettings() ? task.fileState() : 1;
+				tag = adbapi->MylistAdd(task.fileSize(), task.hash(), markWatched, fileState, storage->text());
+				hashes->item(task.rowIndex(), 6)->setText(tag);
 				// Status will be updated when MylistAdd completes (via UpdateLocalPath)
 			} else {
-				hashes->item(info.rowIndex, 6)->setText("0");
+				hashes->item(task.rowIndex(), 6)->setText("0");
 				// File already in mylist - no API call needed
 				// Update status to 2 (in anidb) to prevent re-detection
-				adbapi->UpdateLocalFileStatus(info.filePath, 2);
+				adbapi->UpdateLocalFileStatus(task.filePath(), 2);
 			}
 		} else {
 			// Not logged in - mark as fully processed to prevent re-detection
-			adbapi->UpdateLocalFileStatus(info.filePath, 2);
+			adbapi->UpdateLocalFileStatus(task.filePath(), 2);
 		}
 	}
 	
@@ -2719,7 +2715,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                         unknownFilesData.remove(row);
                         
                         // Update row indices in unknownFilesData map
-                        QMap<int, UnknownFileData> newMap;
+                        QMap<int, LocalFileInfo> newMap;
                         for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
                         {
                             int oldRow = it.key();
@@ -2835,7 +2831,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 						unknownFilesData.remove(row);
 						
 						// Update row indices in unknownFilesData map
-						QMap<int, UnknownFileData> newMap;
+						QMap<int, LocalFileInfo> newMap;
 						for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
 						{
 							int oldRow = it.key();
@@ -3353,15 +3349,11 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     
     unknownFiles->setCellWidget(row, 3, actionContainer);
     
-    // Store file data with filepath as additional key for stable lookup
-    UnknownFileData fileData;
-    fileData.filename = filename;
-    fileData.filepath = filepath;
-    fileData.hash = hash;
-    fileData.size = size;
-    fileData.selectedAid = -1;
-    fileData.selectedEid = -1;
-    unknownFilesData[row] = fileData;
+    // Store file data using LocalFileInfo class
+    LocalFileInfo fileInfo(filename, filepath, hash, size);
+    fileInfo.setSelectedAid(-1);
+    fileInfo.setSelectedEid(-1);
+    unknownFilesData[row] = fileInfo;
     
     // Connect anime search to populate episode suggestions
     connect(animeSearch, &QLineEdit::textChanged, this, [this, filepath, animeSearch, episodeInput, bindButton]() {
@@ -3383,7 +3375,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
         if(cachedTitleToAid.contains(searchText))
         {
             int aid = cachedTitleToAid[searchText];
-            unknownFilesData[currentRow].selectedAid = aid;
+            unknownFilesData[currentRow].setSelectedAid(aid);
             
             // Enable episode input
             episodeInput->setEnabled(true);
@@ -3399,7 +3391,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
             episodeInput->setEnabled(false);
             episodeInput->setPlaceholderText("Select anime first...");
             bindButton->setEnabled(false);
-            unknownFilesData[currentRow].selectedAid = -1;
+            unknownFilesData[currentRow].setSelectedAid(-1);
         }
     });
     
@@ -4014,18 +4006,14 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			QFileInfo fileInfo(filePath);
 			qint64 fileSize = fileInfo.size();
 			
-			// Queue for deferred processing
-			HashedFileInfo info;
-			info.rowIndex = rowIndex;
-			info.filePath = filePath;
-			info.filename = filename;
-			info.hexdigest = hexdigest;
-			info.fileSize = fileSize;
-			info.useUserSettings = false;  // Use auto-watcher defaults
-			info.addToMylist = true;  // Auto-watcher always adds to mylist when logged in
-			info.markWatchedState = Qt::Unchecked;  // Default for auto-watcher
-			info.fileState = 1;  // Internal (HDD)
-			pendingHashedFilesQueue.append(info);
+			// Queue for deferred processing using new HashingTask class
+			HashingTask task(filePath, filename, hexdigest, fileSize);
+			task.setRowIndex(rowIndex);
+			task.setUseUserSettings(false);  // Use auto-watcher defaults
+			task.setAddToMylist(true);  // Auto-watcher always adds to mylist when logged in
+			task.setMarkWatchedState(Qt::Unchecked);  // Default for auto-watcher
+			task.setFileState(1);  // Internal (HDD)
+			pendingHashedFilesQueue.append(task);
 		}
 		
 		// Start timer to process queued files in batches (keeps UI responsive)
@@ -4903,7 +4891,7 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 	}
 	
 	int currentAid = -1;
-	AnimeAlternativeTitles currentTitles;
+	QStringList currentTitles;
 	
 	while (q.next()) {
 		int aid = q.value(0).toInt();
@@ -4917,19 +4905,19 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 		if (aid != currentAid) {
 			// Save previous anime's titles if any
 			if (currentAid != -1) {
-				animeAlternativeTitlesCache[currentAid] = currentTitles;
+				animeAlternativeTitlesCache.addAnime(currentAid, currentTitles);
 			}
 			
 			// Start new anime
 			currentAid = aid;
-			currentTitles.titles.clear();
+			currentTitles.clear();
 			
 			// Add romaji and english names from anime table
 			if (!romaji.isEmpty()) {
-				currentTitles.titles.append(romaji);
+				currentTitles.append(romaji);
 			}
 			if (!english.isEmpty() && english != romaji) {
-				currentTitles.titles.append(english);
+				currentTitles.append(english);
 			}
 			
 			// Add other name from anime table
@@ -4937,8 +4925,8 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 				QStringList otherList = other.split("'", Qt::SkipEmptyParts);
 				for (const QString &otherName : otherList) {
 					QString trimmed = otherName.trimmed();
-					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
-						currentTitles.titles.append(trimmed);
+					if (!trimmed.isEmpty() && !currentTitles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.append(trimmed);
 					}
 				}
 			}
@@ -4948,8 +4936,8 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 				QStringList shortList = shortNames.split("'", Qt::SkipEmptyParts);
 				for (const QString &shortName : shortList) {
 					QString trimmed = shortName.trimmed();
-					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
-						currentTitles.titles.append(trimmed);
+					if (!trimmed.isEmpty() && !currentTitles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.append(trimmed);
 					}
 				}
 			}
@@ -4959,22 +4947,22 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 				QStringList synonymList = synonyms.split("'", Qt::SkipEmptyParts);
 				for (const QString &synonym : synonymList) {
 					QString trimmed = synonym.trimmed();
-					if (!trimmed.isEmpty() && !currentTitles.titles.contains(trimmed, Qt::CaseInsensitive)) {
-						currentTitles.titles.append(trimmed);
+					if (!trimmed.isEmpty() && !currentTitles.contains(trimmed, Qt::CaseInsensitive)) {
+						currentTitles.append(trimmed);
 					}
 				}
 			}
 		}
 		
 		// Add alternative title from anime_titles table if not already in list
-		if (!title.isEmpty() && !currentTitles.titles.contains(title, Qt::CaseInsensitive)) {
-			currentTitles.titles.append(title);
+		if (!title.isEmpty() && !currentTitles.contains(title, Qt::CaseInsensitive)) {
+			currentTitles.append(title);
 		}
 	}
 	
 	// Save last anime's titles
 	if (currentAid != -1) {
-		animeAlternativeTitlesCache[currentAid] = currentTitles;
+		animeAlternativeTitlesCache.addAnime(currentAid, currentTitles);
 	}
 	
 	LOG(QString("[Window] Loaded alternative titles for %1 anime").arg(animeAlternativeTitlesCache.size()));
@@ -4999,16 +4987,8 @@ bool Window::matchesSearchFilter(int aid, const QString &animeName, const QStrin
 	}
 	
 	// Check alternative titles from cache
-	if (animeAlternativeTitlesCache.contains(aid)) {
-		const AnimeAlternativeTitles &titles = animeAlternativeTitlesCache[aid];
-		for (const QString &title : titles.titles) {
-			if (title.contains(searchText, Qt::CaseInsensitive)) {
-				return true;
-			}
-		}
-	}
-	
-	return false;
+	// Use cache for better performance
+	return animeAlternativeTitlesCache.matchesAnyTitle(aid, searchText);
 }
 
 // Check and request missing relation data for a specific anime's chain
@@ -5804,9 +5784,9 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
         return;
     }
     
-    UnknownFileData &fileData = unknownFilesData[row];
+    LocalFileInfo &fileInfo = unknownFilesData[row];
     
-    if(fileData.selectedAid <= 0)
+    if(fileInfo.selectedAid() <= 0)
     {
         LOG(QString("Error: Invalid anime selection for row %1").arg(row));
         QMessageBox::warning(this, "Invalid Selection", "Please select an anime before binding.");
@@ -5821,8 +5801,8 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     }
     
     LOG(QString("Binding unknown file: %1 to anime %2, episode %3")
-        .arg(fileData.filename)
-        .arg(fileData.selectedAid)
+        .arg(fileInfo.filename())
+        .arg(fileInfo.selectedAid())
         .arg(epno));
     
     // Use the settings from the UI
@@ -5842,8 +5822,8 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     // Note: The AniDB API has an undocumented length limit for the 'other' field
     // Testing shows ~100 chars works reliably, so we truncate to stay safe
     QString otherField = QString("File: %1\nHash: %2\nSize: %3")
-        .arg(fileData.filename, fileData.hash)
-        .arg(fileData.size);
+        .arg(fileInfo.filename(), fileInfo.hash())
+        .arg(fileInfo.size());
     
     // Truncate if too long (limit to 100 chars to stay within API limits)
     if(otherField.length() > 100)
@@ -5856,13 +5836,13 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     if(addtomylist->isChecked() && adbapi->LoggedIn())
     {
         LOG(QString("Adding unknown file to mylist using generic: aid=%1, epno=%2")
-            .arg(fileData.selectedAid)
+            .arg(fileInfo.selectedAid())
             .arg(epno));
         
-        adbapi->MylistAddGeneric(fileData.selectedAid, epno, viewed, state, storageStr, otherField);
+        adbapi->MylistAddGeneric(fileInfo.selectedAid(), epno, viewed, state, storageStr, otherField);
         
         // Mark the file in local_files as bound to anime (binding_status 1)
-        adbapi->UpdateLocalFileBindingStatus(fileData.filepath, 1);
+        adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 1);
         
         // Reload mylist to show the newly bound file
         // Note: This happens immediately, before the API response. 
@@ -5899,7 +5879,7 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
         }
         
         LOG(QString("Successfully bound unknown file to anime %1, episode %2")
-            .arg(fileData.selectedAid)
+            .arg(fileInfo.selectedAid())
             .arg(epno));
     }
     else
@@ -5919,10 +5899,10 @@ void Window::onUnknownFileNotAnimeClicked(int row)
     
     UnknownFileData &fileData = unknownFilesData[row];
     
-    LOG(QString("Marking file as not anime: %1").arg(fileData.filename));
+    LOG(QString("Marking file as not anime: %1").arg(fileInfo.filename()));
     
     // Mark the file in local_files as not anime (binding_status 2)
-    adbapi->UpdateLocalFileBindingStatus(fileData.filepath, 2);
+    adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 2);
     
     // Remove from unknown files widget
     unknownFiles->removeRow(row);
@@ -5952,7 +5932,7 @@ void Window::onUnknownFileNotAnimeClicked(int row)
         }
     }
     
-    LOG(QString("Successfully marked file as not anime: %1").arg(fileData.filename));
+    LOG(QString("Successfully marked file as not anime: %1").arg(fileInfo.filename()));
 }
 
 void Window::onUnknownFileRecheckClicked(int row)
@@ -5965,8 +5945,8 @@ void Window::onUnknownFileRecheckClicked(int row)
     
     UnknownFileData &fileData = unknownFilesData[row];
     
-    LOG(QString("Re-checking file against AniDB: %1").arg(fileData.filename));
-    LOG(QString("Hash: %1, Size: %2").arg(fileData.hash).arg(fileData.size));
+    LOG(QString("Re-checking file against AniDB: %1").arg(fileInfo.filename()));
+    LOG(QString("Hash: %1, Size: %2").arg(fileInfo.hash()).arg(fileInfo.size()));
     
     // Check if file is already in hashes table
     bool fileInHashesTable = false;
@@ -5974,7 +5954,7 @@ void Window::onUnknownFileRecheckClicked(int row)
     for(int i = 0; i < hashes->rowCount(); ++i)
     {
         QString hashPath = hashes->item(i, 2)->text();
-        if(hashPath == fileData.filepath)
+        if(hashPath == fileInfo.filepath())
         {
             fileInHashesTable = true;
             hashesRow = i;
@@ -5985,9 +5965,9 @@ void Window::onUnknownFileRecheckClicked(int row)
     // If file is not in hashes table, add it first
     if(!fileInHashesTable)
     {
-        LOG(QString("File not in hashes table, adding: %1").arg(fileData.filename));
-        QFileInfo fileInfo(fileData.filepath);
-        hashesinsertrow(fileInfo, Qt::Unchecked, fileData.hash);
+        LOG(QString("File not in hashes table, adding: %1").arg(fileInfo.filename()));
+        QFileInfo fileInfo(fileInfo.filepath());
+        hashesinsertrow(fileInfo, Qt::Unchecked, fileInfo.hash());
         hashesRow = hashes->rowCount() - 1;
     }
     else
@@ -5997,7 +5977,7 @@ void Window::onUnknownFileRecheckClicked(int row)
     
     // Call MylistAdd API with the hash and size
     // The response will be handled by getNotifyMylistAdd
-    QString tag = adbapi->MylistAdd(fileData.size, fileData.hash, 
+    QString tag = adbapi->MylistAdd(fileInfo.size(), fileInfo.hash(), 
                                      markwatched->checkState(), 
                                      hasherFileState->currentIndex(), 
                                      storage->text());
@@ -6011,7 +5991,7 @@ void Window::onUnknownFileRecheckClicked(int row)
         LOG(QString("Sent re-check request with tag: %1").arg(tag));
     }
     
-    LOG(QString("Re-check initiated for file: %1").arg(fileData.filename));
+    LOG(QString("Re-check initiated for file: %1").arg(fileInfo.filename()));
 }
 
 void Window::onUnknownFileDeleteClicked(int row)
@@ -6024,7 +6004,7 @@ void Window::onUnknownFileDeleteClicked(int row)
     
     UnknownFileData &fileData = unknownFilesData[row];
     
-    LOG(QString("Delete button clicked for file: %1").arg(fileData.filename));
+    LOG(QString("Delete button clicked for file: %1").arg(fileInfo.filename()));
     
     // Show confirmation dialog to prevent accidental deletion
     QMessageBox::StandardButton reply = QMessageBox::question(
@@ -6033,24 +6013,24 @@ void Window::onUnknownFileDeleteClicked(int row)
         QString("Are you sure you want to permanently delete this file?\n\n"
                 "File: %1\n\n"
                 "This action cannot be undone!")
-            .arg(fileData.filename),
+            .arg(fileInfo.filename()),
         QMessageBox::Yes | QMessageBox::No,
         QMessageBox::No  // Default to No for safety
     );
     
     if(reply != QMessageBox::Yes)
     {
-        LOG(QString("File deletion cancelled by user: %1").arg(fileData.filename));
+        LOG(QString("File deletion cancelled by user: %1").arg(fileInfo.filename()));
         return;
     }
     
     // Attempt to delete the physical file
-    QFile file(fileData.filepath);
+    QFile file(fileInfo.filepath());
     if(!file.exists())
     {
-        LOG(QString("Error: File does not exist: %1").arg(fileData.filepath));
+        LOG(QString("Error: File does not exist: %1").arg(fileInfo.filepath()));
         QMessageBox::warning(this, "File Not Found", 
-            QString("The file no longer exists:\n%1").arg(fileData.filepath));
+            QString("The file no longer exists:\n%1").arg(fileInfo.filepath()));
         
         // Save scroll position before removing row
         int scrollPos = unknownFiles->verticalScrollBar()->value();
@@ -6093,17 +6073,17 @@ void Window::onUnknownFileDeleteClicked(int row)
         LOG(QString("Error: Failed to delete file: %1").arg(file.errorString()));
         QMessageBox::critical(this, "Delete Failed", 
             QString("Failed to delete file:\n%1\n\nError: %2")
-                .arg(fileData.filepath, file.errorString()));
+                .arg(fileInfo.filepath(), file.errorString()));
         return;
     }
     
-    LOG(QString("Successfully deleted file: %1").arg(fileData.filepath));
+    LOG(QString("Successfully deleted file: %1").arg(fileInfo.filepath()));
     
     // Save scroll position before removing row
     int scrollPos = unknownFiles->verticalScrollBar()->value();
     
     // Update database - remove from local_files table
-    adbapi->UpdateLocalFileBindingStatus(fileData.filepath, 3); // 3 = deleted
+    adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 3); // 3 = deleted
     
     // Remove from unknown files widget
     unknownFiles->removeRow(row);
@@ -6136,7 +6116,7 @@ void Window::onUnknownFileDeleteClicked(int row)
         }
     }
     
-    LOG(QString("Successfully removed deleted file from UI: %1").arg(fileData.filename));
+    LOG(QString("Successfully removed deleted file from UI: %1").arg(fileInfo.filename()));
 }
 
 // ========== Filter Bar Toggle Implementation ==========

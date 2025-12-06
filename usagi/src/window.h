@@ -54,6 +54,8 @@
 #include "uicolors.h"
 #include "localfileinfo.h"
 #include "progresstracker.h"
+#include "hashingtask.h"
+#include "animemetadatacache.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -577,18 +579,7 @@ private:
 	QList<QPair<QString, QString>> pendingHashUpdates; // path, hash pairs for database update
 	
 	// Deferred processing for already-hashed files to prevent UI freeze
-	struct HashedFileInfo {
-		int rowIndex;
-		QString filePath;
-		QString filename;
-		QString hexdigest;
-		qint64 fileSize;
-		bool useUserSettings;  // If true, use UI settings; if false, use auto-watcher defaults
-		bool addToMylist;      // Whether to add to mylist
-		int markWatchedState;  // Used only when useUserSettings is true
-		int fileState;         // Used only when useUserSettings is true
-	};
-	QList<HashedFileInfo> pendingHashedFilesQueue;
+	QList<HashingTask> pendingHashedFilesQueue;
 	QTimer *hashedFilesProcessingTimer;
 	
 	// Background loading support to prevent UI freeze
@@ -723,16 +714,8 @@ public:
     Window();
 	~Window();
 private:
-    // Unknown files data structure
-    struct UnknownFileData {
-        QString filename;
-        QString filepath;
-        QString hash;
-        qint64 size;
-        int selectedAid;
-        int selectedEid;
-    };
-    QMap<int, UnknownFileData> unknownFilesData; // row index -> file data
+    // Unknown files data structure - now using LocalFileInfo class
+    QMap<int, LocalFileInfo> unknownFilesData; // row index -> file data
     
     // Cached anime titles for unknown files widget (to avoid repeated DB queries)
     QStringList cachedAnimeTitles;
@@ -740,11 +723,8 @@ private:
     bool animeTitlesCacheLoaded;
     void loadAnimeTitlesCache();
     
-    // Helper structure for mylist filtering
-    struct AnimeAlternativeTitles {
-        QStringList titles;  // All titles including romaji, english, and alternative titles
-    };
-    QMap<int, AnimeAlternativeTitles> animeAlternativeTitlesCache;  // aid -> alternative titles
+    // Helper cache for mylist filtering - now using proper class
+    AnimeMetadataCache animeAlternativeTitlesCache;  // aid -> alternative titles
     void loadAnimeAlternativeTitlesForFiltering();
     bool matchesSearchFilter(AnimeCard *card, const QString &searchText);
     bool matchesSearchFilter(int aid, const QString &animeName, const QString &searchText);

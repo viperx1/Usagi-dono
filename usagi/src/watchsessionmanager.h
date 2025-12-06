@@ -7,15 +7,8 @@
 #include <QList>
 #include <QPair>
 #include <tuple>
-
-/**
- * @brief Represents how a file is marked for queue management
- */
-enum class FileMarkType {
-    None = 0,           // No special marking
-    ForDownload = 1,    // Marked for download (priority)
-    ForDeletion = 2     // Marked for soft deletion (can be removed when space needed)
-};
+#include "filemarkinfo.h"
+#include "sessioninfo.h"
 
 /**
  * @brief Deletion threshold type for automatic file cleanup
@@ -23,23 +16,6 @@ enum class FileMarkType {
 enum class DeletionThresholdType {
     FixedGB = 0,        // Fixed amount in GB
     Percentage = 1      // Percentage of total drive space
-};
-
-/**
- * @brief Information about a file's marking status
- */
-struct FileMarkInfo {
-    int lid;                    // MyList ID
-    int aid;                    // Anime ID
-    FileMarkType markType;      // Current marking
-    int markScore;              // Calculated score for deletion priority
-    bool hasLocalFile;          // Whether file exists locally
-    bool isWatched;             // Whether file has been watched (local_watched)
-    bool isInActiveSession;     // Whether this file's anime has an active session
-    
-    FileMarkInfo() : lid(0), aid(0), markType(FileMarkType::None), 
-                     markScore(0), hasLocalFile(false), isWatched(false), 
-                     isInActiveSession(false) {}
 };
 
 /**
@@ -394,17 +370,6 @@ signals:
     void deleteFileRequested(int lid, bool deleteFromDisk);
     
 private:
-    // Session data
-    struct SessionInfo {
-        int aid;                // Anime ID
-        int startAid;           // First anime in series (prequel)
-        int currentEpisode;     // Current episode in session
-        bool isActive;          // Whether session is active
-        QSet<int> watchedEpisodes; // Episodes watched in this session
-        
-        SessionInfo() : aid(0), startAid(0), currentEpisode(0), isActive(false) {}
-    };
-    
     // Static regex for episode number extraction (shared across functions)
     static const QRegularExpression s_epnoNumericRegex;
     

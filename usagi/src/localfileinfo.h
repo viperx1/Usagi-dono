@@ -62,6 +62,13 @@ public:
     void setHash(const QString& hash);
     void setSize(qint64 size) { m_size = size; }
     
+    // Optional fields for unknown file binding (when file is not in AniDB)
+    int selectedAid() const { return m_selectedAid; }
+    int selectedEid() const { return m_selectedEid; }
+    void setSelectedAid(int aid) { m_selectedAid = aid; }
+    void setSelectedEid(int eid) { m_selectedEid = eid; }
+    bool hasSelection() const { return m_selectedAid > 0 && m_selectedEid > 0; }
+    
     // Validation
     bool isValid() const { return !m_filepath.isEmpty() && m_size >= 0; }
     bool hasHash() const { return !m_hash.isEmpty() && isValidHash(m_hash); }
@@ -90,6 +97,10 @@ private:
     QString m_filepath;  // Full path (e.g., "/path/to/video.mkv")
     QString m_hash;      // ED2K hash (32 character hex string)
     qint64 m_size;       // File size in bytes
+    
+    // Optional fields for unknown file binding (when file is not in AniDB)
+    int m_selectedAid;   // Selected anime ID for binding (0 = not set)
+    int m_selectedEid;   // Selected episode ID for binding (0 = not set)
     
     // Common video file extensions
     static const QStringList VIDEO_EXTENSIONS;

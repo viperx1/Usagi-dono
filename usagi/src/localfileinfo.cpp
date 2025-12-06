@@ -17,6 +17,8 @@ const QStringList LocalFileInfo::AUDIO_EXTENSIONS = {
 
 LocalFileInfo::LocalFileInfo()
     : m_size(0)
+    , m_selectedAid(0)
+    , m_selectedEid(0)
 {
 }
 
@@ -26,6 +28,8 @@ LocalFileInfo::LocalFileInfo(const QString& filename, const QString& filepath,
     , m_filepath(filepath)
     , m_hash(hash)
     , m_size(size)
+    , m_selectedAid(0)
+    , m_selectedEid(0)
 {
     // Validate and normalize hash if provided
     if (!hash.isEmpty()) {
@@ -38,6 +42,8 @@ LocalFileInfo::LocalFileInfo(const QFileInfo& fileInfo, const QString& hash)
     , m_filepath(fileInfo.absoluteFilePath())
     , m_hash(hash)
     , m_size(fileInfo.size())
+    , m_selectedAid(0)
+    , m_selectedEid(0)
 {
     // Validate and normalize hash if provided
     if (!hash.isEmpty()) {
