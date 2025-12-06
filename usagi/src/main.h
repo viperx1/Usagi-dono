@@ -2,12 +2,6 @@
 #define MAIN_H
 #include "anidbapi.h"
 
-struct settings_struct
-{
-	QString login;
-	QString password;
-};
-
 class myAniDBApi : public AniDBApi
 {
 	Q_OBJECT

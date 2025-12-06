@@ -32,7 +32,6 @@
 HasherThreadPool *hasherThreadPool = nullptr;
 // adbapi is now defined in anidbapi.cpp (core library)
 extern Window *window;
-settings_struct settings;
 
 // Worker implementations
 
