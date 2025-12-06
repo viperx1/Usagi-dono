@@ -49,7 +49,7 @@ bool FileHashInfo::isValidHexHash(const QString& hash)
         return false;
     }
     
-    // ED2K hashes are 32 characters (128 bits) in hexadecimal
+    // ED2K hashes are ED2K_HASH_LENGTH characters (128 bits) in hexadecimal
     static const QRegularExpression hexPattern(QStringLiteral("^[0-9a-fA-F]{32}$"));
     return hexPattern.match(hash).hasMatch();
 }

@@ -119,7 +119,7 @@ private:
 	QString lastSentPacket;
 	QString currentTag; // Track the tag of the currently pending request
 	
-	// Truncated response handling
+	// Truncated response handling - manages state for multi-part AniDB API responses
 	TruncatedResponseInfo truncatedResponse;
 	
 	// Anime titles download and management
@@ -401,7 +401,7 @@ public:
 	int CreateSocket();
 	QString ParseMessage(QString Message, QString ReplyTo, QString ReplyToMsg, bool isTruncated = false);
 	int Send(QString, QString, QString);
-	ReplyWaiter waitingForReply;
+	ReplyWaiter waitingForReply;  // Manages network reply timeout detection
 
 	/* Socket End === */
 
