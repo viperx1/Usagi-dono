@@ -5897,7 +5897,7 @@ void Window::onUnknownFileNotAnimeClicked(int row)
         return;
     }
     
-    UnknownFileData &fileData = unknownFilesData[row];
+    LocalFileInfo &fileInfo = unknownFilesData[row];
     
     LOG(QString("Marking file as not anime: %1").arg(fileInfo.filename()));
     
@@ -5943,7 +5943,7 @@ void Window::onUnknownFileRecheckClicked(int row)
         return;
     }
     
-    UnknownFileData &fileData = unknownFilesData[row];
+    LocalFileInfo &fileInfo = unknownFilesData[row];
     
     LOG(QString("Re-checking file against AniDB: %1").arg(fileInfo.filename()));
     LOG(QString("Hash: %1, Size: %2").arg(fileInfo.hash()).arg(fileInfo.size()));
@@ -5966,8 +5966,8 @@ void Window::onUnknownFileRecheckClicked(int row)
     if(!fileInHashesTable)
     {
         LOG(QString("File not in hashes table, adding: %1").arg(fileInfo.filename()));
-        QFileInfo fileInfo(fileInfo.filepath());
-        hashesinsertrow(fileInfo, Qt::Unchecked, fileInfo.hash());
+        QFileInfo qFileInfo(fileInfo.filepath());
+        hashesinsertrow(qFileInfo, Qt::Unchecked, fileInfo.hash());
         hashesRow = hashes->rowCount() - 1;
     }
     else
@@ -6002,7 +6002,7 @@ void Window::onUnknownFileDeleteClicked(int row)
         return;
     }
     
-    UnknownFileData &fileData = unknownFilesData[row];
+    LocalFileInfo &fileInfo = unknownFilesData[row];
     
     LOG(QString("Delete button clicked for file: %1").arg(fileInfo.filename()));
     
