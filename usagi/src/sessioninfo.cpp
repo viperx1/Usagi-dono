@@ -65,6 +65,8 @@ void SessionInfo::end()
 
 bool SessionInfo::advanceToNextEpisode()
 {
+    // Note: Episode 0 is allowed as a special state (e.g., OVA, Special)
+    // Advancing from 0 to 1 is valid for starting a new session
     if (m_currentEpisode >= 0) {
         m_currentEpisode++;
         return true;

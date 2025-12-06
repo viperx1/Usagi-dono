@@ -39,9 +39,10 @@ void HashingTask::setFilePath(const QString& path)
 void HashingTask::setHash(const QString& hash)
 {
     // Validate hash format (should be 32 hex characters for ED2K)
+    // Empty hash is allowed (file not yet hashed)
     if (!hash.isEmpty() && hash.length() != 32) {
-        // Log warning but still set it
-        // This allows for flexibility if hash format changes
+        // Invalid hash format - do not set it
+        return;
     }
     m_hexdigest = hash;
 }

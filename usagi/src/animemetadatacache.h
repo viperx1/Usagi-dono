@@ -53,6 +53,9 @@ public:
      * @param aid Anime ID
      * @param searchText Text to search for (case-insensitive)
      * @return true if any title contains the search text
+     * 
+     * Note: Empty search text returns true (matches everything) to allow
+     * showing all results when no filter is applied.
      */
     bool matchesAnyTitle(int aid, const QString& searchText) const;
     
