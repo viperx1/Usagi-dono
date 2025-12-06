@@ -19,6 +19,7 @@
 #include "hash/ed2k.h"
 #include "Qt-AES-master/qaesencryption.h"
 #include "mask.h"
+#include "applicationsettings.h"
 
 // Forward declaration for myAniDBApi (defined in main.h)
 // and extern declaration for the global adbapi pointer
@@ -85,6 +86,11 @@ private:
 	// Hasher filter settings
 	QString hasherFilterMasks;  // Comma-separated list of file masks to ignore when hashing (e.g., "*.!qB,*.tmp")
     /* Settings End === */
+	
+	// ApplicationSettings integration - delegates to this object for all settings
+	// Note: Legacy fields above are kept temporarily for backward compatibility
+	// but all getters/setters now delegate to m_settings
+	ApplicationSettings m_settings;
 
 	int protover; // AniDB API version = 3
 	QString client; // = usagi

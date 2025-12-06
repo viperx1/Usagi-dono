@@ -52,6 +52,8 @@
 #include "mylistfiltersidebar.h"
 #include "watchsessionmanager.h"
 #include "uicolors.h"
+#include "localfileinfo.h"
+#include "progresstracker.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -366,13 +368,9 @@ private:
     QString m_dbName;
 };
 
-// Data structure for unbound file information
-struct UnboundFileData {
-    QString filename;
-    QString filepath;
-    QString hash;
-    qint64 size;
-};
+// Use LocalFileInfo class for unbound file information
+// (replaced UnboundFileData struct with proper class)
+using UnboundFileData = LocalFileInfo;
 
 // Worker thread for loading unbound files
 class UnboundFilesLoaderWorker : public QObject
@@ -384,7 +382,7 @@ public:
     void doWork();
 
 signals:
-    void finished(const QList<UnboundFileData> &files);
+    void finished(const QList<LocalFileInfo> &files);
 
 private:
     QString m_dbName;
@@ -400,20 +398,16 @@ private:
     QTimer *safeclose;
     QTimer *startupTimer;
     QElapsedTimer waitforlogout;
-    QElapsedTimer hashingTimer;
-    QElapsedTimer lastEtaUpdate;
+    
+    // Hashing progress tracking using ProgressTracker utility class
+    ProgressTracker m_hashingProgress;
+    
+    // Legacy progress tracking fields (kept for backward compatibility during transition)
     int totalHashParts;
     int completedHashParts;
     
     // Track last progress per thread to calculate deltas with throttled updates
     QMap<int, int> lastThreadProgress;
-    
-    // Track progress history for ETA calculation using moving average
-    struct ProgressSnapshot {
-        qint64 timestamp;  // Time in milliseconds
-        int completedParts;
-    };
-    QList<ProgressSnapshot> progressHistory;
     
     // Mutex to protect file assignment from concurrent thread requests
     QMutex fileRequestMutex;
@@ -713,7 +707,7 @@ private slots:
 	// Background loading completion handlers
 	void onMylistLoadingFinished(const QList<int> &aids);
 	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
-	void onUnboundFilesLoadingFinished(const QList<UnboundFileData> &files);
+	void onUnboundFilesLoadingFinished(const QList<LocalFileInfo> &files);
 	
 	// Timer-based processing handlers
 	void processPendingHashedFiles();
