@@ -3410,7 +3410,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
         if(currentRow < 0 || !unknownFilesData.contains(currentRow)) return;
         
         QString epnoText = episodeInput->text().trimmed();
-        if(!epnoText.isEmpty() && unknownFilesData[currentRow].selectedAid > 0)
+        if(!epnoText.isEmpty() && unknownFilesData[currentRow].selectedAid() > 0)
         {
             bindButton->setEnabled(true);
         }
@@ -5855,7 +5855,7 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
         unknownFilesData.remove(row);
         
         // Update row indices in unknownFilesData map
-        QMap<int, UnknownFileData> newMap;
+        QMap<int, LocalFileInfo> newMap;
         for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
         {
             int oldRow = it.key();
@@ -5909,7 +5909,7 @@ void Window::onUnknownFileNotAnimeClicked(int row)
     unknownFilesData.remove(row);
     
     // Update row indices in unknownFilesData map
-    QMap<int, UnknownFileData> newMap;
+    QMap<int, LocalFileInfo> newMap;
     for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
     {
         int oldRow = it.key();
@@ -6040,7 +6040,7 @@ void Window::onUnknownFileDeleteClicked(int row)
         unknownFilesData.remove(row);
         
         // Update row indices in unknownFilesData map
-        QMap<int, UnknownFileData> newMap;
+        QMap<int, LocalFileInfo> newMap;
         for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
         {
             int oldRow = it.key();
@@ -6090,7 +6090,7 @@ void Window::onUnknownFileDeleteClicked(int row)
     unknownFilesData.remove(row);
     
     // Update row indices in unknownFilesData map
-    QMap<int, UnknownFileData> newMap;
+    QMap<int, LocalFileInfo> newMap;
     for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
     {
         int oldRow = it.key();
