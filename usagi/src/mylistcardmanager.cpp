@@ -178,14 +178,14 @@ MyListCardManager::CachedAnimeData MyListCardManager::getCachedAnimeData(int aid
         animeName = QString("Anime %1").arg(aid);
     }
     
-    result.animeName = animeName;
-    result.typeName = data.typeName;
-    result.startDate = data.startDate;
-    result.endDate = data.endDate;
-    result.isHidden = data.isHidden;
-    result.is18Restricted = data.is18Restricted;
-    result.eptotal = data.eptotal;
-    result.stats = data.stats;
+    result.setAnimeName(animeName);
+    result.setTypeName(data.typeName);
+    result.setStartDate(data.startDate);
+    result.setEndDate(data.endDate);
+    result.setIsHidden(data.isHidden);
+    result.setIs18Restricted(data.is18Restricted);
+    result.setEptotal(data.eptotal);
+    result.setStats(data.stats);
     
     // Calculate lastPlayed from episodes
     qint64 maxLastPlayed = 0;
@@ -194,9 +194,9 @@ MyListCardManager::CachedAnimeData MyListCardManager::getCachedAnimeData(int aid
             maxLastPlayed = episode.lastPlayed;
         }
     }
-    result.lastPlayed = maxLastPlayed;
+    result.setLastPlayed(maxLastPlayed);
     
-    result.hasData = data.hasData;
+    result.setHasData(data.hasData);
     
     return result;
 }
@@ -204,7 +204,7 @@ MyListCardManager::CachedAnimeData MyListCardManager::getCachedAnimeData(int aid
 bool MyListCardManager::hasCachedData(int aid) const
 {
     QMutexLocker locker(&m_mutex);
-    return m_cardCreationDataCache.contains(aid) && m_cardCreationDataCache[aid].hasData;
+    return m_cardCreationDataCache.contains(aid) && m_cardCreationDataCache[aid].hasData();
 }
 
 void MyListCardManager::updateCardAnimeInfo(int aid)
@@ -728,8 +728,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     card->setIs18Restricted(data.is18Restricted);
     
     // Set type
-    if (!data.typeName.isEmpty()) {
-        card->setAnimeType(data.typeName);
+    if (!data.typeName().isEmpty()) {
+        card->setAnimeType(data.typeName());
     } else {
         card->setAnimeType("Unknown");
         m_animeNeedingMetadata.insert(aid);
@@ -775,12 +775,12 @@ AnimeCard* MyListCardManager::createCard(int aid)
     }
     
     // Set statistics from cache
-    int totalNormalEpisodes = data.eptotal;
+    int totalNormalEpisodes = data.eptotal();
     if (totalNormalEpisodes <= 0) {
-        totalNormalEpisodes = data.stats.normalEpisodes;
+        totalNormalEpisodes = data.stats().normalEpisodes();
     }
-    card->setStatistics(data.stats.normalEpisodes, totalNormalEpisodes, 
-                       data.stats.normalViewed, data.stats.otherEpisodes, data.stats.otherViewed);
+    card->setStatistics(data.stats().normalEpisodes(), totalNormalEpisodes, 
+                       data.stats().normalViewed(), data.stats().otherEpisodes(), data.stats().otherViewed());
     
     // Add to cache first (before layout to avoid triggering layout updates prematurely)
     QMutexLocker locker(&m_mutex);
@@ -909,9 +909,9 @@ void MyListCardManager::updateCardFromDatabase(int aid)
     
     // Recalculate and update statistics
     AnimeStats stats = calculateStatistics(aid);
-    int totalNormalEpisodes = (eps > 0) ? eps : stats.normalEpisodes;
-    card->setStatistics(stats.normalEpisodes, totalNormalEpisodes,
-                       stats.normalViewed, stats.otherEpisodes, stats.otherViewed);
+    int totalNormalEpisodes = (eps > 0) ? eps : stats.normalEpisodes();
+    card->setStatistics(stats.normalEpisodes(), totalNormalEpisodes,
+                       stats.normalViewed(), stats.otherEpisodes(), stats.otherViewed());
     
     emit cardUpdated(aid);
     emit cardNeedsSorting(aid);
@@ -1150,10 +1150,10 @@ MyListCardManager::AnimeStats MyListCardManager::calculateStatistics(int aid)
         }
     }
     
-    stats.normalEpisodes = normalEpisodes.size();
-    stats.otherEpisodes = otherEpisodes.size();
-    stats.normalViewed = viewedNormalEpisodes.size();
-    stats.otherViewed = viewedOtherEpisodes.size();
+    stats.setNormalEpisodes(normalEpisodes.size());
+    stats.setOtherEpisodes(otherEpisodes.size());
+    stats.setNormalViewed(viewedNormalEpisodes.size());
+    stats.setOtherViewed(viewedOtherEpisodes.size());
     
     return stats;
 }
@@ -1321,11 +1321,11 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         for (int aid : aidsWithStats) {
             if (m_cardCreationDataCache.contains(aid)) {
                 CardCreationData& data = m_cardCreationDataCache[aid];
-                data.stats.normalEpisodes = normalEpisodesMap[aid].size();
-                data.stats.normalViewed = viewedNormalEpisodesMap[aid].size();
-                data.stats.otherEpisodes = otherEpisodesMap[aid].size();
-                data.stats.otherViewed = viewedOtherEpisodesMap[aid].size();
-                data.stats.totalNormalEpisodes = 0; // Will be set from eptotal
+                data.stats.setNormalEpisodes(normalEpisodesMap[aid].size());
+                data.stats.setNormalViewed(viewedNormalEpisodesMap[aid].size());
+                data.stats.setOtherEpisodes(otherEpisodesMap[aid].size());
+                data.stats.setOtherViewed(viewedOtherEpisodesMap[aid].size());
+                data.stats.setTotalNormalEpisodes(0); // Will be set from eptotal
             }
         }
     }

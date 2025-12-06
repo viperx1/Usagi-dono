@@ -419,16 +419,16 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     
     // Format episode text
     QString episodeText;
-    if (episode.episodeNumber.isValid()) {
+    if (episode.episodeNumber().isValid()) {
         episodeText = QString("Ep %1: %2")
-            .arg(episode.episodeNumber.toDisplayString(), episode.episodeTitle);
+            .arg(episode.episodeNumber().toDisplayString(), episode.episodeTitle());
     } else {
-        episodeText = QString("Episode: %1").arg(episode.episodeTitle);
+        episodeText = QString("Episode: %1").arg(episode.episodeTitle());
     }
     
     // Show file count
-    if (episode.files.size() > 1) {
-        episodeText += QString(" (%1 files)").arg(episode.files.size());
+    if (episode.fileCount() > 1) {
+        episodeText += QString(" (%1 files)").arg(episode.fileCount());
     }
     
     // Column 0: Empty - expand button only (Qt handles this automatically)
@@ -444,23 +444,23 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     int watchedFileLid = 0;
     int watchedFileVersion = -1;  // Start at -1 to handle files with version 0
     
-    for (const FileInfo& file : episode.files) {      
-        if (!file.localFilePath.isEmpty()) {
-            bool exists = QFile::exists(file.localFilePath);
+    for (const FileInfo& file : episode.files()) {      
+        if (!file.localFilePath().isEmpty()) {
+            bool exists = QFile::exists(file.localFilePath());
             if (exists) {
                 anyFileExists = true;
-                if (!file.localWatched) {
+                if (!file.localWatched()) {
                     allFilesWatched = false;
                     // Track highest version unwatched file
-                    if (file.version > unwatchedFileVersion) {
-                        unwatchedFileLid = file.lid;
-                        unwatchedFileVersion = file.version;
+                    if (file.version() > unwatchedFileVersion) {
+                        unwatchedFileLid = file.lid();
+                        unwatchedFileVersion = file.version();
                     }
                 } else {
                     // Track highest version watched file (fallback)
-                    if (file.version > watchedFileVersion) {
-                        watchedFileLid = file.lid;
-                        watchedFileVersion = file.version;
+                    if (file.version() > watchedFileVersion) {
+                        watchedFileLid = file.lid();
+                        watchedFileVersion = file.version();
                     }
                 }
             }
@@ -496,10 +496,10 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     
     // Column 2: Episode info
     episodeItem->setText(2, episodeText);
-    episodeItem->setData(2, Qt::UserRole + 1, episode.eid);
+    episodeItem->setData(2, Qt::UserRole + 1, episode.eid());
     
     // Add file children
-    for (const FileInfo& file : episode.files) {
+    for (const FileInfo& file : episode.files()) {
         QTreeWidgetItem *fileItem = new QTreeWidgetItem(episodeItem);
         
         // Column 0: Empty - no expand button for files
@@ -508,14 +508,14 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         // Column 1: Play button - reflects local watch status and file existence
         // Check if local file exists
         bool fileExists = false;
-        if (!file.localFilePath.isEmpty()) {
-            fileExists = QFile::exists(file.localFilePath);
+        if (!file.localFilePath().isEmpty()) {
+            fileExists = QFile::exists(file.localFilePath());
         }
         
         if (!fileExists) {
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
-        } else if (file.localWatched) {
+        } else if (file.localWatched()) {
             fileItem->setText(1, "✓"); // Checkmark for locally watched
             fileItem->setForeground(1, QBrush(UIColors::FILE_WATCHED));
         } else {
@@ -527,37 +527,37 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         QString fileText = QString("\\");
         
         // Add version if there are multiple files
-        if (episode.files.size() > 1 && file.version > 0) {
-            fileText += QString(" v%1").arg(file.version);
+        if (episode.fileCount() > 1 && file.version() > 0) {
+            fileText += QString(" v%1").arg(file.version());
         }
         
         // Add file details
         QStringList fileDetails;
-        if (!file.resolution.isEmpty()) {
-            fileDetails << file.resolution;
+        if (!file.resolution().isEmpty()) {
+            fileDetails << file.resolution();
         }
-        if (!file.quality.isEmpty()) {
-            fileDetails << file.quality;
+        if (!file.quality().isEmpty()) {
+            fileDetails << file.quality();
         }
-        if (!file.groupName.isEmpty()) {
-            fileDetails << QString("[%1]").arg(file.groupName);
+        if (!file.groupName().isEmpty()) {
+            fileDetails << QString("[%1]").arg(file.groupName());
         }
         
         if (!fileDetails.isEmpty()) {
             fileText += " " + fileDetails.join(" ");
-        } else if (!file.fileName.isEmpty()) {
-            fileText += " " + file.fileName;
+        } else if (!file.fileName().isEmpty()) {
+            fileText += " " + file.fileName();
         } else {
-            fileText += QString(" FID:%1").arg(file.fid);
+            fileText += QString(" FID:%1").arg(file.fid());
         }
         
         // Add state indicator
-        if (!file.state.isEmpty()) {
-            fileText += QString(" [%1]").arg(file.state);
+        if (!file.state().isEmpty()) {
+            fileText += QString(" [%1]").arg(file.state());
         }
         
         // Add file marking visual indicator
-        switch (file.markType) {
+        switch (file.markType()) {
             case FileMarkType::ForDownload:
                 fileText += " " + UIIcons::MARK_DOWNLOAD;
                 break;
@@ -570,33 +570,33 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         
         // Column 2: File info
         fileItem->setText(2, fileText);
-        fileItem->setData(2, Qt::UserRole, file.lid);
-        fileItem->setData(2, Qt::UserRole + 1, file.fid);
+        fileItem->setData(2, Qt::UserRole, file.lid());
+        fileItem->setData(2, Qt::UserRole + 1, file.fid());
         
         // Color code file text based on state and marking
-        if (file.markType == FileMarkType::ForDownload) {
+        if (file.markType() == FileMarkType::ForDownload) {
             fileItem->setBackground(2, QBrush(UIColors::FILE_MARKED_DOWNLOAD));
-        } else if (file.markType == FileMarkType::ForDeletion) {
+        } else if (file.markType() == FileMarkType::ForDeletion) {
             fileItem->setBackground(2, QBrush(UIColors::FILE_MARKED_DELETION));
-        } else if (file.viewed) {
+        } else if (file.viewed()) {
             fileItem->setForeground(2, QBrush(UIColors::FILE_WATCHED)); // Green for viewed
         }
         
         // Add tooltip with file info
         QString tooltip = QString("File: %1\nStorage: %2\nState: %3\nViewed: %4")
-            .arg(file.fileName, file.storage, file.state, file.viewed ? "Yes" : "No");
+            .arg(file.fileName(), file.storage(), file.state(), file.viewed() ? "Yes" : "No");
         
-        if (!file.resolution.isEmpty()) {
-            tooltip += QString("\nResolution: %1").arg(file.resolution);
+        if (!file.resolution().isEmpty()) {
+            tooltip += QString("\nResolution: %1").arg(file.resolution());
         }
-        if (!file.quality.isEmpty()) {
-            tooltip += QString("\nQuality: %1").arg(file.quality);
+        if (!file.quality().isEmpty()) {
+            tooltip += QString("\nQuality: %1").arg(file.quality());
         }
-        if (!file.groupName.isEmpty()) {
-            tooltip += QString("\nGroup: %1").arg(file.groupName);
+        if (!file.groupName().isEmpty()) {
+            tooltip += QString("\nGroup: %1").arg(file.groupName());
         }
-        if (file.version > 0) {
-            tooltip += QString("\nVersion: v%1").arg(file.version);
+        if (file.version() > 0) {
+            tooltip += QString("\nVersion: v%1").arg(file.version());
         }
         
         // Add marking info to tooltip
