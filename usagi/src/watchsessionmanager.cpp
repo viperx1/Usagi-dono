@@ -846,15 +846,41 @@ bool WatchSessionManager::deleteNextMarkedFile(bool deleteFromDisk)
         return false;
     }
     
-    // Delete only the first file (lowest score)
-    int lid = filesToDelete.first();
+    // Build set of episodes that would be deleted if we processed all marked files
+    // This is needed for proper gap detection
+    QSet<int> potentiallyDeletedEpisodes;
+    for (int lid : filesToDelete) {
+        if (isLastFileForEpisode(lid)) {
+            int episodeId = getEpisodeIdForFile(lid);
+            if (episodeId > 0) {
+                potentiallyDeletedEpisodes.insert(episodeId);
+            }
+        }
+    }
     
-    LOG(QString("[WatchSessionManager] deleteNextMarkedFile: Deleting lid=%1 (1 of %2 marked files)")
-        .arg(lid).arg(filesToDelete.size()));
+    // Find the first file that can be safely deleted (doesn't create a gap)
+    // Process files in score order (lowest score = highest deletion priority)
+    for (int lid : filesToDelete) {
+        // Check if deleting this file would create a gap
+        if (wouldCreateGap(lid, potentiallyDeletedEpisodes)) {
+            LOG(QString("[WatchSessionManager] deleteNextMarkedFile: Skipping lid=%1 - would create gap in series")
+                .arg(lid));
+            continue;
+        }
+        
+        // Found a safe file to delete
+        LOG(QString("[WatchSessionManager] deleteNextMarkedFile: Deleting lid=%1 (1 of %2 marked files)")
+            .arg(lid).arg(filesToDelete.size()));
+        
+        // Delete the file (this will trigger deleteFileRequested signal)
+        deleteFile(lid, deleteFromDisk);
+        return true;
+    }
     
-    // Delete the file (this will trigger deleteFileRequested signal)
-    deleteFile(lid, deleteFromDisk);
-    return true;
+    // No files can be safely deleted without creating gaps
+    LOG(QString("[WatchSessionManager] deleteNextMarkedFile: Cannot delete any files - all %1 marked files would create gaps")
+        .arg(filesToDelete.size()));
+    return false;
 }
 
 void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
