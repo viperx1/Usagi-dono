@@ -120,6 +120,8 @@ void AniDBFileInfo::setAudioLanguagesFromString(const QString& langStr)
 {
     if (!langStr.isEmpty()) {
         m_lang_dub = langStr.split(ANIDB_LANGUAGE_DELIMITER, Qt::SkipEmptyParts);
+    } else {
+        m_lang_dub.clear();
     }
 }
 
@@ -127,6 +129,8 @@ void AniDBFileInfo::setSubtitleLanguagesFromString(const QString& langStr)
 {
     if (!langStr.isEmpty()) {
         m_lang_sub = langStr.split(ANIDB_LANGUAGE_DELIMITER, Qt::SkipEmptyParts);
+    } else {
+        m_lang_sub.clear();
     }
 }
 
@@ -204,7 +208,7 @@ AniDBFileInfo::LegacyFileData AniDBFileInfo::toLegacyStruct() const
     data.lang_sub = m_lang_sub.join("'");
     data.length = QString::number(m_length);
     data.description = m_description;
-    data.airdate = QString::number(m_airdate.toSecsSinceEpoch());
+    data.airdate = m_airdate.isValid() ? QString::number(m_airdate.toSecsSinceEpoch()) : QString();
     data.filename = m_filename;
     return data;
 }
