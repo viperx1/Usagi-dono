@@ -390,6 +390,11 @@ void MyListCardManager::updateOrAddMylistEntry(int lid)
     
     if (isNewAnime) {
         // Card doesn't exist, create it
+        // First, preload the card creation data to avoid race conditions
+        QList<int> aidList;
+        aidList.append(aid);
+        preloadCardCreationData(aidList);
+        
         AnimeCard *card = createCard(aid);
         if (!card) {
             LOG(QString("[MyListCardManager] Failed to create card for aid=%1").arg(aid));

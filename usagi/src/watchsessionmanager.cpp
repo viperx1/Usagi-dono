@@ -228,7 +228,8 @@ void WatchSessionManager::saveToDatabase()
         q.addBindValue(session.aid());
         q.exec();
         
-        for (int ep : session.watchedEpisodes()) {
+        const QSet<int>& watchedEps = session.watchedEpisodes();
+        for (int ep : watchedEps) {
             q.prepare("INSERT INTO session_watched_episodes (aid, episode_number) VALUES (?, ?)");
             q.addBindValue(session.aid());
             q.addBindValue(ep);
@@ -1852,7 +1853,7 @@ double WatchSessionManager::calculateExpectedBitrate(const QString& resolution, 
         megapixels = 33.18;  // 7680×4320
     } else {
         // Try to parse as WxH format
-        QRegularExpression widthHeightRegex(R"((\d+)\s*[x×]\s*(\d+))");
+        static const QRegularExpression widthHeightRegex(R"((\d+)\s*[x×]\s*(\d+))");
         QRegularExpressionMatch match = widthHeightRegex.match(resolution);
         if (match.hasMatch()) {
             int width = match.captured(1).toInt();
@@ -1980,7 +1981,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     }
     
     QSqlQuery q(db);
-    q.prepare("SELECT m.aid, e.epno FROM mylist m "
+    q.prepare("SELECT m.aid, e.epno, m.eid FROM mylist m "
               "JOIN episode e ON m.eid = e.eid "
               "WHERE m.lid = ?");
     q.addBindValue(lid);
@@ -1991,6 +1992,7 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     
     int aid = q.value(0).toInt();
     QString epnoStr = q.value(1).toString();
+    int eid = q.value(2).toInt();
     
     // Parse episode number from epno string using shared static regex
     QRegularExpressionMatch match = s_epnoNumericRegex.match(epnoStr);
@@ -1998,6 +2000,26 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
         return false;  // Can't parse episode number
     }
     int epno = match.captured(0).toInt();
+    
+    // IMPORTANT: Check if there are other files for this same episode
+    // If there are other files, deleting this one won't remove the episode entirely,
+    // so it cannot create a gap
+    QSqlQuery fileCountQuery(db);
+    fileCountQuery.prepare(
+        "SELECT COUNT(*) FROM mylist m "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "WHERE m.eid = ? AND lf.path IS NOT NULL AND lf.path != ''"
+    );
+    fileCountQuery.addBindValue(eid);
+    
+    if (fileCountQuery.exec() && fileCountQuery.next()) {
+        int fileCount = fileCountQuery.value(0).toInt();
+        if (fileCount > 1) {
+            // There are other files for this episode, so deleting this file
+            // won't remove the episode and thus cannot create a gap
+            return false;
+        }
+    }
     
     // Check if this file, when deleted, would leave episodes on both sides
     // creating a gap in the series
