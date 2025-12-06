@@ -70,7 +70,7 @@ QMap<QNetworkReply*, int> posterDownloadRequests;
 
 1. **Poster Downloads:** BOTH classes have poster download handlers:
    - Window: `onPosterDownloadFinished()` at window.cpp:5590
-   - MyListCardManager: `onPosterDownloadFinished()` at mylistcardmanager.cpp:530
+   - MyListCardManager: `onPosterDownloadFinished()` at mylistcardmanager.cpp:527
 
 2. **Network Managers:** BOTH classes create their own:
    - Window: `posterNetworkManager = new QNetworkAccessManager(this)` at window.cpp:339
@@ -409,7 +409,7 @@ Multiple warnings about:
 ```
 
 **Investigation Results:**
-Clazy suggests using QString multi-arg format, but the suggestion doesn't apply correctly in these cases. The multi-arg format `arg(a, b, c, d)` only works with compatible types (all ints, all doubles, etc.), but our code mixes QString with int/bool types which are not compatible.
+Clazy suggests using QString multi-arg format, but this doesn't work correctly in many of these cases. While Qt's `arg()` can handle some automatic type conversions, the multi-arg overloads have specific signatures like `arg(int, int)`, `arg(double, int)`, etc. When mixing QString, int, bool, and other types in a single call, the chained `.arg()` pattern is clearer and more maintainable.
 
 **Example that clazy flags:**
 ```cpp
@@ -420,8 +420,11 @@ QString("text %1 %2 %3 %4")
     .arg(anotherString)  // QString
 ```
 
-**Why multi-arg doesn't work here:**
-Qt's multi-arg only supports: `arg(qlonglong a, int fieldwidth = 0)`and similar - it doesn't support mixed types.
+**Why multi-arg is problematic here:**
+- Qt's multi-arg overloads have specific type signatures (e.g., `arg(int, int)`)
+- Mixed types require chaining for clarity
+- The chained pattern is more readable and explicit
+- Some conversions (like bool → QString) work better with individual calls
 
 **Conclusion:** 
 - ⚠️ These clazy warnings are false positives or require case-by-case analysis
