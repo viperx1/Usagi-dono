@@ -26,6 +26,16 @@ static bool isValidHexHash(const QString& hash, int expectedLength)
     return hexRegex.match(hash).hasMatch();
 }
 
+// Helper function to split or clear language list based on input
+static void setLanguageListFromString(QStringList& langList, const QString& langStr)
+{
+    if (!langStr.isEmpty()) {
+        langList = langStr.split(ANIDB_LANGUAGE_DELIMITER, Qt::SkipEmptyParts);
+    } else {
+        langList.clear();
+    }
+}
+
 AniDBFileInfo::AniDBFileInfo()
     : m_fid(0)
     , m_aid(0)
@@ -118,20 +128,12 @@ void AniDBFileInfo::setAirDateFromUnix(qint64 timestamp)
 
 void AniDBFileInfo::setAudioLanguagesFromString(const QString& langStr)
 {
-    if (!langStr.isEmpty()) {
-        m_lang_dub = langStr.split(ANIDB_LANGUAGE_DELIMITER, Qt::SkipEmptyParts);
-    } else {
-        m_lang_dub.clear();
-    }
+    setLanguageListFromString(m_lang_dub, langStr);
 }
 
 void AniDBFileInfo::setSubtitleLanguagesFromString(const QString& langStr)
 {
-    if (!langStr.isEmpty()) {
-        m_lang_sub = langStr.split(ANIDB_LANGUAGE_DELIMITER, Qt::SkipEmptyParts);
-    } else {
-        m_lang_sub.clear();
-    }
+    setLanguageListFromString(m_lang_sub, langStr);
 }
 
 QString AniDBFileInfo::formatSize() const
@@ -204,8 +206,8 @@ AniDBFileInfo::LegacyFileData AniDBFileInfo::toLegacyStruct() const
     data.bitrate_video = QString::number(m_bitrate_video);
     data.resolution = m_resolution;
     data.filetype = m_filetype;
-    data.lang_dub = m_lang_dub.join("'");
-    data.lang_sub = m_lang_sub.join("'");
+    data.lang_dub = m_lang_dub.join(ANIDB_LANGUAGE_DELIMITER);
+    data.lang_sub = m_lang_sub.join(ANIDB_LANGUAGE_DELIMITER);
     data.length = QString::number(m_length);
     data.description = m_description;
     data.airdate = m_airdate.isValid() ? QString::number(m_airdate.toSecsSinceEpoch()) : QString();
