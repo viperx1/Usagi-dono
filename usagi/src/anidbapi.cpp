@@ -4643,11 +4643,11 @@ AniDBApi::GroupData AniDBApi::parseFileAmaskGroupData(const QStringList& tokens,
  * @param tokens Pipe-delimited response tokens
  * @param amask Anime mask indicating which anime fields are present
  * @param index Current index in tokens array (updated as fields are consumed)
- * @return AnimeData structure with parsed anime fields
+ * @return AniDBAnimeInfo object with parsed anime fields
  */
 AniDBAnimeInfo AniDBApi::parseMask(const QStringList& tokens, uint64_t amask, int& index)
 {
-	AnimeData data;
+	AniDBAnimeInfo::LegacyAnimeData data;
 	
 	// Note: The ANIME command response order is determined by the amask bits
 	// Process from highest bit to lowest bit (MSB to LSB) in strict order
@@ -4862,8 +4862,8 @@ AniDBAnimeInfo AniDBApi::parseMaskFromString(const QStringList& tokens, const QS
  */
 AniDBAnimeInfo AniDBApi::parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
 {
-	// Use legacy struct internally for now (complex parsing logic)
-	AnimeData data;
+	// Use legacy struct internally (complex parsing logic)
+	AniDBAnimeInfo::LegacyAnimeData data;
 	
 	// Parse the hex string into bytes
 	QString paddedMask = amaskHexString.leftJustified(14, '0');
@@ -5072,14 +5072,10 @@ Mask AniDBApi::calculateReducedMask(const Mask& originalMask, const QByteArray& 
 
 /**
  * Store file data in the database.
- * Now uses AniDBFileInfo for type-safe data handling.
+ * Uses AniDBFileInfo type-safe fields directly.
  */
 void AniDBApi::storeFileData(const AniDBFileInfo& fileInfo)
 {
-	// Convert to legacy struct for database insertion
-	// TODO: Update database queries to use typed fields directly
-	auto data = fileInfo.toLegacyStruct();
-	
 	QString q = QString("INSERT OR REPLACE INTO `file` "
 		"(`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, "
 		"`size`, `ed2k`, `md5`, `sha1`, `crc`, `quality`, `source`, "
@@ -5091,33 +5087,33 @@ void AniDBApi::storeFileData(const AniDBFileInfo& fileInfo)
 		"'%16', '%17', '%18', '%19', "
 		"'%20', '%21', '%22', '%23', '%24', "
 		"'%25', '%26', '%27')")
-		.arg(QString(data.fid).replace("'", "''"))
-		.arg(QString(data.aid).replace("'", "''"))
-		.arg(QString(data.eid).replace("'", "''"))
-		.arg(QString(data.gid).replace("'", "''"))
-		.arg(QString(data.lid).replace("'", "''"))
-		.arg(QString(data.othereps).replace("'", "''"))
-		.arg(QString(data.isdepr).replace("'", "''"))
-		.arg(QString(data.state).replace("'", "''"))
-		.arg(QString(data.size).replace("'", "''"))
-		.arg(QString(data.ed2k).replace("'", "''"))
-		.arg(QString(data.md5).replace("'", "''"))
-		.arg(QString(data.sha1).replace("'", "''"))
-		.arg(QString(data.crc).replace("'", "''"))
-		.arg(QString(data.quality).replace("'", "''"))
-		.arg(QString(data.source).replace("'", "''"))
-		.arg(QString(data.codec_audio).replace("'", "''"))
-		.arg(QString(data.bitrate_audio).replace("'", "''"))
-		.arg(QString(data.codec_video).replace("'", "''"))
-		.arg(QString(data.bitrate_video).replace("'", "''"))
-		.arg(QString(data.resolution).replace("'", "''"))
-		.arg(QString(data.filetype).replace("'", "''"))
-		.arg(QString(data.lang_dub).replace("'", "''"))
-		.arg(QString(data.lang_sub).replace("'", "''"))
-		.arg(QString(data.length).replace("'", "''"))
-		.arg(QString(data.description).replace("'", "''"))
-		.arg(QString(data.airdate).replace("'", "''"))
-		.arg(QString(data.filename).replace("'", "''"));
+		.arg(fileInfo.fileId())
+		.arg(fileInfo.animeId())
+		.arg(fileInfo.episodeId())
+		.arg(fileInfo.groupId())
+		.arg(fileInfo.mylistId())
+		.arg(QString(fileInfo.otherEpisodes()).replace("'", "''"))
+		.arg(fileInfo.isDeprecated() ? "1" : "0")
+		.arg(fileInfo.state())
+		.arg(fileInfo.size())
+		.arg(QString(fileInfo.ed2kHash()).replace("'", "''"))
+		.arg(QString(fileInfo.md5Hash()).replace("'", "''"))
+		.arg(QString(fileInfo.sha1Hash()).replace("'", "''"))
+		.arg(QString(fileInfo.crc32()).replace("'", "''"))
+		.arg(QString(fileInfo.quality()).replace("'", "''"))
+		.arg(QString(fileInfo.source()).replace("'", "''"))
+		.arg(QString(fileInfo.audioCodec()).replace("'", "''"))
+		.arg(fileInfo.audioBitrate())
+		.arg(QString(fileInfo.videoCodec()).replace("'", "''"))
+		.arg(fileInfo.videoBitrate())
+		.arg(QString(fileInfo.resolution()).replace("'", "''"))
+		.arg(QString(fileInfo.fileType()).replace("'", "''"))
+		.arg(fileInfo.audioLanguages().join("'").replace("'", "''"))
+		.arg(fileInfo.subtitleLanguages().join("'").replace("'", "''"))
+		.arg(fileInfo.length())
+		.arg(QString(fileInfo.description()).replace("'", "''"))
+		.arg(QString(fileInfo.airDate().toString("yyyy-MM-dd")).replace("'", "''"))
+		.arg(QString(fileInfo.filename()).replace("'", "''"));
 		
 	QSqlQuery query(db);
 	if(!query.exec(q))
@@ -5376,21 +5372,16 @@ QByteArray AniDBApi::decompressIfNeeded(const QByteArray& data)
 
 /**
  * Store anime data in the database.
- * Now uses AniDBAnimeInfo for type-safe data handling.
+ * Uses AniDBAnimeInfo type-safe fields directly.
  */
 void AniDBApi::storeAnimeData(const AniDBAnimeInfo& animeInfo)
 {
 	if(!animeInfo.isValid())
 		return;
 	
-	// Convert to legacy struct for database insertion
-	// TODO: Update database queries to use typed fields directly
-	auto data = animeInfo.toLegacyStruct();
-	
-	// Convert Unix timestamps to YYYY-MM-DDZ format for consistency with mylist export
-	// This enforces the date format at the fundamental level before database storage
-	QString startdate = convertToISODate(data.air_date);
-	QString enddate = convertToISODate(data.end_date);
+	// Convert dates to ISO format for consistency
+	QString startdate = convertToISODate(animeInfo.airDate());
+	QString enddate = convertToISODate(animeInfo.endDate());
 	
 	// Use INSERT with ON CONFLICT DO UPDATE (UPSERT) to merge data from multiple responses
 	// COALESCE preserves existing non-empty values when new value is empty
@@ -5458,52 +5449,52 @@ void AniDBApi::storeAnimeData(const AniDBAnimeInfo& animeInfo)
 	QSqlQuery query(db);
 	query.prepare(q);
 	
-	query.bindValue(":aid", data.aid.toInt());
-	query.bindValue(":eptotal", data.eptotal);
-	query.bindValue(":eplast", data.eplast);
-	query.bindValue(":year", data.year);
-	query.bindValue(":type", data.type);
-	query.bindValue(":relaidlist", data.relaidlist);
-	query.bindValue(":relaidtype", data.relaidtype);
-	query.bindValue(":category", data.category);
-	query.bindValue(":nameromaji", data.nameromaji);
-	query.bindValue(":namekanji", data.namekanji);
-	query.bindValue(":nameenglish", data.nameenglish);
-	query.bindValue(":nameother", data.nameother);
-	query.bindValue(":nameshort", data.nameshort);
-	query.bindValue(":synonyms", data.synonyms);
-	query.bindValue(":typename", data.type);  // typename mirrors type
+	query.bindValue(":aid", animeInfo.animeId());
+	query.bindValue(":eptotal", animeInfo.eptotal());
+	query.bindValue(":eplast", animeInfo.eplast());
+	query.bindValue(":year", animeInfo.year());
+	query.bindValue(":type", animeInfo.type());
+	query.bindValue(":relaidlist", animeInfo.relatedAnimeIds());
+	query.bindValue(":relaidtype", animeInfo.relatedAnimeTypes());
+	query.bindValue(":category", animeInfo.category());
+	query.bindValue(":nameromaji", animeInfo.nameRomaji());
+	query.bindValue(":namekanji", animeInfo.nameKanji());
+	query.bindValue(":nameenglish", animeInfo.nameEnglish());
+	query.bindValue(":nameother", animeInfo.nameOther());
+	query.bindValue(":nameshort", animeInfo.nameShort());
+	query.bindValue(":synonyms", animeInfo.synonyms());
+	query.bindValue(":typename", animeInfo.type());  // typename mirrors type
 	query.bindValue(":startdate", startdate);
 	query.bindValue(":enddate", enddate);
-	query.bindValue(":picname", data.picname);
+	query.bindValue(":picname", animeInfo.pictureName());
 	
-	// Bind new fields from Byte 1-7
-	query.bindValue(":dateflags", data.dateflags);
-	query.bindValue(":episodes", data.episodes.isEmpty() ? QVariant() : data.episodes.toInt());
-	query.bindValue(":highest_episode", data.highest_episode);
-	query.bindValue(":special_ep_count", data.special_ep_count.isEmpty() ? QVariant() : data.special_ep_count.toInt());
-	query.bindValue(":url", data.url);
-	query.bindValue(":rating", data.rating);
-	query.bindValue(":vote_count", data.vote_count.isEmpty() ? QVariant() : data.vote_count.toInt());
-	query.bindValue(":temp_rating", data.temp_rating);
-	query.bindValue(":temp_vote_count", data.temp_vote_count.isEmpty() ? QVariant() : data.temp_vote_count.toInt());
-	query.bindValue(":avg_review_rating", data.avg_review_rating);
-	query.bindValue(":review_count", data.review_count.isEmpty() ? QVariant() : data.review_count.toInt());
-	query.bindValue(":award_list", data.award_list);
-	query.bindValue(":is_18_restricted", data.is_18_restricted.isEmpty() ? QVariant() : data.is_18_restricted.toInt());
-	query.bindValue(":ann_id", data.ann_id.isEmpty() ? QVariant() : data.ann_id.toInt());
-	query.bindValue(":allcinema_id", data.allcinema_id.isEmpty() ? QVariant() : data.allcinema_id.toInt());
-	query.bindValue(":animenfo_id", data.animenfo_id);
-	query.bindValue(":tag_name_list", data.tag_name_list);
-	query.bindValue(":tag_id_list", data.tag_id_list);
-	query.bindValue(":tag_weight_list", data.tag_weight_list);
-	query.bindValue(":date_record_updated", data.date_record_updated.isEmpty() ? QVariant() : data.date_record_updated.toLongLong());
-	query.bindValue(":character_id_list", data.character_id_list);
-	query.bindValue(":specials_count", data.specials_count.isEmpty() ? QVariant() : data.specials_count.toInt());
-	query.bindValue(":credits_count", data.credits_count.isEmpty() ? QVariant() : data.credits_count.toInt());
-	query.bindValue(":other_count", data.other_count.isEmpty() ? QVariant() : data.other_count.toInt());
-	query.bindValue(":trailer_count", data.trailer_count.isEmpty() ? QVariant() : data.trailer_count.toInt());
-	query.bindValue(":parody_count", data.parody_count.isEmpty() ? QVariant() : data.parody_count.toInt());
+	// Bind fields from Byte 1-7 (all type-safe now)
+	query.bindValue(":dateflags", animeInfo.dateFlags());
+	query.bindValue(":episodes", animeInfo.episodeCount() > 0 ? animeInfo.episodeCount() : QVariant());
+	query.bindValue(":highest_episode", animeInfo.highestEpisode());
+	query.bindValue(":special_ep_count", animeInfo.specialEpisodeCount() > 0 ? animeInfo.specialEpisodeCount() : QVariant());
+	query.bindValue(":url", animeInfo.url());
+	query.bindValue(":rating", animeInfo.rating());
+	query.bindValue(":vote_count", animeInfo.voteCount() > 0 ? animeInfo.voteCount() : QVariant());
+	query.bindValue(":temp_rating", animeInfo.tempRating());
+	query.bindValue(":temp_vote_count", animeInfo.tempVoteCount() > 0 ? animeInfo.tempVoteCount() : QVariant());
+	query.bindValue(":avg_review_rating", animeInfo.avgReviewRating());
+	query.bindValue(":review_count", animeInfo.reviewCount() > 0 ? animeInfo.reviewCount() : QVariant());
+	query.bindValue(":award_list", animeInfo.awardList());
+	query.bindValue(":is_18_restricted", animeInfo.is18Restricted() ? 1 : QVariant());
+	query.bindValue(":ann_id", animeInfo.annId() > 0 ? animeInfo.annId() : QVariant());
+	query.bindValue(":allcinema_id", animeInfo.allCinemaId() > 0 ? animeInfo.allCinemaId() : QVariant());
+	query.bindValue(":animenfo_id", animeInfo.animeNfoId());
+	query.bindValue(":tag_name_list", animeInfo.tagNameList());
+	query.bindValue(":tag_id_list", animeInfo.tagIdList());
+	query.bindValue(":tag_weight_list", animeInfo.tagWeightList());
+	query.bindValue(":date_record_updated", animeInfo.dateRecordUpdated() > 0 ? animeInfo.dateRecordUpdated() : QVariant());
+	query.bindValue(":character_id_list", animeInfo.characterIdList());
+	query.bindValue(":specials_count", animeInfo.specialsCount() > 0 ? animeInfo.specialsCount() : QVariant());
+	query.bindValue(":credits_count", animeInfo.creditsCount() > 0 ? animeInfo.creditsCount() : QVariant());
+	query.bindValue(":other_count", animeInfo.otherCount() > 0 ? animeInfo.otherCount() : QVariant());
+	query.bindValue(":trailer_count", animeInfo.trailerCount() > 0 ? animeInfo.trailerCount() : QVariant());
+	query.bindValue(":parody_count", animeInfo.parodyCount() > 0 ? animeInfo.parodyCount() : QVariant());
 	
 	if(!query.exec())
 	{

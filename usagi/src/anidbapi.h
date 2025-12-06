@@ -276,11 +276,8 @@ private:
 	};
 
 	// Data structures for parsed responses
-	// Note: FileData has been replaced by AniDBFileInfo class (see anidbfileinfo.h)
-	// Note: AnimeData has been replaced by AniDBAnimeInfo class (see anidbanimeinfo.h)
-	// Keeping typedef for backward compatibility during transition
-	using FileData = AniDBFileInfo::LegacyFileData;
-	using AnimeData = AniDBAnimeInfo::LegacyAnimeData;
+	// FileData has been replaced by AniDBFileInfo class (see anidbfileinfo.h)
+	// AnimeData has been replaced by AniDBAnimeInfo class (see anidbanimeinfo.h)
 	
 	struct EpisodeData {
 		QString eid, epno, epname, epnameromaji, epnamekanji, eprating, epvotecount;
