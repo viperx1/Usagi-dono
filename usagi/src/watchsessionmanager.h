@@ -162,14 +162,16 @@ public:
     bool deleteFile(int lid, bool deleteFromDisk = true);
     
     /**
-     * @brief Delete all files currently marked for deletion
+     * @brief Delete the next file marked for deletion
      * 
-     * Processes all files in the deletion queue, deleting them one by one.
-     * Files are deleted in order of their mark score (lowest first).
+     * Deletes only one file at a time with the lowest score.
+     * Files must be deleted one at a time and the caller should wait for
+     * API confirmation before calling this again.
      * 
-     * @param deleteFromDisk If true, delete the physical files from disk
+     * @param deleteFromDisk If true, delete the physical file from disk
+     * @return true if a file was deleted, false if no files are marked for deletion
      */
-    void deleteMarkedFiles(bool deleteFromDisk = true);
+    bool deleteNextMarkedFile(bool deleteFromDisk = true);
     
     /**
      * @brief Get all files marked for download
@@ -388,11 +390,6 @@ private:
     // File markings (lid -> mark info)
     mutable QMap<int, FileMarkInfo> m_fileMarks;
     
-    // Deletion queue for sequential file deletion
-    QList<int> m_deletionQueue;                 // Queue of lids pending deletion
-    bool m_deletionInProgress;                  // True when a deletion is in progress
-    bool m_deleteFromDisk;                      // Whether to delete physical files
-    
     // Settings
     int m_aheadBuffer;                          // Episodes to keep ahead
     DeletionThresholdType m_thresholdType;      // Threshold type
@@ -415,15 +412,6 @@ private:
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
-    
-    /**
-     * @brief Process next file in deletion queue
-     * 
-     * Deletes one file at a time from the deletion queue. Called by deleteMarkedFiles()
-     * to start the deletion process and by onFileDeletionResult() to continue processing
-     * after API confirmation.
-     */
-    void processNextDeletion();
     
     // Helper methods for new marking criteria
     bool matchesPreferredAudioLanguage(int lid) const;
