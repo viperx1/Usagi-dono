@@ -481,7 +481,7 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
 
 // ========== File Marking ==========
 
-int WatchSessionManager::calculateMarkScore(int lid) const
+int WatchSessionManager::calculateDeletionScore(int lid) const
 {
     // Base score - all files start with this
     int score = 50;  // Middle-of-the-road score
@@ -710,7 +710,7 @@ void WatchSessionManager::setFileMarkType(int lid, FileMarkType markType)
     FileMarkInfo& info = m_fileMarks[lid];
     info.setLid(lid);
     info.setMarkType(markType);
-    info.setMarkScore(calculateMarkScore(lid));
+    info.setMarkScore(calculateDeletionScore(lid));
     
     emit fileMarkChanged(lid, markType);
 }
@@ -719,14 +719,14 @@ FileMarkInfo WatchSessionManager::getFileMarkInfo(int lid) const
 {
     if (m_fileMarks.contains(lid)) {
         FileMarkInfo info = m_fileMarks[lid];
-        info.setMarkScore(calculateMarkScore(lid));
+        info.setMarkScore(calculateDeletionScore(lid));
         return info;
     }
     
     FileMarkInfo info;
     info.setLid(lid);
     info.setAid(getAnimeIdForFile(lid));
-    info.setMarkScore(calculateMarkScore(lid));
+    info.setMarkScore(calculateDeletionScore(lid));
     info.setIsInActiveSession(info.aid() > 0 && hasActiveSession(info.aid()));
     
     return info;
@@ -738,7 +738,7 @@ QList<int> WatchSessionManager::getFilesForDeletion() const
     
     for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
         if (it.value().markType() == FileMarkType::ForDeletion) {
-            scoredFiles.append(qMakePair(it.key(), calculateMarkScore(it.key())));
+            scoredFiles.append(qMakePair(it.key(), calculateDeletionScore(it.key())));
         }
     }
     
@@ -1014,7 +1014,7 @@ void WatchSessionManager::autoMarkFilesForDeletion()
             continue;
         }
         
-        info.score = calculateMarkScore(info.lid);
+        info.score = calculateDeletionScore(info.lid);
         candidates.append(info);
     }
     
@@ -1152,7 +1152,7 @@ void WatchSessionManager::autoMarkFilesForDownload()
                         FileMarkInfo& info = m_fileMarks[lid];
                         info.setLid(lid);
                         info.setMarkType(FileMarkType::ForDownload);
-                        info.setMarkScore(calculateMarkScore(lid));
+                        info.setMarkScore(calculateDeletionScore(lid));
                         
                         updatedLids.insert(lid);
                         emit fileMarkChanged(lid, FileMarkType::ForDownload);

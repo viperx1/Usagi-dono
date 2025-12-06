@@ -105,7 +105,7 @@ public:
     // ========== File Marking ==========
     
     /**
-     * @brief Calculate the mark score for a file
+     * @brief Calculate the deletion score for a file
      * 
      * Score factors:
      * - Is card hidden (-50 = less priority)
@@ -117,34 +117,7 @@ public:
      * @param lid MyList ID
      * @return Calculated score (higher = keep longer, lower = delete first)
      */
-    int calculateMarkScore(int lid) const;
-    
-    /**
-     * @brief Get the marking type for a file
-     * @param lid MyList ID
-     * @return Current mark type
-     */
-    FileMarkType getFileMarkType(int lid) const;
-    
-    /**
-     * @brief Set the marking type for a file
-     * @param lid MyList ID
-     * @param markType The new mark type
-     */
-    void setFileMarkType(int lid, FileMarkType markType);
-    
-    /**
-     * @brief Get full marking info for a file
-     * @param lid MyList ID
-     * @return FileMarkInfo structure with all details
-     */
-    FileMarkInfo getFileMarkInfo(int lid) const;
-    
-    /**
-     * @brief Get all files marked for deletion, sorted by score
-     * @return List of LIDs sorted by deletion priority (lowest score first)
-     */
-    QList<int> getFilesForDeletion() const;
+    int calculateDeletionScore(int lid) const;
     
     /**
      * @brief Actually delete a file that was marked for deletion
@@ -162,40 +135,29 @@ public:
     bool deleteFile(int lid, bool deleteFromDisk = true);
     
     /**
-     * @brief Delete the next file marked for deletion
+     * @brief Delete the next eligible file based on space threshold
      * 
-     * Deletes only one file at a time with the lowest score.
-     * Files must be deleted one at a time and the caller should wait for
+     * Calculates which file should be deleted on-demand based on:
+     * - Current available disk space vs threshold
+     * - Deletion scores (lower score = delete first)
+     * - Gap protection (won't delete files that create gaps)
+     * 
+     * Deletes only one file at a time. Caller should wait for
      * API confirmation before calling this again.
      * 
      * @param deleteFromDisk If true, delete the physical file from disk
-     * @return true if a file was deleted, false if no files are marked for deletion
+     * @return true if a file was deleted, false if no eligible files found
      */
-    bool deleteNextMarkedFile(bool deleteFromDisk = true);
+    bool deleteNextEligibleFile(bool deleteFromDisk = true);
     
     /**
-     * @brief Get all files marked for download
-     * @return List of LIDs marked for download
-     */
-    QList<int> getFilesForDownload() const;
-    
-    /**
-      * @brief Automatically mark files for deletion based on available space
+     * @brief Check if deletion is needed based on available space
      * 
-     * Uses the configured threshold settings to determine which files
-     * should be soft-marked for deletion.
-     */
-    void autoMarkFilesForDeletion();
-    
-    /**
-     * @brief Automatically mark files for download based on session progress
+     * Compares current available space with configured threshold.
      * 
-     * Marks files that should be downloaded based on:
-     * - Active sessions
-     * - Ahead buffer setting
-     * - Current playback position
+     * @return true if space is below threshold and deletion is needed
      */
-    void autoMarkFilesForDownload();
+    bool isDeletionNeeded() const;
     
     /**
      * @brief Auto-start sessions for existing anime with local files
@@ -345,19 +307,6 @@ signals:
     void sessionStateChanged(int aid, bool isActive);
     
     /**
-     * @brief Emitted when file marking changes
-     * @param lid MyList ID
-     * @param markType New mark type
-     */
-    void fileMarkChanged(int lid, FileMarkType markType);
-    
-    /**
-     * @brief Emitted when files should be refreshed due to marking changes
-     * @param updatedLids Set of MyList IDs that were updated (empty means refresh all)
-     */
-    void markingsUpdated(const QSet<int>& updatedLids);
-    
-    /**
      * @brief Emitted when a file has been deleted
      * @param lid MyList ID of the deleted file
      * @param aid Anime ID the file belonged to
@@ -387,8 +336,8 @@ private:
     // Active sessions by anime ID
     QMap<int, SessionInfo> m_sessions;
     
-    // File markings (lid -> mark info)
-    mutable QMap<int, FileMarkInfo> m_fileMarks;
+    // Track failed deletions to avoid retrying immediately
+    QSet<int> m_failedDeletions;
     
     // Settings
     int m_aheadBuffer;                          // Episodes to keep ahead
