@@ -2,14 +2,13 @@
 #define CARDFILEINFO_H
 
 #include <QString>
-#include "filemarkinfo.h"  // For FileMarkType enum
 
 /**
  * @class CardFileInfo
  * @brief Represents file information displayed in anime cards
  * 
  * This class encapsulates all information about a file associated with an anime episode,
- * including viewing status, local file tracking, quality information, and file marking.
+ * including viewing status, local file tracking, and quality information.
  * 
  * Renamed from FileInfo to CardFileInfo to avoid confusion with other file info classes.
  * 
@@ -48,7 +47,6 @@ public:
     QString quality() const { return m_quality; }
     QString groupName() const { return m_groupName; }
     int version() const { return m_version; }
-    FileMarkType markType() const { return m_markType; }
     
     // Setters
     void setLid(int lid) { m_lid = lid; }
@@ -64,7 +62,6 @@ public:
     void setQuality(const QString& quality) { m_quality = quality; }
     void setGroupName(const QString& groupName) { m_groupName = groupName; }
     void setVersion(int version) { m_version = version; }
-    void setMarkType(FileMarkType markType) { m_markType = markType; }
     
     /**
      * @brief Check if file has valid IDs
@@ -85,12 +82,6 @@ public:
     bool hasLocalFile() const { return !m_localFilePath.isEmpty(); }
     
     /**
-     * @brief Check if file has been marked for action
-     * @return true if mark type is not None
-     */
-    bool isMarked() const { return m_markType != FileMarkType::None; }
-    
-    /**
      * @brief Reset to default empty state
      */
     void reset();
@@ -109,7 +100,6 @@ private:
     QString m_quality;              ///< Quality string
     QString m_groupName;            ///< Release group name
     int m_version;                  ///< File version (1, 2, 3, etc.)
-    FileMarkType m_markType;        ///< File marking for download/deletion
 };
 
 #endif // CARDFILEINFO_H

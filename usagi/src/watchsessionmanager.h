@@ -7,7 +7,6 @@
 #include <QList>
 #include <QPair>
 #include <tuple>
-#include "filemarkinfo.h"
 #include "sessioninfo.h"
 
 /**

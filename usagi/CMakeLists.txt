@@ -52,7 +52,6 @@ set(SOURCES
     src/anidbgroupinfo.cpp
     src/hashingtask.cpp
     src/animemetadatacache.cpp
-    src/filemarkinfo.cpp
     src/sessioninfo.cpp
     src/truncatedresponseinfo.cpp
     src/filehashinfo.cpp
@@ -100,7 +99,6 @@ set(HEADERS
     src/anidbgroupinfo.h
     src/hashingtask.h
     src/animemetadatacache.h
-    src/filemarkinfo.h
     src/sessioninfo.h
     src/truncatedresponseinfo.h
     src/filehashinfo.h

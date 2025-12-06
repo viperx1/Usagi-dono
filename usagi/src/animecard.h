@@ -11,7 +11,6 @@
 #include <QPixmap>
 #include "epno.h"
 #include "aired.h"
-#include "watchsessionmanager.h"  // For FileMarkType enum
 #include "taginfo.h"
 #include "cardfileinfo.h"
 #include "cardepisodeinfo.h"

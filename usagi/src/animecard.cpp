@@ -556,29 +556,13 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             fileText += QString(" [%1]").arg(file.state());
         }
         
-        // Add file marking visual indicator
-        switch (file.markType()) {
-            case FileMarkType::ForDownload:
-                fileText += " " + UIIcons::MARK_DOWNLOAD;
-                break;
-            case FileMarkType::ForDeletion:
-                fileText += " " + UIIcons::MARK_DELETION;
-                break;
-            default:
-                break;
-        }
-        
         // Column 2: File info
         fileItem->setText(2, fileText);
         fileItem->setData(2, Qt::UserRole, file.lid());
         fileItem->setData(2, Qt::UserRole + 1, file.fid());
         
-        // Color code file text based on state and marking
-        if (file.markType() == FileMarkType::ForDownload) {
-            fileItem->setBackground(2, QBrush(UIColors::FILE_MARKED_DOWNLOAD));
-        } else if (file.markType() == FileMarkType::ForDeletion) {
-            fileItem->setBackground(2, QBrush(UIColors::FILE_MARKED_DELETION));
-        } else if (file.viewed()) {
+        // Color code file text based on state
+        if (file.viewed()) {
             fileItem->setForeground(2, QBrush(UIColors::FILE_WATCHED)); // Green for viewed
         }
         
@@ -597,18 +581,6 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         }
         if (file.version() > 0) {
             tooltip += QString("\nVersion: v%1").arg(file.version());
-        }
-        
-        // Add marking info to tooltip
-        switch (file.markType()) {
-            case FileMarkType::ForDownload:
-                tooltip += "\nMarking: For Download";
-                break;
-            case FileMarkType::ForDeletion:
-                tooltip += "\nMarking: For Deletion";
-                break;
-            default:
-                break;
         }
         
         if (file.lastPlayed() > 0) {

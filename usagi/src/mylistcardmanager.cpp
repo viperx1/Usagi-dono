@@ -1034,9 +1034,7 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, c
         // Skip marking - marking system eliminated in Phase 1
         // TODO Phase 2: Remove setMarkType from CardFileInfo entirely
         if (m_watchSessionManager) {
-            fileInfo.setMarkType(FileMarkType::None);
         } else {
-            fileInfo.setMarkType(FileMarkType::None);
         }
         
         // Assign version number
