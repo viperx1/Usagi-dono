@@ -488,13 +488,6 @@ private:
     QScrollArea *filterSidebarScrollArea;  // Scroll area containing filter sidebar
     QPushButton *toggleFilterBarButton;  // Button to show/hide filter sidebar
     QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead (migration incomplete)
-	QSet<int> episodesNeedingData;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_episodesNeedingData)
-	QSet<int> animeNeedingMetadata;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animeNeedingMetadata)
-	QSet<int> animeMetadataRequested;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animeMetadataRequested)
-	QSet<int> animeNeedingPoster;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animeNeedingPoster)
-	QMap<int, QString> animePicnames;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animePicnames)
-	QNetworkAccessManager *posterNetworkManager;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_networkManager)
-	QMap<QNetworkReply*, int> posterDownloadRequests;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_posterDownloadRequests)
 	// page settings
 
     QLabel *labelLogin;
@@ -626,7 +619,6 @@ public slots:
 	void getNotifyExportNoSuchTemplate(QString tag);
 	void getNotifyEpisodeUpdated(int eid, int aid);
 	void getNotifyAnimeUpdated(int aid);
-	void onMylistItemExpanded(QTreeWidgetItem *item);
     void safeClose();
     void loadMylistFromDatabase();
     void updateEpisodeInTree(int eid, int aid);
@@ -649,10 +641,6 @@ public slots:
     void onResetWatchSession(int aid);
     void applyMylistFilters();
     void checkAndRequestChainRelations(int aid);  // Check and request missing relation data for anime's chain
-    
-    // Poster download slots
-    void onPosterDownloadFinished(QNetworkReply *reply);
-    void downloadPosterForAnime(int aid, const QString &picname);
     
     // Directory watcher slots
     void onWatcherEnabledChanged(int state);
