@@ -478,7 +478,7 @@ private:
     FlowLayout *mylistCardLayout;
     VirtualFlowLayout *mylistVirtualLayout;  // Virtual scrolling layout for efficient rendering
     QLabel *mylistStatusLabel;
-    bool mylistSortAscending;  // Sort order (kept for backward compatibility with some functions)
+    bool mylistSortAscending;  // Deprecated: moved to MyListFilterSidebar (migration incomplete)
     bool lastInMyListState;  // Track previous "In MyList" filter state for reload detection
     QSet<int> mylistAnimeIdSet;  // Set of anime IDs that are in the user's mylist (for fast filtering)
     QList<int> allAnimeIdsList;  // Full unfiltered list of anime IDs for filtering (populated by onMylistLoadingFinished/loadMylistAsCards, never modified by filters)
@@ -487,14 +487,14 @@ private:
     MyListFilterSidebar *filterSidebar;  // Filter sidebar widget
     QScrollArea *filterSidebarScrollArea;  // Scroll area containing filter sidebar
     QPushButton *toggleFilterBarButton;  // Button to show/hide filter sidebar
-    QList<AnimeCard*> animeCards;  // Local card list cache for backward compatibility with some older code patterns
-	QSet<int> episodesNeedingData;  // Track episodes that need data requests
-	QSet<int> animeNeedingMetadata;  // Track anime that need metadata requests
-	QSet<int> animeMetadataRequested;  // Track anime that have pending metadata requests
-	QSet<int> animeNeedingPoster;  // Track anime that need poster downloads
-	QMap<int, QString> animePicnames;  // Cache of anime ID to picname mappings for poster downloads
-	QNetworkAccessManager *posterNetworkManager;  // Network manager for poster downloads
-	QMap<QNetworkReply*, int> posterDownloadRequests;  // Track ongoing poster download requests
+    QList<AnimeCard*> animeCards;  // Deprecated: kept for backward compatibility, use cardManager instead (migration incomplete)
+	QSet<int> episodesNeedingData;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_episodesNeedingData)
+	QSet<int> animeNeedingMetadata;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animeNeedingMetadata)
+	QSet<int> animeMetadataRequested;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animeMetadataRequested)
+	QSet<int> animeNeedingPoster;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animeNeedingPoster)
+	QMap<int, QString> animePicnames;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_animePicnames)
+	QNetworkAccessManager *posterNetworkManager;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_networkManager)
+	QMap<QNetworkReply*, int> posterDownloadRequests;  // Deprecated: moved to MyListCardManager (migration incomplete - duplicates m_posterDownloadRequests)
 	// page settings
 
     QLabel *labelLogin;
