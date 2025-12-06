@@ -635,10 +635,9 @@ static QList<AnimeCard::TagInfo> parseTags(const QString& tagNames, const QStrin
     int count = qMin(qMin(names.size(), ids.size()), weights.size());
     
     for (int i = 0; i < count; ++i) {
-        AnimeCard::TagInfo tag;
-        tag.name = names[i].trimmed();
-        tag.id = ids[i].trimmed().toInt();
-        tag.weight = weights[i].trimmed().toInt();
+        AnimeCard::TagInfo tag(names[i].trimmed(), 
+                               ids[i].trimmed().toInt(), 
+                               weights[i].trimmed().toInt());
         tags.append(tag);
     }
     
@@ -671,10 +670,7 @@ QList<AnimeCard::TagInfo> MyListCardManager::getTagsOrCategoryFallback(const QSt
     int weight = 1000;  // Arbitrary high weight for category fallback
     
     for (const QString& catName : std::as_const(categoryNames)) {
-        AnimeCard::TagInfo tag;
-        tag.name = catName.trimmed();
-        tag.id = 0;
-        tag.weight = weight--;
+        AnimeCard::TagInfo tag(catName.trimmed(), 0, weight--);
         categoryTags.append(tag);
     }
     
