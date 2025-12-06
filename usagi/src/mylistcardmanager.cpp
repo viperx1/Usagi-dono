@@ -989,13 +989,13 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, c
         // Get or create episode entry
         if (!episodeMap.contains(eid)) {
             AnimeCard::EpisodeInfo episodeInfo;
-            episodeInfo.eid = eid;
+            episodeInfo.setEid(eid);
             
             if (!entry.epno.isEmpty()) {
-                episodeInfo.episodeNumber = ::epno(entry.epno);
+                episodeInfo.setEpisodeNumber(::epno(entry.epno));
             }
             
-            episodeInfo.episodeTitle = entry.episodeName.isEmpty() ? "Episode" : entry.episodeName;
+            episodeInfo.setEpisodeTitle(entry.episodeName.isEmpty() ? "Episode" : entry.episodeName);
             
             if (entry.episodeName.isEmpty()) {
                 m_episodesNeedingData.insert(eid);
@@ -1007,54 +1007,56 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, c
         
         // Create file info
         AnimeCard::FileInfo fileInfo;
-        fileInfo.lid = entry.lid;
-        fileInfo.fid = entry.fid;
-        fileInfo.fileName = entry.filename.isEmpty() ? QString("FID:%1").arg(entry.fid) : entry.filename;
+        fileInfo.setLid(entry.lid);
+        fileInfo.setFid(entry.fid);
+        fileInfo.setFileName(entry.filename.isEmpty() ? QString("FID:%1").arg(entry.fid) : entry.filename);
         
         // State string
+        QString stateStr;
         switch(entry.state) {
-            case 0: fileInfo.state = "Unknown"; break;
-            case 1: fileInfo.state = "HDD"; break;
-            case 2: fileInfo.state = "CD/DVD"; break;
-            case 3: fileInfo.state = "Deleted"; break;
-            default: fileInfo.state = QString::number(entry.state); break;
+            case 0: stateStr = "Unknown"; break;
+            case 1: stateStr = "HDD"; break;
+            case 2: stateStr = "CD/DVD"; break;
+            case 3: stateStr = "Deleted"; break;
+            default: stateStr = QString::number(entry.state); break;
         }
+        fileInfo.setState(stateStr);
         
-        fileInfo.viewed = (entry.viewed != 0);
-        fileInfo.localWatched = (entry.localWatched != 0);
-        fileInfo.storage = !entry.localFilePath.isEmpty() ? entry.localFilePath : entry.storage;
-        fileInfo.localFilePath = entry.localFilePath;  // Store local file path for existence check
-        fileInfo.lastPlayed = entry.lastPlayed;
-        fileInfo.resolution = entry.resolution;
-        fileInfo.quality = entry.quality;
-        fileInfo.groupName = entry.groupName;
+        fileInfo.setViewed(entry.viewed != 0);
+        fileInfo.setLocalWatched(entry.localWatched != 0);
+        fileInfo.setStorage(!entry.localFilePath.isEmpty() ? entry.localFilePath : entry.storage);
+        fileInfo.setLocalFilePath(entry.localFilePath);  // Store local file path for existence check
+        fileInfo.setLastPlayed(entry.lastPlayed);
+        fileInfo.setResolution(entry.resolution);
+        fileInfo.setQuality(entry.quality);
+        fileInfo.setGroupName(entry.groupName);
         
         // Get file mark from WatchSessionManager (single source of truth)
         if (m_watchSessionManager) {
-            fileInfo.markType = m_watchSessionManager->getFileMarkType(entry.lid);
+            fileInfo.setMarkType(m_watchSessionManager->getFileMarkType(entry.lid));
         } else {
-            fileInfo.markType = FileMarkType::None;
+            fileInfo.setMarkType(FileMarkType::None);
         }
         
         // Assign version number
         episodeFileCount[eid]++;
-        fileInfo.version = episodeFileCount[eid];
+        fileInfo.setVersion(episodeFileCount[eid]);
         
         // Add file to episode
-        episodeMap[eid].files.append(fileInfo);
+        episodeMap[eid].files().append(fileInfo);
     }
     
     // Add all episodes to card in sorted order
     QList<AnimeCard::EpisodeInfo> episodeList = episodeMap.values();
     std::sort(episodeList.begin(), episodeList.end(), 
               [](const AnimeCard::EpisodeInfo& a, const AnimeCard::EpisodeInfo& b) {
-        if (a.episodeNumber.isValid() && b.episodeNumber.isValid()) {
-            return a.episodeNumber < b.episodeNumber;
+        if (a.episodeNumber().isValid() && b.episodeNumber().isValid()) {
+            return a.episodeNumber() < b.episodeNumber();
         }
-        if (!a.episodeNumber.isValid()) {
+        if (!a.episodeNumber().isValid()) {
             return false;
         }
-        if (!b.episodeNumber.isValid()) {
+        if (!b.episodeNumber().isValid()) {
             return true;
         }
         return false;
