@@ -20,6 +20,7 @@
 #include "Qt-AES-master/qaesencryption.h"
 #include "mask.h"
 #include "applicationsettings.h"
+#include "anidbfileinfo.h"
 
 // Forward declaration for myAniDBApi (defined in main.h)
 // and extern declaration for the global adbapi pointer
@@ -274,13 +275,9 @@ private:
 	};
 
 	// Data structures for parsed responses
-	struct FileData {
-		QString fid, aid, eid, gid, lid;
-		QString othereps, isdepr, state, size, ed2k, md5, sha1, crc;
-		QString quality, source, codec_audio, bitrate_audio;
-		QString codec_video, bitrate_video, resolution, filetype;
-		QString lang_dub, lang_sub, length, description, airdate, filename;
-	};
+	// Note: FileData has been replaced by AniDBFileInfo class (see anidbfileinfo.h)
+	// Keeping typedef for backward compatibility during transition
+	using FileData = AniDBFileInfo::LegacyFileData;
 	
 	struct AnimeData {
 		// Byte 1 fields
@@ -314,7 +311,7 @@ private:
 	};
 
 	// Helper methods for mask processing
-	FileData parseFileMask(const QStringList& tokens, unsigned int fmask, int& index);
+	AniDBFileInfo parseFileMask(const QStringList& tokens, unsigned int fmask, int& index);
 	AnimeData parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index);
 	EpisodeData parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index);
 	GroupData parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
@@ -323,7 +320,7 @@ private:
 	AnimeData parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
 	Mask calculateReducedMask(const Mask& originalMask, const QByteArray& parsedMaskBytes);
 	
-	void storeFileData(const FileData& data);
+	void storeFileData(const AniDBFileInfo& data);
 	void storeAnimeData(const AnimeData& data);
 	void storeEpisodeData(const EpisodeData& data);
 	void storeGroupData(const GroupData& data);

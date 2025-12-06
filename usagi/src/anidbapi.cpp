@@ -753,8 +753,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// FID is always the first field in FILE responses
 		int index = 1;  // Start parsing after FID
 		
-		// Parse file data using fmask
-		FileData fileData = parseFileMask(token2, fmask, index);
+		// Parse file data using fmask (now returns AniDBFileInfo)
+		AniDBFileInfo fileInfo = parseFileMask(token2, fmask, index);
+		// Set FID which is returned separately
+		fileInfo.setFileId(token2.value(0).toInt());
 		
 		// Parse anime data using amask
 		AnimeData animeData = parseFileAmaskAnimeData(token2, amask, index);
@@ -766,23 +768,23 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		GroupData groupData = parseFileAmaskGroupData(token2, amask, index);
 		
 		// Store all parsed data
-		storeFileData(fileData);
+		storeFileData(fileInfo);
 		
 		if(!animeData.aid.isEmpty())
 		{
-			animeData.aid = fileData.aid;  // Ensure aid is set from file data
+			animeData.aid = QString::number(fileInfo.animeId());  // Ensure aid is set from file data
 			storeAnimeData(animeData);
 		}
 		
 		if(!episodeData.eid.isEmpty())
 		{
-			episodeData.eid = fileData.eid;  // Ensure eid is set from file data
+			episodeData.eid = QString::number(fileInfo.episodeId());  // Ensure eid is set from file data
 			storeEpisodeData(episodeData);
 		}
 		
 		if(!groupData.gid.isEmpty())
 		{
-			groupData.gid = fileData.gid;  // Ensure gid is set from file data
+			groupData.gid = QString::number(fileInfo.groupId());  // Ensure gid is set from file data
 			storeGroupData(groupData);
 		}
 		
@@ -794,17 +796,17 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		}
 		
 		// Always queue EPISODE API request after FILE reply to ensure complete episode data
-		if(!fileData.eid.isEmpty() && fileData.eid != QLatin1String("0"))
+		if(fileInfo.episodeId() > 0)
 		{
-			LOG(QString("Queuing EPISODE API request for EID %1").arg(fileData.eid));
-			Episode(fileData.eid.toInt());
+			LOG(QString("Queuing EPISODE API request for EID %1").arg(fileInfo.episodeId()));
+			Episode(fileInfo.episodeId());
 		}
 		
 		// Always queue ANIME API request after FILE reply to ensure complete anime data
-		if(!fileData.aid.isEmpty() && fileData.aid != QLatin1String("0"))
+		if(fileInfo.animeId() > 0)
 		{
-			LOG(QString("Queuing ANIME API request for AID %1").arg(fileData.aid));
-			Anime(fileData.aid.toInt());
+			LOG(QString("Queuing ANIME API request for AID %1").arg(fileInfo.animeId()));
+			Anime(fileInfo.animeId());
 		}
 	}
 	else if(ReplyID == "221"){ // 221 MYLIST
@@ -4486,72 +4488,22 @@ void AniDBApi::checkForExistingExport()
 
 /**
  * Parse FILE command response using fmask to determine which fields are present.
- * Processes mask bits in strict MSB to LSB order using a loop to ensure correctness.
+ * Uses AniDBFileInfo class for type-safe parsing.
  * 
  * @param tokens Pipe-delimited response tokens
  * @param fmask File mask indicating which fields are present
  * @param index Current index in tokens array (updated as fields are consumed)
- * @return FileData structure with parsed fields
+ * @return AniDBFileInfo object with parsed fields
  */
-AniDBApi::FileData AniDBApi::parseFileMask(const QStringList& tokens, unsigned int fmask, int& index)
+AniDBFileInfo AniDBApi::parseFileMask(const QStringList& tokens, unsigned int fmask, int& index)
 {
-	FileData data;
+	// Use AniDBFileInfo's factory method for type-safe parsing
+	AniDBFileInfo fileInfo = AniDBFileInfo::fromApiResponse(tokens, fmask, index);
 	
-	// FID is always returned first in FILE responses, regardless of mask
-	// It's not part of the fmask-controlled fields
-	data.fid = tokens.value(0);
+	// FID is always returned first in FILE responses (tokens[0])
+	// It's handled separately in the calling code
 	
-	// Process fmask bits from MSB (bit 30) to LSB (bit 0) in strict order using a loop
-	// This ensures correctness even if individual if-statements are reordered
-	
-	// Define all mask bits in MSB to LSB order
-	struct MaskBit {
-		unsigned int bit;
-		QString* field;
-	};
-	
-	MaskBit maskBits[] = {
-		{fAID,            &data.aid},              // Bit 30
-		{fEID,            &data.eid},              // Bit 29
-		{fGID,            &data.gid},              // Bit 28
-		{fLID,            &data.lid},              // Bit 27
-		{fOTHEREPS,       &data.othereps},         // Bit 26
-		{fISDEPR,         &data.isdepr},           // Bit 25
-		{fSTATE,          &data.state},            // Bit 24
-		{fSIZE,           &data.size},             // Bit 23
-		{fED2K,           &data.ed2k},             // Bit 22
-		{fMD5,            &data.md5},              // Bit 21
-		{fSHA1,           &data.sha1},             // Bit 20
-		{fCRC32,          &data.crc},              // Bit 19
-		// Bits 18-16 reserved
-		{fQUALITY,        &data.quality},          // Bit 15
-		{fSOURCE,         &data.source},           // Bit 14
-		{fCODEC_AUDIO,    &data.codec_audio},      // Bit 13
-		{fBITRATE_AUDIO,  &data.bitrate_audio},    // Bit 12
-		{fCODEC_VIDEO,    &data.codec_video},      // Bit 11
-		{fBITRATE_VIDEO,  &data.bitrate_video},    // Bit 10
-		{fRESOLUTION,     &data.resolution},       // Bit 9
-		{fFILETYPE,       &data.filetype},         // Bit 8
-		{fLANG_DUB,       &data.lang_dub},         // Bit 7
-		{fLANG_SUB,       &data.lang_sub},         // Bit 6
-		{fLENGTH,         &data.length},           // Bit 5
-		{fDESCRIPTION,    &data.description},      // Bit 4
-		{fAIRDATE,        &data.airdate},          // Bit 3
-		// Bits 2-1 reserved
-		{fFILENAME,       &data.filename}          // Bit 0
-	};
-	
-	// Process mask bits in order using a loop
-	// This ensures fields are extracted in the correct sequence
-	for (size_t i = 0; i < sizeof(maskBits) / sizeof(MaskBit); i++)
-	{
-		if (fmask & maskBits[i].bit)
-		{
-			*(maskBits[i].field) = tokens.value(index++);
-		}
-	}
-	
-	return data;
+	return fileInfo;
 }
 
 /**
@@ -5284,9 +5236,14 @@ Mask AniDBApi::calculateReducedMask(const Mask& originalMask, const QByteArray& 
 
 /**
  * Store file data in the database.
+ * Now uses AniDBFileInfo for type-safe data handling.
  */
-void AniDBApi::storeFileData(const FileData& data)
+void AniDBApi::storeFileData(const AniDBFileInfo& fileInfo)
 {
+	// Convert to legacy struct for database insertion
+	// TODO: Update database queries to use typed fields directly
+	auto data = fileInfo.toLegacyStruct();
+	
 	QString q = QString("INSERT OR REPLACE INTO `file` "
 		"(`fid`, `aid`, `eid`, `gid`, `lid`, `othereps`, `isdepr`, `state`, "
 		"`size`, `ed2k`, `md5`, `sha1`, `crc`, `quality`, `source`, "
