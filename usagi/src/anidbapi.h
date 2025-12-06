@@ -21,6 +21,7 @@
 #include "mask.h"
 #include "applicationsettings.h"
 #include "anidbfileinfo.h"
+#include "anidbanimeinfo.h"
 
 // Forward declaration for myAniDBApi (defined in main.h)
 // and extern declaration for the global adbapi pointer
@@ -276,31 +277,10 @@ private:
 
 	// Data structures for parsed responses
 	// Note: FileData has been replaced by AniDBFileInfo class (see anidbfileinfo.h)
+	// Note: AnimeData has been replaced by AniDBAnimeInfo class (see anidbanimeinfo.h)
 	// Keeping typedef for backward compatibility during transition
 	using FileData = AniDBFileInfo::LegacyFileData;
-	
-	struct AnimeData {
-		// Byte 1 fields
-		QString aid, dateflags, year, type;
-		QString relaidlist, relaidtype;
-		// Byte 2 fields
-		QString nameromaji, namekanji, nameenglish, nameother, nameshort, synonyms;
-		// Byte 3 fields
-		QString episodes, highest_episode, special_ep_count;
-		QString air_date, end_date, url, picname;
-		// Byte 4 fields
-		QString rating, vote_count, temp_rating, temp_vote_count;
-		QString avg_review_rating, review_count, award_list, is_18_restricted;
-		// Byte 5 fields
-		QString ann_id, allcinema_id, animenfo_id;
-		QString tag_name_list, tag_id_list, tag_weight_list, date_record_updated;
-		// Byte 6 fields
-		QString character_id_list;
-		// Byte 7 fields
-		QString specials_count, credits_count, other_count, trailer_count, parody_count;
-		// Legacy fields for backward compatibility
-		QString eptotal, eplast, category;
-	};
+	using AnimeData = AniDBAnimeInfo::LegacyAnimeData;
 	
 	struct EpisodeData {
 		QString eid, epno, epname, epnameromaji, epnamekanji, eprating, epvotecount;
@@ -312,16 +292,16 @@ private:
 
 	// Helper methods for mask processing
 	AniDBFileInfo parseFileMask(const QStringList& tokens, unsigned int fmask, int& index);
-	AnimeData parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index);
+	AniDBAnimeInfo parseFileAmaskAnimeData(const QStringList& tokens, unsigned int amask, int& index);
 	EpisodeData parseFileAmaskEpisodeData(const QStringList& tokens, unsigned int amask, int& index);
 	GroupData parseFileAmaskGroupData(const QStringList& tokens, unsigned int amask, int& index);
-	AnimeData parseMask(const QStringList& tokens, uint64_t amask, int& index);
-	AnimeData parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
-	AnimeData parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
+	AniDBAnimeInfo parseMask(const QStringList& tokens, uint64_t amask, int& index);
+	AniDBAnimeInfo parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index);
+	AniDBAnimeInfo parseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes);
 	Mask calculateReducedMask(const Mask& originalMask, const QByteArray& parsedMaskBytes);
 	
 	void storeFileData(const AniDBFileInfo& data);
-	void storeAnimeData(const AnimeData& data);
+	void storeAnimeData(const AniDBAnimeInfo& data);
 	void storeEpisodeData(const EpisodeData& data);
 	void storeGroupData(const GroupData& data);
 	
