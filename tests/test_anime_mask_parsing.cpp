@@ -25,16 +25,13 @@ public:
         // Initialize with test database
     }
     
-    // Expose AnimeData type
-    using AniDBApi::AnimeData;
-    
     // Expose parseMaskFromString for testing
-    AnimeData testParseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index)
+    AniDBAnimeInfo testParseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index)
     {
         return parseMaskFromString(tokens, amaskHexString, index);
     }
     
-    AnimeData testParseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
+    AniDBAnimeInfo testParseMaskFromString(const QStringList& tokens, const QString& amaskHexString, int& index, QByteArray& parsedMaskBytes)
     {
         return parseMaskFromString(tokens, amaskHexString, index, parsedMaskBytes);
     }
@@ -112,7 +109,7 @@ void TestAnimeMaskParsing::testParseWithAidBit()
     auto data = api->testParseMaskFromString(tokens, mask, index, parsedMaskBytes);
     
     // DATEFLAGS should be parsed from token[1]
-    QCOMPARE(data.dateflags, QString("0"));
+    QCOMPARE(data.dateFlags(), QString("0"));
     
     // Index should have advanced by 1 (DATEFLAGS consumed)
     QCOMPARE(index, 2);
@@ -134,7 +131,7 @@ void TestAnimeMaskParsing::testParseWithoutAidBit()
     auto data = api->testParseMaskFromString(tokens, mask, index, parsedMaskBytes);
     
     // SYNONYM_LIST should be parsed from token[0]
-    QCOMPARE(data.synonyms, tokens[0]);
+    QCOMPARE(data.synonyms(), tokens[0]);
     
     // Index should have advanced by 1
     QCOMPARE(index, 1);
@@ -201,13 +198,13 @@ void TestAnimeMaskParsing::testCompleteAnimeResponse()
     
     // Verify key fields were parsed correctly
     // Note: AID is skipped by parser, handled by caller
-    QCOMPARE(data.dateflags, QString("0"));
-    QCOMPARE(data.year, QString("2025-2025"));
-    QCOMPARE(data.type, QString("TV Series"));
-    QCOMPARE(data.nameromaji, QString("Shinjite Ita Nakama-tachi"));
-    QCOMPARE(data.namekanji, QString("信じていた仲間達"));
-    QCOMPARE(data.nameenglish, QString("My Gift Lvl 9999"));
-    QCOMPARE(data.synonyms, QString("Synonyms"));
+    QCOMPARE(data.dateFlags(), QString("0"));
+    QCOMPARE(data.year(), QString("2025-2025"));
+    QCOMPARE(data.type(), QString("TV Series"));
+    QCOMPARE(data.nameRomaji(), QString("Shinjite Ita Nakama-tachi"));
+    QCOMPARE(data.nameKanji(), QString("信じていた仲間達"));
+    QCOMPARE(data.nameEnglish(), QString("My Gift Lvl 9999"));
+    QCOMPARE(data.synonyms(), QString("Synonyms"));
     
     // Verify all tokens were consumed (AID skipped + 11 fields parsed)
     QCOMPARE(index, 12);
@@ -236,12 +233,12 @@ void TestAnimeMaskParsing::testCompleteReRequestResponse()
     auto data = api->testParseMaskFromString(tokens, mask, index, parsedMaskBytes);
     
     // Verify first field is SYNONYM_LIST (not AID)
-    QCOMPARE(data.synonyms, QString("Backstabbed in a Backwater Dungeon"));
+    QCOMPARE(data.synonyms(), QString("Backstabbed in a Backwater Dungeon"));
     
     // Verify some other fields
-    QCOMPARE(data.episodes, QString("12"));
-    QCOMPARE(data.highest_episode, QString("12"));
-    QCOMPARE(data.url, QString("https://mugengacha.com/"));
+    QCOMPARE(data.episodeCount(), 12);
+    QCOMPARE(data.highestEpisode(), QString("12"));
+    QCOMPARE(data.url(), QString("https://mugengacha.com/"));
     
     // Verify correct number of tokens consumed
     QVERIFY(index > 0);
@@ -261,12 +258,12 @@ void TestAnimeMaskParsing::testByte2Fields()
     
     auto data = api->testParseMaskFromString(tokens, mask, index);
     
-    QCOMPARE(data.nameromaji, QString("Romaji Name"));
-    QCOMPARE(data.namekanji, QString("Kanji Name"));
-    QCOMPARE(data.nameenglish, QString("English Name"));
-    QCOMPARE(data.nameother, QString("Other Name"));
-    QCOMPARE(data.nameshort, QString("Short Names"));
-    QCOMPARE(data.synonyms, QString("Synonyms"));
+    QCOMPARE(data.nameRomaji(), QString("Romaji Name"));
+    QCOMPARE(data.nameKanji(), QString("Kanji Name"));
+    QCOMPARE(data.nameEnglish(), QString("English Name"));
+    QCOMPARE(data.nameOther(), QString("Other Name"));
+    QCOMPARE(data.nameShort(), QString("Short Names"));
+    QCOMPARE(data.synonyms(), QString("Synonyms"));
     QCOMPARE(index, 6);
 }
 
@@ -284,13 +281,13 @@ void TestAnimeMaskParsing::testByte3Fields()
     
     auto data = api->testParseMaskFromString(tokens, mask, index);
     
-    QCOMPARE(data.episodes, QString("12"));
-    QCOMPARE(data.highest_episode, QString("12"));
-    QCOMPARE(data.special_ep_count, QString("1"));
-    QCOMPARE(data.air_date, QString("1759449600"));
-    QCOMPARE(data.end_date, QString("1766102400"));
-    QCOMPARE(data.url, QString("https://example.com/"));
-    QCOMPARE(data.picname, QString("image.jpg"));
+    QCOMPARE(data.episodeCount(), 12);
+    QCOMPARE(data.highestEpisode(), QString("12"));
+    QCOMPARE(data.specialEpisodeCount(), 1);
+    QCOMPARE(data.airDate(), QString("1759449600"));
+    QCOMPARE(data.endDate(), QString("1766102400"));
+    QCOMPARE(data.url(), QString("https://example.com/"));
+    QCOMPARE(data.pictureName(), QString("image.jpg"));
     QCOMPARE(index, 7);
 }
 
@@ -307,14 +304,14 @@ void TestAnimeMaskParsing::testByte4Fields()
     
     auto data = api->testParseMaskFromString(tokens, mask, index);
     
-    QCOMPARE(data.rating, QString("349"));
-    QCOMPARE(data.vote_count, QString("40"));
-    QCOMPARE(data.temp_rating, QString("536"));
-    QCOMPARE(data.temp_vote_count, QString("41"));
-    QCOMPARE(data.avg_review_rating, QString("0"));
-    QCOMPARE(data.review_count, QString("0"));
-    QCOMPARE(data.award_list, QString("award1,award2"));
-    QCOMPARE(data.is_18_restricted, QString("0"));
+    QCOMPARE(data.rating(), QString("349"));
+    QCOMPARE(data.voteCount(), 40);
+    QCOMPARE(data.tempRating(), QString("536"));
+    QCOMPARE(data.tempVoteCount(), 41);
+    QCOMPARE(data.avgReviewRating(), QString("0"));
+    QCOMPARE(data.reviewCount(), 0);
+    QCOMPARE(data.awardList(), QString("award1,award2"));
+    QCOMPARE(data.is18Restricted(), false);
     QCOMPARE(index, 8);
 }
 
@@ -333,13 +330,13 @@ void TestAnimeMaskParsing::testByte5Fields()
     auto data = api->testParseMaskFromString(tokens, mask, index);
     
     // Note: First bit in byte 5 is retired, so it gets consumed but not stored
-    QCOMPARE(data.ann_id, QString("34029"));
-    QCOMPARE(data.allcinema_id, QString("400172"));
-    QCOMPARE(data.animenfo_id, QString("animenfo123"));
-    QCOMPARE(data.tag_name_list, QString("action,comedy"));
-    QCOMPARE(data.tag_id_list, QString("100,200"));
-    QCOMPARE(data.tag_weight_list, QString("50,75"));
-    QCOMPARE(data.date_record_updated, QString("1762811997"));
+    QCOMPARE(data.annId(), 34029);
+    QCOMPARE(data.allCinemaId(), 400172);
+    QCOMPARE(data.animeNfoId(), QString("animenfo123"));
+    QCOMPARE(data.tagNameList(), QString("action,comedy"));
+    QCOMPARE(data.tagIdList(), QString("100,200"));
+    QCOMPARE(data.tagWeightList(), QString("50,75"));
+    QCOMPARE(data.dateRecordUpdated(), (qint64)1762811997);
     QCOMPARE(index, 8);
 }
 
@@ -356,7 +353,7 @@ void TestAnimeMaskParsing::testByte6Fields()
     
     auto data = api->testParseMaskFromString(tokens, mask, index);
     
-    QCOMPARE(data.character_id_list, QString("148179,148180,150080"));
+    QCOMPARE(data.characterIdList(), QString("148179,148180,150080"));
     QCOMPARE(index, 1);
 }
 
@@ -373,11 +370,11 @@ void TestAnimeMaskParsing::testByte7Fields()
     
     auto data = api->testParseMaskFromString(tokens, mask, index);
     
-    QCOMPARE(data.specials_count, QString("1"));
-    QCOMPARE(data.credits_count, QString("0"));
-    QCOMPARE(data.other_count, QString("0"));
-    QCOMPARE(data.trailer_count, QString("0"));
-    QCOMPARE(data.parody_count, QString("0"));
+    QCOMPARE(data.specialsCount(), 1);
+    QCOMPARE(data.creditsCount(), 0);
+    QCOMPARE(data.otherCount(), 0);
+    QCOMPARE(data.trailerCount(), 0);
+    QCOMPARE(data.parodyCount(), 0);
     QCOMPARE(index, 5);
 }
 

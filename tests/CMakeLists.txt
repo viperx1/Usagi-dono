@@ -155,6 +155,11 @@ set(ANIME_MASK_PARSING_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(ANIME_MASK_PARSING_TEST_HEADERS
@@ -164,6 +169,11 @@ set(ANIME_MASK_PARSING_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_anime_mask_parsing ${ANIME_MASK_PARSING_TEST_SOURCES} ${ANIME_MASK_PARSING_TEST_HEADERS})
