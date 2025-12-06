@@ -2225,10 +2225,10 @@ void Window::saveMylistSorting()
         .arg(filterSidebar->getSortIndex())
         .arg(filterSidebar->getSortAscending()));
     LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3, deletion=%4")
-        .arg(filterSidebar->getTypeFilter())
-        .arg(filterSidebar->getCompletionFilter())
-        .arg(filterSidebar->getShowOnlyUnwatched())
-        .arg(filterSidebar->getShowMarkedForDeletion()));
+        .arg(filterSidebar->getTypeFilter(),
+             filterSidebar->getCompletionFilter(),
+             filterSidebar->getShowOnlyUnwatched(),
+             filterSidebar->getShowMarkedForDeletion()));
     LOG(QString("Saved mylist view settings: inmylist=%1, serieschain=%2, adult=%3")
         .arg(filterSidebar->getInMyListOnly())
         .arg(filterSidebar->getShowSeriesChain())
