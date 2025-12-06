@@ -1940,7 +1940,7 @@ void Window::loadUnboundFiles()
     LOG("Loading unbound files from database...");
     
     // Get unbound files from database
-    QList<AniDBApi::FileHashInfo> unboundFiles = adbapi->getUnboundFiles();
+    QList<FileHashInfo> unboundFiles = adbapi->getUnboundFiles();
     
     if(unboundFiles.isEmpty())
     {
@@ -1957,9 +1957,9 @@ void Window::loadUnboundFiles()
     unknownFiles->setUpdatesEnabled(false);
     
     // Add each unbound file to the unknown files widget
-    for(const AniDBApi::FileHashInfo& fileInfo : std::as_const(unboundFiles))
+    for(const FileHashInfo& fileInfo : std::as_const(unboundFiles))
     {
-        QFileInfo qFileInfo(fileInfo.path);
+        QFileInfo qFileInfo(fileInfo.path());
         QString filename = qFileInfo.fileName();
         
         // Get file size from filesystem if available
@@ -1969,7 +1969,7 @@ void Window::loadUnboundFiles()
             fileSize = qFileInfo.size();
         }
         
-        unknownFilesInsertRow(filename, fileInfo.path, fileInfo.hash, fileSize);
+        unknownFilesInsertRow(filename, fileInfo.path(), fileInfo.hash(), fileSize);
     }
     
     // Re-enable updates after bulk insertion
@@ -3919,7 +3919,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	// Perform single batch query to retrieve all existing hashes and status
 	QElapsedTimer batchQueryTimer;
 	batchQueryTimer.start();
-	QMap<QString, AniDBApi::FileHashInfo> hashInfoMap = adbapi->batchGetLocalFileHashes(filePaths);
+	QMap<QString, FileHashInfo> hashInfoMap = adbapi->batchGetLocalFileHashes(filePaths);
 	qint64 batchQueryTime = batchQueryTimer.elapsed();
 	LOG(QString("[TIMING] batchGetLocalFileHashes() for %1 files: %2 ms [window.cpp]")
 		.arg(filePaths.size()).arg(batchQueryTime));
@@ -3938,7 +3938,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			continue; // Skip this file
 		}
 		
-		QString preloadedHash = hashInfoMap.contains(filePath) ? hashInfoMap[filePath].hash : QString();
+		QString preloadedHash = hashInfoMap.contains(filePath) ? hashInfoMap[filePath].hash() : QString();
 		hashesinsertrow(fileInfo, Qt::Unchecked, preloadedHash);
 	}
 	
