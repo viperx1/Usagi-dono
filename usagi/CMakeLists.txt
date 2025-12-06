@@ -62,7 +62,6 @@ set(SOURCES
     src/cardepisodeinfo.cpp
     src/animestats.cpp
     src/cachedanimedata.cpp
-    src/treewidgetsortutil.cpp
 )
 
 # Header files
@@ -111,7 +110,6 @@ set(HEADERS
     src/cardepisodeinfo.h
     src/animestats.h
     src/cachedanimedata.h
-    src/treewidgetsortutil.h
 )
 
 # Create executable

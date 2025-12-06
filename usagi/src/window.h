@@ -28,7 +28,6 @@
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTreeWidget>
-#include "treewidgetsortutil.h"
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QCompleter>
@@ -65,30 +64,6 @@ class MyListCardManager;
 class VirtualFlowLayout;
 class WatchSessionManager;
 
-// MyList tree widget column indices (using enum for type safety and maintainability)
-// Column order: Anime, Play, Episode, Episode Title, State, Viewed, Storage, Mylist ID, Type, Aired, Last Played
-enum MyListColumn {
-    COL_ANIME = 0,
-    COL_PLAY = 1,
-    COL_EPISODE = 2,
-    COL_EPISODE_TITLE = 3,
-    COL_STATE = 4,
-    COL_VIEWED = 5,
-    COL_STORAGE = 6,
-    COL_MYLIST_ID = 7,
-    COL_TYPE = 8,
-    COL_AIRED = 9,
-    COL_LAST_PLAYED = 10
-};
-
-// Play button icons used in tree widget
-namespace PlayIcons {
-    constexpr const char* PLAY = "▶";       // Play button (file exists, not watched)
-    constexpr const char* WATCHED = "✓";    // Checkmark (file watched)
-    constexpr const char* NOT_FOUND = "✗";  // X mark (file not found)
-    constexpr const char* EMPTY = "";       // No button/icon
-}
-
 class hashes_ : public QTableWidget
 {
 	Q_OBJECT
@@ -103,165 +78,6 @@ class unknown_files_ : public QTableWidget
 public:
     unknown_files_(QWidget *parent = nullptr);
     bool event(QEvent *e) override;
-};
-
-// Custom tree widget item that can sort episodes using epno type
-class EpisodeTreeWidgetItem : public QTreeWidgetItem
-{
-public:
-    EpisodeTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent) {}
-    
-    // Prevent copying to avoid slicing
-    EpisodeTreeWidgetItem(const EpisodeTreeWidgetItem&) = delete;
-    EpisodeTreeWidgetItem& operator=(const EpisodeTreeWidgetItem&) = delete;
-    
-    void setEpno(const epno& ep) { m_epno = ep; }
-    epno getEpno() const { return m_epno; }
-    
-    bool operator<(const QTreeWidgetItem &other) const override
-    {
-        int column = treeWidget()->sortColumn();
-        
-        // If sorting by episode number column (column 2) and both items have epno data
-        if(column == COL_EPISODE)
-        {
-            const EpisodeTreeWidgetItem *otherEpisode = dynamic_cast<const EpisodeTreeWidgetItem*>(&other);
-            if(otherEpisode && m_epno.isValid() && otherEpisode->m_epno.isValid())
-            {
-                return m_epno < otherEpisode->m_epno;
-            }
-        }
-        
-        // If sorting by Play column, use common utility
-        if(column == COL_PLAY)
-        {
-            return TreeWidgetSortUtil::compareByPlayState(this, &other, column);
-        }
-        
-        // If sorting by Last Played column, use common utility
-        if(column == COL_LAST_PLAYED)
-        {
-            return TreeWidgetSortUtil::compareByLastPlayedTimestamp(this, &other, column);
-        }
-        
-        // Default comparison for other columns
-        return QTreeWidgetItem::operator<(other);
-    }
-    
-private:
-    epno m_epno;
-};
-
-// Custom tree widget item for anime items that can sort by aired dates
-class AnimeTreeWidgetItem : public QTreeWidgetItem
-{
-public:
-    AnimeTreeWidgetItem(QTreeWidget *parent) : QTreeWidgetItem(parent) {}
-    
-    // Prevent copying to avoid slicing
-    AnimeTreeWidgetItem(const AnimeTreeWidgetItem&) = delete;
-    AnimeTreeWidgetItem& operator=(const AnimeTreeWidgetItem&) = delete;
-    
-    void setAired(aired airedDates) { m_aired = airedDates; }
-    aired getAired() const { return m_aired; }
-    
-    bool operator<(const QTreeWidgetItem &other) const override
-    {
-        int column = treeWidget()->sortColumn();
-        
-        // If sorting by Aired column (column 9) and both items have aired data
-        if(column == COL_AIRED)
-        {
-            const AnimeTreeWidgetItem *otherAnime = dynamic_cast<const AnimeTreeWidgetItem*>(&other);
-            if(otherAnime && m_aired.isValid() && otherAnime->m_aired.isValid())
-            {
-                return m_aired < otherAnime->m_aired;
-            }
-            // If one has aired data and the other doesn't, put the one with data first
-            else if(m_aired.isValid() && otherAnime && !otherAnime->m_aired.isValid())
-            {
-                return true; // this item comes before other
-            }
-            else if(!m_aired.isValid() && otherAnime && otherAnime->m_aired.isValid())
-            {
-                return false; // other item comes before this
-            }
-        }
-        
-        // If sorting by Play column, use common utility
-        if(column == COL_PLAY)
-        {
-            return TreeWidgetSortUtil::compareByPlayState(this, &other, column);
-        }
-        
-        // If sorting by Last Played column, use common utility
-        if(column == COL_LAST_PLAYED)
-        {
-            return TreeWidgetSortUtil::compareByLastPlayedTimestamp(this, &other, column);
-        }
-        
-        // Default comparison for other columns
-        return QTreeWidgetItem::operator<(other);
-    }
-    
-private:
-    aired m_aired;
-};
-
-// Custom tree widget item for file items (third level in hierarchy)
-class FileTreeWidgetItem : public QTreeWidgetItem
-{
-public:
-    enum FileType {
-        Video,
-        Subtitle,
-        Audio,
-        Other
-    };
-    
-    explicit FileTreeWidgetItem(QTreeWidgetItem *parent) : QTreeWidgetItem(parent), m_fileType(Other) {}
-    
-    // Prevent copying to avoid slicing
-    FileTreeWidgetItem(const FileTreeWidgetItem&) = delete;
-    FileTreeWidgetItem& operator=(const FileTreeWidgetItem&) = delete;
-    
-    void setFileType(FileType type) { m_fileType = type; }
-    FileType getFileType() const { return m_fileType; }
-    
-    void setResolution(const QString& res) { m_resolution = res; }
-    QString getResolution() const { return m_resolution; }
-    
-    void setQuality(const QString& qual) { m_quality = qual; }
-    QString getQuality() const { return m_quality; }
-    
-    void setGroupName(const QString& group) { m_groupName = group; }
-    QString getGroupName() const { return m_groupName; }
-    
-    bool operator<(const QTreeWidgetItem &other) const override
-    {
-        int column = treeWidget()->sortColumn();
-        
-        // If sorting by Play column, use common utility
-        if(column == COL_PLAY)
-        {
-            return TreeWidgetSortUtil::compareByPlayState(this, &other, column);
-        }
-        
-        // If sorting by Last Played column, use common utility
-        if(column == COL_LAST_PLAYED)
-        {
-            return TreeWidgetSortUtil::compareByLastPlayedTimestamp(this, &other, column);
-        }
-        
-        // Default comparison for other columns
-        return QTreeWidgetItem::operator<(other);
-    }
-    
-private:
-    FileType m_fileType;
-    QString m_resolution;
-    QString m_quality;
-    QString m_groupName;
 };
 
 // Worker thread for loading mylist anime IDs
@@ -347,10 +163,6 @@ private:
     
     // Logout timeout constant
     static const int LOGOUT_TIMEOUT_MS = 5000; // Wait up to 5 seconds for logout to complete
-    
-    // Legacy constants for backward compatibility (deprecated, use enum instead)
-    static const int PLAY_COLUMN = COL_PLAY;
-    static const int MYLIST_ID_COLUMN = COL_MYLIST_ID;
     
 	// main layout
     QBoxLayout *layout;
