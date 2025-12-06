@@ -28,6 +28,7 @@
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTreeWidget>
+#include "treewidgetsortutil.h"
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QCompleter>
@@ -131,41 +132,16 @@ public:
             }
         }
         
-        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        // If sorting by Play column, use common utility
         if(column == COL_PLAY)
         {
-            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
-            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
-            return thisSortKey < otherSortKey;
+            return TreeWidgetSortUtil::compareByPlayState(this, &other, column);
         }
         
-        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        // If sorting by Last Played column, use common utility
         if(column == COL_LAST_PLAYED)
         {
-            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
-            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
-            
-            // Entries with timestamp 0 (never played) should always be at the bottom
-            // regardless of sort order (ascending or descending)
-            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
-            
-            if(thisTimestamp == 0 && otherTimestamp == 0) {
-                return false; // Both never played, keep current order
-            }
-            if(thisTimestamp == 0) {
-                // This is never played - should be at bottom
-                // In ascending order, return false (not less than, so comes after)
-                // In descending order, return true (less than, so comes after when reversed)
-                return (order == Qt::DescendingOrder);
-            }
-            if(otherTimestamp == 0) {
-                // Other is never played - should be at bottom
-                // In ascending order, return true (this is less than, so comes before)
-                // In descending order, return false (not less than, so comes before when reversed)
-                return (order == Qt::AscendingOrder);
-            }
-            
-            return thisTimestamp < otherTimestamp;
+            return TreeWidgetSortUtil::compareByLastPlayedTimestamp(this, &other, column);
         }
         
         // Default comparison for other columns
@@ -212,41 +188,16 @@ public:
             }
         }
         
-        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        // If sorting by Play column, use common utility
         if(column == COL_PLAY)
         {
-            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
-            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
-            return thisSortKey < otherSortKey;
+            return TreeWidgetSortUtil::compareByPlayState(this, &other, column);
         }
         
-        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        // If sorting by Last Played column, use common utility
         if(column == COL_LAST_PLAYED)
         {
-            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
-            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
-            
-            // Entries with timestamp 0 (never played) should always be at the bottom
-            // regardless of sort order (ascending or descending)
-            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
-            
-            if(thisTimestamp == 0 && otherTimestamp == 0) {
-                return false; // Both never played, keep current order
-            }
-            if(thisTimestamp == 0) {
-                // This is never played - should be at bottom
-                // In ascending order, return false (not less than, so comes after)
-                // In descending order, return true (less than, so comes after when reversed)
-                return (order == Qt::DescendingOrder);
-            }
-            if(otherTimestamp == 0) {
-                // Other is never played - should be at bottom
-                // In ascending order, return true (this is less than, so comes before)
-                // In descending order, return false (not less than, so comes before when reversed)
-                return (order == Qt::AscendingOrder);
-            }
-            
-            return thisTimestamp < otherTimestamp;
+            return TreeWidgetSortUtil::compareByLastPlayedTimestamp(this, &other, column);
         }
         
         // Default comparison for other columns
@@ -290,41 +241,16 @@ public:
     {
         int column = treeWidget()->sortColumn();
         
-        // If sorting by Play column, sort by state stored in UserRole (not display text)
+        // If sorting by Play column, use common utility
         if(column == COL_PLAY)
         {
-            int thisSortKey = data(COL_PLAY, Qt::UserRole).toInt();
-            int otherSortKey = other.data(COL_PLAY, Qt::UserRole).toInt();
-            return thisSortKey < otherSortKey;
+            return TreeWidgetSortUtil::compareByPlayState(this, &other, column);
         }
         
-        // If sorting by Last Played column, sort by timestamp stored in UserRole
+        // If sorting by Last Played column, use common utility
         if(column == COL_LAST_PLAYED)
         {
-            qint64 thisTimestamp = data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
-            qint64 otherTimestamp = other.data(COL_LAST_PLAYED, Qt::UserRole).toLongLong();
-            
-            // Entries with timestamp 0 (never played) should always be at the bottom
-            // regardless of sort order (ascending or descending)
-            Qt::SortOrder order = treeWidget()->header()->sortIndicatorOrder();
-            
-            if(thisTimestamp == 0 && otherTimestamp == 0) {
-                return false; // Both never played, keep current order
-            }
-            if(thisTimestamp == 0) {
-                // This is never played - should be at bottom
-                // In ascending order, return false (not less than, so comes after)
-                // In descending order, return true (less than, so comes after when reversed)
-                return (order == Qt::DescendingOrder);
-            }
-            if(otherTimestamp == 0) {
-                // Other is never played - should be at bottom
-                // In ascending order, return true (this is less than, so comes before)
-                // In descending order, return false (not less than, so comes before when reversed)
-                return (order == Qt::AscendingOrder);
-            }
-            
-            return thisTimestamp < otherTimestamp;
+            return TreeWidgetSortUtil::compareByLastPlayedTimestamp(this, &other, column);
         }
         
         // Default comparison for other columns
