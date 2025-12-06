@@ -274,7 +274,7 @@ struct UISettings { ... };
 
 #### Results
 
-- ✅ **Lines Removed:** ~150 lines of duplicate code eliminated
+- ✅ **Lines Removed:** 173 lines removed, 2 lines added (171 net reduction)
 - ✅ **Memory Savings:** 7 duplicate data structures removed
 - ✅ **SOLID Compliance:** Single Responsibility Principle now followed
 - ✅ **Maintainability:** Single point of maintenance for poster downloads
@@ -317,9 +317,10 @@ QString("text %1 %2 %3 %4")
 ### Window Class - 6,290 Lines 🔴 SEVERE SRP VIOLATION
 
 **Location:** usagi/src/window.{h,cpp}  
-**Header:** 759 lines (-7 from duplicate removal)  
-**Implementation:** 6,290 lines (-159 from duplicate removal)  
-**Methods:** ~166 (-3 from duplicate removal)
+**Header:** 759 lines (-7 from poster download removal)  
+**Implementation:** 6,290 lines (-159 from poster download removal)  
+**Net reduction:** 173 lines removed, 2 lines added (171 lines net)  
+**Methods:** ~166 (-3: onPosterDownloadFinished, downloadPosterForAnime, onMylistItemExpanded)
 
 #### 8 Distinct Responsibilities Identified
 
@@ -680,7 +681,7 @@ The SOLID analysis of the Usagi-dono codebase is **complete and comprehensive**.
 - **17 data structures converted** (100% of identified structs)
 - **Zero legacy code remaining**
 - **Poster download migration completed** (2025-12-06)
-- **~150 lines of duplicate code removed**
+- **171 lines net reduction** (173 removed, 2 added) from poster download cleanup
 - **Clear documentation** of large class violations
 - **Actionable roadmap** for future improvements
 
