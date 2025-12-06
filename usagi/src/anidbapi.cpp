@@ -3729,7 +3729,7 @@ QString AniDBApi::getLocalFileHash(QString localPath)
 	return QString();
 }
 
-QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QStringList& filePaths)
+QMap<QString, FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QStringList& filePaths)
 {
 	QElapsedTimer overallTimer;
 	overallTimer.start();
@@ -3816,7 +3816,7 @@ QMap<QString, AniDBApi::FileHashInfo> AniDBApi::batchGetLocalFileHashes(const QS
 	return results;
 }
 
-QList<AniDBApi::FileHashInfo> AniDBApi::getUnboundFiles()
+QList<FileHashInfo> AniDBApi::getUnboundFiles()
 {
 	QList<FileHashInfo> results;
 	
