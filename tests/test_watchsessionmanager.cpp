@@ -313,7 +313,7 @@ void TestWatchSessionManager::testSetFileMarkType()
     
     // Getting info should include mark type
     FileMarkInfo info = manager->getFileMarkInfo(1001);
-    QCOMPARE(info.markType, FileMarkType::ForDownload);
+    QCOMPARE(info.markType(), FileMarkType::ForDownload);
 }
 
 void TestWatchSessionManager::testGetFilesForDeletion()

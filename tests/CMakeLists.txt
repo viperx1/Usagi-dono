@@ -155,6 +155,11 @@ set(ANIME_MASK_PARSING_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(ANIME_MASK_PARSING_TEST_HEADERS
@@ -164,6 +169,11 @@ set(ANIME_MASK_PARSING_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_anime_mask_parsing ${ANIME_MASK_PARSING_TEST_SOURCES} ${ANIME_MASK_PARSING_TEST_HEADERS})
@@ -239,6 +249,12 @@ set(ANIDBAPI_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(ANIDBAPI_TEST_HEADERS
@@ -247,6 +263,12 @@ set(ANIDBAPI_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_anidbapi ${ANIDBAPI_TEST_SOURCES} ${ANIDBAPI_TEST_HEADERS})
@@ -286,6 +308,12 @@ set(COMPRESSION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(COMPRESSION_TEST_HEADERS
@@ -294,6 +322,12 @@ set(COMPRESSION_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_compression ${COMPRESSION_TEST_SOURCES} ${COMPRESSION_TEST_HEADERS})
@@ -334,6 +368,12 @@ set(TIMEOUT_RETRY_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(TIMEOUT_RETRY_TEST_HEADERS
@@ -342,6 +382,12 @@ set(TIMEOUT_RETRY_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_anidb_timeout_retry ${TIMEOUT_RETRY_TEST_SOURCES} ${TIMEOUT_RETRY_TEST_HEADERS})
@@ -381,6 +427,12 @@ set(ANIME_TITLES_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(ANIME_TITLES_TEST_HEADERS
@@ -389,6 +441,12 @@ set(ANIME_TITLES_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_anime_titles ${ANIME_TITLES_TEST_SOURCES} ${ANIME_TITLES_TEST_HEADERS})
@@ -674,6 +732,12 @@ set(HASH_STORAGE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(HASH_STORAGE_TEST_HEADERS
@@ -682,6 +746,12 @@ set(HASH_STORAGE_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_hash_storage ${HASH_STORAGE_TEST_SOURCES} ${HASH_STORAGE_TEST_HEADERS})
@@ -756,6 +826,12 @@ set(HASH_REUSE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(HASH_REUSE_TEST_HEADERS
@@ -764,6 +840,12 @@ set(HASH_REUSE_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_hash_reuse ${HASH_REUSE_TEST_SOURCES} ${HASH_REUSE_TEST_HEADERS})
@@ -803,6 +885,12 @@ set(BATCH_LOCALIDENTIFY_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(BATCH_LOCALIDENTIFY_TEST_HEADERS
@@ -811,6 +899,12 @@ set(BATCH_LOCALIDENTIFY_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_batch_localidentify ${BATCH_LOCALIDENTIFY_TEST_SOURCES} ${BATCH_LOCALIDENTIFY_TEST_HEADERS})
@@ -850,6 +944,12 @@ set(HASH_DUPLICATE_REUSE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(HASH_DUPLICATE_REUSE_TEST_HEADERS
@@ -858,6 +958,12 @@ set(HASH_DUPLICATE_REUSE_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_hash_duplicate_reuse ${HASH_DUPLICATE_REUSE_TEST_SOURCES} ${HASH_DUPLICATE_REUSE_TEST_HEADERS})
@@ -915,6 +1021,12 @@ set(THREAD_SAFETY_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(THREAD_SAFETY_TEST_HEADERS
@@ -923,6 +1035,12 @@ set(THREAD_SAFETY_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_thread_safety ${THREAD_SAFETY_TEST_SOURCES} ${THREAD_SAFETY_TEST_HEADERS})
@@ -962,6 +1080,12 @@ set(IMMEDIATE_IDENTIFICATION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(IMMEDIATE_IDENTIFICATION_TEST_HEADERS
@@ -970,6 +1094,12 @@ set(IMMEDIATE_IDENTIFICATION_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_immediate_identification ${IMMEDIATE_IDENTIFICATION_TEST_SOURCES} ${IMMEDIATE_IDENTIFICATION_TEST_HEADERS})
@@ -1009,6 +1139,12 @@ set(BATCH_HASH_RETRIEVAL_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(BATCH_HASH_RETRIEVAL_TEST_HEADERS
@@ -1017,6 +1153,12 @@ set(BATCH_HASH_RETRIEVAL_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_batch_hash_retrieval ${BATCH_HASH_RETRIEVAL_TEST_SOURCES} ${BATCH_HASH_RETRIEVAL_TEST_HEADERS})
@@ -1056,6 +1198,12 @@ set(UI_FREEZE_FIX_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(UI_FREEZE_FIX_TEST_HEADERS
@@ -1064,6 +1212,12 @@ set(UI_FREEZE_FIX_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_ui_freeze_fix ${UI_FREEZE_FIX_TEST_SOURCES} ${UI_FREEZE_FIX_TEST_HEADERS})
@@ -1105,6 +1259,11 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(HASHER_THREAD_TEST_HEADERS
@@ -1115,6 +1274,11 @@ set(HASHER_THREAD_TEST_HEADERS
     ../usagi/src/main.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_hasher_thread ${HASHER_THREAD_TEST_SOURCES} ${HASHER_THREAD_TEST_HEADERS})
@@ -1161,6 +1325,11 @@ set(HASHER_THREADPOOL_TEST_SOURCES
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(HASHER_THREADPOOL_TEST_HEADERS
@@ -1172,6 +1341,11 @@ set(HASHER_THREADPOOL_TEST_HEADERS
     ../usagi/src/main.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_hasher_threadpool ${HASHER_THREADPOOL_TEST_SOURCES} ${HASHER_THREADPOOL_TEST_HEADERS})
@@ -1227,6 +1401,11 @@ set(STOP_NON_BLOCKING_TEST_SOURCES
     ../usagi/src/anidbapi_settings.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(STOP_NON_BLOCKING_TEST_HEADERS
@@ -1238,6 +1417,11 @@ set(STOP_NON_BLOCKING_TEST_HEADERS
     ../usagi/src/main.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_stop_non_blocking ${STOP_NON_BLOCKING_TEST_SOURCES} ${STOP_NON_BLOCKING_TEST_HEADERS})
@@ -1279,6 +1463,12 @@ set(TRUNCATED_RESPONSE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(TRUNCATED_RESPONSE_TEST_HEADERS
@@ -1287,6 +1477,12 @@ set(TRUNCATED_RESPONSE_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_truncated_response ${TRUNCATED_RESPONSE_TEST_SOURCES} ${TRUNCATED_RESPONSE_TEST_HEADERS})
@@ -1327,6 +1523,12 @@ set(API_OPTIMIZATION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(API_OPTIMIZATION_TEST_HEADERS
@@ -1335,6 +1537,12 @@ set(API_OPTIMIZATION_TEST_HEADERS
     ../usagi/src/hash/md4.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_api_optimization ${API_OPTIMIZATION_TEST_SOURCES} ${API_OPTIMIZATION_TEST_HEADERS})
@@ -1384,6 +1592,13 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/logger.cpp
     ../usagi/src/watchsessionmanager.cpp
     ../usagi/src/watchchunkmanager.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
+    ../usagi/src/sessioninfo.cpp
+    ../usagi/src/filemarkinfo.cpp
 )
 
 set(MYLISTCARDMANAGER_TEST_HEADERS
@@ -1402,6 +1617,13 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
     ../usagi/src/logger.h
     ../usagi/src/watchsessionmanager.h
     ../usagi/src/watchchunkmanager.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
+    ../usagi/src/sessioninfo.h
+    ../usagi/src/filemarkinfo.h
 )
 
 add_executable(test_mylistcardmanager ${MYLISTCARDMANAGER_TEST_SOURCES} ${MYLISTCARDMANAGER_TEST_HEADERS})
@@ -1544,11 +1766,15 @@ set(WATCHSESSIONMANAGER_TEST_SOURCES
     test_watchsessionmanager.cpp
     ../usagi/src/watchsessionmanager.cpp
     ../usagi/src/logger.cpp
+    ../usagi/src/sessioninfo.cpp
+    ../usagi/src/filemarkinfo.cpp
 )
 
 set(WATCHSESSIONMANAGER_TEST_HEADERS
     ../usagi/src/watchsessionmanager.h
     ../usagi/src/logger.h
+    ../usagi/src/sessioninfo.h
+    ../usagi/src/filemarkinfo.h
 )
 
 add_executable(test_watchsessionmanager ${WATCHSESSIONMANAGER_TEST_SOURCES} ${WATCHSESSIONMANAGER_TEST_HEADERS})
@@ -1587,6 +1813,12 @@ set(DUPLICATE_DETECTION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(DUPLICATE_DETECTION_TEST_HEADERS
@@ -1594,6 +1826,12 @@ set(DUPLICATE_DETECTION_TEST_HEADERS
     ../usagi/src/hash/ed2k.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_duplicate_detection ${DUPLICATE_DETECTION_TEST_SOURCES} ${DUPLICATE_DETECTION_TEST_HEADERS})
@@ -1636,6 +1874,12 @@ set(BITRATE_PREFERENCES_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
+
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
 )
 
 set(BITRATE_PREFERENCES_TEST_HEADERS
@@ -1646,6 +1890,12 @@ set(BITRATE_PREFERENCES_TEST_HEADERS
     ../usagi/src/hash/ed2k.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/logger.h
+
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
 )
 
 add_executable(test_bitrate_preferences ${BITRATE_PREFERENCES_TEST_SOURCES} ${BITRATE_PREFERENCES_TEST_HEADERS})
