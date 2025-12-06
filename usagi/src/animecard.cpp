@@ -352,7 +352,7 @@ void AnimeCard::setTags(const QList<TagInfo>& tags)
     // Tags are already sorted by weight (highest first)
     QStringList tagNames;
     for (const TagInfo& tag : tags) {
-        tagNames << tag.name;
+        tagNames << tag.name();
     }
     
     m_tagsLabel->setText("Tags: " + tagNames.join(", "));
