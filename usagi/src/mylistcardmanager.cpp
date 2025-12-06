@@ -724,8 +724,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     card->setIs18Restricted(data.is18Restricted);
     
     // Set type
-    if (!data.typeName().isEmpty()) {
-        card->setAnimeType(data.typeName());
+    if (!data.typeName.isEmpty()) {
+        card->setAnimeType(data.typeName);
     } else {
         card->setAnimeType("Unknown");
         m_animeNeedingMetadata.insert(aid);
@@ -771,12 +771,12 @@ AnimeCard* MyListCardManager::createCard(int aid)
     }
     
     // Set statistics from cache
-    int totalNormalEpisodes = data.eptotal();
+    int totalNormalEpisodes = data.eptotal;
     if (totalNormalEpisodes <= 0) {
-        totalNormalEpisodes = data.stats().normalEpisodes();
+        totalNormalEpisodes = data.stats.normalEpisodes();
     }
-    card->setStatistics(data.stats().normalEpisodes(), totalNormalEpisodes, 
-                       data.stats().normalViewed(), data.stats().otherEpisodes(), data.stats().otherViewed());
+    card->setStatistics(data.stats.normalEpisodes(), totalNormalEpisodes, 
+                       data.stats.normalViewed(), data.stats.otherEpisodes(), data.stats.otherViewed());
     
     // Add to cache first (before layout to avoid triggering layout updates prematurely)
     QMutexLocker locker(&m_mutex);
