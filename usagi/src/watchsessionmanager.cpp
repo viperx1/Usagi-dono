@@ -882,10 +882,25 @@ void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
         LOG(QString("[WatchSessionManager] File deletion succeeded for lid=%1, aid=%2").arg(lid).arg(aid));
         emit fileDeleted(lid, aid);
     } else {
-        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - not emitting fileDeleted").arg(lid).arg(aid));
+        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - attempting next file").arg(lid).arg(aid));
+        
+        // If deletion failed (e.g., file locked by another application),
+        // unmark this file and try the next one automatically
+        if (m_fileMarks.contains(lid)) {
+            m_fileMarks[lid].setMarkType(FileMarkType::None);
+            emit fileMarkChanged(lid, FileMarkType::None);
+        }
+        
+        // Try the next file if auto-deletion is enabled
+        if (m_enableActualDeletion) {
+            bool deletedNext = deleteNextMarkedFile(true);
+            if (!deletedNext) {
+                LOG("[WatchSessionManager] No more files available for deletion after failure");
+            }
+        }
     }
     
-    // Note: We do NOT automatically process the next file.
+    // Note: On success, we do NOT automatically process the next file.
     // The caller must explicitly call deleteNextMarkedFile() again after receiving
     // API confirmation to ensure proper sequencing and gap protection.
 }
