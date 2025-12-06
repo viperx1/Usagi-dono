@@ -848,7 +848,9 @@ bool WatchSessionManager::deleteNextMarkedFile(bool deleteFromDisk)
     
     // Find the first file that can be safely deleted (doesn't create a gap)
     // Process files in score order (lowest score = highest deletion priority)
-    QSet<int> emptyDeletedSet;  // Empty set since we're only deleting one file at a time
+    // Pass empty set because we evaluate gaps against current database state,
+    // not against a hypothetical batch deletion state
+    QSet<int> emptyDeletedSet;
     
     for (int lid : filesToDelete) {
         // Check if deleting this file would create a gap
@@ -1083,7 +1085,7 @@ void WatchSessionManager::autoMarkFilesForDeletion()
     if (!updatedLids.isEmpty()) {
         emit markingsUpdated(updatedLids);
         
-        // Actually delete the first marked file if deletion is enabled
+        // Actually delete the next file with highest priority (lowest score) if deletion is enabled
         // Note: Only one file is deleted at a time. The caller must wait for
         // API confirmation before calling deleteNextMarkedFile() again.
         if (m_enableActualDeletion) {
