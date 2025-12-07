@@ -5621,6 +5621,23 @@ void Window::applyMylistFilters()
 		}
 	}
 	
+	// FINAL VALIDATION: Ensure all anime in the final filtered list have card creation data preloaded
+	// This is critical because the chain grouping and filtering logic above may have added anime
+	// that weren't in the original preload after chain expansion
+	QList<int> missingDataAnime;
+	for (int aid : std::as_const(filteredAnimeIds)) {
+		if (!cardManager->hasCachedData(aid)) {
+			missingDataAnime.append(aid);
+		}
+	}
+	
+	if (!missingDataAnime.isEmpty()) {
+		LOG(QString("[Window] FINAL PRELOAD: Found %1 anime in filteredAnimeIds without cached data, preloading now").arg(missingDataAnime.size()));
+		cardManager->preloadCardCreationData(missingDataAnime);
+	} else {
+		LOG(QString("[Window] FINAL VALIDATION: All %1 anime in filteredAnimeIds have cached data").arg(filteredAnimeIds.size()));
+	}
+	
 	// Update the card manager with the filtered list
 	cardManager->setAnimeIdList(filteredAnimeIds);
 	
