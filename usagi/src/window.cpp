@@ -657,7 +657,7 @@ Window::Window()
     sessionThresholdValueSpinBox->setMaximum(1000.0);
     sessionThresholdValueSpinBox->setValue(50.0);
     sessionThresholdValueSpinBox->setSuffix(" GB");
-    sessionThresholdValueSpinBox->setToolTip("When free space drops below this value, files will be marked for deletion");
+    sessionThresholdValueSpinBox->setToolTip("When free space drops below this value, files will be eligible for deletion");
     
     sessionAutoMarkDeletionCheckbox = new QCheckBox("Auto-mark for deletion");
     sessionAutoMarkDeletionCheckbox->setToolTip("Automatically mark watched files for deletion when disk space is low");
@@ -675,7 +675,7 @@ Window::Window()
     QGroupBox *deletionGroup = new QGroupBox("File Deletion");
     QVBoxLayout *deletionLayout = new QVBoxLayout(deletionGroup);
     sessionEnableAutoDeletionCheckbox = new QCheckBox("Enable automatic file deletion");
-    sessionEnableAutoDeletionCheckbox->setToolTip("When enabled, files marked for deletion will be automatically deleted");
+    sessionEnableAutoDeletionCheckbox->setToolTip("When enabled, files will be automatically deleted when space is low");
     sessionEnableAutoDeletionCheckbox->setChecked(false);  // Default: disabled for safety
     
     sessionForceDeletePermissionsCheckbox = new QCheckBox("Force delete (change permissions)");
@@ -2168,10 +2168,6 @@ void Window::saveMylistSorting()
     q.addBindValue(filterSidebar->getShowOnlyUnwatched() ? 1 : 0);
     q.exec();
     
-    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_deletion', ?)");
-    q.addBindValue(filterSidebar->getShowMarkedForDeletion() ? 1 : 0);
-    q.exec();
-    
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_inmylist', ?)");
     q.addBindValue(filterSidebar->getInMyListOnly() ? 1 : 0);
     q.exec();
@@ -2188,11 +2184,10 @@ void Window::saveMylistSorting()
     LOG(QString("Saved mylist sort settings: index=%1, ascending=%2")
         .arg(filterSidebar->getSortIndex())
         .arg(filterSidebar->getSortAscending()));
-    LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3, deletion=%4")
+    LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3")
         .arg(filterSidebar->getTypeFilter())
         .arg(filterSidebar->getCompletionFilter())
-        .arg(filterSidebar->getShowOnlyUnwatched())
-        .arg(filterSidebar->getShowMarkedForDeletion()));
+        .arg(filterSidebar->getShowOnlyUnwatched()));
     LOG(QString("Saved mylist view settings: inmylist=%1, serieschain=%2, adult=%3")
         .arg(filterSidebar->getInMyListOnly())
         .arg(filterSidebar->getShowSeriesChain())
@@ -2242,10 +2237,6 @@ void Window::restoreMylistSorting()
     
     if (settings.contains("mylist_filter_unwatched")) {
         filterSidebar->setShowOnlyUnwatched(settings["mylist_filter_unwatched"].toInt() != 0);
-    }
-    
-    if (settings.contains("mylist_filter_deletion")) {
-        filterSidebar->setShowMarkedForDeletion(settings["mylist_filter_deletion"].toInt() != 0);
     }
     
     if (settings.contains("mylist_filter_inmylist")) {
@@ -4982,7 +4973,6 @@ void Window::applyMylistFilters()
 	QString typeFilter = filterSidebar->getTypeFilter();
 	QString completionFilter = filterSidebar->getCompletionFilter();
 	bool showOnlyUnwatched = filterSidebar->getShowOnlyUnwatched();
-	bool showMarkedForDeletion = filterSidebar->getShowMarkedForDeletion();
 	QString adultContentFilter = filterSidebar->getAdultContentFilter();
 	bool inMyListOnly = filterSidebar->getInMyListOnly();
 	bool showSeriesChain = filterSidebar->getShowSeriesChain();
@@ -5182,47 +5172,6 @@ void Window::applyMylistFilters()
 			// Show only if there are unwatched episodes
 			visible = visible && ((normalEpisodes > normalViewed) || (otherEpisodes > otherViewed));
 		}
-		
-		// Apply marked for deletion filter
-		if (showMarkedForDeletion) {
-			// Check if this anime has any files marked for deletion
-			bool hasMarkedFiles = false;
-			if (watchSessionManager) {
-				// Query all lids for this anime from mylist table
-				QSqlDatabase db = QSqlDatabase::database();
-				if (db.isOpen()) {
-					QSqlQuery q(db);
-					q.prepare("SELECT lid FROM mylist WHERE aid = ?");
-					q.addBindValue(aid);
-					if (q.exec()) {
-						while (q.next()) {
-						}
-					}
-				}
-			}
-			visible = visible && hasMarkedFiles;
-		}
-		
-		// Apply adult content filter
-		if (adultContentFilter == "hide") {
-			bool is18Restricted = card ? card->is18Restricted() : cachedData.is18Restricted();
-			// Hide 18+ content (default)
-			visible = visible && !is18Restricted;
-		} else if (adultContentFilter == "showonly") {
-			bool is18Restricted = card ? card->is18Restricted() : cachedData.is18Restricted();
-			// Show only 18+ content
-			visible = visible && is18Restricted;
-		}
-		// "ignore" means no filtering based on 18+ status
-		
-		if (visible) {
-			filteredAnimeIds.append(aid);
-		}
-	}
-	
-	// If series chain display is enabled, group and order anime by their series chains
-	if (showSeriesChain && watchSessionManager) {
-		QSet<int> animeToProcess;  // Anime IDs to process for chain grouping
 		QMap<int, QList<int>> chainCache;  // Cache series chains to avoid redundant lookups
 		QSet<int> allAnimeIdsSet = QSet<int>(allAnimeIds.constBegin(), allAnimeIds.constEnd());  // Convert once for O(1) lookups
 		

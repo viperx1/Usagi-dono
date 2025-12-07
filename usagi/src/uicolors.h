@@ -18,13 +18,11 @@ namespace UIColors {
     
     // File marking colors
     inline const QColor FILE_MARKED_DOWNLOAD = QColor(100, 180, 255);  // Blue for download queue
-    inline const QColor FILE_MARKED_DELETION = QColor(255, 180, 180);  // Light red for deletion queue
 }
 
 // UI icons for file marking
 namespace UIIcons {
     inline const QString MARK_DOWNLOAD = QString::fromUtf8("\xE2\xAC\x87");   // ⬇ Down arrow
-    inline const QString MARK_DELETION = QString::fromUtf8("\xF0\x9F\x97\x91"); // 🗑 Wastebasket
     inline const QString MARK_NONE = "";
 }
 
