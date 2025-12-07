@@ -452,6 +452,7 @@ private:
     // Helper cache for mylist filtering - now using proper class
     AnimeMetadataCache animeAlternativeTitlesCache;  // aid -> alternative titles
     void loadAnimeAlternativeTitlesForFiltering();
+    void updateAnimeAlternativeTitlesInCache(int aid);  // Update single anime in cache
     bool matchesSearchFilter(AnimeCard *card, const QString &searchText);
     bool matchesSearchFilter(int aid, const QString &animeName, const QString &searchText);
     

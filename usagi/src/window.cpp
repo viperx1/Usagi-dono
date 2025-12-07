@@ -3077,6 +3077,9 @@ void Window::getNotifyAnimeUpdated(int aid)
 	// Anime metadata was updated in the database
 	LOG(QString("Anime metadata received for AID %1").arg(aid));
 	
+	// Update alternative titles cache for this anime
+	updateAnimeAlternativeTitlesInCache(aid);
+	
 	// Update card view (tree view has been removed)
 	if (cardManager) {
 		// Use card manager for efficient update
@@ -4843,6 +4846,114 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 	}
 	
 	LOG(QString("[Window] Loaded alternative titles for %1 anime").arg(animeAlternativeTitlesCache.size()));
+}
+
+// Update alternative titles for a single anime in the cache
+// This is called when anime metadata is updated to keep the cache fresh
+void Window::updateAnimeAlternativeTitlesInCache(int aid)
+{
+	if (aid <= 0) {
+		return;
+	}
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isOpen()) {
+		LOG("[Window] Database not open for updating alternative titles");
+		return;
+	}
+	
+	// Query all titles for this specific anime
+	QString query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish, "
+	                "a.nameother, a.nameshort, a.synonyms "
+	                "FROM anime_titles at "
+	                "LEFT JOIN anime a ON at.aid = a.aid "
+	                "WHERE at.aid = ? "
+	                "ORDER BY at.aid";
+	
+	QSqlQuery q(db);
+	q.prepare(query);
+	q.addBindValue(aid);
+	
+	if (!q.exec()) {
+		LOG(QString("[Window] Error loading alternative titles for AID %1: %2").arg(aid).arg(q.lastError().text()));
+		return;
+	}
+	
+	QStringList titles;
+	bool hasData = false;
+	
+	while (q.next()) {
+		int qAid = q.value(0).toInt();
+		QString title = q.value(1).toString();
+		QString romaji = q.value(2).toString();
+		QString english = q.value(3).toString();
+		QString other = q.value(4).toString();
+		QString shortNames = q.value(5).toString();
+		QString synonyms = q.value(6).toString();
+		
+		if (!hasData) {
+			// First row - add main titles from anime table
+			hasData = true;
+			
+			// Add romaji and english names from anime table
+			if (!romaji.isEmpty()) {
+				titles.append(romaji);
+			}
+			if (!english.isEmpty() && english != romaji) {
+				titles.append(english);
+			}
+			
+			// Add other name from anime table
+			if (!other.isEmpty()) {
+				QStringList otherList = other.split("'", Qt::SkipEmptyParts);
+				for (const QString &otherName : otherList) {
+					QString trimmed = otherName.trimmed();
+					if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
+						titles.append(trimmed);
+					}
+				}
+			}
+			
+			// Add short names from anime table
+			if (!shortNames.isEmpty()) {
+				QStringList shortList = shortNames.split("'", Qt::SkipEmptyParts);
+				for (const QString &shortName : shortList) {
+					QString trimmed = shortName.trimmed();
+					if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
+						titles.append(trimmed);
+					}
+				}
+			}
+			
+			// Add synonyms from anime table
+			if (!synonyms.isEmpty()) {
+				QStringList synonymList = synonyms.split("'", Qt::SkipEmptyParts);
+				for (const QString &synonym : synonymList) {
+					QString trimmed = synonym.trimmed();
+					if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
+						titles.append(trimmed);
+					}
+				}
+			}
+		}
+		
+		// Add alternative title from anime_titles table if not already in list
+		if (!title.isEmpty() && !titles.contains(title, Qt::CaseInsensitive)) {
+			titles.append(title);
+		}
+	}
+	
+	// Update cache with the titles (or remove if no data found)
+	if (hasData || !titles.isEmpty()) {
+		animeAlternativeTitlesCache.addAnime(aid, titles);
+		LOG(QString("[Window] Updated alternative titles cache for AID %1 (%2 titles)").arg(aid).arg(titles.size()));
+	} else {
+		// No data found - remove from cache if present
+		if (animeAlternativeTitlesCache.contains(aid)) {
+			animeAlternativeTitlesCache.removeAnime(aid);
+			LOG(QString("[Window] Removed AID %1 from alternative titles cache (no data)").arg(aid));
+		}
+	}
 }
 
 // Check if a card matches the search filter
