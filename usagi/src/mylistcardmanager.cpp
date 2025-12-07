@@ -122,6 +122,9 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     QSet<int> availableAids = QSet<int>(aids.begin(), aids.end());
     QSet<int> processedAids;
     
+    LOG(QString("[MyListCardManager] buildChainsFromAnimeIds: input has %1 anime, %2 unique")
+        .arg(aids.size()).arg(availableAids.size()));
+    
     for (int aid : aids) {
         if (processedAids.contains(aid)) {
             continue;
@@ -137,6 +140,17 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         
         // Create chain object
         chains.append(AnimeChain(chainAids));
+    }
+    
+    // Verify total anime count
+    int totalAnimeInChains = 0;
+    for (const AnimeChain& chain : chains) {
+        totalAnimeInChains += chain.getAnimeIds().size();
+    }
+    
+    if (totalAnimeInChains != availableAids.size()) {
+        LOG(QString("[MyListCardManager] WARNING: Chain building mismatch! Input: %1 unique anime, Chains contain: %2 anime")
+            .arg(availableAids.size()).arg(totalAnimeInChains));
     }
     
     return chains;
@@ -243,8 +257,10 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
         return;
     }
     
-    LOG(QString("[MyListCardManager] Sorting %1 chains by criteria %2, ascending=%3")
-        .arg(m_chainList.size()).arg(static_cast<int>(criteria)).arg(ascending));
+    int inputAnimeCount = m_orderedAnimeIds.size();
+    
+    LOG(QString("[MyListCardManager] Sorting %1 chains by criteria %2, ascending=%3 (current ordered list has %4 anime)")
+        .arg(m_chainList.size()).arg(static_cast<int>(criteria)).arg(ascending).arg(inputAnimeCount));
     
     // Sort chains using comparison function
     std::sort(m_chainList.begin(), m_chainList.end(),
@@ -261,6 +277,11 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
             m_orderedAnimeIds.append(aid);
             m_aidToChainIndex[aid] = i;
         }
+    }
+    
+    if (m_orderedAnimeIds.size() != inputAnimeCount) {
+        LOG(QString("[MyListCardManager] WARNING: Anime count changed during sort! Before: %1, After: %2")
+            .arg(inputAnimeCount).arg(m_orderedAnimeIds.size()));
     }
     
     LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains")
