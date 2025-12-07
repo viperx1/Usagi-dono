@@ -425,7 +425,7 @@ private:
     static const int SCORE_HIDDEN_CARD = -50;
     static const int SCORE_ACTIVE_SESSION = 100;  // Factor for being in active watching session
     static const int SCORE_IN_AHEAD_BUFFER = 75;
-    static const int SCORE_ALREADY_WATCHED = -30;
+    static const int SCORE_ALREADY_WATCHED = -5;
     static const int SCORE_NOT_WATCHED = 50;
     static const int SCORE_DISTANCE_FACTOR = -1;  // Per episode away from current
     static const int SCORE_OLDER_REVISION = -1000;  // Per local file with higher version (older revisions more deletable)
