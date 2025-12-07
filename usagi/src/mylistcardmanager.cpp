@@ -294,6 +294,25 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         }
     }
     
+    // CRITICAL FIX: Ensure startAid is in the chain
+    // If we started from a prequel but the sequel relationship is broken/missing,
+    // startAid might not have been added. Add it now if missing.
+    if (!chain.contains(startAid) && (expandChain || availableAids.contains(startAid))) {
+        LOG(QString("[MyListCardManager] WARNING: startAid=%1 not in chain built from chainStart=%2, adding it")
+            .arg(startAid).arg(chainStart));
+        
+        // Find the correct position to insert startAid
+        // Try to insert it after its prequel or at the start if no prequel
+        int prequelAid = findPrequelAid(startAid);
+        if (prequelAid > 0 && chain.contains(prequelAid)) {
+            int insertPos = chain.indexOf(prequelAid) + 1;
+            chain.insert(insertPos, startAid);
+        } else {
+            // No prequel in chain, add at the end (it might be a sequel to the chain)
+            chain.append(startAid);
+        }
+    }
+    
     return chain;
 }
 
