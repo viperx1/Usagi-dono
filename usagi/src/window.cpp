@@ -4872,10 +4872,11 @@ void Window::updateAnimeAlternativeTitlesInCache(int aid)
 	}
 	
 	// Query all titles for this specific anime
+	// Using INNER JOIN since we filter on at.aid - anime without entries in anime_titles won't be found anyway
 	QString query = "SELECT DISTINCT at.aid, at.title, a.nameromaji, a.nameenglish, "
 	                "a.nameother, a.nameshort, a.synonyms "
 	                "FROM anime_titles at "
-	                "LEFT JOIN anime a ON at.aid = a.aid "
+	                "INNER JOIN anime a ON at.aid = a.aid "
 	                "WHERE at.aid = ? "
 	                "ORDER BY at.aid";
 	
