@@ -21,18 +21,13 @@ private slots:
     void testMarkEpisodeWatched();
     void testSessionPersistence();
     
-    // File marking tests
-    void testCalculateMarkScore();
-    void testSetFileMarkType();
-    void testGetFilesForDeletion();
-    void testGetFilesForDownload();
-    void testFileMarkPersistence();
+    // File scoring tests
+    void testCalculateDeletionScore();
     
     // Settings tests
     void testAheadBuffer();
     void testDeletionThreshold();
     void testAutoMarkDeletion();
-    void testDelayedAutoMarkDeletion();
     
     // Anime relations tests
     void testGetOriginalPrequel();
@@ -43,9 +38,6 @@ private slots:
     
     // File version tests
     void testFileVersionScoring();
-    
-    // Sequential deletion tests
-    void testSequentialDeletion();
 
 private:
     QTemporaryFile *tempDbFile;
@@ -283,97 +275,23 @@ void TestWatchSessionManager::testSessionPersistence()
     QCOMPARE(manager->getCurrentSessionEpisode(1), 3);
 }
 
-// ========== File Marking Tests ==========
+// ========== File Scoring Tests ==========
 
-void TestWatchSessionManager::testCalculateMarkScore()
+void TestWatchSessionManager::testCalculateDeletionScore()
 {
     // Start session and calculate scores
     manager->startSession(1, 3);
     
     // Current episode should have high score
-    int score3 = manager->calculateMarkScore(1003); // Episode 3
-    int score4 = manager->calculateMarkScore(1004); // Episode 4 (ahead)
-    int score1 = manager->calculateMarkScore(1001); // Episode 1 (behind)
+    int score3 = manager->calculateDeletionScore(1003); // Episode 3
+    int score4 = manager->calculateDeletionScore(1004); // Episode 4 (ahead)
+    int score1 = manager->calculateDeletionScore(1001); // Episode 1 (behind)
     
     // Episodes ahead should have higher scores than those behind
     QVERIFY(score4 > score1);
     
     // Active session should add points
     QVERIFY(score3 > 0);
-}
-
-void TestWatchSessionManager::testSetFileMarkType()
-{
-    // Set mark type for a file
-    manager->setFileMarkType(1001, FileMarkType::ForDownload);
-    QCOMPARE(manager->getFileMarkType(1001), FileMarkType::ForDownload);
-    
-    manager->setFileMarkType(1002, FileMarkType::ForDeletion);
-    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::ForDeletion);
-    
-    // Getting info should include mark type
-    FileMarkInfo info = manager->getFileMarkInfo(1001);
-    QCOMPARE(info.markType(), FileMarkType::ForDownload);
-}
-
-void TestWatchSessionManager::testGetFilesForDeletion()
-{
-    // Mark some files for deletion
-    manager->setFileMarkType(1001, FileMarkType::ForDeletion);
-    manager->setFileMarkType(1002, FileMarkType::ForDeletion);
-    manager->setFileMarkType(1003, FileMarkType::ForDownload); // Not deletion
-    
-    QList<int> deletionFiles = manager->getFilesForDeletion();
-    QCOMPARE(deletionFiles.size(), 2);
-    QVERIFY(deletionFiles.contains(1001));
-    QVERIFY(deletionFiles.contains(1002));
-    QVERIFY(!deletionFiles.contains(1003));
-}
-
-void TestWatchSessionManager::testGetFilesForDownload()
-{
-    // Mark some files for download
-    manager->setFileMarkType(1001, FileMarkType::ForDownload);
-    manager->setFileMarkType(1002, FileMarkType::ForDownload);
-    manager->setFileMarkType(1003, FileMarkType::ForDeletion); // Not download
-    
-    QList<int> downloadFiles = manager->getFilesForDownload();
-    QCOMPARE(downloadFiles.size(), 2);
-    QVERIFY(downloadFiles.contains(1001));
-    QVERIFY(downloadFiles.contains(1002));
-    QVERIFY(!downloadFiles.contains(1003));
-}
-
-void TestWatchSessionManager::testFileMarkPersistence()
-{
-    // Test that file marks are NOT persisted (they are in-memory only)
-    // File marks will be recalculated on startup and set on demand
-    
-    // Mark some files
-    manager->setFileMarkType(1001, FileMarkType::ForDeletion);
-    manager->setFileMarkType(1002, FileMarkType::ForDeletion);
-    manager->setFileMarkType(1003, FileMarkType::ForDownload);
-    
-    // Verify marks are set in current session
-    QCOMPARE(manager->getFileMarkType(1001), FileMarkType::ForDeletion);
-    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::ForDeletion);
-    QCOMPARE(manager->getFileMarkType(1003), FileMarkType::ForDownload);
-    
-    // Now unmark file 1002 (remove it from deletion)
-    manager->setFileMarkType(1002, FileMarkType::None);
-    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::None);
-    
-    // Save to database (file marks are NOT saved)
-    manager->saveToDatabase();
-    
-    // Create new manager instance - marks should NOT be loaded
-    delete manager;
-    manager = new WatchSessionManager();
-    
-    // All file marks should be None after restart (not persisted)
-    QCOMPARE(manager->getFileMarkType(1001), FileMarkType::None);
-    QCOMPARE(manager->getFileMarkType(1002), FileMarkType::None);
-    QCOMPARE(manager->getFileMarkType(1003), FileMarkType::None);
 }
 
 // ========== Settings Tests ==========
@@ -426,42 +344,6 @@ void TestWatchSessionManager::testAutoMarkDeletion()
     delete manager;
     manager = new WatchSessionManager();
     QVERIFY(manager->isAutoMarkDeletionEnabled());
-}
-
-void TestWatchSessionManager::testDelayedAutoMarkDeletion()
-{
-    // Test that setWatchedPath() and setAutoMarkDeletionEnabled() don't trigger 
-    // auto-mark before performInitialScan(). This prevents marking files for 
-    // deletion before mylist data is loaded.
-    
-    // Initially, no files should be marked for deletion
-    QList<int> deletionFiles = manager->getFilesForDeletion();
-    QCOMPARE(deletionFiles.size(), 0);
-    
-    // Enable auto-mark deletion - should NOT trigger marking before initial scan
-    manager->setAutoMarkDeletionEnabled(true);
-    QVERIFY(manager->isAutoMarkDeletionEnabled());
-    
-    // Files should still not be marked (because initial scan hasn't happened)
-    deletionFiles = manager->getFilesForDeletion();
-    QCOMPARE(deletionFiles.size(), 0);
-    
-    // Setting watched path should also NOT trigger auto-mark before initial scan
-    manager->setWatchedPath("/some/test/path");
-    
-    // Files should still not be marked
-    deletionFiles = manager->getFilesForDeletion();
-    QCOMPARE(deletionFiles.size(), 0);
-    
-    // Now call performInitialScan - this should trigger the scan
-    // (Note: actual marking depends on disk space threshold, which may not trigger
-    // in test environment with invalid path, but the scan logic is executed)
-    manager->performInitialScan();
-    
-    // The test verifies that the delay mechanism works correctly:
-    // - Before performInitialScan(): 0 files marked (verified above)
-    // - After performInitialScan(): scan runs (threshold may or may not trigger marking)
-    // The key assertion is that NO files were marked before performInitialScan()
 }
 
 // ========== Anime Relations Tests ==========
@@ -578,91 +460,14 @@ void TestWatchSessionManager::testFileVersionScoring()
     // Get scores for both files (same episode, different versions)
     // v1 has 1 local file with higher version (v2), so gets -1000 penalty
     // v2 has 0 local files with higher version, so no penalty
-    int scoreV1 = manager->calculateMarkScore(1001);  // v1 (older)
-    int scoreV2 = manager->calculateMarkScore(1100);  // v2 (newer)
+    int scoreV1 = manager->calculateDeletionScore(1001);  // v1 (older)
+    int scoreV2 = manager->calculateDeletionScore(1100);  // v2 (newer)
     
     // The older version (v1) should have a lower score (more eligible for deletion)
     // than the newer version (v2)
     QVERIFY2(scoreV1 < scoreV2, 
              QString("Older version (score=%1) should have lower score than newer version (score=%2)")
              .arg(scoreV1).arg(scoreV2).toLatin1().constData());
-}
-
-void TestWatchSessionManager::testSequentialDeletion()
-{
-    // Test that files are deleted one at a time, waiting for API confirmation
-    // This test verifies that:
-    // 1. deleteMarkedFiles() initiates deletion of only the first file
-    // 2. onFileDeletionResult() triggers deletion of the next file
-    // 3. Files are processed in order
-    
-    QSqlDatabase db = QSqlDatabase::database();
-    QSqlQuery q(db);
-    
-    // Create test data: 3 files marked for deletion
-    q.exec("INSERT INTO local_files (id, path) VALUES (1, '/test/file1.mkv')");
-    q.exec("INSERT INTO local_files (id, path) VALUES (2, '/test/file2.mkv')");
-    q.exec("INSERT INTO local_files (id, path) VALUES (3, '/test/file3.mkv')");
-    
-    q.exec("INSERT INTO mylist (lid, aid, eid, local_file, fid) VALUES (100, 1, 1, 1, 1000)");
-    q.exec("INSERT INTO mylist (lid, aid, eid, local_file, fid) VALUES (200, 1, 2, 2, 2000)");
-    q.exec("INSERT INTO mylist (lid, aid, eid, local_file, fid) VALUES (300, 1, 3, 3, 3000)");
-    
-    // Mark all files for deletion
-    manager->setFileMarkType(100, FileMarkType::ForDeletion);
-    manager->setFileMarkType(200, FileMarkType::ForDeletion);
-    manager->setFileMarkType(300, FileMarkType::ForDeletion);
-    
-    // Set up a shared counter to track delete requests safely
-    auto deleteRequestCount = QSharedPointer<int>::create(0);
-    auto deleteRequestOrder = QSharedPointer<QList<int>>::create();
-    
-    // Connect to deleteFileRequested signal to track when deletions are requested
-    // Using QSharedPointer for lambda capture ensures safe lifetime management
-    QMetaObject::Connection conn = connect(manager, &WatchSessionManager::deleteFileRequested, 
-            [deleteRequestCount, deleteRequestOrder](int lid, bool deleteFromDisk) {
-        Q_UNUSED(deleteFromDisk);
-        (*deleteRequestCount)++;
-        deleteRequestOrder->append(lid);
-    });
-    
-    // Call deleteMarkedFiles - should only request deletion of first file
-    manager->deleteMarkedFiles(true);
-    
-    // Verify that only one deletion was requested initially
-    QCOMPARE(*deleteRequestCount, 1);
-    QCOMPARE(deleteRequestOrder->size(), 1);
-    int firstLid = deleteRequestOrder->at(0);
-    
-    // Simulate API confirmation for first file
-    manager->onFileDeletionResult(firstLid, 1, true);
-    
-    // Now second file should be requested
-    QCOMPARE(*deleteRequestCount, 2);
-    QCOMPARE(deleteRequestOrder->size(), 2);
-    int secondLid = deleteRequestOrder->at(1);
-    
-    // Simulate API confirmation for second file
-    manager->onFileDeletionResult(secondLid, 1, true);
-    
-    // Now third file should be requested
-    QCOMPARE(*deleteRequestCount, 3);
-    QCOMPARE(deleteRequestOrder->size(), 3);
-    int thirdLid = deleteRequestOrder->at(2);
-    
-    // Simulate API confirmation for third file
-    manager->onFileDeletionResult(thirdLid, 1, true);
-    
-    // No more deletions should be requested
-    QCOMPARE(*deleteRequestCount, 3);
-    
-    // Verify the files were deleted in order (by their mark scores)
-    QVERIFY(deleteRequestOrder->contains(100));
-    QVERIFY(deleteRequestOrder->contains(200));
-    QVERIFY(deleteRequestOrder->contains(300));
-    
-    // Disconnect the signal to avoid warnings
-    disconnect(conn);
 }
 
 QTEST_MAIN(TestWatchSessionManager)
