@@ -146,8 +146,28 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
             continue;
         }
         
-        // Mark all anime in this chain as processed
+        // CRITICAL FIX: Remove anime that are already processed from the chain
+        // This prevents duplicates when anime with broken relationships are appended
+        // to chains containing already-processed anime
+        QList<int> filteredChainAids;
         for (int chainAid : chainAids) {
+            if (!processedAids.contains(chainAid)) {
+                filteredChainAids.append(chainAid);
+            } else {
+                LOG(QString("[MyListCardManager] Skipping already-processed anime %1 in chain from %2")
+                    .arg(chainAid).arg(aid));
+            }
+        }
+        
+        // Skip this chain if all anime were already processed
+        if (filteredChainAids.isEmpty()) {
+            LOG(QString("[MyListCardManager] Chain from aid=%1 is empty after filtering processed anime, skipping")
+                .arg(aid));
+            continue;
+        }
+        
+        // Mark all anime in this chain as processed
+        for (int chainAid : filteredChainAids) {
             processedAids.insert(chainAid);
             
             // Debug: Check if this anime is NOT in the original input
@@ -158,7 +178,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         }
         
         // Create chain object
-        chains.append(AnimeChain(chainAids));
+        chains.append(AnimeChain(filteredChainAids));
     }
     
     // Verify total anime count and find duplicates
