@@ -312,8 +312,7 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         // Return a chain with just the starting anime
         // The anime that were found in the forward traversal will be picked up
         // when we process them in the outer loop
-        chain.clear();
-        chain.append(startAid);
+        chain = QList<int>{startAid};
     }
     
     return chain;
