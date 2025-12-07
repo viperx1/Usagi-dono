@@ -22,6 +22,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_layout(nullptr)
     , m_virtualLayout(nullptr)
     , m_watchSessionManager(nullptr)
+    , m_chainModeEnabled(false)  // Initialize chain mode as disabled
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
@@ -73,17 +74,376 @@ QList<int> MyListCardManager::getAnimeIdList() const
 
 void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 {
+    setAnimeIdList(aids, false);  // Default: chain mode disabled
+}
+
+void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
+{
+    QList<int> finalAnimeIds;
+    QList<int> expandedAnimeNeedingData;
+    
     {
         QMutexLocker locker(&m_mutex);
-        m_orderedAnimeIds = aids;
-        LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs").arg(aids.size()));
+        m_chainModeEnabled = chainModeEnabled;
+        m_expandedChainAnimeIds.clear();
+        
+        if (chainModeEnabled) {
+            // Build chains BEFORE sorting - NO EXPANSION initially to avoid needing unloaded data
+            LOG(QString("[MyListCardManager] Building chains from %1 anime IDs WITHOUT expansion (initial pass)").arg(aids.size()));
+            m_chainList = buildChainsFromAnimeIds(aids, false);  // Disable expansion for now
+            
+            // Build aid -> chain index map
+            m_aidToChainIndex.clear();
+            for (int i = 0; i < m_chainList.size(); ++i) {
+                for (int aid : m_chainList[i].getAnimeIds()) {
+                    m_aidToChainIndex[aid] = i;
+                }
+            }
+            
+            // Use only filtered anime for now
+            finalAnimeIds = aids;
+            
+            LOG(QString("[MyListCardManager] Built %1 chains from %2 anime (no expansion)")
+                .arg(m_chainList.size()).arg(finalAnimeIds.size()));
+        } else {
+            // Normal mode: clear chain data
+            m_chainList.clear();
+            m_aidToChainIndex.clear();
+            finalAnimeIds = aids;
+        }
+        
+        m_orderedAnimeIds = finalAnimeIds;
+        LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs, chain mode %2")
+            .arg(finalAnimeIds.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
     }
     
     // Update virtual layout AFTER releasing the mutex to avoid deadlock
     // (setItemCount -> updateVisibleItems -> createCardForIndex -> needs mutex)
     if (m_virtualLayout) {
-        m_virtualLayout->setItemCount(aids.size());
+        m_virtualLayout->setItemCount(finalAnimeIds.size());
     }
+}
+
+QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& aids, bool expandChains) const
+{
+    QList<AnimeChain> chains;
+    QSet<int> availableAids = QSet<int>(aids.begin(), aids.end());
+    QSet<int> processedAids;
+    
+    LOG(QString("[MyListCardManager] buildChainsFromAnimeIds: input has %1 anime, %2 unique, expansion=%3")
+        .arg(aids.size()).arg(availableAids.size()).arg(expandChains ? "ON" : "OFF"));
+    
+    for (int aid : aids) {
+        if (processedAids.contains(aid)) {
+            continue;
+        }
+        
+        // Build chain starting from this anime
+        QList<int> chainAids = buildChainFromAid(aid, availableAids, expandChains);
+        
+        // Skip empty chains (anime not in available set)
+        if (chainAids.isEmpty()) {
+            continue;
+        }
+        
+        // Mark all anime in this chain as processed
+        for (int chainAid : chainAids) {
+            processedAids.insert(chainAid);
+            
+            // Debug: Check if this anime is NOT in the original input
+            if (!expandChains && !availableAids.contains(chainAid)) {
+                LOG(QString("[MyListCardManager] ERROR: Chain from aid=%1 contains aid=%2 which is NOT in input set!")
+                    .arg(aid).arg(chainAid));
+            }
+        }
+        
+        // Create chain object
+        chains.append(AnimeChain(chainAids));
+    }
+    
+    // Verify total anime count
+    int totalAnimeInChains = 0;
+    QSet<int> allAnimeInChains;
+    for (const AnimeChain& chain : chains) {
+        for (int aid : chain.getAnimeIds()) {
+            totalAnimeInChains++;
+            allAnimeInChains.insert(aid);
+        }
+    }
+    
+    if (totalAnimeInChains != availableAids.size()) {
+        LOG(QString("[MyListCardManager] WARNING: Chain building mismatch! Input: %1 unique anime, Chains contain: %2 anime (%3 unique)")
+            .arg(availableAids.size()).arg(totalAnimeInChains).arg(allAnimeInChains.size()));
+            
+        // Log which anime are extra
+        QSet<int> extraAnime = allAnimeInChains - availableAids;
+        if (!extraAnime.isEmpty()) {
+            QStringList extraList;
+            for (int aid : extraAnime) {
+                extraList.append(QString::number(aid));
+            }
+            LOG(QString("[MyListCardManager] Extra anime in chains (NOT in input): %1").arg(extraList.join(", ")));
+        }
+        
+        // Log which anime are missing
+        QSet<int> missingAnime = availableAids - allAnimeInChains;
+        if (!missingAnime.isEmpty()) {
+            QStringList missingList;
+            for (int aid : missingAnime) {
+                missingList.append(QString::number(aid));
+            }
+            LOG(QString("[MyListCardManager] Missing anime from chains: %1").arg(missingList.join(", ")));
+        }
+    }
+    
+    return chains;
+}
+
+QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& availableAids, bool expandChain) const
+{
+    QList<int> chain;
+    QSet<int> visited;
+    const int MAX_CHAIN_LENGTH = 20;  // Safety limit to prevent infinite loops
+    
+    // Find the original prequel (first in chain)
+    int currentAid = startAid;
+    
+    // Only traverse backward if startAid is in our filtered set
+    if (!expandChain && !availableAids.contains(startAid)) {
+        return QList<int>();  // Return empty chain - anime not in filtered list
+    }
+    
+    // Ensure relation data is loaded for startAid
+    loadRelationDataForAnime(startAid);
+    
+    // Track the last anime we found that's in our filtered set
+    int lastAvailableAid = startAid;
+    
+    // Traverse backward to find the first prequel
+    while (true) {
+        if (visited.contains(currentAid)) {
+            break;  // Cycle detected
+        }
+        visited.insert(currentAid);
+        
+        if (visited.size() > MAX_CHAIN_LENGTH) {
+            LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping backward traversal").arg(MAX_CHAIN_LENGTH));
+            break;
+        }
+        
+        int prequelAid = findPrequelAid(currentAid);
+        if (prequelAid == 0) {
+            break;  // No prequel
+        }
+        
+        // Load relation data for the prequel
+        if (expandChain) {
+            loadRelationDataForAnime(prequelAid);
+        }
+        
+        // If not expanding, stop at prequels not in available set
+        if (!expandChain && !availableAids.contains(prequelAid)) {
+            break;
+        }
+        
+        // Update last available anime
+        if (expandChain || availableAids.contains(prequelAid)) {
+            lastAvailableAid = prequelAid;
+        }
+        
+        currentAid = prequelAid;
+    }
+    
+    // Now build chain forward from the last anime in our filtered set
+    // (or from the first prequel if expanding)
+    visited.clear();
+    int chainStart = expandChain ? currentAid : lastAvailableAid;
+    currentAid = chainStart;
+    
+    while (currentAid > 0 && !visited.contains(currentAid)) {
+        // When expanding, include all anime in chain
+        // When not expanding, only include anime in availableAids
+        if (expandChain || availableAids.contains(currentAid)) {
+            chain.append(currentAid);
+            visited.insert(currentAid);
+            
+            if (visited.size() > MAX_CHAIN_LENGTH) {
+                LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping forward traversal").arg(MAX_CHAIN_LENGTH));
+                break;
+            }
+            
+            int sequelAid = findSequelAid(currentAid);
+            if (sequelAid == 0) {
+                break;  // No sequel
+            }
+            
+            // Load relation data for the sequel (only when expanding)
+            if (expandChain) {
+                loadRelationDataForAnime(sequelAid);
+            }
+            
+            // If not expanding, stop at sequels not in available set
+            if (!expandChain && !availableAids.contains(sequelAid)) {
+                break;
+            }
+            
+            currentAid = sequelAid;
+        } else {
+            // Current anime not in available set and not expanding - stop traversing
+            break;
+        }
+    }
+    
+    return chain;
+}
+
+int MyListCardManager::findPrequelAid(int aid) const
+{
+    // Use cached relation data
+    if (!m_cardCreationDataCache.contains(aid)) {
+        return 0;
+    }
+    
+    const CardCreationData& data = m_cardCreationDataCache[aid];
+    if (data.relaidlist.isEmpty() || data.relaidtype.isEmpty()) {
+        return 0;
+    }
+    
+    QStringList aidList = data.relaidlist.split("'", Qt::SkipEmptyParts);
+    QStringList typeList = data.relaidtype.split("'", Qt::SkipEmptyParts);
+    
+    for (int i = 0; i < qMin(aidList.size(), typeList.size()); ++i) {
+        QString type = typeList[i].toLower();
+        // Type 2 = prequel
+        if (type == "2" || type.contains("prequel", Qt::CaseInsensitive)) {
+            return aidList[i].toInt();
+        }
+    }
+    
+    return 0;
+}
+
+int MyListCardManager::findSequelAid(int aid) const
+{
+    // Similar to findPrequelAid but looks for type 1 (sequel)
+    if (!m_cardCreationDataCache.contains(aid)) {
+        return 0;
+    }
+    
+    const CardCreationData& data = m_cardCreationDataCache[aid];
+    if (data.relaidlist.isEmpty() || data.relaidtype.isEmpty()) {
+        return 0;
+    }
+    
+    QStringList aidList = data.relaidlist.split("'", Qt::SkipEmptyParts);
+    QStringList typeList = data.relaidtype.split("'", Qt::SkipEmptyParts);
+    
+    for (int i = 0; i < qMin(aidList.size(), typeList.size()); ++i) {
+        QString type = typeList[i].toLower();
+        // Type 1 = sequel
+        if (type == "1" || type.contains("sequel", Qt::CaseInsensitive)) {
+            return aidList[i].toInt();
+        }
+    }
+    
+    return 0;
+}
+
+void MyListCardManager::loadRelationDataForAnime(int aid) const
+{
+    // If already in cache, nothing to do
+    if (m_cardCreationDataCache.contains(aid)) {
+        return;
+    }
+    
+    // Query database for relation data
+    // Note: This is a const method but modifies mutable cache - we need to cast away const
+    MyListCardManager* mutableThis = const_cast<MyListCardManager*>(this);
+    
+    QSqlQuery query(QSqlDatabase::database());
+    query.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
+    query.addBindValue(aid);
+    
+    if (!query.exec()) {
+        LOG(QString("[MyListCardManager] Failed to load relation data for aid=%1: %2").arg(aid).arg(query.lastError().text()));
+        return;
+    }
+    
+    if (query.next()) {
+        CardCreationData data;
+        data.relaidlist = query.value(0).toString();
+        data.relaidtype = query.value(1).toString();
+        
+        // Store in cache (cast away const)
+        mutableThis->m_cardCreationDataCache[aid] = data;
+        
+        LOG(QString("[MyListCardManager] Loaded relation data for aid=%1 (relaidlist=%2)")
+            .arg(aid).arg(data.relaidlist.isEmpty() ? "empty" : "present"));
+    } else {
+        LOG(QString("[MyListCardManager] No anime found in database for aid=%1").arg(aid));
+    }
+}
+
+void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascending)
+{
+    QMutexLocker locker(&m_mutex);
+    
+    if (!m_chainModeEnabled || m_chainList.isEmpty()) {
+        LOG("[MyListCardManager] sortChains: chain mode not enabled or no chains");
+        return;
+    }
+    
+    int inputAnimeCount = m_orderedAnimeIds.size();
+    
+    LOG(QString("[MyListCardManager] Sorting %1 chains by criteria %2, ascending=%3 (current ordered list has %4 anime)")
+        .arg(m_chainList.size()).arg(static_cast<int>(criteria)).arg(ascending).arg(inputAnimeCount));
+    
+    // Sort chains using comparison function
+    std::sort(m_chainList.begin(), m_chainList.end(),
+              [this, criteria, ascending](const AnimeChain& a, const AnimeChain& b) {
+                  return a.compareWith(b, m_cardCreationDataCache, criteria, ascending) < 0;
+              });
+    
+    // Rebuild flattened anime ID list preserving internal chain order
+    m_orderedAnimeIds.clear();
+    m_aidToChainIndex.clear();
+    
+    for (int i = 0; i < m_chainList.size(); ++i) {
+        for (int aid : m_chainList[i].getAnimeIds()) {
+            m_orderedAnimeIds.append(aid);
+            m_aidToChainIndex[aid] = i;
+        }
+    }
+    
+    if (m_orderedAnimeIds.size() != inputAnimeCount) {
+        LOG(QString("[MyListCardManager] WARNING: Anime count changed during sort! Before: %1, After: %2")
+            .arg(inputAnimeCount).arg(m_orderedAnimeIds.size()));
+    }
+    
+    LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains")
+        .arg(m_orderedAnimeIds.size()).arg(m_chainList.size()));
+    
+    // Update virtual layout
+    if (m_virtualLayout) {
+        m_virtualLayout->setItemCount(m_orderedAnimeIds.size());
+        m_virtualLayout->refresh();
+    }
+}
+
+AnimeChain MyListCardManager::getChainForAnime(int aid) const
+{
+    QMutexLocker locker(&m_mutex);
+    int chainIndex = m_aidToChainIndex.value(aid, -1);
+    if (chainIndex >= 0 && chainIndex < m_chainList.size()) {
+        return m_chainList[chainIndex];
+    }
+    return AnimeChain();  // Empty chain
+}
+
+int MyListCardManager::getChainIndexForAnime(int aid) const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_aidToChainIndex.value(aid, -1);
 }
 
 AnimeCard* MyListCardManager::createCardForIndex(int index)
@@ -1198,7 +1558,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     QString animeQuery = QString("SELECT a.aid, a.nameromaji, a.nameenglish, a.eptotal, "
                                 "at.title as anime_title, "
                                 "a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
-                                "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted "
+                                "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted, "
+                                "a.relaidlist, a.relaidtype "
                                 "FROM anime a "
                                 "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
                                 "WHERE a.aid IN (%1)").arg(aidsList);
@@ -1225,6 +1586,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
             data.tagWeightList = q.value(14).toString();
             data.isHidden = q.value(15).toInt() == 1;
             data.is18Restricted = q.value(16).toInt() == 1;
+            data.relaidlist = q.value(17).toString();
+            data.relaidtype = q.value(18).toString();
             data.hasData = true;
         }
     }

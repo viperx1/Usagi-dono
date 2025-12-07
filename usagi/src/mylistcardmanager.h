@@ -12,6 +12,7 @@
 #include "flowlayout.h"
 #include "animestats.h"
 #include "cachedanimedata.h"
+#include "animechain.h"
 
 // Forward declarations
 class VirtualFlowLayout;
@@ -58,6 +59,28 @@ public:
     
     // Set the ordered list of anime IDs (for virtual scrolling after sorting/filtering)
     void setAnimeIdList(const QList<int>& aids);
+    
+    // Set anime IDs with chain mode enabled (builds chains before sorting)
+    void setAnimeIdList(const QList<int>& aids, bool chainModeEnabled);
+    
+    // Build chains from anime IDs using cached relation data
+    // If expandChains=true, includes related anime not in aids list
+    QList<AnimeChain> buildChainsFromAnimeIds(const QList<int>& aids, bool expandChains = false) const;
+    
+    // Sort chains using specified criteria
+    void sortChains(AnimeChain::SortCriteria criteria, bool ascending);
+    
+    // Get chains (for inspection/debugging)
+    QList<AnimeChain> getChains() const { return m_chainList; }
+    
+    // Get chain for specific anime ID
+    AnimeChain getChainForAnime(int aid) const;
+    
+    // Get chain index for specific anime ID (-1 if not found)
+    int getChainIndexForAnime(int aid) const;
+    
+    // Check if chain mode is enabled
+    bool isChainModeEnabled() const { return m_chainModeEnabled; }
     
     // Create a card for a specific index in the ordered list (for virtual scrolling)
     // This is the factory method called by VirtualFlowLayout
@@ -213,6 +236,10 @@ private:
         bool is18Restricted;
         int eptotal;
         
+        // Relation data (for chain support)
+        QString relaidlist;  // Related anime IDs (apostrophe-separated)
+        QString relaidtype;  // Related anime types (apostrophe-separated)
+        
         // Statistics
         AnimeStats stats;
         
@@ -242,6 +269,14 @@ private:
     
     AnimeStats calculateStatistics(int aid);
     
+    // Chain building helpers
+    QList<int> buildChainFromAid(int startAid, const QSet<int>& availableAids, bool expandChain = false) const;
+    int findPrequelAid(int aid) const;
+    int findSequelAid(int aid) const;
+    
+    // Load relation data for anime not in cache (for chain expansion)
+    void loadRelationDataForAnime(int aid) const;
+    
     // Helper functions for common operations
     QString determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid);
     QList<AnimeCard::TagInfo> getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category);
@@ -269,6 +304,12 @@ private:
     
     // Ordered list of anime IDs for virtual scrolling
     QList<int> m_orderedAnimeIds;
+    
+    // Chain support
+    QList<AnimeChain> m_chainList;          // List of chains
+    QMap<int, int> m_aidToChainIndex;       // Anime ID -> chain index mapping
+    bool m_chainModeEnabled;                // Is chain mode active
+    QSet<int> m_expandedChainAnimeIds;      // Anime IDs added by chain expansion (not in original mylist)
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;

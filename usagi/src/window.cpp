@@ -4150,209 +4150,36 @@ void Window::sortMylistCards(int sortIndex)
 	};
 	
 	// Handle nested sorting when series chain is enabled
-	if (seriesChainEnabled && watchSessionManager) {
-		LOG("[Window] Series chain enabled - applying nested sorting (sort chains, preserve internal order)");
+	if (seriesChainEnabled) {
+		LOG("[Window] Series chain enabled - delegating to MyListCardManager for chain sorting");
 		
-		// Build chain groups from current anime list
-		QMap<int, QList<int>> chainGroups;
-		QSet<int> processedIds;
-		
-		for (int aid : std::as_const(animeIds)) {
-			if (processedIds.contains(aid)) {
-				continue;
-			}
-			
-			// Get the full chain for this anime
-			QList<int> chain = watchSessionManager->getSeriesChain(aid);
-			if (!chain.isEmpty()) {
-				// Check if the chain includes the current anime
-				// If not, treat this anime as a single-item chain
-				if (!chain.contains(aid)) {
-					chainGroups[aid] = QList<int>() << aid;
-					processedIds.insert(aid);
-					continue;
-				}
-				
-				// Use first anime in chain as the key
-				int chainKey = chain.first();
-				
-				// Only add anime that are in our current list
-				QList<int> filteredChain;
-				for (int chainAid : chain) {
-					if (animeIds.contains(chainAid)) {
-						filteredChain.append(chainAid);
-						processedIds.insert(chainAid);
-					}
-				}
-				
-				if (!filteredChain.isEmpty()) {
-					chainGroups[chainKey] = filteredChain;
-				} else {
-					// Chain was filtered to empty - treat original anime as single-item chain
-					chainGroups[aid] = QList<int>() << aid;
-					processedIds.insert(aid);
-				}
-			} else {
-				// Anime not in any chain - treat as single-item chain
-				chainGroups[aid] = QList<int>() << aid;
-				processedIds.insert(aid);
-			}
+		// Map sortIndex to AnimeChain::SortCriteria
+		AnimeChain::SortCriteria criteria;
+		switch (sortIndex) {
+			case 0: // Anime Title
+				criteria = AnimeChain::SortCriteria::ByRepresentativeTitle;
+				break;
+			case 1: // Type
+				criteria = AnimeChain::SortCriteria::ByRepresentativeType;
+				break;
+			case 2: // Aired Date
+				criteria = AnimeChain::SortCriteria::ByRepresentativeDate;
+				break;
+			case 3: // Episodes (Count) - use chain length as proxy
+				criteria = AnimeChain::SortCriteria::ByChainLength;
+				break;
+			case 4: // Completion % - use ID (no direct mapping available)
+			case 5: // Last Played - use ID (no direct mapping available)
+			default:
+				criteria = AnimeChain::SortCriteria::ByRepresentativeId;
+				break;
 		}
 		
-		// Get chain keys for sorting
-		QList<int> chainKeys = chainGroups.keys();
+		// MyListCardManager will sort chains externally while preserving internal order
+		cardManager->sortChains(criteria, sortAscending);
 		
-		// Define comparison lambda that will be used for sorting chains
-		auto compareChains = [&cardsMap, &getCachedData, sortAscending, sortIndex](int chainKeyA, int chainKeyB) -> bool {
-			// Use the first anime in each chain as the representative for sorting
-			int aidA = chainKeyA;
-			int aidB = chainKeyB;
-			
-			AnimeCard* a = cardsMap.value(aidA);
-			AnimeCard* b = cardsMap.value(aidB);
-			
-			// Common hidden check for all sort types
-			bool hiddenA = a ? a->isHidden() : getCachedData(aidA).isHidden();
-			bool hiddenB = b ? b->isHidden() : getCachedData(aidB).isHidden();
-			
-			// Hidden cards always go to the bottom
-			if (hiddenA != hiddenB) {
-				return hiddenB;  // non-hidden comes before hidden
-			}
-			
-			// Apply specific sort criterion
-			switch (sortIndex) {
-				case 0: { // Anime Title
-					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName();
-					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName();
-					return sortAscending ? (titleA < titleB) : (titleA > titleB);
-				}
-				case 1: { // Type
-					QString typeA = a ? a->getAnimeType() : getCachedData(aidA).typeName();
-					QString typeB = b ? b->getAnimeType() : getCachedData(aidB).typeName();
-					if (typeA != typeB) {
-						return sortAscending ? (typeA < typeB) : (typeA > typeB);
-					}
-					// Fallback to title for same type
-					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName();
-					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName();
-					return titleA < titleB;
-				}
-				case 2: { // Aired Date
-					aired airedA, airedB;
-					if (a) {
-						airedA = a->getAired();
-					} else {
-						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
-						airedA = aired(cachedA.startDate(), cachedA.endDate());
-					}
-					if (b) {
-						airedB = b->getAired();
-					} else {
-						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
-						airedB = aired(cachedB.startDate(), cachedB.endDate());
-					}
-					
-					if (airedA == airedB) {
-						// Fallback to title
-						QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName();
-						QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName();
-						return titleA < titleB;
-					}
-					return sortAscending ? (airedA < airedB) : (airedA > airedB);
-				}
-				case 3: { // Episodes (Count)
-					int episodesA, episodesB;
-					if (a) {
-						episodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
-					} else {
-						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
-						episodesA = cachedA.stats().normalEpisodes() + cachedA.stats().otherEpisodes();
-					}
-					if (b) {
-						episodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
-					} else {
-						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
-						episodesB = cachedB.stats().normalEpisodes() + cachedB.stats().otherEpisodes();
-					}
-					if (episodesA != episodesB) {
-						return sortAscending ? (episodesA < episodesB) : (episodesA > episodesB);
-					}
-					// Fallback to title
-					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName();
-					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName();
-					return titleA < titleB;
-				}
-				case 4: { // Completion %
-					int totalEpisodesA, totalEpisodesB, viewedA, viewedB;
-					if (a) {
-						totalEpisodesA = a->getNormalEpisodes() + a->getOtherEpisodes();
-						viewedA = a->getNormalViewed() + a->getOtherViewed();
-					} else {
-						MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
-						totalEpisodesA = cachedA.stats().normalEpisodes() + cachedA.stats().otherEpisodes();
-						viewedA = cachedA.stats().normalViewed() + cachedA.stats().otherViewed();
-					}
-					if (b) {
-						totalEpisodesB = b->getNormalEpisodes() + b->getOtherEpisodes();
-						viewedB = b->getNormalViewed() + b->getOtherViewed();
-					} else {
-						MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
-						totalEpisodesB = cachedB.stats().normalEpisodes() + cachedB.stats().otherEpisodes();
-						viewedB = cachedB.stats().normalViewed() + cachedB.stats().otherViewed();
-					}
-					
-					double percentA = (totalEpisodesA > 0) ? (static_cast<double>(viewedA) / totalEpisodesA) : 0.0;
-					double percentB = (totalEpisodesB > 0) ? (static_cast<double>(viewedB) / totalEpisodesB) : 0.0;
-					
-					if (percentA != percentB) {
-						return sortAscending ? (percentA < percentB) : (percentA > percentB);
-					}
-					// Fallback to title
-					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName();
-					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName();
-					return titleA < titleB;
-				}
-				case 5: { // Last Played
-					qint64 lastPlayedA = a ? a->getLastPlayed() : getCachedData(aidA).lastPlayed();
-					qint64 lastPlayedB = b ? b->getLastPlayed() : getCachedData(aidB).lastPlayed();
-					
-					// Never played items go to end (timestamp is 0)
-					if (lastPlayedA == 0 && lastPlayedB == 0) {
-						return false;
-					}
-					if (lastPlayedA == 0) {
-						return false;  // Never played goes to end
-					}
-					if (lastPlayedB == 0) {
-						return true;
-					}
-					
-					if (lastPlayedA != lastPlayedB) {
-						return sortAscending ? (lastPlayedA < lastPlayedB) : (lastPlayedA > lastPlayedB);
-					}
-					// Fallback to title
-					QString titleA = a ? a->getAnimeTitle() : getCachedData(aidA).animeName();
-					QString titleB = b ? b->getAnimeTitle() : getCachedData(aidB).animeName();
-					return titleA < titleB;
-				}
-				default:
-					return false;
-			}
-		};
-		
-		// Sort the chain keys using the comparison function
-		std::sort(chainKeys.begin(), chainKeys.end(), compareChains);
-		
-		// Rebuild animeIds with sorted chains (preserving internal chain order)
-		animeIds.clear();
-		for (int chainKey : chainKeys) {
-			const QList<int>& chain = chainGroups[chainKey];
-			animeIds.append(chain);
-		}
-		
-		// Update the card manager with the new order
-		cardManager->setAnimeIdList(animeIds);
+		// Get the updated anime ID list from card manager (already reordered)
+		animeIds = cardManager->getAnimeIdList();
 		
 		// If using virtual scrolling, refresh the layout
 		if (mylistVirtualLayout) {
@@ -4380,7 +4207,7 @@ void Window::sortMylistCards(int sortIndex)
 			}
 		}
 		
-		return;  // Done with nested sorting
+		return;  // Done with chain sorting
 	}
 	
 	// Regular sorting (no series chain grouping)
@@ -5289,229 +5116,9 @@ void Window::applyMylistFilters()
 		}
 	}
 	
-	// If series chain display is enabled, group and order anime by their series chains
-	if (showSeriesChain && watchSessionManager) {
-		LOG(QString("[Window] Series chain: Starting with %1 filtered anime").arg(filteredAnimeIds.size()));
-		QSet<int> animeToProcess;  // Anime IDs to process for chain grouping
-		QMap<int, QList<int>> chainCache;  // Cache series chains to avoid redundant lookups
-		QSet<int> allAnimeIdsSet = QSet<int>(allAnimeIds.constBegin(), allAnimeIds.constEnd());  // Convert once for O(1) lookups
-		
-		// If search text is provided, expand results to include full chains of matched anime
-		// Otherwise, just group the filtered results by their chains
-		if (!searchText.isEmpty()) {
-			LOG(QString("[Window] Series chain: Search text '%1' is not empty, expanding chains").arg(searchText));
-			// Expand search results to include entire series chains
-			// When series chain is enabled, we ignore mylist filter for chain members
-			for (int aid : filteredAnimeIds) {
-				// Always add the original anime that matched the search
-				// (it's already in filteredAnimeIds, so it passed all filters)
-				animeToProcess.insert(aid);
-				
-				QList<int> seriesChain;
-				if (!chainCache.contains(aid)) {
-					seriesChain = watchSessionManager->getSeriesChain(aid);
-					LOG(QString("[Window] Series chain: getSeriesChain(%1) returned %2 anime").arg(aid).arg(seriesChain.size()));
-					// If chain is empty (shouldn't happen, but handle it), add the anime itself
-					if (seriesChain.isEmpty()) {
-						seriesChain.append(aid);
-						LOG(QString("[Window] Series chain: Chain was empty for aid=%1, added itself").arg(aid));
-					}
-					// Cache the chain for all anime in it
-					for (int chainAid : seriesChain) {
-						chainCache[chainAid] = seriesChain;
-					}
-				} else {
-					seriesChain = chainCache[aid];
-				}
-				
-				// Add all other anime in the chain to the set
-				// Series chain display ignores mylist filter - show all related anime
-				for (int chainAid : seriesChain) {
-					animeToProcess.insert(chainAid);
-					LOG(QString("[Window] Series chain: Adding aid=%1 from chain to animeToProcess").arg(chainAid));
-				}
-			}
-			LOG(QString("[Window] Series chain: After expansion, animeToProcess has %1 anime").arg(animeToProcess.size()));
-		} else {
-			// No search text - expand filtered results to include full chains
-			// Series chain display ignores mylist filter - show all related anime
-			LOG(QString("[Window] Series chain: No search text, expanding chains for %1 filtered anime").arg(filteredAnimeIds.size()));
-			for (int aid : filteredAnimeIds) {
-				// Always add the original filtered anime
-				animeToProcess.insert(aid);
-				
-				// Get the series chain and add all members
-				QList<int> seriesChain;
-				if (!chainCache.contains(aid)) {
-					seriesChain = watchSessionManager->getSeriesChain(aid);
-					if (seriesChain.isEmpty()) {
-						seriesChain.append(aid);
-					}
-					for (int chainAid : seriesChain) {
-						chainCache[chainAid] = seriesChain;
-					}
-				} else {
-					seriesChain = chainCache[aid];
-				}
-				
-				// Add all anime in the chain, ignoring mylist filter
-				for (int chainAid : seriesChain) {
-					animeToProcess.insert(chainAid);
-				}
-			}
-			LOG(QString("[Window] Series chain: After expansion, animeToProcess has %1 anime").arg(animeToProcess.size()));
-		}
-		
-		// Preload card creation data for any newly added anime from series chain expansion
-		// This ensures that when cards are created, the data is already available
-		QSet<int> originalFilteredSet = QSet<int>(filteredAnimeIds.constBegin(), filteredAnimeIds.constEnd());
-		QList<int> newlyAddedAnime;
-		for (int aid : std::as_const(animeToProcess)) {
-			if (!originalFilteredSet.contains(aid) && !cardManager->hasCachedData(aid)) {
-				newlyAddedAnime.append(aid);
-			}
-		}
-		
-		if (!newlyAddedAnime.isEmpty()) {
-			LOG(QString("[Window] Preloading card creation data for %1 newly added anime from series chain expansion").arg(newlyAddedAnime.size()));
-			cardManager->preloadCardCreationData(newlyAddedAnime);
-		}
-		
-		// Group anime by series chain and order them sequentially
-		if (!animeToProcess.isEmpty()) {
-			// Check for missing relation data and request it
-			// Only request data for anime that are referenced by other anime (i.e., they should have relations)
-			QSet<int> animeNeedingRelationData;
-			QSet<int> animeReferencedByOthers;  // Anime that appear in other anime's relation lists
-			QSqlDatabase db = QSqlDatabase::database();
-			if (db.isOpen()) {
-				QSqlQuery q(db);
-				
-				// First, find all anime that are referenced by others in the current set
-				for (int aid : std::as_const(animeToProcess)) {
-					q.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
-					q.addBindValue(aid);
-					if (q.exec() && q.next()) {
-						QString relaidlist = q.value(0).toString();
-						QString relaidtype = q.value(1).toString();
-						
-						// Parse the relation list to find referenced anime
-						if (!relaidlist.isEmpty() && !relaidtype.isEmpty()) {
-							QStringList aidList = relaidlist.split("'", Qt::SkipEmptyParts);
-							QStringList typeList = relaidtype.split("'", Qt::SkipEmptyParts);
-							
-							int count = qMin(aidList.size(), typeList.size());
-							for (int i = 0; i < count; i++) {
-								int relAid = aidList[i].toInt();
-								QString relType = typeList[i].toLower();
-								// Track anime that are prequels or sequels (part of the chain)
-								if (relAid > 0 && (relType == "1" || relType == "2" || 
-								                    relType.contains("prequel") || relType.contains("sequel"))) {
-									animeReferencedByOthers.insert(relAid);
-								}
-							}
-						}
-					}
-				}
-				
-				// Now check which of the referenced anime are missing their relation data
-				for (int aid : std::as_const(animeReferencedByOthers)) {
-					q.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
-					q.addBindValue(aid);
-					if (q.exec() && q.next()) {
-						QString relaidlist = q.value(0).toString();
-						QString relaidtype = q.value(1).toString();
-						// If relation data is missing, request it
-						if (relaidlist.isEmpty() || relaidtype.isEmpty()) {
-							animeNeedingRelationData.insert(aid);
-						}
-					} else {
-						// Anime is referenced but not in database at all - request it
-						animeNeedingRelationData.insert(aid);
-					}
-				}
-			}
-			
-			// Request anime metadata for those with missing relation data
-			if (!animeNeedingRelationData.isEmpty() && adbapi) {
-				LOG(QString("[Window] Requesting relation data for %1 referenced anime in series chain").arg(animeNeedingRelationData.size()));
-				for (int aid : std::as_const(animeNeedingRelationData)) {
-					adbapi->Anime(aid);
-				}
-			}
-			
-			// Build chain cache for all anime we're processing
-			LOG(QString("[Window] Series chain: Building chain cache for %1 anime").arg(animeToProcess.size()));
-			for (int aid : std::as_const(animeToProcess)) {
-				if (!chainCache.contains(aid)) {
-					QList<int> seriesChain = watchSessionManager->getSeriesChain(aid);
-					LOG(QString("[Window] Series chain: Chain cache miss for aid=%1, getSeriesChain returned %2 anime").arg(aid).arg(seriesChain.size()));
-					// If chain is empty (shouldn't happen, but handle it), add the anime itself
-					if (seriesChain.isEmpty()) {
-						seriesChain.append(aid);
-						LOG(QString("[Window] Series chain: Chain was empty for aid=%1, added itself").arg(aid));
-					}
-					// If the anime we queried isn't in the returned chain, add it
-					if (!seriesChain.contains(aid)) {
-						seriesChain.append(aid);
-						LOG(QString("[Window] Series chain: aid=%1 not in its own chain, added it").arg(aid));
-					}
-					// Cache the chain for all anime in it (including the queried anime)
-					for (int chainAid : seriesChain) {
-						chainCache[chainAid] = seriesChain;
-					}
-				} else {
-					QList<int> existingChain = chainCache[aid];
-					LOG(QString("[Window] Series chain: Chain cache hit for aid=%1, has %2 anime in chain").arg(aid).arg(existingChain.size()));
-				}
-			}
-			
-			// Group by series chain (map from first anime in chain -> list of anime in that chain)
-			QMap<int, QList<int>> chainGroups;
-			
-			LOG(QString("[Window] Series chain: Grouping chains, animeToProcess has %1 anime").arg(animeToProcess.size()));
-			for (int aid : std::as_const(animeToProcess)) {
-				QList<int> chain = chainCache.value(aid);
-				// Safety check: if chain is still empty, create one with just this anime
-				if (chain.isEmpty()) {
-					chain.append(aid);
-					chainCache[aid] = chain;
-					LOG(QString("[Window] Series chain: Chain was empty for aid=%1 after cache lookup, created single-anime chain").arg(aid));
-				}
-				int firstAid = chain.first();  // Use first anime as group key
-				if (!chainGroups.contains(firstAid)) {
-					chainGroups[firstAid] = chain;
-					LOG(QString("[Window] Series chain: Created new chain group with firstAid=%1, chain size=%2").arg(firstAid).arg(chain.size()));
-				} else {
-					LOG(QString("[Window] Series chain: Chain group with firstAid=%1 already exists, skipping").arg(firstAid));
-				}
-			}
-			
-			// Rebuild the filtered list with chains grouped together in sequential order
-			// Use QSet for O(1) lookup instead of QList::contains which is O(n)
-			QSet<int> addedIds;
-			filteredAnimeIds.clear();
-			
-			LOG(QString("[Window] Series chain: Rebuilding filteredAnimeIds from %1 chain groups").arg(chainGroups.size()));
-			for (const QList<int>& chain : std::as_const(chainGroups)) {
-				LOG(QString("[Window] Series chain: Processing chain with %1 anime").arg(chain.size()));
-				for (int aid : chain) {
-					// Add if in the anime to process set and not already added
-					// Series chain ignores mylist filter, so we don't check allAnimeIdsSet
-					if (animeToProcess.contains(aid) && !addedIds.contains(aid)) {
-						filteredAnimeIds.append(aid);
-						addedIds.insert(aid);
-					} else {
-						LOG(QString("[Window] Series chain: Skipping aid=%1 (inProcess=%2, notAdded=%3)")
-						    .arg(aid)
-						    .arg(animeToProcess.contains(aid))
-						    .arg(!addedIds.contains(aid)));
-					}
-				}
-			}
-			LOG(QString("[Window] Series chain: After rebuild, filteredAnimeIds has %1 anime").arg(filteredAnimeIds.size()));
-		}
-	}
+	// Chain building and sorting is now handled by MyListCardManager
+	// The old WatchSessionManager-based chain building code has been removed
+	// MyListCardManager will build chains when setAnimeIdList() is called with chain mode enabled
 	
 	// Update series chain connection info for cards
 	// First, clear all chain info
@@ -5638,8 +5245,8 @@ void Window::applyMylistFilters()
 		LOG(QString("[Window] FINAL VALIDATION: All %1 anime in filteredAnimeIds have cached data").arg(filteredAnimeIds.size()));
 	}
 	
-	// Update the card manager with the filtered list
-	cardManager->setAnimeIdList(filteredAnimeIds);
+	// Update the card manager with the filtered list and chain mode flag
+	cardManager->setAnimeIdList(filteredAnimeIds, showSeriesChain);
 	
 	// If using virtual scrolling, refresh the layout
 	if (mylistVirtualLayout) {
