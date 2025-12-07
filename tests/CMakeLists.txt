@@ -160,6 +160,9 @@ set(ANIME_MASK_PARSING_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(ANIME_MASK_PARSING_TEST_HEADERS
@@ -255,6 +258,9 @@ set(ANIDBAPI_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(ANIDBAPI_TEST_HEADERS
@@ -314,6 +320,9 @@ set(COMPRESSION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(COMPRESSION_TEST_HEADERS
@@ -374,6 +383,9 @@ set(TIMEOUT_RETRY_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(TIMEOUT_RETRY_TEST_HEADERS
@@ -433,6 +445,9 @@ set(ANIME_TITLES_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(ANIME_TITLES_TEST_HEADERS
@@ -738,6 +753,9 @@ set(HASH_STORAGE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(HASH_STORAGE_TEST_HEADERS
@@ -832,6 +850,9 @@ set(HASH_REUSE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(HASH_REUSE_TEST_HEADERS
@@ -891,6 +912,9 @@ set(BATCH_LOCALIDENTIFY_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(BATCH_LOCALIDENTIFY_TEST_HEADERS
@@ -950,6 +974,9 @@ set(HASH_DUPLICATE_REUSE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(HASH_DUPLICATE_REUSE_TEST_HEADERS
@@ -1027,6 +1054,9 @@ set(THREAD_SAFETY_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(THREAD_SAFETY_TEST_HEADERS
@@ -1086,6 +1116,9 @@ set(IMMEDIATE_IDENTIFICATION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(IMMEDIATE_IDENTIFICATION_TEST_HEADERS
@@ -1145,6 +1178,9 @@ set(BATCH_HASH_RETRIEVAL_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(BATCH_HASH_RETRIEVAL_TEST_HEADERS
@@ -1204,6 +1240,9 @@ set(UI_FREEZE_FIX_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(UI_FREEZE_FIX_TEST_HEADERS
@@ -1264,6 +1303,9 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(HASHER_THREAD_TEST_HEADERS
@@ -1330,6 +1372,9 @@ set(HASHER_THREADPOOL_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(HASHER_THREADPOOL_TEST_HEADERS
@@ -1406,6 +1451,9 @@ set(STOP_NON_BLOCKING_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(STOP_NON_BLOCKING_TEST_HEADERS
@@ -1469,6 +1517,9 @@ set(TRUNCATED_RESPONSE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(TRUNCATED_RESPONSE_TEST_HEADERS
@@ -1529,6 +1580,9 @@ set(API_OPTIMIZATION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(API_OPTIMIZATION_TEST_HEADERS
@@ -1598,6 +1652,9 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
     ../usagi/src/sessioninfo.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(MYLISTCARDMANAGER_TEST_HEADERS
@@ -1815,6 +1872,9 @@ set(DUPLICATE_DETECTION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(DUPLICATE_DETECTION_TEST_HEADERS
