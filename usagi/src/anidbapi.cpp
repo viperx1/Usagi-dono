@@ -140,8 +140,6 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// Create local_files table for directory watcher feature
 		// Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
 		// binding_status: 0=not_bound, 1=bound_to_anime, 2=not_anime
-		// marked_for_deletion: 0=keep, 1=marked for deletion (duplicate)
-		// duplicate_score: higher score = better quality/preference (used to determine which duplicate to keep)
 		query.exec("CREATE TABLE IF NOT EXISTS `local_files`("
 		           "`id` INTEGER PRIMARY KEY AUTOINCREMENT, "
 		           "`path` TEXT UNIQUE, "
@@ -149,19 +147,13 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		           "`status` INTEGER DEFAULT 0, "
 		           "`ed2k_hash` TEXT, "
 		           "`binding_status` INTEGER DEFAULT 0, "
-		           "`file_size` BIGINT, "
-		           "`marked_for_deletion` INTEGER DEFAULT 0, "
-		           "`duplicate_score` INTEGER DEFAULT 0)");
+		           "`file_size` BIGINT)");
 		// Add ed2k_hash column to local_files if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `local_files` ADD COLUMN `ed2k_hash` TEXT");
 		// Add binding_status column to local_files if it doesn't exist (for existing databases)
 		query.exec("ALTER TABLE `local_files` ADD COLUMN `binding_status` INTEGER DEFAULT 0");
 		// Add file_size column to local_files for duplicate detection (for existing databases)
 		query.exec("ALTER TABLE `local_files` ADD COLUMN `file_size` BIGINT");
-		// Add marked_for_deletion column to flag duplicate files for deletion (for existing databases)
-		query.exec("ALTER TABLE `local_files` ADD COLUMN `marked_for_deletion` INTEGER DEFAULT 0");
-		// Add duplicate_score column to prioritize which duplicate to keep (for existing databases)
-		query.exec("ALTER TABLE `local_files` ADD COLUMN `duplicate_score` INTEGER DEFAULT 0");
 		// Add local_file column to mylist if it doesn't exist (references local_files.id)
 		query.exec("ALTER TABLE `mylist` ADD COLUMN `local_file` INTEGER");
 		query.exec("CREATE TABLE IF NOT EXISTS `group`(`gid` INTEGER PRIMARY KEY, `name` TEXT, `shortname` TEXT);");

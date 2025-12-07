@@ -160,17 +160,6 @@ void MyListFilterSidebar::setupUI()
     viewedLayout->addWidget(m_showOnlyUnwatchedCheckbox);
     mainLayout->addWidget(viewedGroup);
     
-    // Show marked for deletion checkbox
-    QGroupBox *deletionGroup = new QGroupBox("Deletion Status");
-    QVBoxLayout *deletionLayout = new QVBoxLayout(deletionGroup);
-    
-    m_showMarkedForDeletionCheckbox = new QCheckBox("Show only marked for deletion");
-    connect(m_showMarkedForDeletionCheckbox, &QCheckBox::clicked,
-            this, &MyListFilterSidebar::onFilterChanged);
-    
-    deletionLayout->addWidget(m_showMarkedForDeletionCheckbox);
-    mainLayout->addWidget(deletionGroup);
-    
     // Adult content filter group
     QGroupBox *adultContentGroup = new QGroupBox("Adult Content");
     QVBoxLayout *adultContentLayout = new QVBoxLayout(adultContentGroup);
@@ -220,11 +209,6 @@ QString MyListFilterSidebar::getCompletionFilter() const
 bool MyListFilterSidebar::getShowOnlyUnwatched() const
 {
     return m_showOnlyUnwatchedCheckbox->isChecked();
-}
-
-bool MyListFilterSidebar::getShowMarkedForDeletion() const
-{
-    return m_showMarkedForDeletionCheckbox->isChecked();
 }
 
 int MyListFilterSidebar::getSortIndex() const
@@ -291,11 +275,6 @@ void MyListFilterSidebar::setShowOnlyUnwatched(bool checked)
     m_showOnlyUnwatchedCheckbox->setChecked(checked);
 }
 
-void MyListFilterSidebar::setShowMarkedForDeletion(bool checked)
-{
-    m_showMarkedForDeletionCheckbox->setChecked(checked);
-}
-
 void MyListFilterSidebar::setInMyListOnly(bool checked)
 {
     m_inMyListCheckbox->setChecked(checked);
@@ -320,7 +299,6 @@ void MyListFilterSidebar::resetFilters()
     m_typeFilter->setCurrentIndex(0);
     m_completionFilter->setCurrentIndex(0);
     m_showOnlyUnwatchedCheckbox->setChecked(false);
-    m_showMarkedForDeletionCheckbox->setChecked(false);
     m_inMyListCheckbox->setChecked(true);  // Default to showing only mylist
     m_showSeriesChainCheckbox->setChecked(false);  // Default to not showing series chain
     m_adultContentFilter->setCurrentIndex(1);  // Reset to "Hide 18+"

@@ -1598,7 +1598,6 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
     ../usagi/src/sessioninfo.cpp
-    ../usagi/src/filemarkinfo.cpp
 )
 
 set(MYLISTCARDMANAGER_TEST_HEADERS
@@ -1623,7 +1622,6 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
     ../usagi/src/anidbgroupinfo.h
     ../usagi/src/applicationsettings.h
     ../usagi/src/sessioninfo.h
-    ../usagi/src/filemarkinfo.h
 )
 
 add_executable(test_mylistcardmanager ${MYLISTCARDMANAGER_TEST_SOURCES} ${MYLISTCARDMANAGER_TEST_HEADERS})
@@ -1767,14 +1765,12 @@ set(WATCHSESSIONMANAGER_TEST_SOURCES
     ../usagi/src/watchsessionmanager.cpp
     ../usagi/src/logger.cpp
     ../usagi/src/sessioninfo.cpp
-    ../usagi/src/filemarkinfo.cpp
 )
 
 set(WATCHSESSIONMANAGER_TEST_HEADERS
     ../usagi/src/watchsessionmanager.h
     ../usagi/src/logger.h
     ../usagi/src/sessioninfo.h
-    ../usagi/src/filemarkinfo.h
 )
 
 add_executable(test_watchsessionmanager ${WATCHSESSIONMANAGER_TEST_SOURCES} ${WATCHSESSIONMANAGER_TEST_HEADERS})

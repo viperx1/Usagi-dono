@@ -35,7 +35,6 @@ public:
     QString getTypeFilter() const;
     QString getCompletionFilter() const;
     bool getShowOnlyUnwatched() const;
-    bool getShowMarkedForDeletion() const;
     int getSortIndex() const;
     bool getSortAscending() const;
     QString getAdultContentFilter() const;
@@ -48,7 +47,6 @@ public:
     void setTypeFilter(const QString& typeData);
     void setCompletionFilter(const QString& completionData);
     void setShowOnlyUnwatched(bool checked);
-    void setShowMarkedForDeletion(bool checked);
     void setInMyListOnly(bool checked);
     void setShowSeriesChain(bool checked);
     void setAdultContentFilter(const QString& filterData);
@@ -87,7 +85,6 @@ private:
     QComboBox *m_typeFilter;
     QComboBox *m_completionFilter;
     QCheckBox *m_showOnlyUnwatchedCheckbox;
-    QCheckBox *m_showMarkedForDeletionCheckbox;
     QCheckBox *m_inMyListCheckbox;
     QCheckBox *m_showSeriesChainCheckbox;
     QComboBox *m_sortComboBox;

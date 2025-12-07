@@ -2168,9 +2168,6 @@ void Window::saveMylistSorting()
     q.addBindValue(filterSidebar->getShowOnlyUnwatched() ? 1 : 0);
     q.exec();
     
-    q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_deletion', ?)");
-    q.addBindValue(filterSidebar->getShowMarkedForDeletion() ? 1 : 0);
-    q.exec();
     
     q.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('mylist_filter_inmylist', ?)");
     q.addBindValue(filterSidebar->getInMyListOnly() ? 1 : 0);
@@ -2188,11 +2185,10 @@ void Window::saveMylistSorting()
     LOG(QString("Saved mylist sort settings: index=%1, ascending=%2")
         .arg(filterSidebar->getSortIndex())
         .arg(filterSidebar->getSortAscending()));
-    LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3, deletion=%4")
+    LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3")
         .arg(filterSidebar->getTypeFilter())
         .arg(filterSidebar->getCompletionFilter())
-        .arg(filterSidebar->getShowOnlyUnwatched())
-        .arg(filterSidebar->getShowMarkedForDeletion()));
+        .arg(filterSidebar->getShowOnlyUnwatched()));
     LOG(QString("Saved mylist view settings: inmylist=%1, serieschain=%2, adult=%3")
         .arg(filterSidebar->getInMyListOnly())
         .arg(filterSidebar->getShowSeriesChain())
@@ -2244,9 +2240,6 @@ void Window::restoreMylistSorting()
         filterSidebar->setShowOnlyUnwatched(settings["mylist_filter_unwatched"].toInt() != 0);
     }
     
-    if (settings.contains("mylist_filter_deletion")) {
-        filterSidebar->setShowMarkedForDeletion(settings["mylist_filter_deletion"].toInt() != 0);
-    }
     
     if (settings.contains("mylist_filter_inmylist")) {
         filterSidebar->setInMyListOnly(settings["mylist_filter_inmylist"].toInt() != 0);
@@ -4982,9 +4975,8 @@ void Window::applyMylistFilters()
 	QString typeFilter = filterSidebar->getTypeFilter();
 	QString completionFilter = filterSidebar->getCompletionFilter();
 	bool showOnlyUnwatched = filterSidebar->getShowOnlyUnwatched();
-	bool showMarkedForDeletion = filterSidebar->getShowMarkedForDeletion();
-	QString adultContentFilter = filterSidebar->getAdultContentFilter();
 	bool inMyListOnly = filterSidebar->getInMyListOnly();
+	QString adultContentFilter = filterSidebar->getAdultContentFilter();
 	bool showSeriesChain = filterSidebar->getShowSeriesChain();
 	
 	// Check if we need to handle MyList filter change
@@ -5182,27 +5174,6 @@ void Window::applyMylistFilters()
 			// Show only if there are unwatched episodes
 			visible = visible && ((normalEpisodes > normalViewed) || (otherEpisodes > otherViewed));
 		}
-		
-		// Apply marked for deletion filter
-		if (showMarkedForDeletion) {
-			// Check if this anime has any files marked for deletion
-			bool hasMarkedFiles = false;
-			if (watchSessionManager) {
-				// Query all lids for this anime from mylist table
-				QSqlDatabase db = QSqlDatabase::database();
-				if (db.isOpen()) {
-					QSqlQuery q(db);
-					q.prepare("SELECT lid FROM mylist WHERE aid = ?");
-					q.addBindValue(aid);
-					if (q.exec()) {
-						while (q.next()) {
-						}
-					}
-				}
-			}
-			visible = visible && hasMarkedFiles;
-		}
-		
 		// Apply adult content filter
 		if (adultContentFilter == "hide") {
 			bool is18Restricted = card ? card->is18Restricted() : cachedData.is18Restricted();
