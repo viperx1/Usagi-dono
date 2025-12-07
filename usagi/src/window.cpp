@@ -5306,6 +5306,21 @@ void Window::applyMylistFilters()
 			animeToProcess = QSet<int>(filteredAnimeIds.constBegin(), filteredAnimeIds.constEnd());
 		}
 		
+		// Preload card creation data for any newly added anime from series chain expansion
+		// This ensures that when cards are created, the data is already available
+		QSet<int> originalFilteredSet = QSet<int>(filteredAnimeIds.constBegin(), filteredAnimeIds.constEnd());
+		QList<int> newlyAddedAnime;
+		for (int aid : std::as_const(animeToProcess)) {
+			if (!originalFilteredSet.contains(aid) && !cardManager->hasCachedData(aid)) {
+				newlyAddedAnime.append(aid);
+			}
+		}
+		
+		if (!newlyAddedAnime.isEmpty()) {
+			LOG(QString("[Window] Preloading card creation data for %1 newly added anime from series chain expansion").arg(newlyAddedAnime.size()));
+			cardManager->preloadCardCreationData(newlyAddedAnime);
+		}
+		
 		// Group anime by series chain and order them sequentially
 		if (!animeToProcess.isEmpty()) {
 			// Check for missing relation data and request it
