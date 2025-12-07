@@ -5284,6 +5284,10 @@ void Window::applyMylistFilters()
 			LOG(QString("[Window] Series chain: Search text '%1' is not empty, expanding chains").arg(searchText));
 			// Expand search results to include entire series chains
 			for (int aid : filteredAnimeIds) {
+				// Always add the original anime that matched the search
+				// (it's already in filteredAnimeIds, so it passed all filters)
+				animeToProcess.insert(aid);
+				
 				QList<int> seriesChain;
 				if (!chainCache.contains(aid)) {
 					seriesChain = watchSessionManager->getSeriesChain(aid);
@@ -5301,7 +5305,7 @@ void Window::applyMylistFilters()
 					seriesChain = chainCache[aid];
 				}
 				
-				// Add all anime in the chain to the set
+				// Add all other anime in the chain to the set (if they're available)
 				for (int chainAid : seriesChain) {
 					// Only add if it's in the full list of available anime (O(1) lookup with set)
 					if (allAnimeIdsSet.contains(chainAid)) {
