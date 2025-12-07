@@ -88,30 +88,9 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         m_expandedChainAnimeIds.clear();
         
         if (chainModeEnabled) {
-            // Build chains BEFORE sorting - with expansion enabled
-            LOG(QString("[MyListCardManager] Building chains from %1 anime IDs with expansion").arg(aids.size()));
-            m_chainList = buildChainsFromAnimeIds(aids, true);  // Enable chain expansion
-            
-            // Collect all anime IDs from chains (includes expanded anime)
-            QSet<int> allAnimeInChains;
-            for (const AnimeChain& chain : m_chainList) {
-                for (int aid : chain.getAnimeIds()) {
-                    allAnimeInChains.insert(aid);
-                }
-            }
-            
-            // Track which anime were added by expansion
-            QSet<int> originalAids = QSet<int>(aids.begin(), aids.end());
-            for (int aid : allAnimeInChains) {
-                if (!originalAids.contains(aid)) {
-                    m_expandedChainAnimeIds.insert(aid);
-                    
-                    // Check if this expanded anime needs full data preload
-                    if (!m_cardCreationDataCache.contains(aid) || m_cardCreationDataCache[aid].nameRomaji.isEmpty()) {
-                        expandedAnimeNeedingData.append(aid);
-                    }
-                }
-            }
+            // Build chains BEFORE sorting - NO EXPANSION initially to avoid needing unloaded data
+            LOG(QString("[MyListCardManager] Building chains from %1 anime IDs WITHOUT expansion (initial pass)").arg(aids.size()));
+            m_chainList = buildChainsFromAnimeIds(aids, false);  // Disable expansion for now
             
             // Build aid -> chain index map
             m_aidToChainIndex.clear();
@@ -121,11 +100,11 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 }
             }
             
-            // Use all anime from chains (original + expanded)
-            finalAnimeIds = allAnimeInChains.values();
+            // Use only filtered anime for now
+            finalAnimeIds = aids;
             
-            LOG(QString("[MyListCardManager] Built %1 chains from %2 anime (%3 original + %4 expanded)")
-                .arg(m_chainList.size()).arg(finalAnimeIds.size()).arg(aids.size()).arg(m_expandedChainAnimeIds.size()));
+            LOG(QString("[MyListCardManager] Built %1 chains from %2 anime (no expansion)")
+                .arg(m_chainList.size()).arg(finalAnimeIds.size()));
         } else {
             // Normal mode: clear chain data
             m_chainList.clear();
@@ -136,12 +115,6 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         m_orderedAnimeIds = finalAnimeIds;
         LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs, chain mode %2")
             .arg(finalAnimeIds.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
-    }
-    
-    // Preload data for expanded anime (outside mutex to avoid deadlock)
-    if (!expandedAnimeNeedingData.isEmpty()) {
-        LOG(QString("[MyListCardManager] Preloading data for %1 expanded chain anime").arg(expandedAnimeNeedingData.size()));
-        preloadCardCreationData(expandedAnimeNeedingData);
     }
     
     // Update virtual layout AFTER releasing the mutex to avoid deadlock
