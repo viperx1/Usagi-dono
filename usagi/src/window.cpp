@@ -5388,6 +5388,10 @@ void Window::applyMylistFilters()
 			for (int aid : std::as_const(animeToProcess)) {
 				if (!chainCache.contains(aid)) {
 					QList<int> seriesChain = watchSessionManager->getSeriesChain(aid);
+					// If chain is empty (shouldn't happen, but handle it), add the anime itself
+					if (seriesChain.isEmpty()) {
+						seriesChain.append(aid);
+					}
 					for (int chainAid : seriesChain) {
 						chainCache[chainAid] = seriesChain;
 					}
@@ -5399,11 +5403,14 @@ void Window::applyMylistFilters()
 			
 			for (int aid : std::as_const(animeToProcess)) {
 				QList<int> chain = chainCache.value(aid);
-				if (!chain.isEmpty()) {
-					int firstAid = chain.first();  // Use first anime as group key
-					if (!chainGroups.contains(firstAid)) {
-						chainGroups[firstAid] = chain;
-					}
+				// Safety check: if chain is still empty, create one with just this anime
+				if (chain.isEmpty()) {
+					chain.append(aid);
+					chainCache[aid] = chain;
+				}
+				int firstAid = chain.first();  // Use first anime as group key
+				if (!chainGroups.contains(firstAid)) {
+					chainGroups[firstAid] = chain;
 				}
 			}
 			
