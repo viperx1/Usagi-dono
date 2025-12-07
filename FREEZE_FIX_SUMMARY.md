@@ -7,48 +7,113 @@ The application was freezing during startup after loading the mylist data. The l
 [23:30:02.269] [mylistcardmanager.cpp:484] [MyListCardManager] Rebuilt ordered list: 621 anime in 546 chains
 ```
 
-## Root Cause Analysis
+## Root Cause Analysis (UPDATED after issue #846)
 
-The freeze was caused by a **redundant virtual layout refresh** operation in chain sorting mode.
+The freeze was caused by calling `refresh()` from **within** `sortChains()` creating a re-entrancy issue.
 
-### Call Sequence (Before Fix)
+### Call Sequence Analysis
 
-1. `window.cpp:4185` - Calls `cardManager->sortChains()`
-2. Inside `sortChains()` at `mylistcardmanager.cpp:490` - Calls `m_virtualLayout->setItemCount(621)`
-3. Inside `sortChains()` at `mylistcardmanager.cpp:492` - Calls `m_virtualLayout->refresh()` ✅ First refresh
-4. Returns from `sortChains()` back to `window.cpp`
-5. `window.cpp:4197` - Calls `mylistVirtualLayout->refresh()` ❌ **REDUNDANT SECOND REFRESH**
+**Initial understanding (issue #844):**
+The freeze appeared to happen right after sortChains completed, suggesting a redundant refresh call.
 
-The second `refresh()` call was redundant because:
-- `sortChains()` already refreshed the virtual layout after reordering the chains
-- Both `m_virtualLayout` (in MyListCardManager) and `mylistVirtualLayout` (in Window) reference the **same object**
-- Calling `refresh()` twice in quick succession could cause:
-  - Widget creation/destruction conflicts
-  - Event processing issues
-  - Layout calculation race conditions
+**Detailed analysis (issues #845 and #846 with comprehensive logging):**
+1. First `refresh()` completes successfully before sorting
+2. `window.cpp:4185` - Calls `cardManager->sortChains()`
+3. Inside `sortChains()` at `mylistcardmanager.cpp:492` - Calls `m_virtualLayout->refresh()`
+4. Inside `refresh()` - Calls `updateVisibleItems()` 
+5. Inside `updateVisibleItems()` - Calls `createOrReuseWidget()` for index 0
+6. Inside `createOrReuseWidget()` at line 680 - Calls `m_itemFactory(index)` ❌ **FREEZE HERE**
 
-### Regular Sorting vs Chain Sorting
+The factory callback (`createCardForIndex`) never returns when called from within the `sortChains()` context, indicating a **re-entrancy issue**.
 
-- **Regular sorting** (line 4472): Window calls `refresh()` directly after reordering - this is correct
-- **Chain sorting** (line 4197): Window called `refresh()` after `sortChains()` already did it - this was redundant
+### Why Re-entrancy Causes the Freeze
 
-## Solution
+When `refresh()` is called from within `sortChains()`:
+- The sorting operation holds certain state/locks
+- `refresh()` triggers widget operations that may process Qt events
+- These events may try to access state that's being modified by sortChains
+- This creates a deadlock or infinite wait situation
 
-Removed the redundant `refresh()` call at line 4197 in `window.cpp` for chain sorting mode.
+### The Solution
+
+**Remove the `refresh()` call from inside `sortChains()`** and call it AFTER `sortChains()` returns in `window.cpp`.
+
+This ensures:
+- sortChains completes its reordering operation fully
+- The refresh happens in a clean context without re-entrancy
+- No simultaneous state modification and widget updates
 
 ### Changes Made
 
-**File:** `usagi/src/window.cpp`
+**Files Modified:**
+- `usagi/src/mylistcardmanager.cpp` - Removed `refresh()` call from `sortChains()`
+- `usagi/src/window.cpp` - Added `refresh()` call AFTER `sortChains()` returns
 
-**Before:**
+**Before (commit 5a1bd57):**
 ```cpp
+// In mylistcardmanager.cpp sortChains():
+m_virtualLayout->setItemCount(m_orderedAnimeIds.size());
+m_virtualLayout->refresh();  // ❌ Called from within sortChains - causes re-entrancy freeze
+
+// In window.cpp:
 cardManager->sortChains(criteria, sortAscending);
 animeIds = cardManager->getAnimeIdList();
+// No refresh here because we thought sortChains handled it
+```
 
-// If using virtual scrolling, refresh the layout
+**After (commit b5fd99d):**
+```cpp
+// In mylistcardmanager.cpp sortChains():
+// No refresh call - just complete the sorting operation
+
+// In window.cpp:
+cardManager->sortChains(criteria, sortAscending);
+animeIds = cardManager->getAnimeIdList();
 if (mylistVirtualLayout) {
-    mylistVirtualLayout->refresh();  // ❌ REDUNDANT
+    mylistVirtualLayout->refresh();  // ✅ Called AFTER sortChains returns - no re-entrancy
 }
+```
+
+## Debug Logging Journey
+
+The fix was identified through systematic debug logging across multiple iterations:
+
+### Issue #844 (Original Report)
+- User running old code without debug logs
+- Freeze at line 484: "Rebuilt ordered list: 621 anime in 546 chains"
+
+### Commits b7968ab, 15bd088, 86053dd
+- Added comprehensive logging to sortChains(), refresh(), calculateLayout(), updateVisibleItems()
+- Replaced qDebug() with LOG() macro for consistency
+
+### Issue #845 (First Test with Debug Logs)
+- Confirmed user running updated code
+- Freeze identified in widget creation loop at line 600-604
+
+### Commit ab61ec4
+- Added detailed per-iteration logging in updateVisibleItems loop
+- Added step-by-step logging in createOrReuseWidget (factory, parent, geometry, show, signal)
+
+### Issue #846 (Pinpoint Exact Freeze)
+- Logs showed first refresh() completes successfully
+- sortChains() called and rebuilds list
+- sortChains() calls refresh() internally
+- Second refresh() freezes when calling m_itemFactory(0)
+- Factory callback never returns - **re-entrancy issue identified**
+
+### Commit b5fd99d (The Fix)
+- Removed refresh() from inside sortChains()
+- Added refresh() in window.cpp AFTER sortChains() returns
+- Eliminates re-entrancy by calling refresh in clean context
+
+## Testing Recommendations
+
+1. **Basic test**: Start the app and verify it loads without freezing
+2. **Chain sorting test**: Toggle series chain mode on and verify sorting works
+3. **Multiple sorts**: Try changing sort criteria multiple times
+4. **Performance test**: Check that the app remains responsive after loading
+
+## Related Files Modified
 ```
 
 **After:**
