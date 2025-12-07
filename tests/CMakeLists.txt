@@ -78,6 +78,16 @@ function(skip_automoc_for_usagi_sources target_name)
     endforeach()
 endfunction()
 
+# ==========================================================
+# COMMON DEPENDENCIES FOR ANIDBAPI TESTS
+# ==========================================================
+# SOLID classes required by anidbapi.cpp (created in SOLID refactoring phases 1-2)
+set(ANIDBAPI_SOLID_CLASS_SOURCES
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
+)
+
 # Test 1: Hash functions test
 set(HASH_TEST_SOURCES
     test_hash.cpp
@@ -160,10 +170,7 @@ set(ANIME_MASK_PARSING_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(ANIME_MASK_PARSING_TEST_HEADERS
@@ -258,10 +265,7 @@ set(ANIDBAPI_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(ANIDBAPI_TEST_HEADERS
@@ -320,10 +324,7 @@ set(COMPRESSION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(COMPRESSION_TEST_HEADERS
@@ -383,10 +384,7 @@ set(TIMEOUT_RETRY_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(TIMEOUT_RETRY_TEST_HEADERS
@@ -445,10 +443,7 @@ set(ANIME_TITLES_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(ANIME_TITLES_TEST_HEADERS
@@ -753,10 +748,7 @@ set(HASH_STORAGE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(HASH_STORAGE_TEST_HEADERS
@@ -850,10 +842,7 @@ set(HASH_REUSE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(HASH_REUSE_TEST_HEADERS
@@ -912,10 +901,7 @@ set(BATCH_LOCALIDENTIFY_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(BATCH_LOCALIDENTIFY_TEST_HEADERS
@@ -974,10 +960,7 @@ set(HASH_DUPLICATE_REUSE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(HASH_DUPLICATE_REUSE_TEST_HEADERS
@@ -1054,10 +1037,7 @@ set(THREAD_SAFETY_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(THREAD_SAFETY_TEST_HEADERS
@@ -1116,10 +1096,7 @@ set(IMMEDIATE_IDENTIFICATION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(IMMEDIATE_IDENTIFICATION_TEST_HEADERS
@@ -1178,10 +1155,7 @@ set(BATCH_HASH_RETRIEVAL_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(BATCH_HASH_RETRIEVAL_TEST_HEADERS
@@ -1240,10 +1214,7 @@ set(UI_FREEZE_FIX_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(UI_FREEZE_FIX_TEST_HEADERS
@@ -1304,10 +1275,7 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(HASHER_THREAD_TEST_HEADERS
@@ -1374,10 +1342,7 @@ set(HASHER_THREADPOOL_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(HASHER_THREADPOOL_TEST_HEADERS
@@ -1454,10 +1419,7 @@ set(STOP_NON_BLOCKING_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(STOP_NON_BLOCKING_TEST_HEADERS
@@ -1520,10 +1482,7 @@ set(TRUNCATED_RESPONSE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(TRUNCATED_RESPONSE_TEST_HEADERS
@@ -1583,10 +1542,7 @@ set(API_OPTIMIZATION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(API_OPTIMIZATION_TEST_HEADERS
@@ -1655,10 +1611,7 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
     ../usagi/src/sessioninfo.cpp
 )
 
@@ -1876,10 +1829,7 @@ set(DUPLICATE_DETECTION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(DUPLICATE_DETECTION_TEST_HEADERS
@@ -1940,10 +1890,7 @@ set(BITRATE_PREFERENCES_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
+    ${ANIDBAPI_SOLID_CLASS_SOURCES}
 )
 
 set(BITRATE_PREFERENCES_TEST_HEADERS
