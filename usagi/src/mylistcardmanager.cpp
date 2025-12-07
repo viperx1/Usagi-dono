@@ -183,14 +183,17 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
     while (currentAid > 0 && !visited.contains(currentAid)) {
         if (availableAids.contains(currentAid)) {
             chain.append(currentAid);
-        }
-        visited.insert(currentAid);
-        
-        int sequelAid = findSequelAid(currentAid);
-        if (sequelAid == 0) {
+            visited.insert(currentAid);
+            
+            int sequelAid = findSequelAid(currentAid);
+            if (sequelAid == 0 || !availableAids.contains(sequelAid)) {
+                break;  // No sequel or sequel not in our filtered list
+            }
+            currentAid = sequelAid;
+        } else {
+            // Current anime not in available set - stop traversing
             break;
         }
-        currentAid = sequelAid;
     }
     
     return chain;
