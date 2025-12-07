@@ -6,8 +6,7 @@ CardFileInfo::CardFileInfo()
     , m_viewed(false)
     , m_localWatched(false)
     , m_lastPlayed(0)
-    , m_version(0)
-    , m_markType(FileMarkType::None)
+    , m_version(1)
 {
 }
 
@@ -18,8 +17,7 @@ CardFileInfo::CardFileInfo(int lid, int fid, const QString& fileName)
     , m_viewed(false)
     , m_localWatched(false)
     , m_lastPlayed(0)
-    , m_version(0)
-    , m_markType(FileMarkType::None)
+    , m_version(1)
 {
 }
 
@@ -42,6 +40,5 @@ void CardFileInfo::reset()
     m_resolution.clear();
     m_quality.clear();
     m_groupName.clear();
-    m_version = 0;
-    m_markType = FileMarkType::None;
+    m_version = 1;
 }

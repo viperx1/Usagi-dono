@@ -14,8 +14,6 @@ const QRegularExpression WatchSessionManager::s_epnoNumericRegex(R"(\d+)");
 
 WatchSessionManager::WatchSessionManager(QObject *parent)
     : QObject(parent)
-    , m_deletionInProgress(false)            // No deletion in progress initially
-    , m_deleteFromDisk(false)                // Will be set by deleteMarkedFiles()
     , m_aheadBuffer(DEFAULT_AHEAD_BUFFER)
     , m_thresholdType(DeletionThresholdType::FixedGB)
     , m_thresholdValue(DEFAULT_THRESHOLD_VALUE)
@@ -483,7 +481,7 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
 
 // ========== File Marking ==========
 
-int WatchSessionManager::calculateMarkScore(int lid) const
+int WatchSessionManager::calculateDeletionScore(int lid) const
 {
     // Base score - all files start with this
     int score = 50;  // Middle-of-the-road score
@@ -699,76 +697,144 @@ int WatchSessionManager::getTotalEpisodesForAnime(int aid) const
     return DEFAULT_EPISODE_COUNT;
 }
 
-FileMarkType WatchSessionManager::getFileMarkType(int lid) const
+bool WatchSessionManager::isDeletionNeeded() const
 {
-    if (m_fileMarks.contains(lid)) {
-        return m_fileMarks[lid].markType();
-    }
-    return FileMarkType::None;
-}
-
-void WatchSessionManager::setFileMarkType(int lid, FileMarkType markType)
-{
-    FileMarkInfo& info = m_fileMarks[lid];
-    info.setLid(lid);
-    info.setMarkType(markType);
-    info.setMarkScore(calculateMarkScore(lid));
-    
-    emit fileMarkChanged(lid, markType);
-}
-
-FileMarkInfo WatchSessionManager::getFileMarkInfo(int lid) const
-{
-    if (m_fileMarks.contains(lid)) {
-        FileMarkInfo info = m_fileMarks[lid];
-        info.setMarkScore(calculateMarkScore(lid));
-        return info;
+    if (!m_autoMarkDeletionEnabled) {
+        return false;
     }
     
-    FileMarkInfo info;
-    info.setLid(lid);
-    info.setAid(getAnimeIdForFile(lid));
-    info.setMarkScore(calculateMarkScore(lid));
-    info.setIsInActiveSession(info.aid() > 0 && hasActiveSession(info.aid()));
+    // Get available space on the watched drive (or application directory if not set)
+    QString pathToMonitor = m_watchedPath.isEmpty() ? QCoreApplication::applicationDirPath() : m_watchedPath;
+    QStorageInfo storage(pathToMonitor);
+    qint64 availableBytes = storage.bytesAvailable();
+    qint64 totalBytes = storage.bytesTotal();
     
-    return info;
+    double availableGB = availableBytes / (1024.0 * 1024.0 * 1024.0);
+    double totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
+    
+    double threshold = 0;
+    if (m_thresholdType == DeletionThresholdType::FixedGB) {
+        threshold = m_thresholdValue;
+    } else {
+        // Percentage threshold type: use totalGB to calculate threshold
+        threshold = (m_thresholdValue / 100.0) * totalGB;
+    }
+    
+    // Return true if below threshold
+    return availableGB < threshold;
 }
 
-QList<int> WatchSessionManager::getFilesForDeletion() const
+bool WatchSessionManager::deleteNextEligibleFile(bool deleteFromDisk)
 {
-    QList<QPair<int, int>> scoredFiles; // (lid, score)
+    // Check if deletion is needed based on space threshold
+    if (!isDeletionNeeded()) {
+        LOG("[WatchSessionManager] deleteNextEligibleFile: Space above threshold, no deletion needed");
+        return false;
+    }
     
-    for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
-        if (it.value().markType() == FileMarkType::ForDeletion) {
-            scoredFiles.append(qMakePair(it.key(), calculateMarkScore(it.key())));
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isOpen()) {
+        LOG("[WatchSessionManager] deleteNextEligibleFile: Database not open");
+        return false;
+    }
+    
+    // Get all local files with their scores
+    // Structure to hold candidate info: lid, score, path, anime_name
+    struct CandidateInfo {
+        int lid;
+        int score;
+        QString path;
+        QString animeName;
+    };
+    
+    QList<CandidateInfo> candidates;
+    
+    // Query mylist entries with local paths and anime names
+    QSqlQuery q(db);
+    bool querySuccess = q.exec(
+        "SELECT m.lid, lf.path, "
+        "COALESCE(NULLIF(a.nameromaji, ''), NULLIF(a.nameenglish, ''), NULLIF(a.namekanji, ''), '') as anime_name "
+        "FROM mylist m "
+        "JOIN local_files lf ON m.local_file = lf.id "
+        "LEFT JOIN anime a ON m.aid = a.aid "
+        "WHERE lf.path IS NOT NULL AND lf.path != ''");
+    
+    if (!querySuccess) {
+        LOG("[WatchSessionManager] deleteNextEligibleFile: Query failed");
+        return false;
+    }
+    
+    while (q.next()) {
+        CandidateInfo info;
+        info.lid = q.value(0).toInt();
+        info.path = q.value(1).toString();
+        info.animeName = q.value(2).toString();
+        
+        // Skip files that have failed deletion recently
+        if (m_failedDeletions.contains(info.lid)) {
+            continue;
         }
+        
+        // Verify the file actually exists on disk
+        QFileInfo fileInfo(info.path);
+        if (!fileInfo.exists()) {
+            LOG(QString("[WatchSessionManager] File in database but missing on disk: %1 (lid=%2) - cleaning up status")
+                .arg(info.path).arg(info.lid));
+            cleanupMissingFileStatus(info.lid);
+            continue;
+        }
+        
+        // Verify it's actually a file (not a directory)
+        if (!fileInfo.isFile()) {
+            LOG(QString("[WatchSessionManager] Non-file entry found: %1 (lid=%2) - cleaning up status")
+                .arg(info.path).arg(info.lid));
+            cleanupMissingFileStatus(info.lid);
+            continue;
+        }
+        
+        info.score = calculateDeletionScore(info.lid);
+        candidates.append(info);
     }
     
-    // Sort by score (ascending - lowest score = delete first)
-    std::sort(scoredFiles.begin(), scoredFiles.end(), 
-              [](const QPair<int, int>& a, const QPair<int, int>& b) {
-                  return a.second < b.second;
+    if (candidates.isEmpty()) {
+        LOG("[WatchSessionManager] deleteNextEligibleFile: No eligible files found");
+        return false;
+    }
+    
+    // Sort by score (ascending - lowest score = highest deletion priority)
+    std::sort(candidates.begin(), candidates.end(),
+              [](const CandidateInfo& a, const CandidateInfo& b) {
+                  return a.score < b.score;
               });
     
-    QList<int> result;
-    for (const auto& pair : scoredFiles) {
-        result.append(pair.first);
-    }
+    // Find the first file that can be safely deleted (doesn't create a gap)
+    // Pass empty set because we evaluate gaps against current database state
+    QSet<int> emptyDeletedSet;
     
-    return result;
-}
-
-QList<int> WatchSessionManager::getFilesForDownload() const
-{
-    QList<int> result;
-    
-    for (auto it = m_fileMarks.constBegin(); it != m_fileMarks.constEnd(); ++it) {
-        if (it.value().markType() == FileMarkType::ForDownload) {
-            result.append(it.key());
+    for (const auto& candidate : candidates) {
+        // Check if deleting this file would create a gap
+        if (wouldCreateGap(candidate.lid, emptyDeletedSet)) {
+            LOG(QString("[WatchSessionManager] deleteNextEligibleFile: Skipping lid=%1 (anime=%2) - would create gap in series")
+                .arg(candidate.lid).arg(candidate.animeName));
+            continue;
         }
+        
+        // Found a safe file to delete
+        QString fileName = QFileInfo(candidate.path).fileName();
+        LOG(QString("[WatchSessionManager] deleteNextEligibleFile: Deleting lid=%1, score=%2, anime=%3, file=%4")
+            .arg(candidate.lid)
+            .arg(candidate.score)
+            .arg(candidate.animeName, fileName));
+        
+        // Delete the file (this will trigger deleteFileRequested signal)
+        deleteFile(candidate.lid, deleteFromDisk);
+        return true;
     }
     
-    return result;
+    // No files can be safely deleted without creating gaps
+    LOG(QString("[WatchSessionManager] deleteNextEligibleFile: No safe files to delete from %1 candidates - all would create gaps")
+        .arg(candidates.size()));
+    return false;
 }
 
 bool WatchSessionManager::deleteFile(int lid, bool deleteFromDisk)
@@ -791,15 +857,9 @@ bool WatchSessionManager::deleteFile(int lid, bool deleteFromDisk)
         aid = aidQuery.value(0).toInt();
     }
     
-    // Remove from file marks
-    m_fileMarks.remove(lid);
-    
     // Emit signal to request file deletion (Window will handle it with API access)
     // Window will call onFileDeletionResult() when the operation completes
     emit deleteFileRequested(lid, deleteFromDisk);
-    
-    // Emit fileMarkChanged immediately since we've removed from marks
-    emit fileMarkChanged(lid, FileMarkType::None);
     
     LOG(QString("[WatchSessionManager] File deletion requested for lid=%1, aid=%2").arg(lid).arg(aid));
     return true;
@@ -825,334 +885,61 @@ void WatchSessionManager::cleanupMissingFileStatus(int lid)
         aid = aidQuery.value(0).toInt();
     }
     
-    // Remove from file marks if present
-    m_fileMarks.remove(lid);
-    
     // Emit signal to request file status cleanup (Window will handle it with API access)
     // deleteFromDisk=false because the file is already gone from disk
     // This will update local database and AniDB API to reflect the file's absence
     emit deleteFileRequested(lid, false);
     
-    // Emit fileMarkChanged immediately since we've removed from marks
-    emit fileMarkChanged(lid, FileMarkType::None);
-    
     LOG(QString("[WatchSessionManager] File status cleanup requested for lid=%1, aid=%2").arg(lid).arg(aid));
-}
-
-void WatchSessionManager::deleteMarkedFiles(bool deleteFromDisk)
-{
-    QList<int> filesToDelete = getFilesForDeletion();
-    
-    LOG(QString("[WatchSessionManager] deleteMarkedFiles: %1 files to delete").arg(filesToDelete.size()));
-    
-    // If already processing deletions, log warning and return
-    if (m_deletionInProgress) {
-        LOG("[WatchSessionManager] deleteMarkedFiles: Deletion already in progress, ignoring request");
-        return;
-    }
-    
-    // Clear any existing queue and populate with new files
-    m_deletionQueue = std::move(filesToDelete);
-    m_deleteFromDisk = deleteFromDisk;
-    
-    // Start processing the queue
-    processNextDeletion();
 }
 
 void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
 {
     if (success) {
         LOG(QString("[WatchSessionManager] File deletion succeeded for lid=%1, aid=%2").arg(lid).arg(aid));
+        // Remove from failed deletions list if it was there
+        m_failedDeletions.remove(lid);
         emit fileDeleted(lid, aid);
     } else {
-        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - not emitting fileDeleted").arg(lid).arg(aid));
+        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - attempting next file").arg(lid).arg(aid));
+        
+        // Add to failed deletions to avoid immediate retry
+        m_failedDeletions.insert(lid);
+        
+        // Try the next file if auto-deletion is enabled
+        if (m_enableActualDeletion) {
+            bool deletedNext = deleteNextEligibleFile(true);
+            if (!deletedNext) {
+                LOG("[WatchSessionManager] No more files available for deletion after failure");
+            }
+        }
     }
     
-    // Process next file in deletion queue (regardless of success/failure)
-    processNextDeletion();
-}
-
-void WatchSessionManager::processNextDeletion()
-{
-    // If queue is empty, mark deletion as complete
-    if (m_deletionQueue.isEmpty()) {
-        m_deletionInProgress = false;
-        LOG("[WatchSessionManager] processNextDeletion: Queue empty, deletion complete");
-        return;
-    }
-    
-    // Mark deletion as in progress before taking from queue
-    m_deletionInProgress = true;
-    
-    // Get next file to delete
-    int lid = m_deletionQueue.takeFirst();
-    
-    LOG(QString("[WatchSessionManager] processNextDeletion: Processing lid=%1, %2 files remaining in queue")
-        .arg(lid).arg(m_deletionQueue.size()));
-    
-    // Delete the file (this will trigger deleteFileRequested signal)
-    deleteFile(lid, m_deleteFromDisk);
+    // Note: On success, we do NOT automatically process the next file.
+    // The caller must explicitly call deleteNextEligibleFile() again after receiving
+    // API confirmation to ensure proper sequencing and gap protection.
 }
 
 void WatchSessionManager::autoMarkFilesForDeletion()
 {
-    if (!m_autoMarkDeletionEnabled) {
+    // Simplified: Just trigger deletion if needed
+    // No marking - files are calculated on-demand
+    if (!m_enableActualDeletion) {
         return;
     }
     
-    QSqlDatabase db = QSqlDatabase::database();
-    if (!db.isOpen()) {
-        return;
-    }
-    
-    // Get available space on the watched drive (or application directory if not set)
-    QString pathToMonitor = m_watchedPath.isEmpty() ? QCoreApplication::applicationDirPath() : m_watchedPath;
-    QStorageInfo storage(pathToMonitor);
-    qint64 availableBytes = storage.bytesAvailable();
-    qint64 totalBytes = storage.bytesTotal();
-    
-    double availableGB = availableBytes / (1024.0 * 1024.0 * 1024.0);
-    double totalGB = totalBytes / (1024.0 * 1024.0 * 1024.0);
-    
-    double threshold = 0;
-    if (m_thresholdType == DeletionThresholdType::FixedGB) {
-        threshold = m_thresholdValue;
-    } else {
-        // Percentage threshold type: use totalGB to calculate threshold
-        threshold = (m_thresholdValue / 100.0) * totalGB;
-    }
-    
-    // Track which lids were updated
-    QSet<int> updatedLids;
-    
-    // If we're above threshold, clear deletion marks
-    if (availableGB >= threshold) {
-        for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
-            if (it.value().markType() == FileMarkType::ForDeletion) {
-                it.value().setMarkType(FileMarkType::None);
-                updatedLids.insert(it.key());
-                emit fileMarkChanged(it.key(), FileMarkType::None);
-            }
-        }
-        if (!updatedLids.isEmpty()) {
-            emit markingsUpdated(updatedLids);
-        }
-        return;
-    }
-    
-    // Calculate how many bytes we need to free
-    qint64 spaceToFreeBytes = static_cast<qint64>((threshold - availableGB) * 1024.0 * 1024.0 * 1024.0);
-    
-    // First, clear all existing deletion marks before calculating new ones
-    for (auto it = m_fileMarks.begin(); it != m_fileMarks.end(); ++it) {
-        if (it.value().markType() == FileMarkType::ForDeletion) {
-            it.value().setMarkType(FileMarkType::None);
-            emit fileMarkChanged(it.key(), FileMarkType::None);
-        }
-    }
-    
-    // Get mylist entries with local paths, file sizes, and anime names
-    // Use COALESCE with multiple fallbacks for anime name
-    QSqlQuery q(db);
-    bool querySuccess = q.exec(
-        "SELECT m.lid, lf.path, COALESCE(f.size, 0) as file_size, "
-        "COALESCE(NULLIF(a.nameromaji, ''), NULLIF(a.nameenglish, ''), NULLIF(a.namekanji, ''), '') as anime_name FROM mylist m "
-        "JOIN local_files lf ON m.local_file = lf.id "
-        "LEFT JOIN file f ON m.fid = f.fid "
-        "LEFT JOIN anime a ON m.aid = a.aid "
-        "WHERE lf.path IS NOT NULL AND lf.path != ''");
-    
-    if (!querySuccess) {
-        return;
-    }
-    
-    // Structure to hold candidate info: lid, score, size, path, anime_name
-    struct CandidateInfo {
-        int lid;
-        int score;
-        qint64 size;
-        QString path;
-        QString animeName;
-    };
-    
-    QList<CandidateInfo> candidates;
-    while (q.next()) {
-        CandidateInfo info;
-        info.lid = q.value(0).toInt();
-        info.path = q.value(1).toString();
-        info.size = q.value(2).toLongLong();
-        info.animeName = q.value(3).toString();
-        
-        // Verify the file actually exists on disk before considering it for deletion
-        // This prevents marking stale database entries where files have been deleted externally
-        QFileInfo fileInfo(info.path);
-        if (!fileInfo.exists()) {
-            LOG(QString("[WatchSessionManager] File marked in database but missing on disk: %1 (lid=%2) - cleaning up status")
-                .arg(info.path).arg(info.lid));
-            // Clean up the database status for this missing file (both locally and in API)
-            cleanupMissingFileStatus(info.lid);
-            continue;
-        }
-        
-        // Verify it's actually a file (not a directory)
-        if (!fileInfo.isFile()) {
-            LOG(QString("[WatchSessionManager] Non-file entry found: %1 (lid=%2) - cleaning up status")
-                .arg(info.path).arg(info.lid));
-            // Clean up the database status for this invalid entry
-            cleanupMissingFileStatus(info.lid);
-            continue;
-        }
-        
-        info.score = calculateMarkScore(info.lid);
-        candidates.append(info);
-    }
-    
-    // Sort by score (lowest first - most eligible for deletion)
-    std::sort(candidates.begin(), candidates.end(),
-              [](const CandidateInfo& a, const CandidateInfo& b) {
-                  return a.score < b.score;
-              });
-    
-    // Mark files for deletion until we've accumulated enough space to free
-    // Using "Approach B: Gap as Condition" with "Restart After Each Deletion"
-    // This ensures we always process the lowest-scored available file and maintain score ordering
-    qint64 accumulatedSpace = 0;
-    QSet<int> deletedEpisodeIds;  // Track fully deleted episodes for gap detection
-    
-    size_t index = 0;
-    while (accumulatedSpace < spaceToFreeBytes && index < candidates.size()) {
-        const auto& candidate = candidates[index];
-        
-        // CONSTRAINT 1: Gap prevention - skip files that would create gaps
-        if (wouldCreateGap(candidate.lid, deletedEpisodeIds)) {
-            LOG(QString("[WatchSessionManager] Skipping lid=%1 (score=%2, anime=%3): would create gap in series")
-                .arg(candidate.lid).arg(candidate.score).arg(candidate.animeName));
-            index++;
-            continue;
-        }
-        
-        // CONSTRAINT 2: Last file protection - additional check for last file of episode
-        if (isLastFileForEpisode(candidate.lid)) {
-            // This is the last file for its episode
-            // Double-check gap condition with current deletion state
-            if (wouldCreateGap(candidate.lid, deletedEpisodeIds)) {
-                LOG(QString("[WatchSessionManager] Skipping lid=%1 (score=%2, anime=%3): last file that would create gap")
-                    .arg(candidate.lid).arg(candidate.score).arg(candidate.animeName));
-                index++;
-                continue;
-            }
-        }
-        
-        // Mark this file for deletion
-        FileMarkInfo& markInfo = m_fileMarks[candidate.lid];
-        markInfo.setLid(candidate.lid);
-        markInfo.setMarkType(FileMarkType::ForDeletion);
-        markInfo.setMarkScore(candidate.score);
-        
-        accumulatedSpace += candidate.size;
-        
-        // Extract file name from path
-        QString fileName = QFileInfo(candidate.path).fileName();
-        
-        LOG(QString("[WatchSessionManager] Marked file for deletion: lid=%1, score=%2, size=%3 bytes, accumulated=%4 bytes, anime=%5, file=%6")
-            .arg(candidate.lid)
-            .arg(candidate.score)
-            .arg(candidate.size)
-            .arg(accumulatedSpace)
-            .arg(candidate.animeName, fileName));
-        
-        updatedLids.insert(candidate.lid);
-        emit fileMarkChanged(candidate.lid, FileMarkType::ForDeletion);
-        
-        // Track which episodes are fully deleted for gap detection
-        if (isLastFileForEpisode(candidate.lid)) {
-            int episodeId = getEpisodeIdForFile(candidate.lid);
-            if (episodeId > 0) {
-                deletedEpisodeIds.insert(episodeId);
-            }
-        }
-        
-        // CRITICAL: Restart from beginning after each deletion
-        // This ensures we always check newly-available endpoints first
-        // and strictly maintain score ordering
-        index = 0;
-    }
-    
-    // Log if quota not met due to series continuity constraints
-    if (accumulatedSpace < spaceToFreeBytes) {
-        LOG(QString("[WatchSessionManager] Could not meet space quota (%1 MB freed of %2 MB needed) - "
-                    "remaining files protected by series continuity")
-            .arg(accumulatedSpace / 1024.0 / 1024.0, 0, 'f', 2)
-            .arg(spaceToFreeBytes / 1024.0 / 1024.0, 0, 'f', 2));
-    }
-    
-    if (!updatedLids.isEmpty()) {
-        emit markingsUpdated(updatedLids);
-        
-        // Actually delete the marked files if deletion is enabled
-        if (m_enableActualDeletion) {
-            deleteMarkedFiles(true);
-        }
+    // Trigger deletion if space is below threshold
+    if (isDeletionNeeded()) {
+        deleteNextEligibleFile(true);
     }
 }
 
 void WatchSessionManager::autoMarkFilesForDownload()
 {
-    QSqlDatabase db = QSqlDatabase::database();
-    if (!db.isOpen()) {
-        return;
-    }
-    
-    // Track which lids were updated
-    QSet<int> updatedLids;
-    
-    // For each active session, mark files in the ahead buffer for download
-    for (auto it = m_sessions.constBegin(); it != m_sessions.constEnd(); ++it) {
-        const SessionInfo& session = it.value();
-        
-        if (!session.isActive()) {
-            continue;
-        }
-        
-        // Use global ahead buffer setting (applies to all anime)
-        int aheadBuffer = m_aheadBuffer;
-        
-        // Find files for episodes in the ahead buffer
-        for (int ep = session.currentEpisode(); ep <= session.currentEpisode() + aheadBuffer; ep++) {
-            // Query for files that match this episode and don't have a local file
-            QSqlQuery q(db);
-            q.prepare("SELECT m.lid FROM mylist m "
-                      "JOIN episode e ON m.eid = e.eid "
-                      "LEFT JOIN local_files lf ON m.lid = lf.lid "
-                      "WHERE m.aid = ? AND e.epno LIKE ? "
-                      "AND (lf.local_path IS NULL OR lf.local_path = '')");
-            q.addBindValue(session.aid());
-            q.addBindValue(QString::number(ep) + "%"); // Match episode number
-            
-            if (q.exec()) {
-                while (q.next()) {
-                    int lid = q.value(0).toInt();
-                    
-                    // Only mark if not already marked for something else
-                    if (!m_fileMarks.contains(lid) || 
-                        m_fileMarks[lid].markType() == FileMarkType::None) {
-                        FileMarkInfo& info = m_fileMarks[lid];
-                        info.setLid(lid);
-                        info.setMarkType(FileMarkType::ForDownload);
-                        info.setMarkScore(calculateMarkScore(lid));
-                        
-                        updatedLids.insert(lid);
-                        emit fileMarkChanged(lid, FileMarkType::ForDownload);
-                    }
-                }
-            }
-        }
-    }
-    
-    if (!updatedLids.isEmpty()) {
-        emit markingsUpdated(updatedLids);
-    }
+    // Removed: Marking system has been eliminated
+    // Download management now handled elsewhere
 }
+
 
 // ========== Settings ==========
 

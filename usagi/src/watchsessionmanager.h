@@ -7,7 +7,6 @@
 #include <QList>
 #include <QPair>
 #include <tuple>
-#include "filemarkinfo.h"
 #include "sessioninfo.h"
 
 /**
@@ -105,7 +104,7 @@ public:
     // ========== File Marking ==========
     
     /**
-     * @brief Calculate the mark score for a file
+     * @brief Calculate the deletion score for a file
      * 
      * Score factors:
      * - Is card hidden (-50 = less priority)
@@ -117,34 +116,7 @@ public:
      * @param lid MyList ID
      * @return Calculated score (higher = keep longer, lower = delete first)
      */
-    int calculateMarkScore(int lid) const;
-    
-    /**
-     * @brief Get the marking type for a file
-     * @param lid MyList ID
-     * @return Current mark type
-     */
-    FileMarkType getFileMarkType(int lid) const;
-    
-    /**
-     * @brief Set the marking type for a file
-     * @param lid MyList ID
-     * @param markType The new mark type
-     */
-    void setFileMarkType(int lid, FileMarkType markType);
-    
-    /**
-     * @brief Get full marking info for a file
-     * @param lid MyList ID
-     * @return FileMarkInfo structure with all details
-     */
-    FileMarkInfo getFileMarkInfo(int lid) const;
-    
-    /**
-     * @brief Get all files marked for deletion, sorted by score
-     * @return List of LIDs sorted by deletion priority (lowest score first)
-     */
-    QList<int> getFilesForDeletion() const;
+    int calculateDeletionScore(int lid) const;
     
     /**
      * @brief Actually delete a file that was marked for deletion
@@ -162,36 +134,42 @@ public:
     bool deleteFile(int lid, bool deleteFromDisk = true);
     
     /**
-     * @brief Delete all files currently marked for deletion
+     * @brief Delete the next eligible file based on space threshold
      * 
-     * Processes all files in the deletion queue, deleting them one by one.
-     * Files are deleted in order of their mark score (lowest first).
+     * Calculates which file should be deleted on-demand based on:
+     * - Current available disk space vs threshold
+     * - Deletion scores (lower score = delete first)
+     * - Gap protection (won't delete files that create gaps)
      * 
-     * @param deleteFromDisk If true, delete the physical files from disk
+     * Deletes only one file at a time. Caller should wait for
+     * API confirmation before calling this again.
+     * 
+     * @param deleteFromDisk If true, delete the physical file from disk
+     * @return true if a file was deleted, false if no eligible files found
      */
-    void deleteMarkedFiles(bool deleteFromDisk = true);
+    bool deleteNextEligibleFile(bool deleteFromDisk = true);
     
     /**
-     * @brief Get all files marked for download
-     * @return List of LIDs marked for download
-     */
-    QList<int> getFilesForDownload() const;
-    
-    /**
-      * @brief Automatically mark files for deletion based on available space
+     * @brief Check if deletion is needed based on available space
      * 
-     * Uses the configured threshold settings to determine which files
-     * should be soft-marked for deletion.
+     * Compares current available space with configured threshold.
+     * 
+     * @return true if space is below threshold and deletion is needed
+     */
+    bool isDeletionNeeded() const;
+
+    /**
+     * @brief Trigger file deletion when space is low (simplified from marking system)
+     * 
+     * Checks if space is below threshold and triggers deleteNextEligibleFile() if needed.
+     * This replaces the complex marking logic with simple on-demand deletion triggering.
      */
     void autoMarkFilesForDeletion();
     
     /**
-     * @brief Automatically mark files for download based on session progress
+     * @brief Placeholder for download marking (removed)
      * 
-     * Marks files that should be downloaded based on:
-     * - Active sessions
-     * - Ahead buffer setting
-     * - Current playback position
+     * This method is now a no-op. Download management should be handled elsewhere.
      */
     void autoMarkFilesForDownload();
     
@@ -343,19 +321,6 @@ signals:
     void sessionStateChanged(int aid, bool isActive);
     
     /**
-     * @brief Emitted when file marking changes
-     * @param lid MyList ID
-     * @param markType New mark type
-     */
-    void fileMarkChanged(int lid, FileMarkType markType);
-    
-    /**
-     * @brief Emitted when files should be refreshed due to marking changes
-     * @param updatedLids Set of MyList IDs that were updated (empty means refresh all)
-     */
-    void markingsUpdated(const QSet<int>& updatedLids);
-    
-    /**
      * @brief Emitted when a file has been deleted
      * @param lid MyList ID of the deleted file
      * @param aid Anime ID the file belonged to
@@ -385,13 +350,8 @@ private:
     // Active sessions by anime ID
     QMap<int, SessionInfo> m_sessions;
     
-    // File markings (lid -> mark info)
-    mutable QMap<int, FileMarkInfo> m_fileMarks;
-    
-    // Deletion queue for sequential file deletion
-    QList<int> m_deletionQueue;                 // Queue of lids pending deletion
-    bool m_deletionInProgress;                  // True when a deletion is in progress
-    bool m_deleteFromDisk;                      // Whether to delete physical files
+    // Track failed deletions to avoid retrying immediately
+    QSet<int> m_failedDeletions;
     
     // Settings
     int m_aheadBuffer;                          // Episodes to keep ahead
@@ -415,15 +375,6 @@ private:
     void loadSettings();
     void saveSettings();
     void ensureTablesExist();
-    
-    /**
-     * @brief Process next file in deletion queue
-     * 
-     * Deletes one file at a time from the deletion queue. Called by deleteMarkedFiles()
-     * to start the deletion process and by onFileDeletionResult() to continue processing
-     * after API confirmation.
-     */
-    void processNextDeletion();
     
     // Helper methods for new marking criteria
     bool matchesPreferredAudioLanguage(int lid) const;

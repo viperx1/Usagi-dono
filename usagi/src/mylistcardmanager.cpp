@@ -1031,14 +1031,6 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, c
         fileInfo.setQuality(entry.quality);
         fileInfo.setGroupName(entry.groupName);
         
-        // Get file mark from WatchSessionManager (single source of truth)
-        if (m_watchSessionManager) {
-            fileInfo.setMarkType(m_watchSessionManager->getFileMarkType(entry.lid));
-        } else {
-            fileInfo.setMarkType(FileMarkType::None);
-        }
-        
-        // Assign version number
         episodeFileCount[eid]++;
         fileInfo.setVersion(episodeFileCount[eid]);
         
