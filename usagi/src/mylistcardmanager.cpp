@@ -1198,7 +1198,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     QString animeQuery = QString("SELECT a.aid, a.nameromaji, a.nameenglish, a.eptotal, "
                                 "at.title as anime_title, "
                                 "a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
-                                "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted "
+                                "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted, "
+                                "a.relaidlist, a.relaidtype "
                                 "FROM anime a "
                                 "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
                                 "WHERE a.aid IN (%1)").arg(aidsList);
@@ -1225,6 +1226,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
             data.tagWeightList = q.value(14).toString();
             data.isHidden = q.value(15).toInt() == 1;
             data.is18Restricted = q.value(16).toInt() == 1;
+            data.relaidlist = q.value(17).toString();
+            data.relaidtype = q.value(18).toString();
             data.hasData = true;
         }
     }

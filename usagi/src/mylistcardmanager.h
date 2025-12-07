@@ -213,6 +213,10 @@ private:
         bool is18Restricted;
         int eptotal;
         
+        // Relation data (for chain support)
+        QString relaidlist;  // Related anime IDs (apostrophe-separated)
+        QString relaidtype;  // Related anime types (apostrophe-separated)
+        
         // Statistics
         AnimeStats stats;
         

@@ -1,73 +1,67 @@
 #ifndef ANIMECHAIN_H
 #define ANIMECHAIN_H
 
-#include <QWidget>
-#include <QHBoxLayout>
-#include <QFrame>
 #include <QList>
-#include "animecard.h"
+#include <QString>
+#include <QPair>
 
 /**
- * AnimeChain - A widget that displays a series of related anime as a single chain unit
+ * AnimeChain - Data structure for managing anime series chains
  * 
- * This widget groups related anime (prequels/sequels) into a single visual element.
- * The chain maintains internal ordering (prequel -> sequel) while allowing
- * external sorting of chains relative to each other.
- * 
- * Layout:
- * +----------------------------------------------------+
- * | [Card A] -> [Card B] -> [Card C] ...             |
- * +----------------------------------------------------+
+ * This is a data layer (not a widget) that represents a series of related anime
+ * (prequels/sequels) and provides helper methods for chain-based operations
+ * like sorting and filtering.
  * 
  * Design principles:
- * - Each chain contains 1 or more anime cards
- * - Cards within a chain are ordered from prequel to sequel
- * - Chains can be sorted externally by various criteria
- * - The first anime in the chain is used as the representative for sorting
+ * - Pure data structure with no UI logic
+ * - Stores ordered list of anime IDs from prequel to sequel
+ * - Provides utility methods for chain operations
+ * - Used to simplify sorting/filtering logic when chain mode is enabled
  */
-class AnimeChain : public QFrame
+class AnimeChain
 {
-    Q_OBJECT
-    
 public:
-    explicit AnimeChain(QWidget *parent = nullptr);
-    virtual ~AnimeChain();
+    AnimeChain() = default;
+    
+    // Construct from a list of anime IDs (should be ordered prequel to sequel)
+    explicit AnimeChain(const QList<int>& animeIds) : m_animeIds(animeIds) {}
     
     // Get the list of anime IDs in this chain (ordered from prequel to sequel)
     QList<int> getAnimeIds() const { return m_animeIds; }
     
-    // Get the first (representative) anime ID for sorting
-    int getRepresentativeAnimeId() const;
+    // Get the first (representative) anime ID for external sorting
+    int getRepresentativeAnimeId() const {
+        return m_animeIds.isEmpty() ? 0 : m_animeIds.first();
+    }
     
-    // Add an anime card to this chain
-    void addCard(AnimeCard *card);
+    // Get the last anime ID in the chain
+    int getLastAnimeId() const {
+        return m_animeIds.isEmpty() ? 0 : m_animeIds.last();
+    }
     
-    // Clear all cards from this chain
-    void clear();
+    // Get chain size
+    int size() const { return m_animeIds.size(); }
     
-    // Get all cards in this chain
-    QList<AnimeCard*> getCards() const { return m_cards; }
+    // Check if chain is empty
+    bool isEmpty() const { return m_animeIds.isEmpty(); }
     
-    // Get card count
-    int getCardCount() const { return m_cards.size(); }
+    // Check if chain contains a specific anime ID
+    bool contains(int aid) const { return m_animeIds.contains(aid); }
     
-    // Size management
-    QSize sizeHint() const override;
-    QSize minimumSizeHint() const override;
+    // Add an anime ID to the chain (at the end, maintaining order)
+    void addAnime(int aid) { m_animeIds.append(aid); }
     
-signals:
-    void episodeClicked(int lid);
-    void cardClicked(int aid);
-    void fetchDataRequested(int aid);
-    void playAnimeRequested(int aid);
+    // Clear the chain
+    void clear() { m_animeIds.clear(); }
+    
+    // Parse relation data and build a series chain
+    // Returns a list of anime IDs in order from prequel to sequel
+    static QList<int> buildChainFromRelations(
+        int startAid,
+        const QMap<int, QPair<QString, QString>>& relationData);
     
 private:
-    QHBoxLayout *m_layout;
-    QList<AnimeCard*> m_cards;
-    QList<int> m_animeIds;
-    
-    void setupUI();
-    void connectCardSignals(AnimeCard *card);
+    QList<int> m_animeIds;  // Ordered list of anime IDs (prequel to sequel)
 };
 
 #endif // ANIMECHAIN_H

@@ -1,117 +1,84 @@
 #include "animechain.h"
-#include <QLabel>
+#include <QSet>
+#include <QMap>
 
-AnimeChain::AnimeChain(QWidget *parent)
-    : QFrame(parent)
-    , m_layout(nullptr)
+QList<int> AnimeChain::buildChainFromRelations(
+    int startAid,
+    const QMap<int, QPair<QString, QString>>& relationData)
 {
-    setupUI();
-}
-
-AnimeChain::~AnimeChain()
-{
-    clear();
-}
-
-void AnimeChain::setupUI()
-{
-    // Set frame style for visual grouping
-    setFrameShape(QFrame::Box);
-    setFrameShadow(QFrame::Raised);
-    setLineWidth(2);
+    QList<int> chain;
+    QSet<int> visited;
     
-    // Create horizontal layout for cards
-    m_layout = new QHBoxLayout(this);
-    m_layout->setContentsMargins(10, 10, 10, 10);
-    m_layout->setSpacing(15);  // Space between cards and arrows
-    
-    setLayout(m_layout);
-}
-
-void AnimeChain::addCard(AnimeCard *card)
-{
-    if (!card) {
-        return;
+    if (!relationData.contains(startAid)) {
+        // No relation data for this anime, return single-item chain
+        chain.append(startAid);
+        return chain;
     }
     
-    // If this is not the first card, add an arrow before it
-    if (!m_cards.isEmpty()) {
-        QLabel *arrow = new QLabel("→", this);
-        QFont arrowFont = arrow->font();
-        arrowFont.setPointSize(24);
-        arrowFont.setBold(true);
-        arrow->setFont(arrowFont);
-        arrow->setAlignment(Qt::AlignCenter);
-        m_layout->addWidget(arrow);
-    }
+    // Find the original prequel (first anime in the chain)
+    int currentAid = startAid;
+    QSet<int> prequelSearchVisited;
     
-    // Add the card
-    m_layout->addWidget(card);
-    m_cards.append(card);
-    m_animeIds.append(card->getAnimeId());
-    
-    // Connect card signals to chain signals
-    connectCardSignals(card);
-}
-
-void AnimeChain::clear()
-{
-    // Note: Cards are owned by their parent (usually the card manager)
-    // We just remove them from our layout without deleting them
-    while (m_layout->count() > 0) {
-        QLayoutItem *item = m_layout->takeAt(0);
-        if (item->widget()) {
-            item->widget()->setParent(nullptr);
-        }
-        delete item;
-    }
-    
-    m_cards.clear();
-    m_animeIds.clear();
-}
-
-int AnimeChain::getRepresentativeAnimeId() const
-{
-    return m_animeIds.isEmpty() ? 0 : m_animeIds.first();
-}
-
-void AnimeChain::connectCardSignals(AnimeCard *card)
-{
-    connect(card, &AnimeCard::episodeClicked, this, &AnimeChain::episodeClicked);
-    connect(card, &AnimeCard::cardClicked, this, &AnimeChain::cardClicked);
-    connect(card, &AnimeCard::fetchDataRequested, this, &AnimeChain::fetchDataRequested);
-    connect(card, &AnimeCard::playAnimeRequested, this, &AnimeChain::playAnimeRequested);
-}
-
-QSize AnimeChain::sizeHint() const
-{
-    if (m_cards.isEmpty()) {
-        return QSize(600, 450);
-    }
-    
-    // Calculate total width: sum of card widths + arrows + spacing
-    int totalWidth = 0;
-    int maxHeight = 0;
-    
-    for (int i = 0; i < m_cards.size(); ++i) {
-        QSize cardSize = m_cards[i]->sizeHint();
-        totalWidth += cardSize.width();
-        maxHeight = qMax(maxHeight, cardSize.height());
+    while (currentAid > 0 && !prequelSearchVisited.contains(currentAid)) {
+        prequelSearchVisited.insert(currentAid);
         
-        // Add space for arrow (except after last card)
-        if (i < m_cards.size() - 1) {
-            totalWidth += 50;  // Arrow width + spacing
+        if (!relationData.contains(currentAid)) {
+            break;
+        }
+        
+        const QPair<QString, QString>& relations = relationData[currentAid];
+        QStringList relAids = relations.first.split("'", Qt::SkipEmptyParts);
+        QStringList relTypes = relations.second.split("'", Qt::SkipEmptyParts);
+        
+        // Look for prequel (type code 2)
+        int prequelAid = 0;
+        for (int i = 0; i < qMin(relAids.size(), relTypes.size()); i++) {
+            QString typeStr = relTypes[i].toLower();
+            if (typeStr == "2" || typeStr.contains("prequel", Qt::CaseInsensitive)) {
+                prequelAid = relAids[i].toInt();
+                break;
+            }
+        }
+        
+        if (prequelAid > 0) {
+            currentAid = prequelAid;
+        } else {
+            break;
         }
     }
     
-    // Add margins
-    totalWidth += m_layout->contentsMargins().left() + m_layout->contentsMargins().right();
-    maxHeight += m_layout->contentsMargins().top() + m_layout->contentsMargins().bottom();
+    // Now build the chain from the original prequel following sequels
+    int chainStart = currentAid;
+    currentAid = chainStart;
     
-    return QSize(totalWidth, maxHeight);
-}
-
-QSize AnimeChain::minimumSizeHint() const
-{
-    return sizeHint();
+    while (currentAid > 0 && !visited.contains(currentAid)) {
+        chain.append(currentAid);
+        visited.insert(currentAid);
+        
+        if (!relationData.contains(currentAid)) {
+            break;
+        }
+        
+        const QPair<QString, QString>& relations = relationData[currentAid];
+        QStringList relAids = relations.first.split("'", Qt::SkipEmptyParts);
+        QStringList relTypes = relations.second.split("'", Qt::SkipEmptyParts);
+        
+        // Look for sequel (type code 1)
+        int sequelAid = 0;
+        for (int i = 0; i < qMin(relAids.size(), relTypes.size()); i++) {
+            QString typeStr = relTypes[i].toLower();
+            if (typeStr == "1" || typeStr.contains("sequel", Qt::CaseInsensitive)) {
+                sequelAid = relAids[i].toInt();
+                break;
+            }
+        }
+        
+        if (sequelAid > 0) {
+            currentAid = sequelAid;
+        } else {
+            break;
+        }
+    }
+    
+    return chain;
 }
