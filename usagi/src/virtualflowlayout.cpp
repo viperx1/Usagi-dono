@@ -599,7 +599,11 @@ void VirtualFlowLayout::updateVisibleItems()
     LOG(QString("[VirtualFlowLayout] Creating/reusing %1 widgets").arg(widgetCount));
     for (int idx = firstVisible; idx <= lastVisible; ++idx) {
         if (!m_visibleWidgets.contains(idx)) {
+            LOG(QString("[VirtualFlowLayout] About to call createOrReuseWidget for index %1").arg(idx));
             createOrReuseWidget(idx);
+            LOG(QString("[VirtualFlowLayout] createOrReuseWidget completed for index %1").arg(idx));
+        } else {
+            LOG(QString("[VirtualFlowLayout] Widget already exists for index %1, skipping").arg(idx));
         }
     }
     LOG("[VirtualFlowLayout] updateVisibleItems() complete");
@@ -660,39 +664,53 @@ void VirtualFlowLayout::getVisibleRange(int &firstVisible, int &lastVisible) con
 
 QWidget* VirtualFlowLayout::createOrReuseWidget(int index)
 {
+    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: entry for index %1").arg(index));
+    
     if (index < 0 || index >= m_itemCount || !m_itemFactory) {
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: invalid index or no factory, returning null"));
         return nullptr;
     }
     
     // Check if already in visible widgets map
     if (m_visibleWidgets.contains(index)) {
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: widget already exists for index %1").arg(index));
         return m_visibleWidgets[index];
     }
     
+    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: calling m_itemFactory for index %1").arg(index));
     // Get or create widget using factory
     // The factory may return an existing cached card from the card manager
     QWidget *widget = m_itemFactory(index);
+    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: m_itemFactory returned widget %1 for index %2").arg(widget ? "non-null" : "null").arg(index));
     
     if (widget) {
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: setting parent for index %1").arg(index));
         // Ensure proper parent (may have been unparented if recycled)
         if (widget->parent() != this) {
             widget->setParent(this);
         }
         
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: positioning widget for index %1").arg(index));
         // Position the widget
         int row = index / m_columnsPerRow;
         int col = index % m_columnsPerRow;
         int x = col * (m_itemSize.width() + m_hSpacing);
         int y = row * m_rowHeight;
         
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: calling setGeometry for index %1").arg(index));
         widget->setGeometry(x, y, m_itemSize.width(), m_itemSize.height());
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: calling show for index %1").arg(index));
         widget->show();
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: show completed for index %1").arg(index));
         
         m_visibleWidgets[index] = widget;
         
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: emitting widgetCreated for index %1").arg(index));
         emit widgetCreated(index, widget);
+        LOG(QString("[VirtualFlowLayout] createOrReuseWidget: signal emitted for index %1").arg(index));
     }
     
+    LOG(QString("[VirtualFlowLayout] createOrReuseWidget: returning for index %1").arg(index));
     return widget;
 }
 
