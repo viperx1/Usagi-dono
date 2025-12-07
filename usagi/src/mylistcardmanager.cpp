@@ -146,8 +146,28 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
             continue;
         }
         
-        // Mark all anime in this chain as processed
+        // CRITICAL FIX: Remove anime that are already processed from the chain
+        // This prevents duplicates when anime with broken relationships are appended
+        // to chains containing already-processed anime
+        QList<int> filteredChainAids;
         for (int chainAid : chainAids) {
+            if (!processedAids.contains(chainAid)) {
+                filteredChainAids.append(chainAid);
+            } else {
+                LOG(QString("[MyListCardManager] Skipping already-processed anime %1 in chain from %2")
+                    .arg(chainAid).arg(aid));
+            }
+        }
+        
+        // Skip this chain if all anime were already processed
+        if (filteredChainAids.isEmpty()) {
+            LOG(QString("[MyListCardManager] Chain from aid=%1 is empty after filtering processed anime, skipping")
+                .arg(aid));
+            continue;
+        }
+        
+        // Mark all anime in this chain as processed
+        for (int chainAid : filteredChainAids) {
             processedAids.insert(chainAid);
             
             // Debug: Check if this anime is NOT in the original input
@@ -158,16 +178,26 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         }
         
         // Create chain object
-        chains.append(AnimeChain(chainAids));
+        chains.append(AnimeChain(filteredChainAids));
     }
     
-    // Verify total anime count
+    // Verify total anime count and find duplicates
     int totalAnimeInChains = 0;
     QSet<int> allAnimeInChains;
-    for (const AnimeChain& chain : chains) {
+    QMap<int, int> animeOccurrences;  // Track how many times each anime appears
+    
+    for (int chainIdx = 0; chainIdx < chains.size(); ++chainIdx) {
+        const AnimeChain& chain = chains[chainIdx];
         for (int aid : chain.getAnimeIds()) {
             totalAnimeInChains++;
             allAnimeInChains.insert(aid);
+            animeOccurrences[aid]++;
+            
+            // Log if anime appears more than once
+            if (animeOccurrences[aid] > 1) {
+                LOG(QString("[MyListCardManager] ERROR: Anime %1 appears %2 times (chain %3)")
+                    .arg(aid).arg(animeOccurrences[aid]).arg(chainIdx));
+            }
         }
     }
     
@@ -193,6 +223,17 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 missingList.append(QString::number(aid));
             }
             LOG(QString("[MyListCardManager] Missing anime from chains: %1").arg(missingList.join(", ")));
+        }
+        
+        // Log duplicates
+        QStringList duplicates;
+        for (QMap<int, int>::const_iterator it = animeOccurrences.constBegin(); it != animeOccurrences.constEnd(); ++it) {
+            if (it.value() > 1) {
+                duplicates.append(QString("%1(x%2)").arg(it.key()).arg(it.value()));
+            }
+        }
+        if (!duplicates.isEmpty()) {
+            LOG(QString("[MyListCardManager] Duplicate anime in chains: %1").arg(duplicates.join(", ")));
         }
     }
     
@@ -260,12 +301,19 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
     int chainStart = expandChain ? currentAid : lastAvailableAid;
     currentAid = chainStart;
     
+    // Track if we've added startAid to ensure it's always included
+    bool startAidAdded = false;
+    
     while (currentAid > 0 && !visited.contains(currentAid)) {
         // When expanding, include all anime in chain
         // When not expanding, only include anime in availableAids
         if (expandChain || availableAids.contains(currentAid)) {
             chain.append(currentAid);
             visited.insert(currentAid);
+            
+            if (currentAid == startAid) {
+                startAidAdded = true;
+            }
             
             if (visited.size() > MAX_CHAIN_LENGTH) {
                 LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping forward traversal").arg(MAX_CHAIN_LENGTH));
@@ -292,6 +340,19 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
             // Current anime not in available set and not expanding - stop traversing
             break;
         }
+    }
+    
+    // CRITICAL FIX: Ensure startAid is in the chain
+    // If we started from a prequel but couldn't reach startAid via sequel relationships,
+    // append startAid to the chain to keep it with its prequel.
+    // This handles database inconsistencies where prequel->sequel relationships are not bidirectional.
+    if (!startAidAdded && (expandChain || availableAids.contains(startAid))) {
+        LOG(QString("[MyListCardManager] WARNING: startAid=%1 not reachable from chainStart=%2 via sequel relationships, appending to chain")
+            .arg(startAid).arg(chainStart));
+        
+        // Append the starting anime to the chain it belongs to (based on its prequel relationship)
+        // This keeps related anime together even when sequel relationships are broken
+        chain.append(startAid);
     }
     
     return chain;
