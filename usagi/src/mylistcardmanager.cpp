@@ -484,15 +484,10 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains")
         .arg(m_orderedAnimeIds.size()).arg(m_chainList.size()));
     
-    // Update virtual layout
-    // Note: We don't call refresh() here because it causes issues when called synchronously
-    // during sorting. The caller (window.cpp) will handle refreshing the layout after sorting completes.
-    if (m_virtualLayout) {
-        LOG("[MyListCardManager] sortChains complete - layout refresh deferred to caller");
-    } else {
-        LOG("[MyListCardManager] No virtual layout to update");
-    }
-    LOG("[MyListCardManager] sortChains complete");
+    // Note: We don't call refresh() here because it causes re-entrancy issues
+    // when called synchronously during sorting. The caller (window.cpp) will
+    // handle refreshing the layout after sorting completes.
+}
 }
 
 AnimeChain MyListCardManager::getChainForAnime(int aid) const
