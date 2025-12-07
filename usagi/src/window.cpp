@@ -5273,6 +5273,7 @@ void Window::applyMylistFilters()
 	
 	// If series chain display is enabled, group and order anime by their series chains
 	if (showSeriesChain && watchSessionManager) {
+		LOG(QString("[Window] Series chain: Starting with %1 filtered anime").arg(filteredAnimeIds.size()));
 		QSet<int> animeToProcess;  // Anime IDs to process for chain grouping
 		QMap<int, QList<int>> chainCache;  // Cache series chains to avoid redundant lookups
 		QSet<int> allAnimeIdsSet = QSet<int>(allAnimeIds.constBegin(), allAnimeIds.constEnd());  // Convert once for O(1) lookups
@@ -5280,11 +5281,18 @@ void Window::applyMylistFilters()
 		// If search text is provided, expand results to include full chains of matched anime
 		// Otherwise, just group the filtered results by their chains
 		if (!searchText.isEmpty()) {
+			LOG(QString("[Window] Series chain: Search text '%1' is not empty, expanding chains").arg(searchText));
 			// Expand search results to include entire series chains
 			for (int aid : filteredAnimeIds) {
 				QList<int> seriesChain;
 				if (!chainCache.contains(aid)) {
 					seriesChain = watchSessionManager->getSeriesChain(aid);
+					LOG(QString("[Window] Series chain: getSeriesChain(%1) returned %2 anime").arg(aid).arg(seriesChain.size()));
+					// If chain is empty (shouldn't happen, but handle it), add the anime itself
+					if (seriesChain.isEmpty()) {
+						seriesChain.append(aid);
+						LOG(QString("[Window] Series chain: Chain was empty for aid=%1, added itself").arg(aid));
+					}
 					// Cache the chain for all anime in it
 					for (int chainAid : seriesChain) {
 						chainCache[chainAid] = seriesChain;
@@ -5298,12 +5306,16 @@ void Window::applyMylistFilters()
 					// Only add if it's in the full list of available anime (O(1) lookup with set)
 					if (allAnimeIdsSet.contains(chainAid)) {
 						animeToProcess.insert(chainAid);
+					} else {
+						LOG(QString("[Window] Series chain: aid=%1 not in allAnimeIdsSet, skipping").arg(chainAid));
 					}
 				}
 			}
+			LOG(QString("[Window] Series chain: After expansion, animeToProcess has %1 anime").arg(animeToProcess.size()));
 		} else {
 			// No search text - just group the current filtered results
 			animeToProcess = QSet<int>(filteredAnimeIds.constBegin(), filteredAnimeIds.constEnd());
+			LOG(QString("[Window] Series chain: No search text, animeToProcess has %1 anime").arg(animeToProcess.size()));
 		}
 		
 		// Preload card creation data for any newly added anime from series chain expansion
@@ -5385,32 +5397,43 @@ void Window::applyMylistFilters()
 			}
 			
 			// Build chain cache for all anime we're processing
+			LOG(QString("[Window] Series chain: Building chain cache for %1 anime").arg(animeToProcess.size()));
 			for (int aid : std::as_const(animeToProcess)) {
 				if (!chainCache.contains(aid)) {
 					QList<int> seriesChain = watchSessionManager->getSeriesChain(aid);
+					LOG(QString("[Window] Series chain: Chain cache miss for aid=%1, getSeriesChain returned %2 anime").arg(aid).arg(seriesChain.size()));
 					// If chain is empty (shouldn't happen, but handle it), add the anime itself
 					if (seriesChain.isEmpty()) {
 						seriesChain.append(aid);
+						LOG(QString("[Window] Series chain: Chain was empty for aid=%1, added itself").arg(aid));
 					}
 					for (int chainAid : seriesChain) {
 						chainCache[chainAid] = seriesChain;
 					}
+				} else {
+					QList<int> existingChain = chainCache[aid];
+					LOG(QString("[Window] Series chain: Chain cache hit for aid=%1, has %2 anime in chain").arg(aid).arg(existingChain.size()));
 				}
 			}
 			
 			// Group by series chain (map from first anime in chain -> list of anime in that chain)
 			QMap<int, QList<int>> chainGroups;
 			
+			LOG(QString("[Window] Series chain: Grouping chains, animeToProcess has %1 anime").arg(animeToProcess.size()));
 			for (int aid : std::as_const(animeToProcess)) {
 				QList<int> chain = chainCache.value(aid);
 				// Safety check: if chain is still empty, create one with just this anime
 				if (chain.isEmpty()) {
 					chain.append(aid);
 					chainCache[aid] = chain;
+					LOG(QString("[Window] Series chain: Chain was empty for aid=%1 after cache lookup, created single-anime chain").arg(aid));
 				}
 				int firstAid = chain.first();  // Use first anime as group key
 				if (!chainGroups.contains(firstAid)) {
 					chainGroups[firstAid] = chain;
+					LOG(QString("[Window] Series chain: Created new chain group with firstAid=%1, chain size=%2").arg(firstAid).arg(chain.size()));
+				} else {
+					LOG(QString("[Window] Series chain: Chain group with firstAid=%1 already exists, skipping").arg(firstAid));
 				}
 			}
 			
@@ -5419,15 +5442,24 @@ void Window::applyMylistFilters()
 			QSet<int> addedIds;
 			filteredAnimeIds.clear();
 			
+			LOG(QString("[Window] Series chain: Rebuilding filteredAnimeIds from %1 chain groups").arg(chainGroups.size()));
 			for (const QList<int>& chain : std::as_const(chainGroups)) {
+				LOG(QString("[Window] Series chain: Processing chain with %1 anime").arg(chain.size()));
 				for (int aid : chain) {
 					// Only add if in the anime to process set and not already added
 					if (animeToProcess.contains(aid) && !addedIds.contains(aid) && allAnimeIdsSet.contains(aid)) {
 						filteredAnimeIds.append(aid);
 						addedIds.insert(aid);
+					} else {
+						LOG(QString("[Window] Series chain: Skipping aid=%1 (inProcess=%2, notAdded=%3, inAllAnime=%4)")
+						    .arg(aid)
+						    .arg(animeToProcess.contains(aid))
+						    .arg(!addedIds.contains(aid))
+						    .arg(allAnimeIdsSet.contains(aid)));
 					}
 				}
 			}
+			LOG(QString("[Window] Series chain: After rebuild, filteredAnimeIds has %1 anime").arg(filteredAnimeIds.size()));
 		}
 	}
 	
