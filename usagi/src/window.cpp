@@ -5466,7 +5466,6 @@ void Window::applyMylistFilters()
 	}
 	
 	// Update the card manager with the filtered list and chain mode flag
-	bool showSeriesChain = filterSidebar->getShowSeriesChain();
 	cardManager->setAnimeIdList(filteredAnimeIds, showSeriesChain);
 	
 	// If using virtual scrolling, refresh the layout
