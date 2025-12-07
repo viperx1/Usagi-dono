@@ -22,6 +22,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_layout(nullptr)
     , m_virtualLayout(nullptr)
     , m_watchSessionManager(nullptr)
+    , m_chainModeEnabled(false)  // Initialize chain mode as disabled
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
@@ -73,10 +74,39 @@ QList<int> MyListCardManager::getAnimeIdList() const
 
 void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 {
+    setAnimeIdList(aids, false);  // Default: chain mode disabled
+}
+
+void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
+{
     {
         QMutexLocker locker(&m_mutex);
+        m_chainModeEnabled = chainModeEnabled;
+        
+        if (chainModeEnabled) {
+            // Build chains BEFORE sorting
+            LOG(QString("[MyListCardManager] Building chains from %1 anime IDs").arg(aids.size()));
+            m_chainList = buildChainsFromAnimeIds(aids);
+            
+            // Build aid -> chain index map
+            m_aidToChainIndex.clear();
+            for (int i = 0; i < m_chainList.size(); ++i) {
+                for (int aid : m_chainList[i].getAnimeIds()) {
+                    m_aidToChainIndex[aid] = i;
+                }
+            }
+            
+            LOG(QString("[MyListCardManager] Built %1 chains from %2 anime")
+                .arg(m_chainList.size()).arg(aids.size()));
+        } else {
+            // Normal mode: clear chain data
+            m_chainList.clear();
+            m_aidToChainIndex.clear();
+        }
+        
         m_orderedAnimeIds = aids;
-        LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs").arg(aids.size()));
+        LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs, chain mode %2")
+            .arg(aids.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
     }
     
     // Update virtual layout AFTER releasing the mutex to avoid deadlock
@@ -84,6 +114,179 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids)
     if (m_virtualLayout) {
         m_virtualLayout->setItemCount(aids.size());
     }
+}
+
+QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& aids) const
+{
+    QList<AnimeChain> chains;
+    QSet<int> availableAids = QSet<int>(aids.begin(), aids.end());
+    QSet<int> processedAids;
+    
+    for (int aid : aids) {
+        if (processedAids.contains(aid)) {
+            continue;
+        }
+        
+        // Build chain starting from this anime
+        QList<int> chainAids = buildChainFromAid(aid, availableAids);
+        
+        // Mark all anime in this chain as processed
+        for (int chainAid : chainAids) {
+            processedAids.insert(chainAid);
+        }
+        
+        // Create chain object
+        chains.append(AnimeChain(chainAids));
+    }
+    
+    return chains;
+}
+
+QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& availableAids) const
+{
+    QList<int> chain;
+    QSet<int> visited;
+    
+    // Find the original prequel (first in chain)
+    int currentAid = startAid;
+    while (true) {
+        if (visited.contains(currentAid)) {
+            break;  // Cycle detected
+        }
+        visited.insert(currentAid);
+        
+        int prequelAid = findPrequelAid(currentAid);
+        if (prequelAid == 0 || !availableAids.contains(prequelAid)) {
+            break;  // No prequel or not in our list
+        }
+        currentAid = prequelAid;
+    }
+    
+    // Now build chain forward from the prequel
+    visited.clear();
+    int chainStart = currentAid;
+    
+    while (currentAid > 0 && !visited.contains(currentAid)) {
+        if (availableAids.contains(currentAid)) {
+            chain.append(currentAid);
+        }
+        visited.insert(currentAid);
+        
+        int sequelAid = findSequelAid(currentAid);
+        if (sequelAid == 0) {
+            break;
+        }
+        currentAid = sequelAid;
+    }
+    
+    return chain;
+}
+
+int MyListCardManager::findPrequelAid(int aid) const
+{
+    // Use cached relation data
+    if (!m_cardCreationDataCache.contains(aid)) {
+        return 0;
+    }
+    
+    const CardCreationData& data = m_cardCreationDataCache[aid];
+    if (data.relaidlist.isEmpty() || data.relaidtype.isEmpty()) {
+        return 0;
+    }
+    
+    QStringList aidList = data.relaidlist.split("'", Qt::SkipEmptyParts);
+    QStringList typeList = data.relaidtype.split("'", Qt::SkipEmptyParts);
+    
+    for (int i = 0; i < qMin(aidList.size(), typeList.size()); ++i) {
+        QString type = typeList[i].toLower();
+        // Type 2 = prequel
+        if (type == "2" || type.contains("prequel", Qt::CaseInsensitive)) {
+            return aidList[i].toInt();
+        }
+    }
+    
+    return 0;
+}
+
+int MyListCardManager::findSequelAid(int aid) const
+{
+    // Similar to findPrequelAid but looks for type 1 (sequel)
+    if (!m_cardCreationDataCache.contains(aid)) {
+        return 0;
+    }
+    
+    const CardCreationData& data = m_cardCreationDataCache[aid];
+    if (data.relaidlist.isEmpty() || data.relaidtype.isEmpty()) {
+        return 0;
+    }
+    
+    QStringList aidList = data.relaidlist.split("'", Qt::SkipEmptyParts);
+    QStringList typeList = data.relaidtype.split("'", Qt::SkipEmptyParts);
+    
+    for (int i = 0; i < qMin(aidList.size(), typeList.size()); ++i) {
+        QString type = typeList[i].toLower();
+        // Type 1 = sequel
+        if (type == "1" || type.contains("sequel", Qt::CaseInsensitive)) {
+            return aidList[i].toInt();
+        }
+    }
+    
+    return 0;
+}
+
+void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascending)
+{
+    QMutexLocker locker(&m_mutex);
+    
+    if (!m_chainModeEnabled || m_chainList.isEmpty()) {
+        LOG("[MyListCardManager] sortChains: chain mode not enabled or no chains");
+        return;
+    }
+    
+    LOG(QString("[MyListCardManager] Sorting %1 chains by criteria %2, ascending=%3")
+        .arg(m_chainList.size()).arg(static_cast<int>(criteria)).arg(ascending));
+    
+    // Sort chains using comparison function
+    std::sort(m_chainList.begin(), m_chainList.end(),
+              [this, criteria, ascending](const AnimeChain& a, const AnimeChain& b) {
+                  return a.compareWith(b, m_cardCreationDataCache, criteria, ascending) < 0;
+              });
+    
+    // Rebuild flattened anime ID list preserving internal chain order
+    m_orderedAnimeIds.clear();
+    m_aidToChainIndex.clear();
+    
+    for (int i = 0; i < m_chainList.size(); ++i) {
+        for (int aid : m_chainList[i].getAnimeIds()) {
+            m_orderedAnimeIds.append(aid);
+            m_aidToChainIndex[aid] = i;
+        }
+    }
+    
+    LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains")
+        .arg(m_orderedAnimeIds.size()).arg(m_chainList.size()));
+    
+    // Update virtual layout
+    if (m_virtualLayout) {
+        m_virtualLayout->setItemCount(m_orderedAnimeIds.size());
+        m_virtualLayout->refresh();
+    }
+}
+
+AnimeChain MyListCardManager::getChainForAnime(int aid) const
+{
+    QMutexLocker locker(&m_mutex);
+    int chainIndex = m_aidToChainIndex.value(aid, -1);
+    if (chainIndex >= 0 && chainIndex < m_chainList.size()) {
+        return m_chainList[chainIndex];
+    }
+    return AnimeChain();  // Empty chain
+}
+
+int MyListCardManager::getChainIndexForAnime(int aid) const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_aidToChainIndex.value(aid, -1);
 }
 
 AnimeCard* MyListCardManager::createCardForIndex(int index)

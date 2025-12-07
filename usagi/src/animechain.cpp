@@ -2,6 +2,22 @@
 #include <QSet>
 #include <QMap>
 
+bool AnimeChain::operator<(const AnimeChain& other) const
+{
+    // Default comparison: by representative anime ID
+    return getRepresentativeAnimeId() < other.getRepresentativeAnimeId();
+}
+
+bool AnimeChain::operator>(const AnimeChain& other) const
+{
+    return getRepresentativeAnimeId() > other.getRepresentativeAnimeId();
+}
+
+bool AnimeChain::operator==(const AnimeChain& other) const
+{
+    return getRepresentativeAnimeId() == other.getRepresentativeAnimeId();
+}
+
 QList<int> AnimeChain::buildChainFromRelations(
     int startAid,
     const QMap<int, QPair<QString, QString>>& relationData)
