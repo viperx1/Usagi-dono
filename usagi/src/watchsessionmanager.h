@@ -18,30 +18,6 @@ enum class DeletionThresholdType {
 };
 
 /**
- * @brief File mark type for tracking download/deletion intentions
- */
-enum class FileMarkType {
-    None = 0,           // No mark
-    ForDownload = 1,    // Marked for download
-    ForDeletion = 2     // Marked for deletion
-};
-
-/**
- * @brief Information about a file's mark status
- */
-class FileMarkInfo {
-public:
-    FileMarkInfo() : m_markType(FileMarkType::None) {}
-    explicit FileMarkInfo(FileMarkType markType) : m_markType(markType) {}
-    
-    FileMarkType markType() const { return m_markType; }
-    void setMarkType(FileMarkType markType) { m_markType = markType; }
-    
-private:
-    FileMarkType m_markType;
-};
-
-/**
  * @brief Manages watch sessions and file marking for download/deletion
  * 
  * This class provides:
@@ -141,69 +117,6 @@ public:
      * @return Calculated score (higher = keep longer, lower = delete first)
      */
     int calculateDeletionScore(int lid) const;
-    
-    /**
-     * @brief Calculate the mark score for a file (alias for calculateDeletionScore)
-     * 
-     * This is an alias method that calls calculateDeletionScore for backward compatibility.
-     * 
-     * @param lid MyList ID
-     * @return Calculated score (higher = keep longer, lower = delete first)
-     */
-    int calculateMarkScore(int lid) const;
-    
-    /**
-     * @brief Set the mark type for a file
-     * 
-     * Marks a file for download or deletion. These marks are stored in-memory only
-     * and are not persisted to the database.
-     * 
-     * @param lid MyList ID
-     * @param markType The mark type to set
-     */
-    void setFileMarkType(int lid, FileMarkType markType);
-    
-    /**
-     * @brief Get the mark type for a file
-     * 
-     * @param lid MyList ID
-     * @return The current mark type for the file
-     */
-    FileMarkType getFileMarkType(int lid) const;
-    
-    /**
-     * @brief Get file mark information
-     * 
-     * @param lid MyList ID
-     * @return FileMarkInfo object containing mark information
-     */
-    FileMarkInfo getFileMarkInfo(int lid) const;
-    
-    /**
-     * @brief Get list of files marked for deletion
-     * 
-     * @return List of MyList IDs marked for deletion
-     */
-    QList<int> getFilesForDeletion() const;
-    
-    /**
-     * @brief Get list of files marked for download
-     * 
-     * @return List of MyList IDs marked for download
-     */
-    QList<int> getFilesForDownload() const;
-    
-    /**
-     * @brief Delete files that have been marked for deletion
-     * 
-     * This method processes all files marked for deletion, deleting them one at a time.
-     * Only the first eligible file is deleted. Caller should wait for API confirmation
-     * and call this method again to delete the next file.
-     * 
-     * @param deleteFromDisk If true, delete the physical file from disk
-     * @return true if a deletion was initiated, false otherwise
-     */
-    bool deleteMarkedFiles(bool deleteFromDisk = true);
     
     /**
      * @brief Actually delete a file that was marked for deletion
@@ -439,9 +352,6 @@ private:
     
     // Track failed deletions to avoid retrying immediately
     QSet<int> m_failedDeletions;
-    
-    // File marks (in-memory only, not persisted)
-    QMap<int, FileMarkType> m_fileMarks;  // lid -> mark type
     
     // Settings
     int m_aheadBuffer;                          // Episodes to keep ahead
