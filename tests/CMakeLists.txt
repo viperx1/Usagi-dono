@@ -1946,3 +1946,30 @@ endif()
 
 add_test(NAME test_anidbfileinfo COMMAND test_anidbfileinfo -v2)
 
+# ==========================================================
+# test_card_filtering - Card filtering logic tests
+# ==========================================================
+add_executable(test_card_filtering
+    test_card_filtering.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animemetadatacache.cpp
+)
+
+target_link_libraries(test_card_filtering PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_card_filtering PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_card_filtering PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_card_filtering COMMAND test_card_filtering -v2)
+
+
