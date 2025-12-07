@@ -4792,46 +4792,8 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 			currentAid = aid;
 			currentTitles.clear();
 			
-			// Add romaji and english names from anime table
-			if (!romaji.isEmpty()) {
-				currentTitles.append(romaji);
-			}
-			if (!english.isEmpty() && english != romaji) {
-				currentTitles.append(english);
-			}
-			
-			// Add other name from anime table
-			if (!other.isEmpty()) {
-				QStringList otherList = other.split("'", Qt::SkipEmptyParts);
-				for (const QString &otherName : otherList) {
-					QString trimmed = otherName.trimmed();
-					if (!trimmed.isEmpty() && !currentTitles.contains(trimmed, Qt::CaseInsensitive)) {
-						currentTitles.append(trimmed);
-					}
-				}
-			}
-			
-			// Add short names from anime table
-			if (!shortNames.isEmpty()) {
-				QStringList shortList = shortNames.split("'", Qt::SkipEmptyParts);
-				for (const QString &shortName : shortList) {
-					QString trimmed = shortName.trimmed();
-					if (!trimmed.isEmpty() && !currentTitles.contains(trimmed, Qt::CaseInsensitive)) {
-						currentTitles.append(trimmed);
-					}
-				}
-			}
-			
-			// Add synonyms from anime table
-			if (!synonyms.isEmpty()) {
-				QStringList synonymList = synonyms.split("'", Qt::SkipEmptyParts);
-				for (const QString &synonym : synonymList) {
-					QString trimmed = synonym.trimmed();
-					if (!trimmed.isEmpty() && !currentTitles.contains(trimmed, Qt::CaseInsensitive)) {
-						currentTitles.append(trimmed);
-					}
-				}
-			}
+			// Add main titles from anime table using helper function
+			addAnimeTitlesToList(currentTitles, romaji, english, other, shortNames, synonyms);
 		}
 		
 		// Add alternative title from anime_titles table if not already in list
@@ -4846,6 +4808,53 @@ void Window::loadAnimeAlternativeTitlesForFiltering()
 	}
 	
 	LOG(QString("[Window] Loaded alternative titles for %1 anime").arg(animeAlternativeTitlesCache.size()));
+}
+
+// Helper function to parse and add anime titles from database fields to a title list
+// Extracts titles from romaji, english, other, shortNames, and synonyms fields
+void Window::addAnimeTitlesToList(QStringList& titles, const QString& romaji, const QString& english,
+                                   const QString& other, const QString& shortNames, const QString& synonyms)
+{
+	// Add romaji and english names from anime table
+	if (!romaji.isEmpty()) {
+		titles.append(romaji);
+	}
+	if (!english.isEmpty() && english != romaji) {
+		titles.append(english);
+	}
+	
+	// Add other name from anime table
+	if (!other.isEmpty()) {
+		QStringList otherList = other.split("'", Qt::SkipEmptyParts);
+		for (const QString &otherName : otherList) {
+			QString trimmed = otherName.trimmed();
+			if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
+				titles.append(trimmed);
+			}
+		}
+	}
+	
+	// Add short names from anime table
+	if (!shortNames.isEmpty()) {
+		QStringList shortList = shortNames.split("'", Qt::SkipEmptyParts);
+		for (const QString &shortName : shortList) {
+			QString trimmed = shortName.trimmed();
+			if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
+				titles.append(trimmed);
+			}
+		}
+	}
+	
+	// Add synonyms from anime table
+	if (!synonyms.isEmpty()) {
+		QStringList synonymList = synonyms.split("'", Qt::SkipEmptyParts);
+		for (const QString &synonym : synonymList) {
+			QString trimmed = synonym.trimmed();
+			if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
+				titles.append(trimmed);
+			}
+		}
+	}
 }
 
 // Update alternative titles for a single anime in the cache
@@ -4883,7 +4892,6 @@ void Window::updateAnimeAlternativeTitlesInCache(int aid)
 	bool hasData = false;
 	
 	while (q.next()) {
-		int qAid = q.value(0).toInt();
 		QString title = q.value(1).toString();
 		QString romaji = q.value(2).toString();
 		QString english = q.value(3).toString();
@@ -4892,49 +4900,9 @@ void Window::updateAnimeAlternativeTitlesInCache(int aid)
 		QString synonyms = q.value(6).toString();
 		
 		if (!hasData) {
-			// First row - add main titles from anime table
+			// First row - add main titles from anime table using helper function
 			hasData = true;
-			
-			// Add romaji and english names from anime table
-			if (!romaji.isEmpty()) {
-				titles.append(romaji);
-			}
-			if (!english.isEmpty() && english != romaji) {
-				titles.append(english);
-			}
-			
-			// Add other name from anime table
-			if (!other.isEmpty()) {
-				QStringList otherList = other.split("'", Qt::SkipEmptyParts);
-				for (const QString &otherName : otherList) {
-					QString trimmed = otherName.trimmed();
-					if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
-						titles.append(trimmed);
-					}
-				}
-			}
-			
-			// Add short names from anime table
-			if (!shortNames.isEmpty()) {
-				QStringList shortList = shortNames.split("'", Qt::SkipEmptyParts);
-				for (const QString &shortName : shortList) {
-					QString trimmed = shortName.trimmed();
-					if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
-						titles.append(trimmed);
-					}
-				}
-			}
-			
-			// Add synonyms from anime table
-			if (!synonyms.isEmpty()) {
-				QStringList synonymList = synonyms.split("'", Qt::SkipEmptyParts);
-				for (const QString &synonym : synonymList) {
-					QString trimmed = synonym.trimmed();
-					if (!trimmed.isEmpty() && !titles.contains(trimmed, Qt::CaseInsensitive)) {
-						titles.append(trimmed);
-					}
-				}
-			}
+			addAnimeTitlesToList(titles, romaji, english, other, shortNames, synonyms);
 		}
 		
 		// Add alternative title from anime_titles table if not already in list
@@ -4944,7 +4912,7 @@ void Window::updateAnimeAlternativeTitlesInCache(int aid)
 	}
 	
 	// Update cache with the titles (or remove if no data found)
-	if (hasData || !titles.isEmpty()) {
+	if (!titles.isEmpty()) {
 		animeAlternativeTitlesCache.addAnime(aid, titles);
 		LOG(QString("[Window] Updated alternative titles cache for AID %1 (%2 titles)").arg(aid).arg(titles.size()));
 	} else {
