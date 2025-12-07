@@ -149,6 +149,12 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         // Mark all anime in this chain as processed
         for (int chainAid : chainAids) {
             processedAids.insert(chainAid);
+            
+            // Debug: Check if this anime is NOT in the original input
+            if (!expandChains && !availableAids.contains(chainAid)) {
+                LOG(QString("[MyListCardManager] ERROR: Chain from aid=%1 contains aid=%2 which is NOT in input set!")
+                    .arg(aid).arg(chainAid));
+            }
         }
         
         // Create chain object
@@ -157,13 +163,37 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     
     // Verify total anime count
     int totalAnimeInChains = 0;
+    QSet<int> allAnimeInChains;
     for (const AnimeChain& chain : chains) {
-        totalAnimeInChains += chain.getAnimeIds().size();
+        for (int aid : chain.getAnimeIds()) {
+            totalAnimeInChains++;
+            allAnimeInChains.insert(aid);
+        }
     }
     
     if (totalAnimeInChains != availableAids.size()) {
-        LOG(QString("[MyListCardManager] WARNING: Chain building mismatch! Input: %1 unique anime, Chains contain: %2 anime")
-            .arg(availableAids.size()).arg(totalAnimeInChains));
+        LOG(QString("[MyListCardManager] WARNING: Chain building mismatch! Input: %1 unique anime, Chains contain: %2 anime (%3 unique)")
+            .arg(availableAids.size()).arg(totalAnimeInChains).arg(allAnimeInChains.size()));
+            
+        // Log which anime are extra
+        QSet<int> extraAnime = allAnimeInChains - availableAids;
+        if (!extraAnime.isEmpty()) {
+            QStringList extraList;
+            for (int aid : extraAnime) {
+                extraList.append(QString::number(aid));
+            }
+            LOG(QString("[MyListCardManager] Extra anime in chains (NOT in input): %1").arg(extraList.join(", ")));
+        }
+        
+        // Log which anime are missing
+        QSet<int> missingAnime = availableAids - allAnimeInChains;
+        if (!missingAnime.isEmpty()) {
+            QStringList missingList;
+            for (int aid : missingAnime) {
+                missingList.append(QString::number(aid));
+            }
+            LOG(QString("[MyListCardManager] Missing anime from chains: %1").arg(missingList.join(", ")));
+        }
     }
     
     return chains;
