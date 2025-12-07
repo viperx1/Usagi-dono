@@ -64,7 +64,8 @@ public:
     void setAnimeIdList(const QList<int>& aids, bool chainModeEnabled);
     
     // Build chains from anime IDs using cached relation data
-    QList<AnimeChain> buildChainsFromAnimeIds(const QList<int>& aids) const;
+    // If expandChains=true, includes related anime not in aids list
+    QList<AnimeChain> buildChainsFromAnimeIds(const QList<int>& aids, bool expandChains = false) const;
     
     // Sort chains using specified criteria
     void sortChains(AnimeChain::SortCriteria criteria, bool ascending);
@@ -269,9 +270,12 @@ private:
     AnimeStats calculateStatistics(int aid);
     
     // Chain building helpers
-    QList<int> buildChainFromAid(int startAid, const QSet<int>& availableAids) const;
+    QList<int> buildChainFromAid(int startAid, const QSet<int>& availableAids, bool expandChain = false) const;
     int findPrequelAid(int aid) const;
     int findSequelAid(int aid) const;
+    
+    // Load relation data for anime not in cache (for chain expansion)
+    void loadRelationDataForAnime(int aid) const;
     
     // Helper functions for common operations
     QString determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid);
@@ -305,6 +309,7 @@ private:
     QList<AnimeChain> m_chainList;          // List of chains
     QMap<int, int> m_aidToChainIndex;       // Anime ID -> chain index mapping
     bool m_chainModeEnabled;                // Is chain mode active
+    QSet<int> m_expandedChainAnimeIds;      // Anime IDs added by chain expansion (not in original mylist)
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;
