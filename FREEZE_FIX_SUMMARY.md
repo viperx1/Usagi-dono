@@ -78,9 +78,7 @@ To help identify the exact freeze location and assist with future debugging, com
    - Log before/after `sortMylistCards()` call
    - Log all steps in `onMylistLoadingFinished()`
 
-These logs use a mix of:
-- `LOG()` macro (custom logger to file) - for application-level events
-- `qDebug()` (Qt debug output) - for low-level layout operations
+All logs use the `LOG()` macro (custom logger to file) for consistency across the application.
 
 ## Expected Behavior After Fix
 
@@ -99,8 +97,10 @@ The application should:
 ## Related Files Modified
 
 - `usagi/src/mylistcardmanager.cpp` - Added debug logging, no logic changes
-- `usagi/src/virtualflowlayout.cpp` - Added debug logging and QDebug header
+- `usagi/src/virtualflowlayout.cpp` - Added debug logging using LOG() macro, removed QDebug header
 - `usagi/src/window.cpp` - Removed redundant refresh() call, added debug logging
+
+**Note**: All debug logging uses the `LOG()` macro for consistency. The initial implementation used `qDebug()` for low-level layout operations, but this was changed to `LOG()` to ensure all debug output goes to the log file rather than just Qt debug output.
 
 ## Technical Notes
 
