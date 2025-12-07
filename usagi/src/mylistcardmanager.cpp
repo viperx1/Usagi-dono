@@ -488,7 +488,6 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     // when called synchronously during sorting. The caller (window.cpp) will
     // handle refreshing the layout after sorting completes.
 }
-}
 
 AnimeChain MyListCardManager::getChainForAnime(int aid) const
 {
