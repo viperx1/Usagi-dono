@@ -484,11 +484,9 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains")
         .arg(m_orderedAnimeIds.size()).arg(m_chainList.size()));
     
-    // Update virtual layout
-    if (m_virtualLayout) {
-        m_virtualLayout->setItemCount(m_orderedAnimeIds.size());
-        m_virtualLayout->refresh();
-    }
+    // Note: We don't call refresh() here because it causes re-entrancy issues
+    // when called synchronously during sorting. The caller (window.cpp) will
+    // handle refreshing the layout after sorting completes.
 }
 
 AnimeChain MyListCardManager::getChainForAnime(int aid) const

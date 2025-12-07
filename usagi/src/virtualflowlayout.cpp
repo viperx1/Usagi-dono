@@ -455,6 +455,7 @@ void VirtualFlowLayout::calculateLayout()
     // Re-entrancy guard INSIDE calculateLayout to prevent recursive calls
     // This is the final defense against recursive layout crashes
     if (m_inLayoutUpdate) {
+        LOG("[VirtualFlowLayout] Re-entrancy detected in calculateLayout, preventing recursive call");
         recursionDepth--;
         return;
     }
@@ -465,6 +466,7 @@ void VirtualFlowLayout::calculateLayout()
     
     // Emergency stop if we're recursing too deep
     if (recursionDepth > 10) {
+        LOG(QString("[VirtualFlowLayout] ERROR: Recursion depth %1 exceeded in calculateLayout").arg(recursionDepth));
         recursionDepth--;
         return;
     }

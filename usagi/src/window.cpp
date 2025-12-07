@@ -2083,19 +2083,25 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     applyMylistFilters();
     
     // Apply sorting after filtering
+    LOG("[Window] Calling sortMylistCards()");
     sortMylistCards(filterSidebar->getSortIndex());
+    LOG("[Window] sortMylistCards() returned");
     
     mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
     LOG(QString("[Virtual Scrolling] Ready to display %1 anime").arg(aids.size()));
     
     // Mark initial loading as complete so new anime can be detected
+    LOG("[Window] Setting initial load complete");
     cardManager->setInitialLoadComplete();
+    LOG("[Window] Initial load complete set");
     
     // Perform initial scan for file marking after mylist is loaded
     if (watchSessionManager) {
         LOG("[Window] Mylist loaded, triggering initial file marking scan");
         watchSessionManager->performInitialScan();
+        LOG("[Window] Initial file marking scan triggered");
     }
+    LOG("[Window] onMylistLoadingFinished complete");
 }
 
 
@@ -4181,7 +4187,9 @@ void Window::sortMylistCards(int sortIndex)
 		// Get the updated anime ID list from card manager (already reordered)
 		animeIds = cardManager->getAnimeIdList();
 		
-		// If using virtual scrolling, refresh the layout
+		// Refresh the virtual layout to display the reordered items
+		// This must be done AFTER sortChains returns, not from within sortChains,
+		// to avoid re-entrancy issues during the sorting operation
 		if (mylistVirtualLayout) {
 			mylistVirtualLayout->refresh();
 		}
@@ -4197,6 +4205,7 @@ void Window::sortMylistCards(int sortIndex)
 		
 		// If not using virtual scrolling (backward compatibility), update the regular flow layout
 		if (!mylistVirtualLayout && mylistCardLayout) {
+			LOG("[Window] Updating flow layout for non-virtual mode");
 			// Remove all cards from layout
 			for (AnimeCard* const card : std::as_const(animeCards)) {
 				mylistCardLayout->removeWidget(card);
@@ -4205,6 +4214,7 @@ void Window::sortMylistCards(int sortIndex)
 			for (AnimeCard* const card : std::as_const(animeCards)) {
 				mylistCardLayout->addWidget(card);
 			}
+			LOG("[Window] Flow layout updated for non-virtual mode");
 		}
 		
 		return;  // Done with chain sorting
