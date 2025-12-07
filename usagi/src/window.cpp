@@ -4715,6 +4715,13 @@ void Window::loadMylistAsCards()
 		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
 		cardManager->preloadCardCreationData(aids);
 		LOG("[Window] Card data preload complete");
+		
+		// Preload relation data for all anime (for series chain functionality)
+		if (watchSessionManager) {
+			LOG(QString("[Window] Preloading relation data for %1 anime").arg(aids.size()));
+			watchSessionManager->preloadRelationData(aids);
+			LOG("[Window] Relation data preload complete");
+		}
 	}
 	
 	// Set the ordered anime ID list for virtual scrolling
@@ -5119,6 +5126,13 @@ void Window::applyMylistFilters()
 				mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
 				cardManager->preloadCardCreationData(aids);
 				LOG("[Window] Card data preload complete");
+				
+				// Preload relation data for all anime (for series chain functionality)
+				if (watchSessionManager) {
+					LOG(QString("[Window] Preloading relation data for %1 anime").arg(aids.size()));
+					watchSessionManager->preloadRelationData(aids);
+					LOG("[Window] Relation data preload complete");
+				}
 			}
 			
 			// Mark all anime titles as loaded

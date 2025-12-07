@@ -479,6 +479,14 @@ QList<int> WatchSessionManager::getSeriesChain(int aid) const
     return chain;
 }
 
+void WatchSessionManager::preloadRelationData(const QList<int>& aids)
+{
+    // Preload relation data for all specified anime
+    for (int aid : aids) {
+        loadAnimeRelations(aid);
+    }
+}
+
 // ========== File Marking ==========
 
 int WatchSessionManager::calculateDeletionScore(int lid) const
