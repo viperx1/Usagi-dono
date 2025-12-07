@@ -207,7 +207,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         
         // Log duplicates
         QStringList duplicates;
-        for (auto it = animeOccurrences.constBegin(); it != animeOccurrences.constEnd(); ++it) {
+        for (QMap<int, int>::const_iterator it = animeOccurrences.constBegin(); it != animeOccurrences.constEnd(); ++it) {
             if (it.value() > 1) {
                 duplicates.append(QString("%1(x%2)").arg(it.key()).arg(it.value()));
             }
