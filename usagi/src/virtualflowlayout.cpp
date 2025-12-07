@@ -8,6 +8,7 @@
 #include <QPainterPath>
 #include <QApplication>
 #include <QScopeGuard>
+#include <QDebug>
 #include <algorithm>
 #include <cmath>  // For M_PI
 
