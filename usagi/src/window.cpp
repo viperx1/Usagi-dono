@@ -2083,19 +2083,25 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     applyMylistFilters();
     
     // Apply sorting after filtering
+    LOG("[Window] Calling sortMylistCards()");
     sortMylistCards(filterSidebar->getSortIndex());
+    LOG("[Window] sortMylistCards() returned");
     
     mylistStatusLabel->setText(QString("MyList Status: %1 anime (virtual scrolling)").arg(aids.size()));
     LOG(QString("[Virtual Scrolling] Ready to display %1 anime").arg(aids.size()));
     
     // Mark initial loading as complete so new anime can be detected
+    LOG("[Window] Setting initial load complete");
     cardManager->setInitialLoadComplete();
+    LOG("[Window] Initial load complete set");
     
     // Perform initial scan for file marking after mylist is loaded
     if (watchSessionManager) {
         LOG("[Window] Mylist loaded, triggering initial file marking scan");
         watchSessionManager->performInitialScan();
+        LOG("[Window] Initial file marking scan triggered");
     }
+    LOG("[Window] onMylistLoadingFinished complete");
 }
 
 
@@ -4176,27 +4182,40 @@ void Window::sortMylistCards(int sortIndex)
 		}
 		
 		// MyListCardManager will sort chains externally while preserving internal order
+		LOG("[Window] Calling cardManager->sortChains()");
 		cardManager->sortChains(criteria, sortAscending);
+		LOG("[Window] cardManager->sortChains() returned");
 		
 		// Get the updated anime ID list from card manager (already reordered)
+		LOG("[Window] Getting anime ID list from card manager");
 		animeIds = cardManager->getAnimeIdList();
+		LOG(QString("[Window] Got %1 anime IDs from card manager").arg(animeIds.size()));
 		
 		// If using virtual scrolling, refresh the layout
 		if (mylistVirtualLayout) {
+			LOG("[Window] Refreshing virtual layout (chain mode)");
 			mylistVirtualLayout->refresh();
+			LOG("[Window] Virtual layout refresh complete (chain mode)");
+		} else {
+			LOG("[Window] No virtual layout to refresh (chain mode)");
 		}
 		
 		// Also update the legacy animeCards list order for backward compatibility
+		LOG("[Window] Building legacy animeCards list");
 		animeCards.clear();
+		int cardCount = 0;
 		for (int aid : animeIds) {
 			AnimeCard* card = cardManager->getCard(aid);
 			if (card) {
 				animeCards.append(card);
+				cardCount++;
 			}
 		}
+		LOG(QString("[Window] Built legacy animeCards list with %1 cards").arg(cardCount));
 		
 		// If not using virtual scrolling (backward compatibility), update the regular flow layout
 		if (!mylistVirtualLayout && mylistCardLayout) {
+			LOG("[Window] Updating flow layout for non-virtual mode");
 			// Remove all cards from layout
 			for (AnimeCard* const card : std::as_const(animeCards)) {
 				mylistCardLayout->removeWidget(card);
@@ -4205,8 +4224,10 @@ void Window::sortMylistCards(int sortIndex)
 			for (AnimeCard* const card : std::as_const(animeCards)) {
 				mylistCardLayout->addWidget(card);
 			}
+			LOG("[Window] Flow layout updated for non-virtual mode");
 		}
 		
+		LOG("[Window] Chain sorting complete, returning");
 		return;  // Done with chain sorting
 	}
 	

@@ -486,9 +486,15 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     
     // Update virtual layout
     if (m_virtualLayout) {
+        LOG("[MyListCardManager] Calling setItemCount on virtual layout");
         m_virtualLayout->setItemCount(m_orderedAnimeIds.size());
+        LOG("[MyListCardManager] Calling refresh on virtual layout");
         m_virtualLayout->refresh();
+        LOG("[MyListCardManager] Virtual layout refresh complete");
+    } else {
+        LOG("[MyListCardManager] No virtual layout to update");
     }
+    LOG("[MyListCardManager] sortChains complete");
 }
 
 AnimeChain MyListCardManager::getChainForAnime(int aid) const

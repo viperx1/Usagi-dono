@@ -270,26 +270,35 @@ void VirtualFlowLayout::ensureVisible(int index)
 
 void VirtualFlowLayout::refresh()
 {
+    qDebug() << "[VirtualFlowLayout] refresh() started";
     int savedScrollY = saveScrollPosition();
+    qDebug() << "[VirtualFlowLayout] Saved scroll position:" << savedScrollY;
     
     // Force recalculation and update of all visible items
     // We need to hide and clear all visible widgets first because after
     // sorting/filtering, the same index may now represent a different item
+    qDebug() << "[VirtualFlowLayout] Hiding" << m_visibleWidgets.size() << "visible widgets";
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
         if (it.value()) {
             it.value()->hide();
         }
     }
     m_visibleWidgets.clear();
+    qDebug() << "[VirtualFlowLayout] Visible widgets cleared";
     
     m_cachedFirstVisible = -1;
     m_cachedLastVisible = -1;
     // Let calculateLayout and updateVisibleItems handle their own re-entrancy guards
+    qDebug() << "[VirtualFlowLayout] Calling calculateLayout()";
     calculateLayout();
+    qDebug() << "[VirtualFlowLayout] Calling updateVisibleItems()";
     updateVisibleItems();
+    qDebug() << "[VirtualFlowLayout] Calling update()";
     update();
     
+    qDebug() << "[VirtualFlowLayout] Restoring scroll position";
     restoreScrollPosition(savedScrollY);
+    qDebug() << "[VirtualFlowLayout] refresh() complete";
 }
 
 void VirtualFlowLayout::clear()
@@ -448,6 +457,7 @@ void VirtualFlowLayout::onScrollChanged()
 
 void VirtualFlowLayout::calculateLayout()
 {
+    qDebug() << "[VirtualFlowLayout] calculateLayout() started";
     // Static recursion counter to detect infinite recursion (backup check)
     static thread_local int recursionDepth = 0;
     recursionDepth++;
@@ -455,6 +465,7 @@ void VirtualFlowLayout::calculateLayout()
     // Re-entrancy guard INSIDE calculateLayout to prevent recursive calls
     // This is the final defense against recursive layout crashes
     if (m_inLayoutUpdate) {
+        qDebug() << "[VirtualFlowLayout] Already in layout update, returning";
         recursionDepth--;
         return;
     }
@@ -465,6 +476,7 @@ void VirtualFlowLayout::calculateLayout()
     
     // Emergency stop if we're recursing too deep
     if (recursionDepth > 10) {
+        qDebug() << "[VirtualFlowLayout] Recursion depth" << recursionDepth << "exceeded, returning";
         recursionDepth--;
         return;
     }
@@ -480,6 +492,7 @@ void VirtualFlowLayout::calculateLayout()
     } else {
         m_columnsPerRow = qMax(1, (availableWidth + m_hSpacing) / (m_itemSize.width() + m_hSpacing));
     }
+    qDebug() << "[VirtualFlowLayout] Columns per row:" << m_columnsPerRow << "available width:" << availableWidth;
     
     m_rowHeight = m_itemSize.height() + m_vSpacing;
     
@@ -492,13 +505,17 @@ void VirtualFlowLayout::calculateLayout()
         m_contentHeight -= m_vSpacing;  // No spacing after last row
     }
     m_contentHeight += 10;  // Small padding at bottom
+    qDebug() << "[VirtualFlowLayout] Total rows:" << m_totalRows << "content height:" << m_contentHeight;
     
     // Update our minimum height to match content
+    qDebug() << "[VirtualFlowLayout] Setting minimum height to" << m_contentHeight;
     setMinimumHeight(m_contentHeight);
+    qDebug() << "[VirtualFlowLayout] Minimum height set";
     
     // Collect indices of widgets that may need to be removed (invalid or destroyed)
     QList<int> indicesToRemove;
     
+    qDebug() << "[VirtualFlowLayout] Repositioning" << m_visibleWidgets.size() << "visible widgets";
     for (auto it = m_visibleWidgets.begin(); it != m_visibleWidgets.end(); ++it) {
         int index = it.key();
         QWidget *widget = it.value();
@@ -525,10 +542,14 @@ void VirtualFlowLayout::calculateLayout()
     }
     
     // Remove any dead or null widget entries
+    if (!indicesToRemove.isEmpty()) {
+        qDebug() << "[VirtualFlowLayout] Removing" << indicesToRemove.size() << "dead widgets";
+    }
     for (int index : indicesToRemove) {
         m_visibleWidgets.remove(index);
     }
     
+    qDebug() << "[VirtualFlowLayout] calculateLayout() complete";
     recursionDepth--;
 }
 
@@ -539,15 +560,19 @@ void VirtualFlowLayout::updateVisibleItems()
     // 2. updateVisibleItems is typically called right after calculateLayout from the same entry point
     // 3. If called from a recursive event, calculateLayout's guard will block the chain
     
+    qDebug() << "[VirtualFlowLayout] updateVisibleItems() started";
     if (!m_itemFactory || m_itemCount == 0) {
+        qDebug() << "[VirtualFlowLayout] No factory or items, returning";
         return;
     }
     
     int firstVisible, lastVisible;
     getVisibleRange(firstVisible, lastVisible);
+    qDebug() << "[VirtualFlowLayout] Visible range:" << firstVisible << "to" << lastVisible;
     
     // Check if the range has changed
     if (firstVisible == m_cachedFirstVisible && lastVisible == m_cachedLastVisible) {
+        qDebug() << "[VirtualFlowLayout] Range unchanged, skipping update";
         return;  // No change, skip update
     }
     
@@ -562,6 +587,7 @@ void VirtualFlowLayout::updateVisibleItems()
             toRecycle.append(idx);
         }
     }
+    qDebug() << "[VirtualFlowLayout] Recycling" << toRecycle.size() << "widgets";
     
     // Recycle widgets that are no longer visible
     for (int idx : toRecycle) {
@@ -569,11 +595,14 @@ void VirtualFlowLayout::updateVisibleItems()
     }
     
     // Create widgets for newly visible items
+    int widgetCount = lastVisible - firstVisible + 1;
+    qDebug() << "[VirtualFlowLayout] Creating/reusing" << widgetCount << "widgets";
     for (int idx = firstVisible; idx <= lastVisible; ++idx) {
         if (!m_visibleWidgets.contains(idx)) {
             createOrReuseWidget(idx);
         }
     }
+    qDebug() << "[VirtualFlowLayout] updateVisibleItems() complete";
 }
 
 QRect VirtualFlowLayout::visibleRect() const
