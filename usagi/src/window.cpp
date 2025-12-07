@@ -4165,6 +4165,11 @@ void Window::sortMylistCards(int sortIndex)
 			case 2: // Aired Date
 				criteria = AnimeChain::SortCriteria::ByRepresentativeDate;
 				break;
+			case 3: // Episodes (Count) - use chain length as proxy
+				criteria = AnimeChain::SortCriteria::ByChainLength;
+				break;
+			case 4: // Completion % - use ID (no direct mapping available)
+			case 5: // Last Played - use ID (no direct mapping available)
 			default:
 				criteria = AnimeChain::SortCriteria::ByRepresentativeId;
 				break;
