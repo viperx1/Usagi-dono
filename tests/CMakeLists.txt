@@ -1876,6 +1876,10 @@ set(BITRATE_PREFERENCES_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/sessioninfo.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(BITRATE_PREFERENCES_TEST_HEADERS
