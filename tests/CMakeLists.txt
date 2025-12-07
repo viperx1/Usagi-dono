@@ -1303,6 +1303,9 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(HASHER_THREAD_TEST_HEADERS
@@ -1369,6 +1372,9 @@ set(HASHER_THREADPOOL_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(HASHER_THREADPOOL_TEST_HEADERS
@@ -1445,6 +1451,9 @@ set(STOP_NON_BLOCKING_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(STOP_NON_BLOCKING_TEST_HEADERS
@@ -1508,6 +1517,9 @@ set(TRUNCATED_RESPONSE_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(TRUNCATED_RESPONSE_TEST_HEADERS
@@ -1568,6 +1580,9 @@ set(API_OPTIMIZATION_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(API_OPTIMIZATION_TEST_HEADERS
@@ -1637,6 +1652,9 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
     ../usagi/src/sessioninfo.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
 )
 
 set(MYLISTCARDMANAGER_TEST_HEADERS
