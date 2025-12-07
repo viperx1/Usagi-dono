@@ -322,6 +322,9 @@ private:
 	// Mutex for protecting shared data between threads
 	QMutex backgroundLoadingMutex;
 	
+	// Mutex for protecting filter/sort operations to prevent race conditions
+	QMutex filterOperationsMutex;
+	
 	// Cache for hasher filter patterns (for performance)
 	QString cachedFilterMasks;
 	QList<QRegularExpression> cachedFilterRegexes;

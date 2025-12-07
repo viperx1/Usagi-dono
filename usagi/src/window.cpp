@@ -4103,6 +4103,9 @@ void Window::startPlaybackForFile(int lid)
 // Sort cards based on selected criterion
 void Window::sortMylistCards(int sortIndex)
 {
+	// Prevent concurrent sort operations to avoid race conditions
+	QMutexLocker locker(&filterOperationsMutex);
+	
 	// Get the list of anime IDs from the card manager
 	QList<int> animeIds = cardManager->getAnimeIdList();
 	
@@ -5041,6 +5044,9 @@ void Window::checkAndRequestChainRelations(int aid)
 // Apply filters to mylist cards
 void Window::applyMylistFilters()
 {
+	// Prevent concurrent filter operations to avoid race conditions
+	QMutexLocker locker(&filterOperationsMutex);
+	
 	// Use the stored full unfiltered list of anime IDs (not the current filtered list)
 	// This ensures that when filters are removed, previously hidden cards reappear
 	QList<int> allAnimeIds = allAnimeIdsList;
@@ -5445,6 +5451,12 @@ void Window::applyMylistFilters()
 						seriesChain.append(aid);
 						LOG(QString("[Window] Series chain: Chain was empty for aid=%1, added itself").arg(aid));
 					}
+					// If the anime we queried isn't in the returned chain, add it
+					if (!seriesChain.contains(aid)) {
+						seriesChain.append(aid);
+						LOG(QString("[Window] Series chain: aid=%1 not in its own chain, added it").arg(aid));
+					}
+					// Cache the chain for all anime in it (including the queried anime)
 					for (int chainAid : seriesChain) {
 						chainCache[chainAid] = seriesChain;
 					}
