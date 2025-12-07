@@ -133,6 +133,11 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         // Build chain starting from this anime
         QList<int> chainAids = buildChainFromAid(aid, availableAids);
         
+        // Skip empty chains (anime not in available set)
+        if (chainAids.isEmpty()) {
+            continue;
+        }
+        
         // Mark all anime in this chain as processed
         for (int chainAid : chainAids) {
             processedAids.insert(chainAid);
@@ -161,8 +166,14 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
     QList<int> chain;
     QSet<int> visited;
     
-    // Find the original prequel (first in chain)
+    // Find the original prequel (first in chain) - only follow prequels in availableAids
     int currentAid = startAid;
+    
+    // Only traverse backward if startAid is in our filtered set
+    if (!availableAids.contains(startAid)) {
+        return QList<int>();  // Return empty chain - anime not in filtered list
+    }
+    
     while (true) {
         if (visited.contains(currentAid)) {
             break;  // Cycle detected
