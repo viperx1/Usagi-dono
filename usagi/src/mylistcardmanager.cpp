@@ -186,6 +186,9 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
     // Ensure relation data is loaded for startAid
     loadRelationDataForAnime(startAid);
     
+    // Track the last anime we found that's in our filtered set
+    int lastAvailableAid = startAid;
+    
     // Traverse backward to find the first prequel
     while (true) {
         if (visited.contains(currentAid)) {
@@ -203,19 +206,29 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
             break;  // No prequel
         }
         
+        // Load relation data for the prequel
+        if (expandChain) {
+            loadRelationDataForAnime(prequelAid);
+        }
+        
         // If not expanding, stop at prequels not in available set
         if (!expandChain && !availableAids.contains(prequelAid)) {
             break;
         }
         
-        // Load relation data for the prequel
-        loadRelationDataForAnime(prequelAid);
+        // Update last available anime
+        if (expandChain || availableAids.contains(prequelAid)) {
+            lastAvailableAid = prequelAid;
+        }
+        
         currentAid = prequelAid;
     }
     
-    // Now build chain forward from the prequel
+    // Now build chain forward from the last anime in our filtered set
+    // (or from the first prequel if expanding)
     visited.clear();
-    int chainStart = currentAid;
+    int chainStart = expandChain ? currentAid : lastAvailableAid;
+    currentAid = chainStart;
     
     while (currentAid > 0 && !visited.contains(currentAid)) {
         // When expanding, include all anime in chain
@@ -234,8 +247,10 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
                 break;  // No sequel
             }
             
-            // Load relation data for the sequel
-            loadRelationDataForAnime(sequelAid);
+            // Load relation data for the sequel (only when expanding)
+            if (expandChain) {
+                loadRelationDataForAnime(sequelAid);
+            }
             
             // If not expanding, stop at sequels not in available set
             if (!expandChain && !availableAids.contains(sequelAid)) {
