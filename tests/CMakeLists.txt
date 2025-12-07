@@ -160,7 +160,6 @@ set(ANIME_MASK_PARSING_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -254,18 +253,11 @@ set(ANIDBAPI_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -323,18 +315,11 @@ set(COMPRESSION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
-    # SOLID classes required by anidbapi
-    ../usagi/src/truncatedresponseinfo.cpp
-    ../usagi/src/replywaiter.cpp
-    ../usagi/src/filehashinfo.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -393,13 +378,11 @@ set(TIMEOUT_RETRY_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -457,13 +440,11 @@ set(ANIME_TITLES_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -767,13 +748,11 @@ set(HASH_STORAGE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -866,13 +845,11 @@ set(HASH_REUSE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -930,13 +907,11 @@ set(BATCH_LOCALIDENTIFY_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -994,13 +969,11 @@ set(HASH_DUPLICATE_REUSE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1076,13 +1049,11 @@ set(THREAD_SAFETY_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1140,13 +1111,11 @@ set(IMMEDIATE_IDENTIFICATION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1204,13 +1173,11 @@ set(BATCH_HASH_RETRIEVAL_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1268,13 +1235,11 @@ set(UI_FREEZE_FIX_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1339,7 +1304,6 @@ set(HASHER_THREAD_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1410,7 +1374,6 @@ set(HASHER_THREADPOOL_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1491,7 +1454,6 @@ set(STOP_NON_BLOCKING_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1553,13 +1515,11 @@ set(TRUNCATED_RESPONSE_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1618,13 +1578,11 @@ set(API_OPTIMIZATION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1697,7 +1655,6 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1914,13 +1871,11 @@ set(DUPLICATE_DETECTION_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
@@ -1980,13 +1935,11 @@ set(BITRATE_PREFERENCES_TEST_SOURCES
     ../usagi/src/hash/md4.cpp
     ../usagi/src/Qt-AES-master/qaesencryption.cpp
     ../usagi/src/logger.cpp
-
     ../usagi/src/anidbanimeinfo.cpp
     ../usagi/src/anidbfileinfo.cpp
     ../usagi/src/anidbepisodeinfo.cpp
     ../usagi/src/anidbgroupinfo.cpp
     ../usagi/src/applicationsettings.cpp
-    
     # SOLID classes required by anidbapi
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
