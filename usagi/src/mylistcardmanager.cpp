@@ -260,12 +260,19 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
     int chainStart = expandChain ? currentAid : lastAvailableAid;
     currentAid = chainStart;
     
+    // Track if we've added startAid to ensure it's always included
+    bool startAidAdded = false;
+    
     while (currentAid > 0 && !visited.contains(currentAid)) {
         // When expanding, include all anime in chain
         // When not expanding, only include anime in availableAids
         if (expandChain || availableAids.contains(currentAid)) {
             chain.append(currentAid);
             visited.insert(currentAid);
+            
+            if (currentAid == startAid) {
+                startAidAdded = true;
+            }
             
             if (visited.size() > MAX_CHAIN_LENGTH) {
                 LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping forward traversal").arg(MAX_CHAIN_LENGTH));
@@ -295,22 +302,18 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
     }
     
     // CRITICAL FIX: Ensure startAid is in the chain
-    // If we started from a prequel but the sequel relationship is broken/missing,
-    // startAid might not have been added. Add it now if missing.
-    if (!chain.contains(startAid) && (expandChain || availableAids.contains(startAid))) {
-        LOG(QString("[MyListCardManager] WARNING: startAid=%1 not in chain built from chainStart=%2, adding it")
+    // If we started from a prequel but couldn't reach startAid via sequel relationships,
+    // create a single-anime chain containing just startAid instead.
+    // This handles database inconsistencies where prequel->sequel relationships are not bidirectional.
+    if (!startAidAdded && (expandChain || availableAids.contains(startAid))) {
+        LOG(QString("[MyListCardManager] WARNING: startAid=%1 not reachable from chainStart=%2 via sequel relationships, creating single-anime chain")
             .arg(startAid).arg(chainStart));
         
-        // Find the correct position to insert startAid
-        // Try to insert it after its prequel or at the start if no prequel
-        int prequelAid = findPrequelAid(startAid);
-        if (prequelAid > 0 && chain.contains(prequelAid)) {
-            int insertPos = chain.indexOf(prequelAid) + 1;
-            chain.insert(insertPos, startAid);
-        } else {
-            // No prequel in chain, add at the end (it might be a sequel to the chain)
-            chain.append(startAid);
-        }
+        // Return a chain with just the starting anime
+        // The anime that were found in the forward traversal will be picked up
+        // when we process them in the outer loop
+        chain.clear();
+        chain.append(startAid);
     }
     
     return chain;
