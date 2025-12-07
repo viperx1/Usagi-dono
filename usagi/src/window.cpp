@@ -4184,14 +4184,21 @@ void Window::sortMylistCards(int sortIndex)
 		// MyListCardManager will sort chains externally while preserving internal order
 		LOG("[Window] Calling cardManager->sortChains()");
 		cardManager->sortChains(criteria, sortAscending);
-		LOG("[Window] cardManager->sortChains() returned (already refreshed virtual layout)");
+		LOG("[Window] cardManager->sortChains() returned");
 		
 		// Get the updated anime ID list from card manager (already reordered)
 		LOG("[Window] Getting anime ID list from card manager");
 		animeIds = cardManager->getAnimeIdList();
 		LOG(QString("[Window] Got %1 anime IDs from card manager").arg(animeIds.size()));
 		
-		// Note: No need to refresh the virtual layout here because sortChains() already did it
+		// Refresh the virtual layout to display the reordered items
+		// This must be done AFTER sortChains returns, not from within sortChains,
+		// to avoid re-entrancy issues during the sorting operation
+		if (mylistVirtualLayout) {
+			LOG("[Window] Refreshing virtual layout after chain sorting");
+			mylistVirtualLayout->refresh();
+			LOG("[Window] Virtual layout refresh complete");
+		}
 		
 		// Also update the legacy animeCards list order for backward compatibility
 		LOG("[Window] Building legacy animeCards list");

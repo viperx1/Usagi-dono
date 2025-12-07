@@ -485,12 +485,10 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
         .arg(m_orderedAnimeIds.size()).arg(m_chainList.size()));
     
     // Update virtual layout
+    // Note: We don't call refresh() here because it causes issues when called synchronously
+    // during sorting. The caller (window.cpp) will handle refreshing the layout after sorting completes.
     if (m_virtualLayout) {
-        LOG("[MyListCardManager] Calling setItemCount on virtual layout");
-        m_virtualLayout->setItemCount(m_orderedAnimeIds.size());
-        LOG("[MyListCardManager] Calling refresh on virtual layout");
-        m_virtualLayout->refresh();
-        LOG("[MyListCardManager] Virtual layout refresh complete");
+        LOG("[MyListCardManager] sortChains complete - layout refresh deferred to caller");
     } else {
         LOG("[MyListCardManager] No virtual layout to update");
     }
