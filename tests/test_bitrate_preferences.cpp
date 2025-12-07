@@ -94,23 +94,23 @@ void TestBitratePreferences::testCalculateExpectedBitrate()
     api->setPreferredBitrate(3.5);
     
     // Test 1080p (2.07 MP) - should return baseline
-    double bitrate1080p = watchManager->calculateExpectedBitrate("1080p");
+    double bitrate1080p = watchManager->calculateExpectedBitrate("1080p", "H.264");
     QVERIFY(qAbs(bitrate1080p - 3.5) < 0.01);
     
     // Test 720p (0.92 MP) - should be ~1.6 Mbps
-    double bitrate720p = watchManager->calculateExpectedBitrate("720p");
+    double bitrate720p = watchManager->calculateExpectedBitrate("720p", "H.264");
     QVERIFY(qAbs(bitrate720p - 1.56) < 0.1);
     
     // Test 1440p (3.69 MP) - should be ~6.2 Mbps
-    double bitrate1440p = watchManager->calculateExpectedBitrate("1440p");
+    double bitrate1440p = watchManager->calculateExpectedBitrate("1440p", "H.264");
     QVERIFY(qAbs(bitrate1440p - 6.24) < 0.1);
     
     // Test 4K (8.29 MP) - should be ~14 Mbps
-    double bitrate4K = watchManager->calculateExpectedBitrate("4K");
+    double bitrate4K = watchManager->calculateExpectedBitrate("4K", "H.264");
     QVERIFY(qAbs(bitrate4K - 14.0) < 0.5);
     
     // Test with WxH format
-    double bitrate1920x1080 = watchManager->calculateExpectedBitrate("1920x1080");
+    double bitrate1920x1080 = watchManager->calculateExpectedBitrate("1920x1080", "H.264");
     QVERIFY(qAbs(bitrate1920x1080 - 3.5) < 0.01);
 }
 
@@ -120,15 +120,15 @@ void TestBitratePreferences::testCalculateBitrateScoreWithSingleFile()
     api->setPreferredBitrate(3.5);
     
     // Test with perfect match
-    double score1 = watchManager->calculateBitrateScore(3500, "1080p", 1);
+    double score1 = watchManager->calculateBitrateScore(3500, "1080p", "H.264", 1);
     QCOMPARE(score1, 0.0);
     
     // Test with very different bitrate
-    double score2 = watchManager->calculateBitrateScore(10000, "1080p", 1);
+    double score2 = watchManager->calculateBitrateScore(10000, "1080p", "H.264", 1);
     QCOMPARE(score2, 0.0);
     
     // Test with very low bitrate
-    double score3 = watchManager->calculateBitrateScore(1000, "1080p", 1);
+    double score3 = watchManager->calculateBitrateScore(1000, "1080p", "H.264", 1);
     QCOMPARE(score3, 0.0);
 }
 
@@ -138,11 +138,11 @@ void TestBitratePreferences::testCalculateBitrateScoreWithMultipleFiles()
     api->setPreferredBitrate(3.5);
     
     // Test with perfect match (within 10% - no penalty)
-    double score1 = watchManager->calculateBitrateScore(3500, "1080p", 2);
+    double score1 = watchManager->calculateBitrateScore(3500, "1080p", "H.264", 2);
     QCOMPARE(score1, 0.0);
     
     // Test with 5% difference (within 10% - no penalty)
-    double score2 = watchManager->calculateBitrateScore(3675, "1080p", 2);
+    double score2 = watchManager->calculateBitrateScore(3675, "1080p", "H.264", 2);
     QCOMPARE(score2, 0.0);
 }
 
@@ -151,19 +151,19 @@ void TestBitratePreferences::testCalculateBitrateScoreVariousDistances()
     api->setPreferredBitrate(3.5);
     
     // Test 20% difference (10-30% range) - should get -10 penalty
-    double score1 = watchManager->calculateBitrateScore(4200, "1080p", 2);
+    double score1 = watchManager->calculateBitrateScore(4200, "1080p", "H.264", 2);
     QCOMPARE(score1, -10.0);
     
     // Test 40% difference (30-50% range) - should get -25 penalty
-    double score2 = watchManager->calculateBitrateScore(4900, "1080p", 2);
+    double score2 = watchManager->calculateBitrateScore(4900, "1080p", "H.264", 2);
     QCOMPARE(score2, -25.0);
     
     // Test 60% difference (50%+ range) - should get -40 penalty
-    double score3 = watchManager->calculateBitrateScore(5600, "1080p", 2);
+    double score3 = watchManager->calculateBitrateScore(5600, "1080p", "H.264", 2);
     QCOMPARE(score3, -40.0);
     
     // Test with very low bitrate (60% below expected)
-    double score4 = watchManager->calculateBitrateScore(1400, "1080p", 2);
+    double score4 = watchManager->calculateBitrateScore(1400, "1080p", "H.264", 2);
     QCOMPARE(score4, -40.0);
 }
 
