@@ -4162,6 +4162,14 @@ void Window::sortMylistCards(int sortIndex)
 			// Get the full chain for this anime
 			QList<int> chain = watchSessionManager->getSeriesChain(aid);
 			if (!chain.isEmpty()) {
+				// Check if the chain includes the current anime
+				// If not, treat this anime as a single-item chain
+				if (!chain.contains(aid)) {
+					chainGroups[aid] = QList<int>() << aid;
+					processedIds.insert(aid);
+					continue;
+				}
+				
 				// Use first anime in chain as the key
 				int chainKey = chain.first();
 				
@@ -4176,6 +4184,10 @@ void Window::sortMylistCards(int sortIndex)
 				
 				if (!filteredChain.isEmpty()) {
 					chainGroups[chainKey] = filteredChain;
+				} else {
+					// Chain was filtered to empty - treat original anime as single-item chain
+					chainGroups[aid] = QList<int>() << aid;
+					processedIds.insert(aid);
 				}
 			} else {
 				// Anime not in any chain - treat as single-item chain
