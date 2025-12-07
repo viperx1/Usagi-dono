@@ -101,15 +101,6 @@ public:
      */
     QList<int> getSeriesChain(int aid) const;
     
-    /**
-     * @brief Preload relation data for multiple anime into cache
-     * @param aids List of anime IDs to preload relation data for
-     * 
-     * This is used for optimization when series chain view is enabled,
-     * to avoid lazy loading during filtering/sorting operations.
-     */
-    void preloadRelationData(const QList<int>& aids);
-    
     // ========== File Marking ==========
     
     /**

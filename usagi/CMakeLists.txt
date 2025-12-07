@@ -37,6 +37,7 @@ set(SOURCES
     src/playbackmanager.cpp
     src/playbuttondelegate.cpp
     src/animecard.cpp
+    src/animechain.cpp
     src/flowlayout.cpp
     src/mylistcardmanager.cpp
     src/mylistfiltersidebar.cpp
@@ -82,6 +83,7 @@ set(HEADERS
     src/playbackmanager.h
     src/playbuttondelegate.h
     src/animecard.h
+    src/animechain.h
     src/flowlayout.h
     src/mylistcardmanager.h
     src/mylistfiltersidebar.h
