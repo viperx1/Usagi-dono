@@ -56,6 +56,8 @@
 #include "progresstracker.h"
 #include "hashingtask.h"
 #include "animemetadatacache.h"
+#include "backgrounddatabaseworker.h"
+#include "hashercoordinator.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -63,6 +65,7 @@ class PlayButtonDelegate;
 class MyListCardManager;
 class VirtualFlowLayout;
 class WatchSessionManager;
+class HasherCoordinator;
 
 class hashes_ : public QTableWidget
 {
@@ -81,35 +84,42 @@ public:
 };
 
 // Worker thread for loading mylist anime IDs
-class MylistLoaderWorker : public QObject
+class MylistLoaderWorker : public BackgroundDatabaseWorker<QList<int>>
 {
     Q_OBJECT
 public:
-    explicit MylistLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
-
-    void doWork();
+    explicit MylistLoaderWorker(const QString &dbName) 
+        : BackgroundDatabaseWorker<QList<int>>(dbName, "MylistThread") {}
 
 signals:
     void finished(const QList<int> &aids);
 
-private:
-    QString m_dbName;
+protected:
+    QList<int> executeQuery(QSqlDatabase &db) override;
+    QList<int> getDefaultResult() const override { return QList<int>(); }
+    void emitFinished(const QList<int> &result) override { emit finished(result); }
 };
 
 // Worker thread for loading anime titles cache
-class AnimeTitlesLoaderWorker : public QObject
+// Note: This worker returns two results, so we use a QPair
+class AnimeTitlesLoaderWorker : public BackgroundDatabaseWorker<QPair<QStringList, QMap<QString, int>>>
 {
     Q_OBJECT
 public:
-    explicit AnimeTitlesLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
-
-    void doWork();
+    explicit AnimeTitlesLoaderWorker(const QString &dbName) 
+        : BackgroundDatabaseWorker<QPair<QStringList, QMap<QString, int>>>(dbName, "AnimeTitlesThread") {}
 
 signals:
     void finished(const QStringList &titles, const QMap<QString, int> &titleToAid);
 
-private:
-    QString m_dbName;
+protected:
+    QPair<QStringList, QMap<QString, int>> executeQuery(QSqlDatabase &db) override;
+    QPair<QStringList, QMap<QString, int>> getDefaultResult() const override { 
+        return QPair<QStringList, QMap<QString, int>>(QStringList(), QMap<QString, int>()); 
+    }
+    void emitFinished(const QPair<QStringList, QMap<QString, int>> &result) override { 
+        emit finished(result.first, result.second); 
+    }
 };
 
 // Use LocalFileInfo class for unbound file information
@@ -117,19 +127,20 @@ private:
 using UnboundFileData = LocalFileInfo;
 
 // Worker thread for loading unbound files
-class UnboundFilesLoaderWorker : public QObject
+class UnboundFilesLoaderWorker : public BackgroundDatabaseWorker<QList<LocalFileInfo>>
 {
     Q_OBJECT
 public:
-    explicit UnboundFilesLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
-
-    void doWork();
+    explicit UnboundFilesLoaderWorker(const QString &dbName) 
+        : BackgroundDatabaseWorker<QList<LocalFileInfo>>(dbName, "UnboundFilesThread") {}
 
 signals:
     void finished(const QList<LocalFileInfo> &files);
 
-private:
-    QString m_dbName;
+protected:
+    QList<LocalFileInfo> executeQuery(QSqlDatabase &db) override;
+    QList<LocalFileInfo> getDefaultResult() const override { return QList<LocalFileInfo>(); }
+    void emitFinished(const QList<LocalFileInfo> &result) override { emit finished(result); }
 };
 
 class Window : public QWidget
@@ -184,31 +195,7 @@ private:
 	QWidget *pageApiTesterParent;
 
 	// page hasher
-    QBoxLayout *pageHasherAddButtons;
-    QGridLayout *pageHasherSettings;
-    QWidget *pageHasherAddButtonsParent;
-    QWidget *pageHasherSettingsParent;
-    QPushButton *button1;
-    QPushButton *button2;
-	QPushButton *button3;
-    QTextEdit *hasherOutput;
-    QPushButton *buttonstart;
-    QPushButton *buttonstop;
-	QPushButton *buttonclear;
-	QVector<QProgressBar*> threadProgressBars; // One progress bar per hasher thread
-	QProgressBar *progressTotal;
-	QLabel *progressTotalLabel;
-	QCheckBox *addtomylist;
-	QCheckBox *markwatched;
-	QLineEdit *storage;
-	QComboBox *hasherFileState;
-	QCheckBox *moveto;
-	QCheckBox *renameto;
-	QLineEdit *movetodir;
-	QLineEdit *renametopattern;
-
-
-	QString lastDir;
+	HasherCoordinator *hasherCoordinator;  // Manages all hasher UI and logic
 
     // page mylist (card view only - tree view removed)
     QScrollArea *mylistCardScrollArea;
@@ -324,22 +311,9 @@ private:
 	
 	// Mutex for protecting filter/sort operations to prevent race conditions
 	QMutex filterOperationsMutex;
-	
-	// Cache for hasher filter patterns (for performance)
-	QString cachedFilterMasks;
-	QList<QRegularExpression> cachedFilterRegexes;
-	void updateFilterCache();
 
 
 public slots:
-    void Button1Click();
-    void Button2Click();
-	void Button3Click();
-    void ButtonHasherStartClick();
-    void ButtonHasherStopClick();
-    void ButtonHasherClearClick();
-    void getNotifyPartsDone(int threadId, int total, int done);
-    void getNotifyFileHashed(int threadId, ed2k::ed2kfilestruct fileData);
     void getNotifyLogAppend(QString);
     void getNotifyLoginChagned(QString);
     void getNotifyPasswordChagned(QString);
@@ -347,7 +321,6 @@ public slots:
     void shot();
     void saveSettings();
 	void apitesterProcess();
-	void markwatchedStateChanged(int);
 
     void ButtonLoginClick();
 	void getNotifyMylistAdd(QString, int);
@@ -398,9 +371,6 @@ public slots:
     void onFileMarkedAsLocallyWatched(int lid);
     void onAnimationTimerTimeout();
     
-    // Hasher slots
-    void provideNextFileToHash();
-    
     // Unknown files slots
     void onUnknownFileAnimeSearchChanged(int row);
     void onUnknownFileEpisodeSelected(int row);
@@ -428,15 +398,11 @@ private slots:
 	void onMylistLoadingFinished(const QList<int> &aids);
 	void onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<QString, int> &titleToAid);
 	void onUnboundFilesLoadingFinished(const QList<LocalFileInfo> &files);
-	
-	// Timer-based processing handlers
-	void processPendingHashedFiles();
 
 public:
 	// page hasher
     hashes_ *hashes;
     unknown_files_ *unknownFiles;
-	void hashesinsertrow(QFileInfo, Qt::CheckState, const QString& preloadedHash = QString());
     void unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size);
     void loadUnboundFiles();
 	int parseMylistExport(const QString &tarGzPath);
@@ -461,14 +427,8 @@ private:
     bool matchesSearchFilter(AnimeCard *card, const QString &searchText);
     bool matchesSearchFilter(int aid, const QString &animeName, const QString &searchText);
     
-    // Helper method for hasher file filtering
-    bool shouldFilterFile(const QString &filePath);
-    
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
-    int calculateTotalHashParts(const QStringList &files);
-    void setupHashingProgress(const QStringList &files);
-    QStringList getFilesNeedingHash();
     
     // Helper methods for playback
     QString getFilePathForPlayback(int lid);

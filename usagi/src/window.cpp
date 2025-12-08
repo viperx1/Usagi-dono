@@ -35,153 +35,95 @@ extern Window *window;
 
 // Worker implementations
 
-void MylistLoaderWorker::doWork()
+QList<int> MylistLoaderWorker::executeQuery(QSqlDatabase &db)
 {
     LOG("Background thread: Loading mylist anime IDs...");
     
     QList<int> aids;
     
-    {
-        // Create separate database connection for this thread
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MylistThread");
-        db.setDatabaseName(m_dbName);
-        
-        if (!db.open()) {
-            LOG("Background thread: Failed to open database for mylist");
-            QSqlDatabase::removeDatabase("MylistThread");
-            emit finished(QList<int>());
-            return;
-        }
-        
-        // Query all anime IDs in mylist (same query as MyListCardManager but only get AIDs)
-        QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY "
-                       "(SELECT nameromaji FROM anime WHERE aid = m.aid)";
-        
-        QSqlQuery q(db);
-        
-        if (q.exec(query)) {
-            while (q.next()) {
-                aids.append(q.value(0).toInt());
-            }
-        } else {
-            LOG(QString("Background thread: Error loading mylist: %1").arg(q.lastError().text()));
-        }
-        
-        db.close();
-        // Query object q is destroyed here when leaving scope
-    }
+    // Query all anime IDs in mylist (same query as MyListCardManager but only get AIDs)
+    QString query = "SELECT DISTINCT m.aid FROM mylist m ORDER BY "
+                   "(SELECT nameromaji FROM anime WHERE aid = m.aid)";
     
-    // Now safe to remove database connection
-    QSqlDatabase::removeDatabase("MylistThread");
+    QSqlQuery q(db);
+    
+    if (q.exec(query)) {
+        while (q.next()) {
+            aids.append(q.value(0).toInt());
+        }
+    } else {
+        LOG(QString("Background thread: Error loading mylist: %1").arg(q.lastError().text()));
+    }
     
     LOG(QString("Background thread: Loaded %1 mylist anime IDs").arg(aids.size()));
     
-    emit finished(aids);
+    return aids;
 }
 
-void AnimeTitlesLoaderWorker::doWork()
+QPair<QStringList, QMap<QString, int>> AnimeTitlesLoaderWorker::executeQuery(QSqlDatabase &db)
 {
     LOG("Background thread: Loading anime titles cache...");
     
     QStringList tempTitles;
     QMap<QString, int> tempTitleToAid;
     
-    {
-        // We need to use a separate database connection for this thread
-        // Qt SQL requires each thread to have its own connection
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "AnimeTitlesThread");
-        db.setDatabaseName(m_dbName);
-        
-        if (!db.open()) {
-            LOG("Background thread: Failed to open database for anime titles");
-            QSqlDatabase::removeDatabase("AnimeTitlesThread");
-            emit finished(QStringList(), QMap<QString, int>());
-            return;
-        }
-        
-        QSqlQuery query(db);
-        query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
-        
-        while (query.next()) {
-            int aid = query.value(0).toInt();
-            QString title = query.value(1).toString();
-            QString displayText = QString("%1: %2").arg(aid).arg(title);
-            tempTitles << displayText;
-            tempTitleToAid[displayText] = aid;
-        }
-        
-        db.close();
-        // Query object is destroyed here when leaving scope
-    }
+    QSqlQuery query(db);
+    query.exec("SELECT DISTINCT aid, title FROM anime_titles ORDER BY title");
     
-    // Now safe to remove database connection
-    QSqlDatabase::removeDatabase("AnimeTitlesThread");
+    while (query.next()) {
+        int aid = query.value(0).toInt();
+        QString title = query.value(1).toString();
+        QString displayText = QString("%1: %2").arg(aid).arg(title);
+        tempTitles << displayText;
+        tempTitleToAid[displayText] = aid;
+    }
     
     LOG(QString("Background thread: Loaded %1 anime titles").arg(tempTitles.size()));
     
-    emit finished(tempTitles, tempTitleToAid);
+    return QPair<QStringList, QMap<QString, int>>(tempTitles, tempTitleToAid);
 }
 
-void UnboundFilesLoaderWorker::doWork()
+QList<LocalFileInfo> UnboundFilesLoaderWorker::executeQuery(QSqlDatabase &db)
 {
     LOG("Background thread: Loading unbound files...");
     
     QList<LocalFileInfo> tempUnboundFiles;
     
-    {
-        // Create separate database connection for this thread
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "UnboundFilesThread");
-        db.setDatabaseName(m_dbName);
-        
-        if (!db.open()) {
-            LOG("Background thread: Failed to open database for unbound files");
-            QSqlDatabase::removeDatabase("UnboundFilesThread");
-            emit finished(QList<LocalFileInfo>());
-            return;
-        }
-        
-        // Query unbound files using same criteria as AniDBApi::getUnboundFiles
-        // binding_status = 0 (not_bound) AND status = 3 (not in anidb)
-        QSqlQuery query(db);
-        query.prepare("SELECT `path`, `filename`, `ed2k_hash` FROM `local_files` WHERE `binding_status` = 0 AND `status` = 3 AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
-        
-        if (!query.exec()) {
-            LOG(QString("Background thread: Failed to query unbound files: %1").arg(query.lastError().text()));
-        } else {
-            while (query.next()) {
-                QString filepath = query.value(0).toString();
-                QString filename = query.value(1).toString();
-                QString hash = query.value(2).toString();
-                
-                // Use QFileInfo to get filename if not in database
-                if (filename.isEmpty()) {
-                    QFileInfo qFileInfo(filepath);
-                    filename = qFileInfo.fileName();
-                }
-                
-                // LocalFileInfo constructor will get size if file exists
-                LocalFileInfo fileInfo(filename, filepath, hash, 0);
-                
-                // Get file size if file exists
-                QFileInfo qFileInfo(filepath);
-                if (qFileInfo.exists()) {
-                    fileInfo.setSize(qFileInfo.size());
-                }
-                
-                tempUnboundFiles.append(fileInfo);
-            }
-        }
-        
-        db.close();
-        // Query object is destroyed here when leaving scope
-    }
+    // Query unbound files using same criteria as AniDBApi::getUnboundFiles
+    // binding_status = 0 (not_bound) AND status = 3 (not in anidb)
+    QSqlQuery query(db);
+    query.prepare("SELECT `path`, `filename`, `ed2k_hash` FROM `local_files` WHERE `binding_status` = 0 AND `status` = 3 AND `ed2k_hash` IS NOT NULL AND `ed2k_hash` != ''");
     
-    // Now safe to remove database connection
-    QSqlDatabase::removeDatabase("UnboundFilesThread");
+    if (!query.exec()) {
+        LOG(QString("Background thread: Failed to query unbound files: %1").arg(query.lastError().text()));
+    } else {
+        while (query.next()) {
+            QString filepath = query.value(0).toString();
+            QString filename = query.value(1).toString();
+            QString hash = query.value(2).toString();
+            
+            // Use QFileInfo to get filename if not in database
+            if (filename.isEmpty()) {
+                QFileInfo qFileInfo(filepath);
+                filename = qFileInfo.fileName();
+            }
+            
+            // LocalFileInfo constructor will get size if file exists
+            LocalFileInfo fileInfo(filename, filepath, hash, 0);
+            
+            // Get file size if file exists
+            QFileInfo qFileInfo(filepath);
+            if (qFileInfo.exists()) {
+                fileInfo.setSize(qFileInfo.size());
+            }
+            
+            tempUnboundFiles.append(fileInfo);
+        }
+    }
     
     LOG(QString("Background thread: Loaded %1 unbound files").arg(tempUnboundFiles.size()));
     
-    emit finished(tempUnboundFiles);
+    return tempUnboundFiles;
 }
 
 
@@ -273,48 +215,13 @@ Window::Window()
     tabwidget->addTab(pageLogParent, "Log");
 	tabwidget->addTab(pageApiTesterParent, "ApiTester");
 
-    // page hasher
-    pageHasherSettings = new QGridLayout;
-    button1 = new QPushButton("Add files...");
-    button2 = new QPushButton("Add directories...");
-	button3 = new QPushButton("Last directory");
-    hashes = new hashes_; // QTableWidget
+    // page hasher - Create HasherCoordinator to manage all hasher UI and logic
+    hasherCoordinator = new HasherCoordinator(adbapi, this);
+    hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
     unknownFiles = new unknown_files_(this); // Unknown files widget
-    hasherOutput = new QTextEdit;
-	hasherFileState = new QComboBox;
-	addtomylist = new QCheckBox("Add file(s) to MyList");
-	markwatched = new QCheckBox("Mark watched (no change)");
-    QLabel *label1 = new QLabel("Set state:");
-    buttonstart = new QPushButton("Start");
-    buttonstop = new QPushButton("Stop");
-    buttonclear = new QPushButton("Clear");
-	moveto = new QCheckBox("Move to:");
-	renameto = new QCheckBox("Rename to:");
-	movetodir = new QLineEdit;
-	renametopattern = new QLineEdit;
-	storage = new QLineEdit;
-    QBoxLayout *layout1 = new QBoxLayout(QBoxLayout::LeftToRight);
-    QBoxLayout *layout2 = new QBoxLayout(QBoxLayout::LeftToRight);
-    QPushButton *movetodirbutton = new QPushButton("...");
-    QPushButton *patternhelpbutton = new QPushButton("?");
-    QBoxLayout *progress = new QBoxLayout(QBoxLayout::TopToBottom);
     
-    // Create one progress bar per hasher thread
-    int numThreads = hasherThreadPool->threadCount();
-    for (int i = 0; i < numThreads; ++i) {
-        QProgressBar *threadProgress = new QProgressBar;
-        threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
-        threadProgressBars.append(threadProgress);
-        progress->addWidget(threadProgress);
-    }
-    
-    progressTotal = new QProgressBar;
-    progressTotalLabel = new QLabel;
-    QBoxLayout *progressTotalLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    progressTotalLayout->addWidget(progressTotal);
-    progressTotalLayout->addWidget(progressTotalLabel);
-
-    pageHasher->addWidget(hashes, 1);
+    // Add HasherCoordinator's widget to the page
+    pageHasher->addWidget(hasherCoordinator->getHasherPageWidget(), 1);
     
     // Add unknown files widget with a label (initially hidden)
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
@@ -326,9 +233,23 @@ Window::Window()
     unknownFilesLabel->hide();
     unknownFiles->hide();
     
-    pageHasher->addLayout(pageHasherSettings);
-    pageHasher->addLayout(progress);
-    pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
+    // Connect HasherCoordinator signals
+    connect(hasherCoordinator, &HasherCoordinator::hashingFinished, this, &Window::hasherFinished);
+    connect(hasherCoordinator, &HasherCoordinator::logMessage, this, &Window::getNotifyLogAppend);
+    
+    // Connect hasher thread pool signals to HasherCoordinator
+    connect(hasherThreadPool, &HasherThreadPool::requestNextFile, hasherCoordinator, &HasherCoordinator::provideNextFileToHash);
+    connect(hasherThreadPool, &HasherThreadPool::notifyPartsDone, hasherCoordinator, &HasherCoordinator::onProgressUpdate);
+    connect(hasherThreadPool, &HasherThreadPool::notifyFileHashed, hasherCoordinator, &HasherCoordinator::onFileHashed);
+    connect(hasherThreadPool, &HasherThreadPool::finished, hasherCoordinator, &HasherCoordinator::onHashingFinished);
+    
+    // Connect AniDBApi signals
+    connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
+    connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
+	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
+	
+	// Connect unified Logger to log tab using modern Qt5+ syntax for type safety
+	connect(Logger::instance(), &Logger::logMessage, this, &Window::getNotifyLogAppend);
 
     // page mylist (card view only)
     mylistSortAscending = false;  // Default to descending (newest first for aired date)
@@ -497,23 +418,10 @@ Window::Window()
     mylistStatusLabel->setStyleSheet("padding: 5px; background-color: #f0f0f0;");
     pageMylist->addWidget(mylistStatusLabel);
 
-    // page hasher - signals
-    connect(button1, SIGNAL(clicked()), this, SLOT(Button1Click()));
-    connect(button2, SIGNAL(clicked()), this, SLOT(Button2Click()));
-	connect(button3, SIGNAL(clicked()), this, SLOT(Button3Click()));
-    connect(buttonstart, SIGNAL(clicked()), this, SLOT(ButtonHasherStartClick()));
-    connect(buttonclear, SIGNAL(clicked()), this, SLOT(ButtonHasherClearClick()));
-    connect(hasherThreadPool, SIGNAL(requestNextFile()), this, SLOT(provideNextFileToHash()));
-    connect(hasherThreadPool, SIGNAL(sendHash(QString)), hasherOutput, SLOT(append(QString)));
-    connect(hasherThreadPool, SIGNAL(finished()), this, SLOT(hasherFinished()));
-    // Connect thread pool signals for hashing progress and completion with thread ID
-    connect(hasherThreadPool, SIGNAL(notifyPartsDone(int,int,int)), this, SLOT(getNotifyPartsDone(int,int,int)));
-    connect(hasherThreadPool, SIGNAL(notifyFileHashed(int,ed2k::ed2kfilestruct)), this, SLOT(getNotifyFileHashed(int,ed2k::ed2kfilestruct)));
-    connect(buttonstop, SIGNAL(clicked()), this, SLOT(ButtonHasherStopClick()));
+    // Note: Hasher signals now connected in HasherCoordinator constructor
     connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
     connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
 	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
-	connect(markwatched, SIGNAL(stateChanged(int)), this, SLOT(markwatchedStateChanged(int)));
 	
 	// Connect unified Logger to log tab using modern Qt5+ syntax for type safety
 	connect(Logger::instance(), &Logger::logMessage, this, &Window::getNotifyLogAppend);
@@ -531,47 +439,7 @@ Window::Window()
 	hashes->setHorizontalHeaderLabels((QStringList() << "Filename" << "Progress" << "path" << "LF" << "LL" << "RF" << "RL" << "Ren" << "FP" << "Hash"));
     hashes->setColumnWidth(0, 600);
     hashes->setColumnWidth(9, 250); // Hash column width
-//	hashes->setCellWidget(3, 3, button2);
-//	hashes->setColumnHidden(2, 1);
-//	hashes->setColumnHidden(3, 1);
-
-    // page hasher - settings
-    pageHasherSettings->addWidget(label1, 1, 0, Qt::AlignRight);
-    pageHasherSettings->addWidget(hasherFileState, 1, 1, Qt::AlignLeft);
-	pageHasherSettings->addWidget(storage, 1, 2, Qt::AlignLeft);
-    pageHasherSettings->addWidget(addtomylist, 0, 1, Qt::AlignLeft);
-    pageHasherSettings->addWidget(markwatched, 0, 2, Qt::AlignLeft);
-    pageHasherSettings->addWidget(button1, 1, 4, Qt::AlignLeft);
-    pageHasherSettings->addWidget(button2, 1, 5, Qt::AlignLeft);
-	pageHasherSettings->addWidget(button3, 1, 6, Qt::AlignLeft);
-    pageHasherSettings->addWidget(buttonstart, 0, 4, Qt::AlignLeft);
-    pageHasherSettings->addWidget(buttonstop, 0, 5, Qt::AlignLeft);
-    pageHasherSettings->addWidget(buttonclear, 0, 6, Qt::AlignLeft);
-    pageHasherSettings->addWidget(moveto, 2, 0, Qt::AlignRight);
-//    pageHasherSettings->addWidget(renameto, 3, 0, Qt::AlignRight); // hide rename to
-    pageHasherSettings->addLayout(layout1, 2, 1, 1, 6);
-//	pageHasherSettings->addLayout(layout2, 3, 1, 1, 6); // ^^^
-	pageHasherSettings->setColumnStretch(3, 100);
-
-    hasherFileState->addItem("Unknown");
-    hasherFileState->addItem("Internal (HDD)");
-    hasherFileState->addItem("External (CD/DVD)");
-    hasherFileState->addItem("Deleted");
-    hasherFileState->setCurrentIndex(1);
-
-    addtomylist->setChecked(1);
-	markwatched->setTristate();
-	markwatched->setChecked(0);
-    renameto->setChecked(1);
-
-	patternhelpbutton->setToolTip("TODO: rename pattern help");
-	layout1->addWidget(movetodir);
-	layout1->addWidget(movetodirbutton);
-	layout2->addWidget(renametopattern);
-	layout2->addWidget(patternhelpbutton);
-
-	// page hasher - progress (already added in loop above)
-	progress->addLayout(progressTotalLayout);
+    // Note: All other hasher UI setup is now handled by HasherCoordinator
 
     // page settings - reorganized with group boxes for better visual grouping
     
@@ -991,7 +859,8 @@ Window::Window()
     hashedFilesProcessingTimer = new QTimer(this);
     hashedFilesProcessingTimer->setSingleShot(false);
     hashedFilesProcessingTimer->setInterval(HASHED_FILES_TIMER_INTERVAL);
-    connect(hashedFilesProcessingTimer, &QTimer::timeout, this, &Window::processPendingHashedFiles);
+    // Note: processPendingHashedFiles is now handled by HasherCoordinator
+    // hashedFilesProcessingTimer is kept for backward compatibility but not used
     
     // Initialize background loading threads
     mylistLoadingThread = nullptr;
@@ -1333,376 +1202,23 @@ void Window::debugPrintDatabaseInfoForLid(int lid)
 	LOG("=================================================================");
 }
 
-void Window::updateFilterCache()
-{
-	QString filterMasks = adbapi->getHasherFilterMasks();
-	
-	// Only update cache if masks have changed
-	if (cachedFilterMasks == filterMasks) {
-		return;
-	}
-	
-	cachedFilterMasks = filterMasks;
-	cachedFilterRegexes.clear();
-	
-	if (filterMasks.isEmpty()) {
-		return;
-	}
-	
-	// Pre-compile all regex patterns
-	QStringList masks = filterMasks.split(',', Qt::SkipEmptyParts);
-	for (const QString &mask : masks) {
-		QString trimmedMask = mask.trimmed();
-		if (!trimmedMask.isEmpty()) {
-			QRegularExpression regex(QRegularExpression::wildcardToRegularExpression(trimmedMask));
-			// Validate the regex pattern before adding to cache
-			if (regex.isValid()) {
-				cachedFilterRegexes.append(regex);
-			} else {
-				LOG(QString("Warning: Invalid filter mask pattern '%1', skipping").arg(trimmedMask));
-			}
-		}
-	}
-}
+// Note: updateFilterCache, shouldFilterFile, and addFilesFromDirectory methods
+// have been moved to HasherCoordinator class
 
-bool Window::shouldFilterFile(const QString &filePath)
-{
-	// Update cache if needed (checks internally if update is required)
-	updateFilterCache();
-	
-	// If no filter patterns, don't filter anything
-	if (cachedFilterRegexes.isEmpty()) {
-		return false;
-	}
-	
-	// Get the file name from the path
-	QFileInfo fileInfo(filePath);
-	QString fileName = fileInfo.fileName();
-	
-	// Check if the file matches any of the cached patterns
-	for (const QRegularExpression &regex : cachedFilterRegexes) {
-		if (regex.match(fileName).hasMatch()) {
-			// Extract the mask pattern for logging (use the cached masks string)
-			LOG(QString("File '%1' matches filter pattern, skipping").arg(fileName));
-			return true; // File should be filtered
-		}
-	}
-	
-	return false; // File should not be filtered
-}
+// Note: Button1Click, Button2Click, Button3Click methods
+// have been moved to HasherCoordinator class
 
-void Window::Button1Click() // add files
-{
-    QStringList files = QFileDialog::getOpenFileNames(0, 0, adbapi->getLastDirectory());
-	QColor colorgray;
-	colorgray.setRgb(230, 230, 230);
-    if(!files.isEmpty())
-    {
-        adbapi->setLastDirectory(QFileInfo(files.first()).filePath());
-        while(!files.isEmpty())
-        {
-//            QFileInfo file = files.first();
-            QFileInfo file = QFileInfo(files.first());
-            files.pop_front();
-            
-            // Check if file should be filtered
-            if (!shouldFilterFile(file.absoluteFilePath())) {
-                hashesinsertrow(file, renameto->checkState());
-            }
-    //		delete item1, item2, item3;
-        }
-    }
-}
+// Note: calculateTotalHashParts, setupHashingProgress, getFilesNeedingHash methods
+// have been moved to HasherCoordinator class
 
-void Window::Button2Click() // add directories
-{
-	hashes->setUpdatesEnabled(0);
-    QStringList files;
-    QFileDialog dialog;
-    dialog.setFileMode(QFileDialog::Directory);
-    QListView *l = dialog.findChild<QListView*>("listView");
-    if(l)
-    {
-		l->setSelectionMode(QAbstractItemView::MultiSelection);
-    }
-    QTreeView *t = dialog.findChild<QTreeView*>();
-    if(t)
-    {
-		t->setSelectionMode(QAbstractItemView::MultiSelection);
-    }
+// Note: ButtonHasherStartClick, ButtonHasherStopClick, provideNextFileToHash, ButtonHasherClearClick methods
+// have been moved to HasherCoordinator class
 
-	dialog.setDirectory(adbapi->getLastDirectory());
+// Note: markwatchedStateChanged method has been moved to HasherCoordinator class
 
-    if(dialog.exec())
-    {
-		files = dialog.selectedFiles();
-		if(files.count() == 1)
-		{
-			adbapi->setLastDirectory(files.last());
-		}
-		while(!files.isEmpty())
-		{
-			QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
-			files.pop_front();
-			while(directory_walker.hasNext())
-            {
-                QFileInfo file = QFileInfo(directory_walker.next());
-                
-                // Check if file should be filtered
-                if (!shouldFilterFile(file.absoluteFilePath())) {
-                    hashesinsertrow(file, renameto->checkState());
-                }
-//				adbapi.ed2khash(file.absoluteFilePath());
-		    }
-		}
-    }
-    hashes->setUpdatesEnabled(1);
-}
+// Note: getNotifyPartsDone method has been moved to HasherCoordinator class
 
-void Window::Button3Click()
-{
-	hashes->setUpdatesEnabled(0);
-	QStringList files;
-
-	files.append(adbapi->getLastDirectory());
-    if(!files.last().isEmpty())
-    {
-        while(!files.isEmpty())
-        {
-            QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
-            files.pop_front();
-            while(directory_walker.hasNext())
-            {
-                QFileInfo file = QFileInfo(directory_walker.next());
-                
-                // Check if file should be filtered
-                if (!shouldFilterFile(file.absoluteFilePath())) {
-                    hashesinsertrow(file, renameto->checkState());
-                }
-            }
-        }
-    }
-	hashes->setUpdatesEnabled(1);
-}
-
-int Window::calculateTotalHashParts(const QStringList &files)
-{
-	QFileInfo file;
-	int totalparts = 0;
-	for(const QString &filepath : files)
-	{
-		file.setFile(filepath);
-		double a = file.size();
-		double b = a/102400;
-		double c = ceil(b);
-		totalparts += c;
-	}
-	return totalparts;
-}
-
-void Window::setupHashingProgress(const QStringList &files)
-{
-	totalHashParts = calculateTotalHashParts(files);
-	completedHashParts = 0;
-	lastThreadProgress.clear(); // Reset per-thread progress tracking
-	
-	// Initialize ProgressTracker with total parts and start tracking
-	m_hashingProgress.reset(totalHashParts);
-	m_hashingProgress.start();
-	
-	progressTotal->setValue(0);
-	progressTotal->setMaximum(totalHashParts > 0 ? totalHashParts : 1);
-	progressTotal->setFormat("ETA: calculating...");
-	progressTotalLabel->setText("0%");
-}
-
-QStringList Window::getFilesNeedingHash()
-{
-	QStringList filesToHash;
-	for(int i=0; i<hashes->rowCount(); i++)
-	{
-		QString progress = hashes->item(i, 1)->text();
-		QString existingHash = hashes->item(i, 9)->text();
-		if(progress == "0" && existingHash.isEmpty())
-		{
-			filesToHash.append(hashes->item(i, 2)->text());
-		}
-	}
-	return filesToHash;
-}
-
-void Window::ButtonHasherStartClick()
-{
-	QList<int> rowsWithHashes; // Rows that already have hashes
-	int filesToHashCount = 0;
-	
-	for(int i=0; i<hashes->rowCount(); i++)
-	{
-		QString progress = hashes->item(i, 1)->text();
-		QString existingHash = hashes->item(i, 9)->text(); // Check hash column
-		
-		// Process files with progress="0" or progress="1" (already hashed but not yet API-processed)
-		if(progress == "0" || progress == "1")
-		{
-			// Check if file has pending API calls (tags in columns 5 or 6)
-			// Tags are "?" initially, set to actual tag when API call is queued, and "0" when completed/not needed
-			QString fileTag = hashes->item(i, 5)->text();
-			QString mylistTag = hashes->item(i, 6)->text();
-			bool hasPendingAPICalls = (!fileTag.isEmpty() && fileTag != "?" && fileTag != "0") || 
-			                          (!mylistTag.isEmpty() && mylistTag != "?" && mylistTag != "0");
-			
-			if (!existingHash.isEmpty())
-			{
-				// Skip files with pending API calls to avoid duplicate processing
-				if (!hasPendingAPICalls)
-				{
-					// File already has a hash - queue for deferred processing
-					rowsWithHashes.append(i);
-				}
-			}
-			else
-			{
-				// File needs to be hashed
-				// Note: If progress="1" but no hash, this is an inconsistent state
-				if (progress == "1")
-				{
-					LOG(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
-				}
-				filesToHashCount++;
-			}
-		}
-	}
-	
-	// Queue files with existing hashes for deferred processing to prevent UI freeze
-	for (int rowIndex : rowsWithHashes)
-	{
-		QString filename = hashes->item(rowIndex, 0)->text();
-		QString filePath = hashes->item(rowIndex, 2)->text();
-		QString hexdigest = hashes->item(rowIndex, 9)->text();
-		
-		LOG(QString("Queueing already-hashed file for processing: %1").arg(filename));
-		
-		// Get file size
-		QFileInfo fileInfo(filePath);
-		qint64 fileSize = fileInfo.size();
-		
-		// Queue for deferred processing using new HashingTask class
-		HashingTask task(filePath, filename, hexdigest, fileSize);
-		task.setRowIndex(rowIndex);
-		task.setUseUserSettings(true);
-		task.setAddToMylist(addtomylist->checkState() > 0);
-		task.setMarkWatchedState(markwatched->checkState());
-		task.setFileState(hasherFileState->currentIndex());
-		pendingHashedFilesQueue.append(task);
-	}
-	
-	// Start timer to process queued files in batches (keeps UI responsive)
-	if (!rowsWithHashes.isEmpty())
-	{
-		LOG(QString("Queued %1 already-hashed file(s) for deferred processing").arg(rowsWithHashes.size()));
-		hashedFilesProcessingTimer->start();
-	}
-	
-	// Start hashing for files without existing hashes
-	if (filesToHashCount > 0)
-	{
-		// Calculate total hash parts for progress tracking
-		QStringList filesToHash = getFilesNeedingHash();
-		setupHashingProgress(filesToHash);
-		
-		buttonstart->setEnabled(0);
-		buttonclear->setEnabled(0);
-		hasherThreadPool->start();
-	}
-	else if (rowsWithHashes.isEmpty())
-	{
-		// No files to process at all
-		LOG("No files to process");
-	}
-	else
-	{
-		// Only had pre-hashed files, queued for processing
-		LOG(QString("Queued %1 already-hashed file(s) for processing").arg(rowsWithHashes.size()));
-	}
-}
-
-void Window::ButtonHasherStopClick()
-{
-	buttonstart->setEnabled(1);
-	buttonclear->setEnabled(1);
-	progressTotal->setValue(0);
-	progressTotal->setMaximum(1);
-	progressTotal->setFormat("");
-	progressTotalLabel->setText("");
-	
-	// Reset all thread progress bars
-	for (QProgressBar* const bar : std::as_const(threadProgressBars)) {
-		bar->setValue(0);
-		bar->setMaximum(1);
-	}
-	
-	// Reset progress of files that were assigned but not completed
-	// Files with progress "0.1" were assigned to threads but stopped before completion
-	// Reset them to "0" so they can be picked up again on next start
-	for (int i = 0; i < hashes->rowCount(); i++)
-	{
-		QString progress = hashes->item(i, 1)->text();
-		if (progress == "0.1")
-		{
-			hashes->item(i, 1)->setText("0");
-		}
-	}
-	
-	// Notify all worker threads to stop hashing
-	// 1. First, notify ed2k instances in all worker threads to interrupt current hashing
-	//    This sets a flag that ed2khash checks, causing it to return early
-	hasherThreadPool->broadcastStopHasher();
-	emit notifyStopHasher(); // Also notify main adbapi for consistency
-	
-	// 2. Then signal the thread pool to stop processing more files
-	hasherThreadPool->stop();
-	
-	// 3. Don't wait here - let threads finish asynchronously to prevent UI freeze
-	//    The hasherFinished() slot will be called automatically when all threads complete
-}
-
-void Window::provideNextFileToHash()
-{
-	// Thread-safe file assignment: only one thread can request a file at a time
-	QMutexLocker locker(&fileRequestMutex);
-	
-	// Look through the hashes widget for the next file that needs hashing (progress="0" and no hash)
-	for(int i=0; i<hashes->rowCount(); i++)
-	{
-		QString progress = hashes->item(i, 1)->text();
-		QString existingHash = hashes->item(i, 9)->text();
-		
-		if(progress == "0" && existingHash.isEmpty())
-		{
-			QString filePath = hashes->item(i, 2)->text();
-			
-			// Immediately mark this file as assigned to prevent other threads from picking it up
-			QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
-			hashes->setItem(i, 1, itemProgressAssigned);
-			
-			hasherThreadPool->addFile(filePath);
-			return;
-		}
-	}
-	
-	// No more files to hash, send empty string to signal completion
-	hasherThreadPool->addFile(QString());
-}
-
-void Window::ButtonHasherClearClick()
-{
-	hashes->setUpdatesEnabled(0);
-	while(hashes->rowCount() > 0)
-	{
-		hashes->removeRow(0);
-	}
-	hashes->setUpdatesEnabled(1);
-}
+// Note: getNotifyFileHashed method has been moved to HasherCoordinator class
 
 void Window::ButtonLoginClick()
 {
@@ -1719,152 +1235,11 @@ void Window::ButtonLoginClick()
     }
 }
 
-void Window::markwatchedStateChanged(int state)
-{
-	switch(state)
-	{
-	case Qt::Unchecked:
-		markwatched->setText("Mark watched (no change)");
-		break;
-	case Qt::PartiallyChecked:
-		markwatched->setText("Mark watched (unwatched)");
-		break;
-	case Qt::Checked:
-		markwatched->setText("Mark watched (watched)");
-		break;
-	default:
-		break;
-	}
-}
+// Note: markwatchedStateChanged method has been moved to HasherCoordinator class
 
-void Window::getNotifyPartsDone(int threadId, int total, int done)
-{
-	// Calculate the delta from last update for this thread
-	int lastProgress = lastThreadProgress.value(threadId, 0);
-	int delta = done - lastProgress;
-	lastThreadProgress[threadId] = done;
-	
-	// Update completed parts by the actual delta (not just +1)
-	completedHashParts += delta;
-	
-	// Update ProgressTracker with current progress
-	m_hashingProgress.updateProgress(completedHashParts);
-	
-	// Update the specific thread's progress bar
-	if (threadId >= 0 && threadId < threadProgressBars.size()) {
-		threadProgressBars[threadId]->setMaximum(total);
-		threadProgressBars[threadId]->setValue(done);
-	}
-	
-	progressTotal->setValue(completedHashParts);
-	
-	// Update percentage label using ProgressTracker
-	int percentage = static_cast<int>(m_hashingProgress.getProgressPercent());
-	progressTotalLabel->setText(QString("%1%").arg(percentage));
-	
-	// Calculate and display ETA using ProgressTracker - throttled to once per second
-	if (m_hashingProgress.shouldUpdateETA(1000)) {
-		QString etaStr = m_hashingProgress.getETAString();
-		if (etaStr == "Calculating...") {
-			progressTotal->setFormat("ETA: calculating...");
-		} else if (etaStr == "Complete") {
-			progressTotal->setFormat("Complete");
-		} else {
-			progressTotal->setFormat(QString("ETA: %1").arg(etaStr));
-		}
-	}
-}
+// Note: getNotifyPartsDone method has been moved to HasherCoordinator class
 
-void Window::getNotifyFileHashed(int threadId, ed2k::ed2kfilestruct data)
-{
-	for(int i=0; i<hashes->rowCount(); i++)
-	{
-		// Match by filename AND verify it's the file being hashed (progress starts with "0" - either "0" or "0.1" for assigned)
-		// This prevents matching wrong file when there are multiple files with the same name
-		QString progress = hashes->item(i, 1)->text();
-		if(hashes->item(i, 0)->text() == data.filename && progress.startsWith("0"))
-		{
-			// Additional check: verify file size matches to ensure we have the right file
-			QString filePath = hashes->item(i, 2)->text();
-			QFileInfo fileInfo(filePath);
-			if(!fileInfo.exists() || fileInfo.size() != data.size)
-			{
-				// Size mismatch or file doesn't exist - this is not the right file, continue searching
-				continue;
-			}
-            // Mark as hashed in UI (use pre-allocated color object)
-            hashes->item(i, 0)->setBackground(m_hashedFileColor);
-			QTableWidgetItem *itemprogress = new QTableWidgetItem(QString("1"));
-		    hashes->setItem(i, 1, itemprogress);
-		    getNotifyLogAppend(QString("File hashed: %1").arg(data.filename));
-			
-			// Update the hash column (column 9) in the UI to reflect the newly computed hash
-			if (QTableWidgetItem* hashItem = hashes->item(i, 9))
-			{
-				hashItem->setText(data.hexdigest);
-			}
-			else
-			{
-				// Column 9 doesn't exist, create it
-				QTableWidgetItem* newHashItem = new QTableWidgetItem(data.hexdigest);
-				hashes->setItem(i, 9, newHashItem);
-			}
-			
-			// Process file identification immediately instead of batching
-			if (addtomylist->checkState() > 0)
-			{
-				// Update hash in database with status=1 immediately
-				adbapi->updateLocalFileHash(filePath, data.hexdigest, 1);
-				
-				// Perform LocalIdentify immediately
-				// Note: This is done per-file instead of batching to provide immediate feedback
-				// LocalIdentify is a fast indexed database query, so the performance difference
-				// is negligible compared to the user experience improvement of seeing results
-				// immediately after each file is hashed rather than waiting for the entire batch
-				std::bitset<2> li = adbapi->LocalIdentify(data.size, data.hexdigest);
-				
-				// Update UI with LocalIdentify results
-				hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
-				
-				QString tag;
-				if(li[AniDBApi::LI_FILE_IN_DB] == 0)
-				{
-					tag = adbapi->File(data.size, data.hexdigest);
-					hashes->item(i, 5)->setText(tag);
-					// File info not in local DB yet - File() API call queued to fetch from AniDB
-				}
-				else
-				{
-					hashes->item(i, 5)->setText("0");
-					// File is in local DB (previously fetched from AniDB)
-					// Update status to 2 (in anidb) to prevent re-detection
-					adbapi->UpdateLocalFileStatus(filePath, 2);
-				}
-
-				hashes->item(i, 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0")); // File in mylist
-				if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0)
-				{
-					tag = adbapi->MylistAdd(data.size, data.hexdigest, markwatched->checkState(), hasherFileState->currentIndex(), storage->text());
-					hashes->item(i, 6)->setText(tag);
-					// Status will be updated when MylistAdd completes (via UpdateLocalPath)
-				}
-				else
-				{
-					hashes->item(i, 6)->setText("0");
-					// File already in mylist - link the local_file and update status
-					adbapi->LinkLocalFileToMylist(data.size, data.hexdigest, filePath);
-				}
-			}
-			else
-			{
-				// Not adding to mylist - just accumulate hash for batch database update later
-				pendingHashUpdates.append(qMakePair(filePath, data.hexdigest));
-			}
-			
-			break; // Found the file, no need to continue
-		}
-	}
-}
+// Note: getNotifyFileHashed method has been moved to HasherCoordinator class
 
 void Window::safeClose()
 {
@@ -2279,78 +1654,11 @@ void Window::hasherFinished()
 		pendingHashUpdates.clear();
 	}
 	
-	// Note: File identification now happens immediately in getNotifyFileHashed()
-	// This ensures UI remains responsive and files are identified as soon as they are hashed
-	
-	buttonstart->setEnabled(1);
-	buttonclear->setEnabled(1);
-	progressTotal->setFormat("");
-	progressTotalLabel->setText("");
+	// Note: All UI updates are handled by HasherCoordinator::onHashingFinished()
+	// File identification happens immediately in HasherCoordinator::onFileHashed()
 }
 
-void Window::processPendingHashedFiles()
-{
-	// Process files in small batches to keep UI responsive
-	int processed = 0;
-	
-	while (!pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
-		HashingTask task = pendingHashedFilesQueue.takeFirst();
-		processed++;
-		
-		// Mark as hashed in UI (use pre-allocated color object)
-		hashes->item(task.rowIndex(), 0)->setBackground(m_hashedFileColor);
-		hashes->item(task.rowIndex(), 1)->setText("1");
-		
-		// Update hash in database with status=1
-		adbapi->updateLocalFileHash(task.filePath(), task.hash(), 1);
-		
-		// If adding to mylist and logged in, perform API calls
-		if (task.addToMylist() && adbapi->LoggedIn()) {
-			// Perform LocalIdentify
-			std::bitset<2> li = adbapi->LocalIdentify(task.fileSize(), task.hash());
-			
-			// Update UI with LocalIdentify results
-			hashes->item(task.rowIndex(), 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0"));
-			
-			QString tag;
-			if(li[AniDBApi::LI_FILE_IN_DB] == 0) {
-				tag = adbapi->File(task.fileSize(), task.hash());
-				hashes->item(task.rowIndex(), 5)->setText(tag);
-				// File info not in local DB yet - File() API call queued to fetch from AniDB
-				// Status will be updated to 2 when subsequent MylistAdd completes (via UpdateLocalPath)
-			} else {
-				hashes->item(task.rowIndex(), 5)->setText("0");
-				// File is in local DB (previously fetched from AniDB)
-				// Update status to 2 (in anidb) to prevent re-detection
-				adbapi->UpdateLocalFileStatus(task.filePath(), 2);
-			}
-
-			hashes->item(task.rowIndex(), 4)->setText(QString((li[AniDBApi::LI_FILE_IN_MYLIST])?"1":"0"));
-			if(li[AniDBApi::LI_FILE_IN_MYLIST] == 0) {
-				// Use settings from the task
-				int markWatched = task.useUserSettings() ? task.markWatchedState() : Qt::Unchecked;
-				int fileState = task.useUserSettings() ? task.fileState() : 1;
-				tag = adbapi->MylistAdd(task.fileSize(), task.hash(), markWatched, fileState, storage->text());
-				hashes->item(task.rowIndex(), 6)->setText(tag);
-				// Status will be updated when MylistAdd completes (via UpdateLocalPath)
-			} else {
-				hashes->item(task.rowIndex(), 6)->setText("0");
-				// File already in mylist - no API call needed
-				// Update status to 2 (in anidb) to prevent re-detection
-				adbapi->UpdateLocalFileStatus(task.filePath(), 2);
-			}
-		} else {
-			// Not logged in - mark as fully processed to prevent re-detection
-			adbapi->UpdateLocalFileStatus(task.filePath(), 2);
-		}
-	}
-	
-	// Stop timer if queue is empty
-	if (pendingHashedFilesQueue.isEmpty()) {
-		hashedFilesProcessingTimer->stop();
-		LOG("Finished processing all already-hashed files");
-	}
-}
+// Note: processPendingHashedFiles method has been moved to HasherCoordinator class
 
 bool Window::eventFilter(QObject *obj, QEvent *event)
 {
@@ -3129,34 +2437,8 @@ void Window::updateOrAddMylistEntry(int lid)
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash)
 {
-	QTableWidgetItem *item1 = new QTableWidgetItem(QTableWidgetItem(QString(file.fileName())));
-	QColor colorgray;
-	colorgray.setRgb(230, 230, 230);
-    item1->setBackground(colorgray.toRgb());
-	QTableWidgetItem *item2 = new QTableWidgetItem(QTableWidgetItem(QString("0")));
-	QTableWidgetItem *item3 = new QTableWidgetItem(QTableWidgetItem(QString(file.absoluteFilePath())));
-	QTableWidgetItem *item4 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item5 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item6 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item7 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item8 = new QTableWidgetItem(QTableWidgetItem(QString(ren > 0 ? "1" : "0")));
-	QTableWidgetItem *item9 = new QTableWidgetItem(QTableWidgetItem(QString("0")));
-	
-	// Use preloaded hash if provided, otherwise query database
-	QString existingHash = preloadedHash.isEmpty() ? adbapi->getLocalFileHash(file.absoluteFilePath()) : preloadedHash;
-	QTableWidgetItem *item10 = new QTableWidgetItem(QTableWidgetItem(existingHash.isEmpty() ? QString("") : existingHash));
-	
-	hashes->insertRow(hashes->rowCount());
-	hashes->setItem(hashes->rowCount()-1, 0, item1);
-	hashes->setItem(hashes->rowCount()-1, 1, item2);
-	hashes->setItem(hashes->rowCount()-1, 2, item3);
-	hashes->setItem(hashes->rowCount()-1, 3, item4);
-	hashes->setItem(hashes->rowCount()-1, 4, item5);
-	hashes->setItem(hashes->rowCount()-1, 5, item6);
-	hashes->setItem(hashes->rowCount()-1, 6, item7);
-	hashes->setItem(hashes->rowCount()-1, 7, item8);
-	hashes->setItem(hashes->rowCount()-1, 8, item9);
-	hashes->setItem(hashes->rowCount()-1, 9, item10);
+	// Delegate to HasherCoordinator which owns the hashes table and hasher logic
+	hasherCoordinator->hashesInsertRow(file, ren, preloadedHash);
 }
 
 void Window::unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
@@ -3818,8 +3100,8 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	for (const QString &filePath : filePaths) {
 		QFileInfo fileInfo(filePath);
 		
-		// Check if file should be filtered
-		if (shouldFilterFile(filePath)) {
+		// Check if file should be filtered (delegate to HasherCoordinator)
+		if (hasherCoordinator->shouldFilterFile(filePath)) {
 			continue; // Skip this file
 		}
 		
@@ -3836,12 +3118,11 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	
 	// Directory watcher always auto-starts the hasher for detected files
 	if (!hasherThreadPool->isRunning()) {
-		// Set settings for auto-hash if logged in
-		if (adbapi->LoggedIn()) {
-			addtomylist->setChecked(true);
-			markwatched->setCheckState(Qt::Unchecked);  // no change (tristate: Unchecked=no change, PartiallyChecked=unwatched, Checked=watched)
-			hasherFileState->setCurrentIndex(1);  // Internal (HDD)
-		}
+		// Note: Hasher settings (addtomylist, markwatched, hasherFileState) are now in HasherCoordinator
+		// They are set to defaults in HasherCoordinator constructor:
+		// - addtomylist: checked
+		// - markwatched: unchecked (no change)
+		// - hasherFileState: 1 (Internal HDD)
 		
 		// Separate files with existing hashes from those that need hashing
 		// Check ALL files with progress="0" or "1", not just newly added ones
@@ -5459,18 +4740,12 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
         .arg(fileInfo.selectedAid())
         .arg(epno));
     
-    // Use the settings from the UI
-    int viewed = 0;
-    if(markwatched->checkState() == Qt::Checked) {
-        viewed = 1;
-    } else if(markwatched->checkState() == Qt::PartiallyChecked) {
-        viewed = 0;
-    } else {
-        viewed = -1; // no change
-    }
-    
-    int state = hasherFileState->currentIndex();
-    QString storageStr = storage->text();
+    // Use default settings for unknown file submission
+    // Note: Hasher settings (markwatched, hasherFileState, storage) are now in HasherCoordinator
+    // For unknown files widget, we use reasonable defaults:
+    int viewed = -1; // no change (since we don't have access to markwatched widget)
+    int state = 1; // Internal (HDD) - reasonable default
+    QString storageStr = ""; // Empty storage
     
     // Prepare the "other" field with file details
     // Note: The AniDB API has an undocumented length limit for the 'other' field
@@ -5487,7 +4762,8 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
     }
     
     // Add to mylist via API using generic parameter
-    if(addtomylist->isChecked() && adbapi->LoggedIn())
+    // Note: Always add unknown files to mylist when user clicks submit button
+    if(adbapi->LoggedIn())
     {
         LOG(QString("Adding unknown file to mylist using generic: aid=%1, epno=%2")
             .arg(fileInfo.selectedAid())
