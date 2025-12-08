@@ -56,6 +56,7 @@
 #include "progresstracker.h"
 #include "hashingtask.h"
 #include "animemetadatacache.h"
+#include "backgrounddatabaseworker.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -81,35 +82,42 @@ public:
 };
 
 // Worker thread for loading mylist anime IDs
-class MylistLoaderWorker : public QObject
+class MylistLoaderWorker : public BackgroundDatabaseWorker<QList<int>>
 {
     Q_OBJECT
 public:
-    explicit MylistLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
-
-    void doWork();
+    explicit MylistLoaderWorker(const QString &dbName) 
+        : BackgroundDatabaseWorker<QList<int>>(dbName, "MylistThread") {}
 
 signals:
     void finished(const QList<int> &aids);
 
-private:
-    QString m_dbName;
+protected:
+    QList<int> executeQuery(QSqlDatabase &db) override;
+    QList<int> getDefaultResult() const override { return QList<int>(); }
+    void emitFinished(const QList<int> &result) override { emit finished(result); }
 };
 
 // Worker thread for loading anime titles cache
-class AnimeTitlesLoaderWorker : public QObject
+// Note: This worker returns two results, so we use a QPair
+class AnimeTitlesLoaderWorker : public BackgroundDatabaseWorker<QPair<QStringList, QMap<QString, int>>>
 {
     Q_OBJECT
 public:
-    explicit AnimeTitlesLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
-
-    void doWork();
+    explicit AnimeTitlesLoaderWorker(const QString &dbName) 
+        : BackgroundDatabaseWorker<QPair<QStringList, QMap<QString, int>>>(dbName, "AnimeTitlesThread") {}
 
 signals:
     void finished(const QStringList &titles, const QMap<QString, int> &titleToAid);
 
-private:
-    QString m_dbName;
+protected:
+    QPair<QStringList, QMap<QString, int>> executeQuery(QSqlDatabase &db) override;
+    QPair<QStringList, QMap<QString, int>> getDefaultResult() const override { 
+        return QPair<QStringList, QMap<QString, int>>(QStringList(), QMap<QString, int>()); 
+    }
+    void emitFinished(const QPair<QStringList, QMap<QString, int>> &result) override { 
+        emit finished(result.first, result.second); 
+    }
 };
 
 // Use LocalFileInfo class for unbound file information
@@ -117,19 +125,20 @@ private:
 using UnboundFileData = LocalFileInfo;
 
 // Worker thread for loading unbound files
-class UnboundFilesLoaderWorker : public QObject
+class UnboundFilesLoaderWorker : public BackgroundDatabaseWorker<QList<LocalFileInfo>>
 {
     Q_OBJECT
 public:
-    explicit UnboundFilesLoaderWorker(const QString &dbName) : m_dbName(dbName) {}
-
-    void doWork();
+    explicit UnboundFilesLoaderWorker(const QString &dbName) 
+        : BackgroundDatabaseWorker<QList<LocalFileInfo>>(dbName, "UnboundFilesThread") {}
 
 signals:
     void finished(const QList<LocalFileInfo> &files);
 
-private:
-    QString m_dbName;
+protected:
+    QList<LocalFileInfo> executeQuery(QSqlDatabase &db) override;
+    QList<LocalFileInfo> getDefaultResult() const override { return QList<LocalFileInfo>(); }
+    void emitFinished(const QList<LocalFileInfo> &result) override { emit finished(result); }
 };
 
 class Window : public QWidget
