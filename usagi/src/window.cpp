@@ -1391,6 +1391,23 @@ bool Window::shouldFilterFile(const QString &filePath)
 	return false; // File should not be filtered
 }
 
+void Window::addFilesFromDirectory(const QString &dirPath)
+{
+	// Extracted method to avoid code duplication in Button2Click and Button3Click
+	// This method walks a directory recursively and adds all matching files to the hasher
+	QDirIterator directory_walker(dirPath, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+	
+	while(directory_walker.hasNext())
+	{
+		QFileInfo file = QFileInfo(directory_walker.next());
+		
+		// Check if file should be filtered
+		if (!shouldFilterFile(file.absoluteFilePath())) {
+			hashesinsertrow(file, renameto->checkState());
+		}
+	}
+}
+
 void Window::Button1Click() // add files
 {
     QStringList files = QFileDialog::getOpenFileNames(0, 0, adbapi->getLastDirectory());
@@ -1442,18 +1459,9 @@ void Window::Button2Click() // add directories
 		}
 		while(!files.isEmpty())
 		{
-			QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+			QString dirPath = files.first();
 			files.pop_front();
-			while(directory_walker.hasNext())
-            {
-                QFileInfo file = QFileInfo(directory_walker.next());
-                
-                // Check if file should be filtered
-                if (!shouldFilterFile(file.absoluteFilePath())) {
-                    hashesinsertrow(file, renameto->checkState());
-                }
-//				adbapi.ed2khash(file.absoluteFilePath());
-		    }
+			addFilesFromDirectory(dirPath);
 		}
     }
     hashes->setUpdatesEnabled(1);
@@ -1469,17 +1477,9 @@ void Window::Button3Click()
     {
         while(!files.isEmpty())
         {
-            QDirIterator directory_walker(files.first(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+            QString dirPath = files.first();
             files.pop_front();
-            while(directory_walker.hasNext())
-            {
-                QFileInfo file = QFileInfo(directory_walker.next());
-                
-                // Check if file should be filtered
-                if (!shouldFilterFile(file.absoluteFilePath())) {
-                    hashesinsertrow(file, renameto->checkState());
-                }
-            }
+            addFilesFromDirectory(dirPath);
         }
     }
 	hashes->setUpdatesEnabled(1);

@@ -464,6 +464,9 @@ private:
     // Helper method for hasher file filtering
     bool shouldFilterFile(const QString &filePath);
     
+    // Helper method for adding files from directory (extracted to avoid code duplication)
+    void addFilesFromDirectory(const QString &dirPath);
+    
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);
     int calculateTotalHashParts(const QStringList &files);
