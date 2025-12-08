@@ -4999,6 +4999,23 @@ void Window::applyMylistFilters()
 	QList<int> filteredAnimeIds;
 	int totalCount = allAnimeIds.size();
 	
+	// When chain display is enabled, build chains from ALL mylist anime FIRST
+	// This allows forming complete chains even when some anime don't match the filter
+	QList<AnimeChain> prebuiltChains;
+	if (showSeriesChain) {
+		LOG(QString("[Window] Pre-building chains from ALL %1 mylist anime before filtering").arg(totalCount));
+		// Use only mylist anime for chain building
+		QList<int> mylistIds;
+		for (int aid : allAnimeIds) {
+			if (mylistAnimeIdSet.contains(aid)) {
+				mylistIds.append(aid);
+			}
+		}
+		LOG(QString("[Window] Building chains from %1 mylist anime").arg(mylistIds.size()));
+		prebuiltChains = cardManager->buildChainsFromAnimeIds(mylistIds);
+		LOG(QString("[Window] Pre-built %1 chains before filtering").arg(prebuiltChains.size()));
+	}
+	
 	// Apply filters to determine which anime to show
 	// Use cached data when card widgets don't exist (virtual scrolling)
 	for (int aid : allAnimeIds) {
@@ -5112,6 +5129,53 @@ void Window::applyMylistFilters()
 		if (visible) {
 			filteredAnimeIds.append(aid);
 		}
+	}
+	
+	// When chain display is enabled, expand filtered results to include complete chains
+	// If a chain has at least one visible anime, include ALL anime from that chain
+	if (showSeriesChain && !prebuiltChains.isEmpty()) {
+		LOG(QString("[Window] Expanding filtered results to include complete chains (before: %1 anime)").arg(filteredAnimeIds.size()));
+		
+		QSet<int> filteredSet = QSet<int>(filteredAnimeIds.begin(), filteredAnimeIds.end());
+		QSet<int> expandedSet = filteredSet;
+		
+		// For each chain, if it contains any visible anime, include all anime from that chain
+		for (const AnimeChain& chain : prebuiltChains) {
+			QList<int> chainAnimeIds = chain.getAnimeIds();
+			
+			// Check if this chain has at least one visible anime
+			bool hasVisibleAnime = false;
+			for (int aid : chainAnimeIds) {
+				if (filteredSet.contains(aid)) {
+					hasVisibleAnime = true;
+					break;
+				}
+			}
+			
+			// If chain has visible anime, include ALL anime from the chain
+			if (hasVisibleAnime) {
+				for (int aid : chainAnimeIds) {
+					expandedSet.insert(aid);
+				}
+			}
+		}
+		
+		// Rebuild filteredAnimeIds from expanded set
+		// Preserve original order where possible
+		QList<int> expandedList;
+		for (int aid : filteredAnimeIds) {
+			if (expandedSet.contains(aid)) {
+				expandedList.append(aid);
+				expandedSet.remove(aid);
+			}
+		}
+		// Add remaining anime from chains (those not in original filtered list)
+		for (int aid : expandedSet) {
+			expandedList.append(aid);
+		}
+		
+		filteredAnimeIds = expandedList;
+		LOG(QString("[Window] After chain expansion: %1 anime").arg(filteredAnimeIds.size()));
 	}
 	
 	// Chain building and sorting is now handled by MyListCardManager
