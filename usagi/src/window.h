@@ -404,6 +404,7 @@ public:
     hashes_ *hashes;
     unknown_files_ *unknownFiles;
     void unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size);
+    void hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash = QString());
     void loadUnboundFiles();
 	int parseMylistExport(const QString &tarGzPath);
     Window();
