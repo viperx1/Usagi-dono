@@ -64,8 +64,8 @@ public:
     void setAnimeIdList(const QList<int>& aids, bool chainModeEnabled);
     
     // Build chains from anime IDs using cached relation data
-    // If expandChains=true, includes related anime not in aids list
-    QList<AnimeChain> buildChainsFromAnimeIds(const QList<int>& aids, bool expandChains = false) const;
+    // Chains are always expanded to include related anime not in the original list
+    QList<AnimeChain> buildChainsFromAnimeIds(const QList<int>& aids) const;
     
     // Sort chains using specified criteria
     void sortChains(AnimeChain::SortCriteria criteria, bool ascending);

@@ -2192,8 +2192,7 @@ void Window::saveMylistSorting()
         .arg(filterSidebar->getSortIndex())
         .arg(filterSidebar->getSortAscending()));
     LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3")
-        .arg(filterSidebar->getTypeFilter())
-        .arg(filterSidebar->getCompletionFilter())
+        .arg(filterSidebar->getTypeFilter(), filterSidebar->getCompletionFilter())
         .arg(filterSidebar->getShowOnlyUnwatched()));
     LOG(QString("Saved mylist view settings: inmylist=%1, serieschain=%2, adult=%3")
         .arg(filterSidebar->getInMyListOnly())
@@ -4157,32 +4156,11 @@ void Window::sortMylistCards(int sortIndex)
 	
 	// Handle nested sorting when series chain is enabled
 	if (seriesChainEnabled) {
-		LOG("[Window] Series chain enabled - delegating to MyListCardManager for chain sorting");
+		LOG("[Window] Series chain enabled - delegating to MyListCardManager for chain sorting (airdate descending)");
 		
-		// Map sortIndex to AnimeChain::SortCriteria
-		AnimeChain::SortCriteria criteria;
-		switch (sortIndex) {
-			case 0: // Anime Title
-				criteria = AnimeChain::SortCriteria::ByRepresentativeTitle;
-				break;
-			case 1: // Type
-				criteria = AnimeChain::SortCriteria::ByRepresentativeType;
-				break;
-			case 2: // Aired Date
-				criteria = AnimeChain::SortCriteria::ByRepresentativeDate;
-				break;
-			case 3: // Episodes (Count) - use chain length as proxy
-				criteria = AnimeChain::SortCriteria::ByChainLength;
-				break;
-			case 4: // Completion % - use ID (no direct mapping available)
-			case 5: // Last Played - use ID (no direct mapping available)
-			default:
-				criteria = AnimeChain::SortCriteria::ByRepresentativeId;
-				break;
-		}
-		
-		// MyListCardManager will sort chains externally while preserving internal order
-		cardManager->sortChains(criteria, sortAscending);
+		// Always sort chains by aired date descending (newest first)
+		// This ensures prequels appear before sequels chronologically
+		cardManager->sortChains(AnimeChain::SortCriteria::ByRepresentativeDate, false);  // false = descending
 		
 		// Get the updated anime ID list from card manager (already reordered)
 		animeIds = cardManager->getAnimeIdList();
@@ -4547,11 +4525,26 @@ void Window::loadMylistAsCards()
 	// Store the full unfiltered list of anime IDs (for filter reset)
 	allAnimeIdsList = aids;
 	
-	// Preload all data for cards
-	if (!aids.isEmpty()) {
-		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
-		cardManager->preloadCardCreationData(aids);
+	// Preload data for ALL anime in database (not just mylist)
+	// This enables proper chain building even when some anime in a chain are not in mylist
+	QList<int> allAnimeIds;
+	QSqlQuery allAnimeQuery(db);
+	if (allAnimeQuery.exec("SELECT aid FROM anime")) {
+		while (allAnimeQuery.next()) {
+			allAnimeIds.append(allAnimeQuery.value(0).toInt());
+		}
+		LOG(QString("[Window] Preloading data for %1 total anime (including %2 in mylist)").arg(allAnimeIds.size()).arg(aids.size()));
+		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(allAnimeIds.size()));
+		cardManager->preloadCardCreationData(allAnimeIds);
 		LOG("[Window] Card data preload complete");
+	} else {
+		LOG(QString("[Window] Error loading all anime: %1").arg(allAnimeQuery.lastError().text()));
+		// Fallback to loading just mylist anime
+		if (!aids.isEmpty()) {
+			mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
+			cardManager->preloadCardCreationData(aids);
+			LOG("[Window] Card data preload complete (fallback to mylist only)");
+		}
 	}
 	
 	// Set the ordered anime ID list for virtual scrolling
@@ -4813,8 +4806,18 @@ void Window::checkAndRequestChainRelations(int aid)
 		return;
 	}
 	
-	// Get the series chain for this anime
-	QList<int> chain = watchSessionManager->getSeriesChain(aid);
+	// CONSOLIDATION: Use MyListCardManager's chain building instead of WatchSessionManager
+	// This maintains SOLID principle - single responsibility for chain building logic
+	// MyListCardManager is now the authoritative source for all chain operations
+	// Build chain from this single anime (chains are always expanded)
+	QList<AnimeChain> chains = cardManager->buildChainsFromAnimeIds(QList<int>() << aid);
+	
+	if (chains.isEmpty()) {
+		return;
+	}
+	
+	// Get the first chain (should only be one since we started with one anime)
+	QList<int> chain = chains.first().getAnimeIds();
 	
 	if (chain.isEmpty()) {
 		return;
@@ -5011,6 +5014,23 @@ void Window::applyMylistFilters()
 	QList<int> filteredAnimeIds;
 	int totalCount = allAnimeIds.size();
 	
+	// When chain display is enabled, build chains from ALL mylist anime FIRST
+	// This allows forming complete chains even when some anime don't match the filter
+	QList<AnimeChain> prebuiltChains;
+	if (showSeriesChain) {
+		LOG(QString("[Window] Pre-building chains from ALL %1 mylist anime before filtering").arg(totalCount));
+		// Use only mylist anime for chain building
+		QList<int> mylistIds;
+		for (int aid : allAnimeIds) {
+			if (mylistAnimeIdSet.contains(aid)) {
+				mylistIds.append(aid);
+			}
+		}
+		LOG(QString("[Window] Building chains from %1 mylist anime").arg(mylistIds.size()));
+		prebuiltChains = cardManager->buildChainsFromAnimeIds(mylistIds);
+		LOG(QString("[Window] Pre-built %1 chains before filtering").arg(prebuiltChains.size()));
+	}
+	
 	// Apply filters to determine which anime to show
 	// Use cached data when card widgets don't exist (virtual scrolling)
 	for (int aid : allAnimeIds) {
@@ -5126,117 +5146,56 @@ void Window::applyMylistFilters()
 		}
 	}
 	
+	// When chain display is enabled, expand filtered results to include complete chains
+	// If a chain has at least one visible anime, include ALL anime from that chain
+	if (showSeriesChain && !prebuiltChains.isEmpty()) {
+		LOG(QString("[Window] Expanding filtered results to include complete chains (before: %1 anime)").arg(filteredAnimeIds.size()));
+		
+		QSet<int> filteredSet = QSet<int>(filteredAnimeIds.begin(), filteredAnimeIds.end());
+		QSet<int> expandedSet = filteredSet;
+		
+		// For each chain, if it contains any visible anime, include all anime from that chain
+		for (const AnimeChain& chain : prebuiltChains) {
+			QList<int> chainAnimeIds = chain.getAnimeIds();
+			
+			// Check if this chain has at least one visible anime
+			bool hasVisibleAnime = false;
+			for (int aid : chainAnimeIds) {
+				if (filteredSet.contains(aid)) {
+					hasVisibleAnime = true;
+					break;
+				}
+			}
+			
+			// If chain has visible anime, include ALL anime from the chain
+			if (hasVisibleAnime) {
+				for (int aid : chainAnimeIds) {
+					expandedSet.insert(aid);
+				}
+			}
+		}
+		
+		// Rebuild filteredAnimeIds from expanded set
+		// Preserve original order where possible
+		QList<int> expandedList;
+		for (int aid : filteredAnimeIds) {
+			if (expandedSet.contains(aid)) {
+				expandedList.append(aid);
+				expandedSet.remove(aid);
+			}
+		}
+		// Add remaining anime from chains (those not in original filtered list)
+		for (int aid : expandedSet) {
+			expandedList.append(aid);
+		}
+		
+		filteredAnimeIds = expandedList;
+		LOG(QString("[Window] After chain expansion: %1 anime").arg(filteredAnimeIds.size()));
+	}
+	
 	// Chain building and sorting is now handled by MyListCardManager
 	// The old WatchSessionManager-based chain building code has been removed
 	// MyListCardManager will build chains when setAnimeIdList() is called with chain mode enabled
-	
-	// Update series chain connection info for cards
-	// First, clear all chain info
-	for (AnimeCard* card : cardManager->getAllCards()) {
-		card->setSeriesChainInfo(0, 0);
-	}
-	
-	// If series chain display is enabled, set prequel/sequel info for arrow connections
-	if (showSeriesChain && watchSessionManager) {
-		// Cache series chains to avoid redundant lookups
-		QMap<int, QList<int>> chainCache;
-		
-		for (int i = 0; i < filteredAnimeIds.size(); ++i) {
-			int currentAid = filteredAnimeIds[i];
-			
-			// Determine prequel and sequel AIDs by checking adjacent anime
-			int prequelAid = 0;
-			int sequelAid = 0;
-			
-			// Check if previous anime in filtered list is a prequel
-			if (i > 0) {
-				int prevAid = filteredAnimeIds[i - 1];
-				
-				// Get both chains
-				QList<int> currentChain;
-				if (!chainCache.contains(currentAid)) {
-					currentChain = watchSessionManager->getSeriesChain(currentAid);
-					chainCache[currentAid] = currentChain;
-				} else {
-					currentChain = chainCache[currentAid];
-				}
-				
-				QList<int> prevChain;
-				if (!chainCache.contains(prevAid)) {
-					prevChain = watchSessionManager->getSeriesChain(prevAid);
-					chainCache[prevAid] = prevChain;
-				} else {
-					prevChain = chainCache[prevAid];
-				}
-				
-				// If both anime are in the same chain, or if their chains overlap,
-				// check if prevAid comes before currentAid in the chain
-				QList<int> mergedChain = currentChain;
-				for (int aid : prevChain) {
-					if (!mergedChain.contains(aid)) {
-						mergedChain.append(aid);
-					}
-				}
-				
-				int prevIdx = mergedChain.indexOf(prevAid);
-				int currIdx = mergedChain.indexOf(currentAid);
-				
-				// If both are in the merged chain and prevAid comes right before currentAid
-				if (prevIdx >= 0 && currIdx >= 0 && prevIdx < currIdx) {
-					// Check if they're consecutive or if prev is a direct prequel
-					// For now, just set the prequel if prev comes before current
-					prequelAid = prevAid;
-				}
-			}
-			
-			// Check if next anime in filtered list is a sequel
-			if (i < filteredAnimeIds.size() - 1) {
-				int nextAid = filteredAnimeIds[i + 1];
-				
-				// Get both chains
-				QList<int> currentChain;
-				if (!chainCache.contains(currentAid)) {
-					currentChain = watchSessionManager->getSeriesChain(currentAid);
-					chainCache[currentAid] = currentChain;
-				} else {
-					currentChain = chainCache[currentAid];
-				}
-				
-				QList<int> nextChain;
-				if (!chainCache.contains(nextAid)) {
-					nextChain = watchSessionManager->getSeriesChain(nextAid);
-					chainCache[nextAid] = nextChain;
-				} else {
-					nextChain = chainCache[nextAid];
-				}
-				
-				// If both anime are in the same chain, or if their chains overlap,
-				// check if nextAid comes after currentAid in the chain
-				QList<int> mergedChain = currentChain;
-				for (int aid : nextChain) {
-					if (!mergedChain.contains(aid)) {
-						mergedChain.append(aid);
-					}
-				}
-				
-				int currIdx = mergedChain.indexOf(currentAid);
-				int nextIdx = mergedChain.indexOf(nextAid);
-				
-				// If both are in the merged chain and nextAid comes right after currentAid
-				if (currIdx >= 0 && nextIdx >= 0 && currIdx < nextIdx) {
-					// Check if they're consecutive or if next is a direct sequel
-					// For now, just set the sequel if next comes after current
-					sequelAid = nextAid;
-				}
-			}
-			
-			// Set the chain info on the card
-			AnimeCard* card = cardManager->getCard(currentAid);
-			if (card) {
-				card->setSeriesChainInfo(prequelAid, sequelAid);
-			}
-		}
-	}
 	
 	// FINAL VALIDATION: Ensure all anime in the final filtered list have card creation data preloaded
 	// This is critical because the chain grouping and filtering logic above may have added anime
@@ -5256,7 +5215,58 @@ void Window::applyMylistFilters()
 	}
 	
 	// Update the card manager with the filtered list and chain mode flag
+	// This will build chains if showSeriesChain is true
 	cardManager->setAnimeIdList(filteredAnimeIds, showSeriesChain);
+	
+	// Update series chain connection info for cards
+	// MUST be done AFTER setAnimeIdList so chains are built first
+	// First, clear all chain info
+	for (AnimeCard* card : cardManager->getAllCards()) {
+		card->setSeriesChainInfo(0, 0);
+	}
+	
+	// If series chain display is enabled, set prequel/sequel info for arrow connections
+	// Use the chains already built by MyListCardManager for consistency
+	if (showSeriesChain) {
+		LOG("[Window] Setting chain connection info for series chain display from MyListCardManager chains");
+		QList<AnimeChain> chains = cardManager->getChains();
+		
+		LOG(QString("[Window] Retrieved %1 chains from MyListCardManager").arg(chains.size()));
+		
+		// Iterate through each chain and set prequel/sequel connections
+		for (const AnimeChain& chain : chains) {
+			QList<int> chainAnimeIds = chain.getAnimeIds();
+			
+			LOG(QString("[Window] Processing chain with %1 anime: %2")
+				.arg(chainAnimeIds.size())
+				.arg([&chainAnimeIds]() {
+					QStringList aidStrings;
+					for (int aid : chainAnimeIds) {
+						aidStrings.append(QString::number(aid));
+					}
+					return aidStrings.join(", ");
+				}()));
+			
+			// For each anime in the chain, set its prequel and sequel
+			for (int i = 0; i < chainAnimeIds.size(); ++i) {
+				int currentAid = chainAnimeIds[i];
+				int prequelAid = (i > 0) ? chainAnimeIds[i - 1] : 0;
+				int sequelAid = (i < chainAnimeIds.size() - 1) ? chainAnimeIds[i + 1] : 0;
+				
+				// Set the chain info on the card if it exists
+				AnimeCard* card = cardManager->getCard(currentAid);
+				if (card) {
+					card->setSeriesChainInfo(prequelAid, sequelAid);
+					LOG(QString("[Window] Set chain info for aid=%1: prequel=%2, sequel=%3")
+						.arg(currentAid).arg(prequelAid).arg(sequelAid));
+				} else {
+					LOG(QString("[Window] WARNING: Card not found for aid=%1 in chain").arg(currentAid));
+				}
+			}
+		}
+		
+		LOG(QString("[Window] Set chain connections for %1 chains").arg(chains.size()));
+	}
 	
 	// If using virtual scrolling, refresh the layout
 	if (mylistVirtualLayout) {
