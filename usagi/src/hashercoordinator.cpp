@@ -333,14 +333,136 @@ void HasherCoordinator::hashesInsertRow(QFileInfo file, Qt::CheckState renameSta
 
 void HasherCoordinator::startHashing()
 {
-    // TODO: Implement - extracted from Window::ButtonHasherStartClick
-    LOG("HasherCoordinator::startHashing() - stub");
+    QList<int> rowsWithHashes; // Rows that already have hashes
+    int filesToHashCount = 0;
+    
+    for(int i=0; i<m_hashes->rowCount(); i++)
+    {
+        QString progress = m_hashes->item(i, 1)->text();
+        QString existingHash = m_hashes->item(i, 9)->text(); // Check hash column
+        
+        // Process files with progress="0" or progress="1" (already hashed but not yet API-processed)
+        if(progress == "0" || progress == "1")
+        {
+            // Check if file has pending API calls (tags in columns 5 or 6)
+            // Tags are "?" initially, set to actual tag when API call is queued, and "0" when completed/not needed
+            QString fileTag = m_hashes->item(i, 5)->text();
+            QString mylistTag = m_hashes->item(i, 6)->text();
+            bool hasPendingAPICalls = (!fileTag.isEmpty() && fileTag != "?" && fileTag != "0") || 
+                                      (!mylistTag.isEmpty() && mylistTag != "?" && mylistTag != "0");
+            
+            if (!existingHash.isEmpty())
+            {
+                // Skip files with pending API calls to avoid duplicate processing
+                if (!hasPendingAPICalls)
+                {
+                    // File already has a hash - queue for deferred processing
+                    rowsWithHashes.append(i);
+                }
+            }
+            else
+            {
+                // File needs to be hashed
+                // Note: If progress="1" but no hash, this is an inconsistent state
+                if (progress == "1")
+                {
+                    LOG(QString("Warning: File at row %1 has progress=1 but no hash - inconsistent state").arg(i));
+                }
+                filesToHashCount++;
+            }
+        }
+    }
+    
+    // Queue files with existing hashes for deferred processing to prevent UI freeze
+    for (int rowIndex : rowsWithHashes)
+    {
+        QString filename = m_hashes->item(rowIndex, 0)->text();
+        QString filePath = m_hashes->item(rowIndex, 2)->text();
+        QString hexdigest = m_hashes->item(rowIndex, 9)->text();
+        
+        LOG(QString("Queueing already-hashed file for processing: %1").arg(filename));
+        
+        // Get file size
+        QFileInfo fileInfo(filePath);
+        qint64 fileSize = fileInfo.size();
+        
+        // Queue for deferred processing using HashingTask class
+        HashingTask task(filePath, filename, hexdigest, fileSize);
+        task.setRowIndex(rowIndex);
+        task.setUseUserSettings(true);
+        task.setAddToMylist(m_addToMyList->checkState() > 0);
+        task.setMarkWatchedState(m_markWatched->checkState());
+        task.setFileState(m_hasherFileState->currentIndex());
+        m_pendingHashedFilesQueue.append(task);
+    }
+    
+    // Start timer to process queued files in batches (keeps UI responsive)
+    if (!rowsWithHashes.isEmpty())
+    {
+        LOG(QString("Queued %1 already-hashed file(s) for deferred processing").arg(rowsWithHashes.size()));
+        m_hashedFilesProcessingTimer->start();
+    }
+    
+    // Start hashing for files without existing hashes
+    if (filesToHashCount > 0)
+    {
+        // Calculate total hash parts for progress tracking
+        QStringList filesToHash = getFilesNeedingHash();
+        setupHashingProgress(filesToHash);
+        
+        m_buttonStart->setEnabled(false);
+        m_buttonClear->setEnabled(false);
+        m_hasherThreadPool->start();
+    }
+    else if (rowsWithHashes.isEmpty())
+    {
+        // No files to process at all
+        LOG("No files to process");
+    }
+    else
+    {
+        // Only had pre-hashed files, queued for processing
+        LOG(QString("Queued %1 already-hashed file(s) for processing").arg(rowsWithHashes.size()));
+    }
 }
 
 void HasherCoordinator::stopHashing()
 {
-    // TODO: Implement - extracted from Window::ButtonHasherStopClick
-    LOG("HasherCoordinator::stopHashing() - stub");
+    m_buttonStart->setEnabled(true);
+    m_buttonClear->setEnabled(true);
+    m_progressTotal->setValue(0);
+    m_progressTotal->setMaximum(1);
+    m_progressTotal->setFormat("");
+    m_progressTotalLabel->setText("");
+    
+    // Reset all thread progress bars
+    for (QProgressBar* bar : m_threadProgressBars) {
+        bar->setValue(0);
+        bar->setMaximum(1);
+    }
+    
+    // Reset progress of files that were assigned but not completed
+    // Files with progress "0.1" were assigned to threads but stopped before completion
+    // Reset them to "0" so they can be picked up again on next start
+    for (int i = 0; i < m_hashes->rowCount(); i++)
+    {
+        QString progress = m_hashes->item(i, 1)->text();
+        if (progress == "0.1")
+        {
+            m_hashes->item(i, 1)->setText("0");
+        }
+    }
+    
+    // Notify all worker threads to stop hashing
+    // 1. First, notify ed2k instances in all worker threads to interrupt current hashing
+    //    This sets a flag that ed2khash checks, causing it to return early
+    m_hasherThreadPool->broadcastStopHasher();
+    
+    // 2. Then signal the thread pool to stop processing more files
+    m_hasherThreadPool->stop();
+    
+    // 3. Don't wait here - let threads finish asynchronously to prevent UI freeze
+    //    The onHashingFinished() slot will be called automatically when all threads complete
 }
 
 void HasherCoordinator::clearHasher()
@@ -356,24 +478,75 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
 
 void HasherCoordinator::onProgressUpdate(int threadId, int total, int done)
 {
-    // TODO: Implement - extracted from Window::getNotifyPartsDone
+    // Update individual thread progress bar
     if (threadId >= 0 && threadId < m_threadProgressBars.size()) {
         m_threadProgressBars[threadId]->setMaximum(total);
         m_threadProgressBars[threadId]->setValue(done);
+    }
+    
+    // Update total progress
+    // Calculate delta from last known progress for this thread
+    int lastProgress = m_lastThreadProgress.value(threadId, 0);
+    int delta = done - lastProgress;
+    m_lastThreadProgress[threadId] = done;
+    
+    // Add delta to completed parts
+    m_completedHashParts += delta;
+    
+    // Update total progress bar
+    if (m_totalHashParts > 0) {
+        m_progressTotal->setValue(m_completedHashParts);
+        m_hashingProgress.updateProgress(delta);
     }
 }
 
 void HasherCoordinator::onHashingFinished()
 {
-    // TODO: Implement - extracted from Window::hasherFinished
-    LOG("HasherCoordinator::onHashingFinished() - stub");
+    LOG("HasherCoordinator::onHashingFinished() - All hashing threads completed");
+    
+    m_buttonStart->setEnabled(true);
+    m_buttonClear->setEnabled(true);
+    
+    // Reset progress bars
+    m_progressTotal->setValue(0);
+    m_progressTotal->setMaximum(1);
+    m_progressTotal->setFormat("");
+    m_progressTotalLabel->setText("");
+    
+    for (QProgressBar* bar : m_threadProgressBars) {
+        bar->setValue(0);
+        bar->setMaximum(1);
+    }
+    
     emit hashingFinished();
 }
 
 void HasherCoordinator::provideNextFileToHash()
 {
-    // TODO: Implement - extracted from Window::provideNextFileToHash
-    LOG("HasherCoordinator::provideNextFileToHash() - stub");
+    // Thread-safe file assignment: only one thread can request a file at a time
+    QMutexLocker locker(&m_fileRequestMutex);
+    
+    // Look through the hashes widget for the next file that needs hashing (progress="0" and no hash)
+    for(int i=0; i<m_hashes->rowCount(); i++)
+    {
+        QString progress = m_hashes->item(i, 1)->text();
+        QString existingHash = m_hashes->item(i, 9)->text();
+        
+        if(progress == "0" && existingHash.isEmpty())
+        {
+            QString filePath = m_hashes->item(i, 2)->text();
+            
+            // Immediately mark this file as assigned to prevent other threads from picking it up
+            QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
+            m_hashes->setItem(i, 1, itemProgressAssigned);
+            
+            m_hasherThreadPool->addFile(filePath);
+            return;
+        }
+    }
+    
+    // No more files to hash, send empty string to signal completion
+    m_hasherThreadPool->addFile(QString());
 }
 
 void HasherCoordinator::onMarkWatchedStateChanged(int state)
@@ -384,8 +557,21 @@ void HasherCoordinator::onMarkWatchedStateChanged(int state)
 
 void HasherCoordinator::setupHashingProgress(const QStringList &files)
 {
-    // TODO: Implement - extracted from Window::setupHashingProgress
-    LOG("HasherCoordinator::setupHashingProgress() - stub");
+    // Calculate total hash parts for all files
+    m_totalHashParts = calculateTotalHashParts(files);
+    m_completedHashParts = 0;
+    m_lastThreadProgress.clear();
+    
+    // Reset progress bars
+    m_progressTotal->setValue(0);
+    m_progressTotal->setMaximum(m_totalHashParts);
+    m_progressTotal->setFormat("%v/%m parts (%p%)");
+    m_progressTotalLabel->setText(QString("Hashing %1 file(s)...").arg(files.size()));
+    
+    // Reset ProgressTracker
+    m_hashingProgress.reset(m_totalHashParts);
+    
+    LOG(QString("Setup hashing progress: %1 files, %2 total parts").arg(files.size()).arg(m_totalHashParts));
 }
 
 int HasherCoordinator::calculateTotalHashParts(const QStringList &files)
