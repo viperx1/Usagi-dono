@@ -88,9 +88,9 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         m_expandedChainAnimeIds.clear();
         
         if (chainModeEnabled) {
-            // Build chains BEFORE sorting - NO EXPANSION initially to avoid needing unloaded data
-            LOG(QString("[MyListCardManager] Building chains from %1 anime IDs WITHOUT expansion (initial pass)").arg(aids.size()));
-            m_chainList = buildChainsFromAnimeIds(aids, false);  // Disable expansion for now
+            // Build chains BEFORE sorting - always expand to include related anime
+            LOG(QString("[MyListCardManager] Building chains from %1 anime IDs WITH expansion").arg(aids.size()));
+            m_chainList = buildChainsFromAnimeIds(aids);  // Always expand chains
             
             // Build aid -> chain index map
             m_aidToChainIndex.clear();
@@ -103,7 +103,7 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             // Use only filtered anime for now
             finalAnimeIds = aids;
             
-            LOG(QString("[MyListCardManager] Built %1 chains from %2 anime (no expansion)")
+            LOG(QString("[MyListCardManager] Built %1 chains from %2 anime (with expansion)")
                 .arg(m_chainList.size()).arg(finalAnimeIds.size()));
         } else {
             // Normal mode: clear chain data
@@ -124,22 +124,22 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
     }
 }
 
-QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& aids, bool expandChains) const
+QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& aids) const
 {
     QList<AnimeChain> chains;
     QSet<int> availableAids = QSet<int>(aids.begin(), aids.end());
     QSet<int> processedAids;
     
-    LOG(QString("[MyListCardManager] buildChainsFromAnimeIds: input has %1 anime, %2 unique, expansion=%3")
-        .arg(aids.size()).arg(availableAids.size()).arg(expandChains ? "ON" : "OFF"));
+    LOG(QString("[MyListCardManager] buildChainsFromAnimeIds: input has %1 anime, %2 unique, expansion=ALWAYS ON")
+        .arg(aids.size()).arg(availableAids.size()));
     
     for (int aid : aids) {
         if (processedAids.contains(aid)) {
             continue;
         }
         
-        // Build chain starting from this anime
-        QList<int> chainAids = buildChainFromAid(aid, availableAids, expandChains);
+        // Build chain starting from this anime (always with expansion)
+        QList<int> chainAids = buildChainFromAid(aid, availableAids, true);
         
         // Skip empty chains (anime not in available set)
         if (chainAids.isEmpty()) {
@@ -169,12 +169,6 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         // Mark all anime in this chain as processed
         for (int chainAid : filteredChainAids) {
             processedAids.insert(chainAid);
-            
-            // Debug: Check if this anime is NOT in the original input
-            if (!expandChains && !availableAids.contains(chainAid)) {
-                LOG(QString("[MyListCardManager] ERROR: Chain from aid=%1 contains aid=%2 which is NOT in input set!")
-                    .arg(aid).arg(chainAid));
-            }
         }
         
         // Create chain object
