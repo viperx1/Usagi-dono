@@ -2437,34 +2437,8 @@ void Window::updateOrAddMylistEntry(int lid)
 
 void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash)
 {
-	QTableWidgetItem *item1 = new QTableWidgetItem(QTableWidgetItem(QString(file.fileName())));
-	QColor colorgray;
-	colorgray.setRgb(230, 230, 230);
-    item1->setBackground(colorgray.toRgb());
-	QTableWidgetItem *item2 = new QTableWidgetItem(QTableWidgetItem(QString("0")));
-	QTableWidgetItem *item3 = new QTableWidgetItem(QTableWidgetItem(QString(file.absoluteFilePath())));
-	QTableWidgetItem *item4 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item5 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item6 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item7 = new QTableWidgetItem(QTableWidgetItem(QString("?")));
-	QTableWidgetItem *item8 = new QTableWidgetItem(QTableWidgetItem(QString(ren > 0 ? "1" : "0")));
-	QTableWidgetItem *item9 = new QTableWidgetItem(QTableWidgetItem(QString("0")));
-	
-	// Use preloaded hash if provided, otherwise query database
-	QString existingHash = preloadedHash.isEmpty() ? adbapi->getLocalFileHash(file.absoluteFilePath()) : preloadedHash;
-	QTableWidgetItem *item10 = new QTableWidgetItem(QTableWidgetItem(existingHash.isEmpty() ? QString("") : existingHash));
-	
-	hashes->insertRow(hashes->rowCount());
-	hashes->setItem(hashes->rowCount()-1, 0, item1);
-	hashes->setItem(hashes->rowCount()-1, 1, item2);
-	hashes->setItem(hashes->rowCount()-1, 2, item3);
-	hashes->setItem(hashes->rowCount()-1, 3, item4);
-	hashes->setItem(hashes->rowCount()-1, 4, item5);
-	hashes->setItem(hashes->rowCount()-1, 5, item6);
-	hashes->setItem(hashes->rowCount()-1, 6, item7);
-	hashes->setItem(hashes->rowCount()-1, 7, item8);
-	hashes->setItem(hashes->rowCount()-1, 8, item9);
-	hashes->setItem(hashes->rowCount()-1, 9, item10);
+	// Delegate to HasherCoordinator which owns the hashes table and hasher logic
+	hasherCoordinator->hashesInsertRow(file, ren, preloadedHash);
 }
 
 void Window::unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
@@ -3126,8 +3100,8 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	for (const QString &filePath : filePaths) {
 		QFileInfo fileInfo(filePath);
 		
-		// Check if file should be filtered
-		if (shouldFilterFile(filePath)) {
+		// Check if file should be filtered (delegate to HasherCoordinator)
+		if (hasherCoordinator->shouldFilterFile(filePath)) {
 			continue; // Skip this file
 		}
 		
