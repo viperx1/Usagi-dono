@@ -215,48 +215,13 @@ Window::Window()
     tabwidget->addTab(pageLogParent, "Log");
 	tabwidget->addTab(pageApiTesterParent, "ApiTester");
 
-    // page hasher
-    pageHasherSettings = new QGridLayout;
-    button1 = new QPushButton("Add files...");
-    button2 = new QPushButton("Add directories...");
-	button3 = new QPushButton("Last directory");
-    hashes = new hashes_; // QTableWidget
+    // page hasher - Create HasherCoordinator to manage all hasher UI and logic
+    hasherCoordinator = new HasherCoordinator(adbapi, this);
+    hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
     unknownFiles = new unknown_files_(this); // Unknown files widget
-    hasherOutput = new QTextEdit;
-	hasherFileState = new QComboBox;
-	addtomylist = new QCheckBox("Add file(s) to MyList");
-	markwatched = new QCheckBox("Mark watched (no change)");
-    QLabel *label1 = new QLabel("Set state:");
-    buttonstart = new QPushButton("Start");
-    buttonstop = new QPushButton("Stop");
-    buttonclear = new QPushButton("Clear");
-	moveto = new QCheckBox("Move to:");
-	renameto = new QCheckBox("Rename to:");
-	movetodir = new QLineEdit;
-	renametopattern = new QLineEdit;
-	storage = new QLineEdit;
-    QBoxLayout *layout1 = new QBoxLayout(QBoxLayout::LeftToRight);
-    QBoxLayout *layout2 = new QBoxLayout(QBoxLayout::LeftToRight);
-    QPushButton *movetodirbutton = new QPushButton("...");
-    QPushButton *patternhelpbutton = new QPushButton("?");
-    QBoxLayout *progress = new QBoxLayout(QBoxLayout::TopToBottom);
     
-    // Create one progress bar per hasher thread
-    int numThreads = hasherThreadPool->threadCount();
-    for (int i = 0; i < numThreads; ++i) {
-        QProgressBar *threadProgress = new QProgressBar;
-        threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
-        threadProgressBars.append(threadProgress);
-        progress->addWidget(threadProgress);
-    }
-    
-    progressTotal = new QProgressBar;
-    progressTotalLabel = new QLabel;
-    QBoxLayout *progressTotalLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    progressTotalLayout->addWidget(progressTotal);
-    progressTotalLayout->addWidget(progressTotalLabel);
-
-    pageHasher->addWidget(hashes, 1);
+    // Add HasherCoordinator's widget to the page
+    pageHasher->addWidget(hasherCoordinator->getHasherPageWidget(), 1);
     
     // Add unknown files widget with a label (initially hidden)
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
@@ -268,9 +233,23 @@ Window::Window()
     unknownFilesLabel->hide();
     unknownFiles->hide();
     
-    pageHasher->addLayout(pageHasherSettings);
-    pageHasher->addLayout(progress);
-    pageHasher->addWidget(hasherOutput, 0, Qt::AlignTop);
+    // Connect HasherCoordinator signals
+    connect(hasherCoordinator, &HasherCoordinator::hashingFinished, this, &Window::hasherFinished);
+    connect(hasherCoordinator, &HasherCoordinator::logMessage, this, &Window::getNotifyLogAppend);
+    
+    // Connect hasher thread pool signals to HasherCoordinator
+    connect(hasherThreadPool, &HasherThreadPool::requestNextFile, hasherCoordinator, &HasherCoordinator::provideNextFileToHash);
+    connect(hasherThreadPool, &HasherThreadPool::notifyPartsDone, hasherCoordinator, &HasherCoordinator::onProgressUpdate);
+    connect(hasherThreadPool, &HasherThreadPool::notifyFileHashed, hasherCoordinator, &HasherCoordinator::onFileHashed);
+    connect(hasherThreadPool, &HasherThreadPool::finished, hasherCoordinator, &HasherCoordinator::onHashingFinished);
+    
+    // Connect AniDBApi signals
+    connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
+    connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
+	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
+	
+	// Connect unified Logger to log tab using modern Qt5+ syntax for type safety
+	connect(Logger::instance(), &Logger::logMessage, this, &Window::getNotifyLogAppend);
 
     // page mylist (card view only)
     mylistSortAscending = false;  // Default to descending (newest first for aired date)
