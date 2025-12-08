@@ -177,6 +177,90 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         chains.append(AnimeChain(filteredChainAids));
     }
     
+    // Merge chains that share anime or have connecting prequel/sequel relationships
+    // This handles cases where anime point to the same prequel but form separate chains
+    bool merged = true;
+    while (merged && chains.size() > 1) {
+        merged = false;
+        
+        for (int i = 0; i < chains.size() && !merged; ++i) {
+            for (int j = i + 1; j < chains.size() && !merged; ++j) {
+                QList<int> chainI = chains[i].getAnimeIds();
+                QList<int> chainJ = chains[j].getAnimeIds();
+                
+                // Check if chains share any anime
+                bool sharesAnime = false;
+                for (int aid : chainI) {
+                    if (chainJ.contains(aid)) {
+                        sharesAnime = true;
+                        break;
+                    }
+                }
+                
+                if (sharesAnime) {
+                    LOG(QString("[MyListCardManager] Merging chains %1 and %2 (share anime)").arg(i).arg(j));
+                    
+                    // Merge chains by combining anime lists
+                    QSet<int> mergedSet = QSet<int>(chainI.begin(), chainI.end());
+                    for (int aid : chainJ) {
+                        mergedSet.insert(aid);
+                    }
+                    
+                    // Rebuild merged chain using relation data to determine order
+                    QList<int> mergedList = mergedSet.values();
+                    chains[i] = AnimeChain(buildChainFromAid(mergedList.first(), mergedSet, true));
+                    chains.removeAt(j);
+                    merged = true;
+                    break;
+                }
+                
+                // Check if last anime of chain i connects to first anime of chain j (sequel relationship)
+                if (!chainI.isEmpty() && !chainJ.isEmpty()) {
+                    int lastI = chainI.last();
+                    int firstJ = chainJ.first();
+                    
+                    // Load relation data for both anime
+                    loadRelationDataForAnime(lastI);
+                    loadRelationDataForAnime(firstJ);
+                    
+                    CardCreationData dataI = m_cardCreationDataCache.value(lastI);
+                    CardCreationData dataJ = m_cardCreationDataCache.value(firstJ);
+                    
+                    // Check if they connect via sequel/prequel
+                    QStringList relAidListI = dataI.relaidlist.split('\'', Qt::SkipEmptyParts);
+                    QStringList relAidTypeI = dataI.relaidtype.split('\'', Qt::SkipEmptyParts);
+                    
+                    bool connects = false;
+                    for (int k = 0; k < relAidListI.size() && k < relAidTypeI.size(); ++k) {
+                        int relAid = relAidListI[k].toInt();
+                        int relType = relAidTypeI[k].toInt();
+                        
+                        // Check if lastI has sequel pointing to firstJ
+                        if (relType == 2 && relAid == firstJ) {  // Type 2 = Sequel
+                            connects = true;
+                            break;
+                        }
+                    }
+                    
+                    if (connects) {
+                        LOG(QString("[MyListCardManager] Merging chains %1 and %2 (sequel connection: %3->%4)")
+                            .arg(i).arg(j).arg(lastI).arg(firstJ));
+                        
+                        // Merge by appending chain j to chain i
+                        QList<int> mergedList = chainI;
+                        mergedList.append(chainJ);
+                        chains[i] = AnimeChain(mergedList);
+                        chains.removeAt(j);
+                        merged = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    LOG(QString("[MyListCardManager] After merging: %1 chains").arg(chains.size()));
+    
     // Verify total anime count and find duplicates
     int totalAnimeInChains = 0;
     QSet<int> allAnimeInChains;
