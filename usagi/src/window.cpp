@@ -4525,11 +4525,26 @@ void Window::loadMylistAsCards()
 	// Store the full unfiltered list of anime IDs (for filter reset)
 	allAnimeIdsList = aids;
 	
-	// Preload all data for cards
-	if (!aids.isEmpty()) {
-		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
-		cardManager->preloadCardCreationData(aids);
+	// Preload data for ALL anime in database (not just mylist)
+	// This enables proper chain building even when some anime in a chain are not in mylist
+	QList<int> allAnimeIds;
+	QSqlQuery allAnimeQuery(db);
+	if (allAnimeQuery.exec("SELECT aid FROM anime")) {
+		while (allAnimeQuery.next()) {
+			allAnimeIds.append(allAnimeQuery.value(0).toInt());
+		}
+		LOG(QString("[Window] Preloading data for %1 total anime (including %2 in mylist)").arg(allAnimeIds.size()).arg(aids.size()));
+		mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(allAnimeIds.size()));
+		cardManager->preloadCardCreationData(allAnimeIds);
 		LOG("[Window] Card data preload complete");
+	} else {
+		LOG(QString("[Window] Error loading all anime: %1").arg(allAnimeQuery.lastError().text()));
+		// Fallback to loading just mylist anime
+		if (!aids.isEmpty()) {
+			mylistStatusLabel->setText(QString("MyList Status: Preloading data for %1 anime...").arg(aids.size()));
+			cardManager->preloadCardCreationData(aids);
+			LOG("[Window] Card data preload complete (fallback to mylist only)");
+		}
 	}
 	
 	// Set the ordered anime ID list for virtual scrolling
