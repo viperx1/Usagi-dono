@@ -92,16 +92,18 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             LOG(QString("[MyListCardManager] Building chains from %1 anime IDs WITH expansion").arg(aids.size()));
             m_chainList = buildChainsFromAnimeIds(aids);  // Always expand chains
             
-            // Build aid -> chain index map
+            // Build aid -> chain index map and collect all anime IDs from expanded chains
             m_aidToChainIndex.clear();
+            finalAnimeIds.clear();
             for (int i = 0; i < m_chainList.size(); ++i) {
                 for (int aid : m_chainList[i].getAnimeIds()) {
                     m_aidToChainIndex[aid] = i;
+                    // Add all anime from chains (including expanded ones not in original aids list)
+                    if (!finalAnimeIds.contains(aid)) {
+                        finalAnimeIds.append(aid);
+                    }
                 }
             }
-            
-            // Use only filtered anime for now
-            finalAnimeIds = aids;
             
             LOG(QString("[MyListCardManager] Built %1 chains from %2 anime (with expansion)")
                 .arg(m_chainList.size()).arg(finalAnimeIds.size()));
