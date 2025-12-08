@@ -5129,39 +5129,6 @@ void Window::applyMylistFilters()
 	// The old WatchSessionManager-based chain building code has been removed
 	// MyListCardManager will build chains when setAnimeIdList() is called with chain mode enabled
 	
-	// Update series chain connection info for cards
-	// First, clear all chain info
-	for (AnimeCard* card : cardManager->getAllCards()) {
-		card->setSeriesChainInfo(0, 0);
-	}
-	
-	// If series chain display is enabled, set prequel/sequel info for arrow connections
-	// Use the chains already built by MyListCardManager for consistency
-	if (showSeriesChain) {
-		LOG("[Window] Setting chain connection info for series chain display from MyListCardManager chains");
-		QList<AnimeChain> chains = cardManager->getChains();
-		
-		// Iterate through each chain and set prequel/sequel connections
-		for (const AnimeChain& chain : chains) {
-			QList<int> chainAnimeIds = chain.getAnimeIds();
-			
-			// For each anime in the chain, set its prequel and sequel
-			for (int i = 0; i < chainAnimeIds.size(); ++i) {
-				int currentAid = chainAnimeIds[i];
-				int prequelAid = (i > 0) ? chainAnimeIds[i - 1] : 0;
-				int sequelAid = (i < chainAnimeIds.size() - 1) ? chainAnimeIds[i + 1] : 0;
-				
-				// Set the chain info on the card if it exists
-				AnimeCard* card = cardManager->getCard(currentAid);
-				if (card) {
-					card->setSeriesChainInfo(prequelAid, sequelAid);
-				}
-			}
-		}
-		
-		LOG(QString("[Window] Set chain connections for %1 chains").arg(chains.size()));
-	}
-	
 	// FINAL VALIDATION: Ensure all anime in the final filtered list have card creation data preloaded
 	// This is critical because the chain grouping and filtering logic above may have added anime
 	// that weren't in the original preload after chain expansion
@@ -5180,7 +5147,58 @@ void Window::applyMylistFilters()
 	}
 	
 	// Update the card manager with the filtered list and chain mode flag
+	// This will build chains if showSeriesChain is true
 	cardManager->setAnimeIdList(filteredAnimeIds, showSeriesChain);
+	
+	// Update series chain connection info for cards
+	// MUST be done AFTER setAnimeIdList so chains are built first
+	// First, clear all chain info
+	for (AnimeCard* card : cardManager->getAllCards()) {
+		card->setSeriesChainInfo(0, 0);
+	}
+	
+	// If series chain display is enabled, set prequel/sequel info for arrow connections
+	// Use the chains already built by MyListCardManager for consistency
+	if (showSeriesChain) {
+		LOG("[Window] Setting chain connection info for series chain display from MyListCardManager chains");
+		QList<AnimeChain> chains = cardManager->getChains();
+		
+		LOG(QString("[Window] Retrieved %1 chains from MyListCardManager").arg(chains.size()));
+		
+		// Iterate through each chain and set prequel/sequel connections
+		for (const AnimeChain& chain : chains) {
+			QList<int> chainAnimeIds = chain.getAnimeIds();
+			
+			LOG(QString("[Window] Processing chain with %1 anime: %2")
+				.arg(chainAnimeIds.size())
+				.arg([&chainAnimeIds]() {
+					QStringList aidStrings;
+					for (int aid : chainAnimeIds) {
+						aidStrings.append(QString::number(aid));
+					}
+					return aidStrings.join(", ");
+				}()));
+			
+			// For each anime in the chain, set its prequel and sequel
+			for (int i = 0; i < chainAnimeIds.size(); ++i) {
+				int currentAid = chainAnimeIds[i];
+				int prequelAid = (i > 0) ? chainAnimeIds[i - 1] : 0;
+				int sequelAid = (i < chainAnimeIds.size() - 1) ? chainAnimeIds[i + 1] : 0;
+				
+				// Set the chain info on the card if it exists
+				AnimeCard* card = cardManager->getCard(currentAid);
+				if (card) {
+					card->setSeriesChainInfo(prequelAid, sequelAid);
+					LOG(QString("[Window] Set chain info for aid=%1: prequel=%2, sequel=%3")
+						.arg(currentAid).arg(prequelAid).arg(sequelAid));
+				} else {
+					LOG(QString("[Window] WARNING: Card not found for aid=%1 in chain").arg(currentAid));
+				}
+			}
+		}
+		
+		LOG(QString("[Window] Set chain connections for %1 chains").arg(chains.size()));
+	}
 	
 	// If using virtual scrolling, refresh the layout
 	if (mylistVirtualLayout) {
