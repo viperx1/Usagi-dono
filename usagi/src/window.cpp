@@ -5138,7 +5138,7 @@ void Window::applyMylistFilters()
 	// If series chain display is enabled, set prequel/sequel info for arrow connections
 	// Use the chains already built by MyListCardManager for consistency
 	if (showSeriesChain) {
-		LOG("[Window] Setting chain connection info from MyListCardManager chains");
+		LOG("[Window] Setting chain connection info for series chain display from MyListCardManager chains");
 		QList<AnimeChain> chains = cardManager->getChains();
 		
 		// Iterate through each chain and set prequel/sequel connections
