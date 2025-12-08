@@ -23,6 +23,7 @@ set(SOURCES
     src/myanidbapi.cpp
     src/main.cpp
     src/window.cpp
+    src/hashercoordinator.cpp
     src/hasherthread.cpp
     src/hasherthreadpool.cpp
     src/hash/md4.cpp
@@ -71,6 +72,7 @@ set(HEADERS
     src/mask.h
     src/main.h
     src/window.h
+    src/hashercoordinator.h
     src/hasherthread.h
     src/hasherthreadpool.h
     src/hash/md4.h
