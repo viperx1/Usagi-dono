@@ -438,6 +438,10 @@ int WatchSessionManager::findPrequelAid(int aid, const QString& relationType) co
 
 QList<int> WatchSessionManager::getSeriesChain(int aid) const
 {
+    // NOTE: This method is only used internally by WatchSessionManager for session management.
+    // For UI chain display and other chain operations, use MyListCardManager::buildChainsFromAnimeIds()
+    // to maintain SOLID compliance (single source of truth for chain building).
+    
     // Check series chain cache first
     if (m_seriesChainCache.contains(aid)) {
         return m_seriesChainCache[aid];

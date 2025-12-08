@@ -98,6 +98,9 @@ public:
      * @brief Get all related anime IDs (sequel/prequel chain)
      * @param aid Anime ID
      * @return List of anime IDs in order from prequel to sequel
+     * @deprecated This method is only used internally by WatchSessionManager.
+     *             For UI chain display and other chain operations, use MyListCardManager::buildChainsFromAnimeIds()
+     *             to maintain SOLID compliance (single source of truth for chain building).
      */
     QList<int> getSeriesChain(int aid) const;
     

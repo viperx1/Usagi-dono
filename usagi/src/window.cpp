@@ -4812,8 +4812,18 @@ void Window::checkAndRequestChainRelations(int aid)
 		return;
 	}
 	
-	// Get the series chain for this anime
-	QList<int> chain = watchSessionManager->getSeriesChain(aid);
+	// CONSOLIDATION: Use MyListCardManager's chain building instead of WatchSessionManager
+	// This maintains SOLID principle - single responsibility for chain building logic
+	// MyListCardManager is now the authoritative source for all chain operations
+	// Build chain from this single anime (with expansion to include related anime not in mylist)
+	QList<AnimeChain> chains = cardManager->buildChainsFromAnimeIds(QList<int>() << aid, true);  // expandChains=true
+	
+	if (chains.isEmpty()) {
+		return;
+	}
+	
+	// Get the first chain (should only be one since we started with one anime)
+	QList<int> chain = chains.first().getAnimeIds();
 	
 	if (chain.isEmpty()) {
 		return;
