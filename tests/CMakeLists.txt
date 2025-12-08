@@ -1679,6 +1679,13 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
     ../usagi/src/anidbgroupinfo.h
     ../usagi/src/applicationsettings.h
     ../usagi/src/sessioninfo.h
+    ../usagi/src/animechain.h
+    ../usagi/src/animestats.h
+    ../usagi/src/cachedanimedata.h
+    ../usagi/src/taginfo.h
+    ../usagi/src/cardfileinfo.h
+    ../usagi/src/cardepisodeinfo.h
+    ../usagi/src/relationdata.h
 )
 
 add_executable(test_mylistcardmanager ${MYLISTCARDMANAGER_TEST_SOURCES} ${MYLISTCARDMANAGER_TEST_HEADERS})
@@ -2037,3 +2044,55 @@ endif()
 add_test(NAME test_card_filtering COMMAND test_card_filtering -v2)
 
 
+
+# ==========================================================
+# test_relationdata - RelationData class tests
+# ==========================================================
+add_executable(test_relationdata
+    test_relationdata.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/relationdata.cpp
+)
+
+target_link_libraries(test_relationdata PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_relationdata PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_relationdata PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_relationdata COMMAND test_relationdata -v2)
+
+# ==========================================================
+# test_cardcreationdata_api - CardCreationData API tests
+# ==========================================================
+add_executable(test_cardcreationdata_api
+    test_cardcreationdata_api.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/relationdata.cpp
+)
+
+target_link_libraries(test_cardcreationdata_api PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_cardcreationdata_api PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_cardcreationdata_api PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_cardcreationdata_api COMMAND test_cardcreationdata_api -v2)

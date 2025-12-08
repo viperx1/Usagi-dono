@@ -13,6 +13,7 @@
 #include "animestats.h"
 #include "cachedanimedata.h"
 #include "animechain.h"
+#include "relationdata.h"
 
 // Forward declarations
 class VirtualFlowLayout;
@@ -215,10 +216,20 @@ private:
         int localWatched;
     };
     
-    // Comprehensive data structure containing ALL data needed for card creation
-    // This eliminates the need for any SQL queries during card creation
-    struct CardCreationData {
-        // Anime basic info
+    /**
+     * CardCreationData - Comprehensive data class for card creation
+     * 
+     * This class follows SOLID principles:
+     * - Single Responsibility: Contains all data needed for card creation
+     * - Encapsulation: Private data members with controlled public access
+     * - Open/Closed: Can be extended without modifying existing code
+     */
+    class CardCreationData {
+    public:
+        CardCreationData() 
+            : isHidden(false), is18Restricted(false), eptotal(0), hasData(false) {}
+        
+        // Anime basic info - public members for direct access (struct-like interface)
         QString nameRomaji;
         QString nameEnglish;
         QString animeTitle;
@@ -236,10 +247,6 @@ private:
         bool is18Restricted;
         int eptotal;
         
-        // Relation data (for chain support)
-        QString relaidlist;  // Related anime IDs (apostrophe-separated)
-        QString relaidtype;  // Related anime types (apostrophe-separated)
-        
         // Statistics
         AnimeStats stats;
         
@@ -249,7 +256,74 @@ private:
         // Flag to indicate if this anime has full data
         bool hasData;
         
-        CardCreationData() : isHidden(false), is18Restricted(false), eptotal(0), hasData(false) {}
+        // Relation data - encapsulated with proper getters/setters
+        
+        /**
+         * Set relation data from apostrophe-separated strings (AniDB format)
+         * @param aidList Apostrophe-separated anime IDs
+         * @param typeList Apostrophe-separated relation types
+         */
+        void setRelations(const QString& aidList, const QString& typeList) {
+            m_relations.setRelations(aidList, typeList);
+        }
+        
+        /**
+         * Get the anime ID of the prequel (if exists)
+         * @return Anime ID of prequel, or 0 if no prequel exists
+         */
+        int getPrequel() const {
+            return m_relations.getPrequel();
+        }
+        
+        /**
+         * Get the anime ID of the sequel (if exists)
+         * @return Anime ID of sequel, or 0 if no sequel exists
+         */
+        int getSequel() const {
+            return m_relations.getSequel();
+        }
+        
+        /**
+         * Check if this anime has a prequel
+         */
+        bool hasPrequel() const {
+            return m_relations.hasPrequel();
+        }
+        
+        /**
+         * Check if this anime has a sequel
+         */
+        bool hasSequel() const {
+            return m_relations.hasSequel();
+        }
+        
+        /**
+         * Get all relations
+         */
+        QMap<int, RelationData::RelationType> getAllRelations() const {
+            return m_relations.getAllRelations();
+        }
+        
+        /**
+         * Get the relation data object (for advanced operations)
+         */
+        const RelationData& getRelationData() const {
+            return m_relations;
+        }
+        
+        /**
+         * Get raw relation data for database storage
+         */
+        QString getRelationAidList() const {
+            return m_relations.getRelationAidList();
+        }
+        
+        QString getRelationTypeList() const {
+            return m_relations.getRelationTypeList();
+        }
+        
+    private:
+        RelationData m_relations;
     };
     
     // Update card data from database
