@@ -2068,7 +2068,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 				QString localPath = hashes->item(i, 2)->text();
 				int lid = adbapi->UpdateLocalPath(tag, localPath);
 				
-				if(renameto->checkState() > 0)
+				if(hasherCoordinator->getRenameTo()->checkState() > 0)
 				{
 					// TODO: rename
 				}
@@ -3191,12 +3191,12 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 		// Start hashing for files without existing hashes
 		if (filesToHashCount > 0) {
 			// Calculate total hash parts for progress tracking
-			QStringList filesToHash = getFilesNeedingHash();
-			setupHashingProgress(filesToHash);
+			QStringList filesToHash = hasherCoordinator->getFilesNeedingHash();
+			hasherCoordinator->setupHashingProgress(filesToHash);
 			
 			// Start hashing all detected files that need hashing
-			buttonstart->setEnabled(false);
-			buttonclear->setEnabled(false);
+			hasherCoordinator->getButtonStart()->setEnabled(false);
+			hasherCoordinator->getButtonClear()->setEnabled(false);
 			hasherThreadPool->start();
 			
 			if (adbapi->LoggedIn()) {
@@ -4908,9 +4908,9 @@ void Window::onUnknownFileRecheckClicked(int row)
     // Call MylistAdd API with the hash and size
     // The response will be handled by getNotifyMylistAdd
     QString tag = adbapi->MylistAdd(fileInfo.size(), fileInfo.hash(), 
-                                     markwatched->checkState(), 
-                                     hasherFileState->currentIndex(), 
-                                     storage->text());
+                                     hasherCoordinator->getMarkWatched()->checkState(), 
+                                     hasherCoordinator->getHasherFileState()->currentIndex(), 
+                                     hasherCoordinator->getStorage()->text());
     
     // Store the tag in the hashes table for response matching
     if(hashesRow >= 0 && hashesRow < hashes->rowCount())

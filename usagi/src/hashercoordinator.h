@@ -58,6 +58,20 @@ public:
     // Get the hashes table widget for external access
     hashes_* getHashesTable() const { return m_hashes; }
     
+    // Public accessors for UI widgets (needed by Window for backward compatibility)
+    QCheckBox* getRenameTo() const { return m_renameTo; }
+    QPushButton* getButtonStart() const { return m_buttonStart; }
+    QPushButton* getButtonClear() const { return m_buttonClear; }
+    QCheckBox* getMarkWatched() const { return m_markWatched; }
+    QComboBox* getHasherFileState() const { return m_hasherFileState; }
+    QLineEdit* getStorage() const { return m_storage; }
+    
+    // Public methods for file management (needed by Window)
+    bool shouldFilterFile(const QString &filePath);
+    void hashesInsertRow(QFileInfo file, Qt::CheckState renameState, const QString& preloadedHash = QString());
+    QStringList getFilesNeedingHash();
+    void setupHashingProgress(const QStringList &files);
+    
 signals:
     // Signal to notify when hashing is finished
     void hashingFinished();
@@ -94,12 +108,8 @@ private:
     
     // Helper methods
     void addFilesFromDirectory(const QString &dirPath);
-    bool shouldFilterFile(const QString &filePath);
     void updateFilterCache();
-    void hashesInsertRow(QFileInfo file, Qt::CheckState renameState, const QString& preloadedHash = QString());
-    void setupHashingProgress(const QStringList &files);
     int calculateTotalHashParts(const QStringList &files);
-    QStringList getFilesNeedingHash();
     void processPendingHashedFiles();
     
     // UI Widgets
