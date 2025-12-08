@@ -101,16 +101,12 @@ public:
     void clear();
 
 private:
-    // Parse the relation strings and populate the cache
-    void parseRelations() const;
-    
     // Raw data from database (apostrophe-separated strings)
     QString m_relaidlist;
     QString m_relaidtype;
     
-    // Parsed cache (mutable to allow lazy parsing in const methods)
-    mutable QMap<int, RelationType> m_relationCache;
-    mutable bool m_cacheParsed = false;
+    // Parsed cache
+    QMap<int, RelationType> m_relationCache;
 };
 
 #endif // RELATIONDATA_H
