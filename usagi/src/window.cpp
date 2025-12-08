@@ -2192,8 +2192,7 @@ void Window::saveMylistSorting()
         .arg(filterSidebar->getSortIndex())
         .arg(filterSidebar->getSortAscending()));
     LOG(QString("Saved mylist filter settings: type=%1, completion=%2, unwatched=%3")
-        .arg(filterSidebar->getTypeFilter())
-        .arg(filterSidebar->getCompletionFilter())
+        .arg(filterSidebar->getTypeFilter(), filterSidebar->getCompletionFilter())
         .arg(filterSidebar->getShowOnlyUnwatched()));
     LOG(QString("Saved mylist view settings: inmylist=%1, serieschain=%2, adult=%3")
         .arg(filterSidebar->getInMyListOnly())
@@ -5137,105 +5136,30 @@ void Window::applyMylistFilters()
 	}
 	
 	// If series chain display is enabled, set prequel/sequel info for arrow connections
-	if (showSeriesChain && watchSessionManager) {
-		// Cache series chains to avoid redundant lookups
-		QMap<int, QList<int>> chainCache;
+	// Use the chains already built by MyListCardManager for consistency
+	if (showSeriesChain) {
+		LOG("[Window] Setting chain connection info from MyListCardManager chains");
+		QList<AnimeChain> chains = cardManager->getChains();
 		
-		for (int i = 0; i < filteredAnimeIds.size(); ++i) {
-			int currentAid = filteredAnimeIds[i];
+		// Iterate through each chain and set prequel/sequel connections
+		for (const AnimeChain& chain : chains) {
+			QList<int> chainAnimeIds = chain.getAnimeIds();
 			
-			// Determine prequel and sequel AIDs by checking adjacent anime
-			int prequelAid = 0;
-			int sequelAid = 0;
-			
-			// Check if previous anime in filtered list is a prequel
-			if (i > 0) {
-				int prevAid = filteredAnimeIds[i - 1];
+			// For each anime in the chain, set its prequel and sequel
+			for (int i = 0; i < chainAnimeIds.size(); ++i) {
+				int currentAid = chainAnimeIds[i];
+				int prequelAid = (i > 0) ? chainAnimeIds[i - 1] : 0;
+				int sequelAid = (i < chainAnimeIds.size() - 1) ? chainAnimeIds[i + 1] : 0;
 				
-				// Get both chains
-				QList<int> currentChain;
-				if (!chainCache.contains(currentAid)) {
-					currentChain = watchSessionManager->getSeriesChain(currentAid);
-					chainCache[currentAid] = currentChain;
-				} else {
-					currentChain = chainCache[currentAid];
+				// Set the chain info on the card if it exists
+				AnimeCard* card = cardManager->getCard(currentAid);
+				if (card) {
+					card->setSeriesChainInfo(prequelAid, sequelAid);
 				}
-				
-				QList<int> prevChain;
-				if (!chainCache.contains(prevAid)) {
-					prevChain = watchSessionManager->getSeriesChain(prevAid);
-					chainCache[prevAid] = prevChain;
-				} else {
-					prevChain = chainCache[prevAid];
-				}
-				
-				// If both anime are in the same chain, or if their chains overlap,
-				// check if prevAid comes before currentAid in the chain
-				QList<int> mergedChain = currentChain;
-				for (int aid : prevChain) {
-					if (!mergedChain.contains(aid)) {
-						mergedChain.append(aid);
-					}
-				}
-				
-				int prevIdx = mergedChain.indexOf(prevAid);
-				int currIdx = mergedChain.indexOf(currentAid);
-				
-				// If both are in the merged chain and prevAid comes right before currentAid
-				if (prevIdx >= 0 && currIdx >= 0 && prevIdx < currIdx) {
-					// Check if they're consecutive or if prev is a direct prequel
-					// For now, just set the prequel if prev comes before current
-					prequelAid = prevAid;
-				}
-			}
-			
-			// Check if next anime in filtered list is a sequel
-			if (i < filteredAnimeIds.size() - 1) {
-				int nextAid = filteredAnimeIds[i + 1];
-				
-				// Get both chains
-				QList<int> currentChain;
-				if (!chainCache.contains(currentAid)) {
-					currentChain = watchSessionManager->getSeriesChain(currentAid);
-					chainCache[currentAid] = currentChain;
-				} else {
-					currentChain = chainCache[currentAid];
-				}
-				
-				QList<int> nextChain;
-				if (!chainCache.contains(nextAid)) {
-					nextChain = watchSessionManager->getSeriesChain(nextAid);
-					chainCache[nextAid] = nextChain;
-				} else {
-					nextChain = chainCache[nextAid];
-				}
-				
-				// If both anime are in the same chain, or if their chains overlap,
-				// check if nextAid comes after currentAid in the chain
-				QList<int> mergedChain = currentChain;
-				for (int aid : nextChain) {
-					if (!mergedChain.contains(aid)) {
-						mergedChain.append(aid);
-					}
-				}
-				
-				int currIdx = mergedChain.indexOf(currentAid);
-				int nextIdx = mergedChain.indexOf(nextAid);
-				
-				// If both are in the merged chain and nextAid comes right after currentAid
-				if (currIdx >= 0 && nextIdx >= 0 && currIdx < nextIdx) {
-					// Check if they're consecutive or if next is a direct sequel
-					// For now, just set the sequel if next comes after current
-					sequelAid = nextAid;
-				}
-			}
-			
-			// Set the chain info on the card
-			AnimeCard* card = cardManager->getCard(currentAid);
-			if (card) {
-				card->setSeriesChainInfo(prequelAid, sequelAid);
 			}
 		}
+		
+		LOG(QString("[Window] Set chain connections for %1 chains").arg(chains.size()));
 	}
 	
 	// FINAL VALIDATION: Ensure all anime in the final filtered list have card creation data preloaded
