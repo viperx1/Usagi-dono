@@ -174,7 +174,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 int relAid = it.key();
                 RelationData::RelationType relType = it.value();
                 
-                // Only interested in Prequel (2) and Sequel (1) relationships
+                // Only interested in Sequel (1) and Prequel (2) relationships
                 if (relType != RelationData::RelationType::Sequel && 
                     relType != RelationData::RelationType::Prequel) {
                     continue;
