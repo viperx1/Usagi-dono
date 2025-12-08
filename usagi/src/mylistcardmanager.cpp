@@ -177,86 +177,133 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         chains.append(AnimeChain(filteredChainAids));
     }
     
-    // Merge chains that share anime or have connecting prequel/sequel relationships
-    // This handles cases where anime point to the same prequel but form separate chains
-    bool merged = true;
-    while (merged && chains.size() > 1) {
-        merged = false;
+    // OPTIMIZED: Build anime-to-chain-index map for O(1) lookups
+    QMap<int, int> animeToChainIndex;
+    for (int i = 0; i < chains.size(); ++i) {
+        for (int aid : chains[i].getAnimeIds()) {
+            animeToChainIndex[aid] = i;
+        }
+    }
+    
+    // Merge chains by checking each anime's prequel/sequel relations
+    // Instead of O(n²) chain pair checking, this is O(n×relations) which is much faster
+    QSet<int> chainsToMerge;  // Track which chains need merging
+    QMap<int, QSet<int>> chainMergeGroups;  // Group chains that should be merged together
+    
+    for (int chainIdx = 0; chainIdx < chains.size(); ++chainIdx) {
+        QList<int> chainAnime = chains[chainIdx].getAnimeIds();
         
-        for (int i = 0; i < chains.size() && !merged; ++i) {
-            for (int j = i + 1; j < chains.size() && !merged; ++j) {
-                QList<int> chainI = chains[i].getAnimeIds();
-                QList<int> chainJ = chains[j].getAnimeIds();
+        for (int aid : chainAnime) {
+            // Load relation data for this anime
+            loadRelationDataForAnime(aid);
+            CardCreationData data = m_cardCreationDataCache.value(aid);
+            
+            QStringList relAidList = data.relaidlist.split('\'', Qt::SkipEmptyParts);
+            QStringList relAidType = data.relaidtype.split('\'', Qt::SkipEmptyParts);
+            
+            // Check both prequel and sequel relations
+            for (int k = 0; k < relAidList.size() && k < relAidType.size(); ++k) {
+                int relAid = relAidList[k].toInt();
+                int relType = relAidType[k].toInt();
                 
-                // Check if chains share any anime
-                bool sharesAnime = false;
-                for (int aid : chainI) {
-                    if (chainJ.contains(aid)) {
-                        sharesAnime = true;
-                        break;
-                    }
+                // Only interested in Prequel (1) and Sequel (2) relationships
+                if (relType != 1 && relType != 2) {
+                    continue;
                 }
                 
-                if (sharesAnime) {
-                    LOG(QString("[MyListCardManager] Merging chains %1 and %2 (share anime)").arg(i).arg(j));
+                // Check if this related anime is in another chain
+                if (animeToChainIndex.contains(relAid)) {
+                    int otherChainIdx = animeToChainIndex[relAid];
                     
-                    // Merge chains by combining anime lists
-                    QSet<int> mergedSet = QSet<int>(chainI.begin(), chainI.end());
-                    for (int aid : chainJ) {
-                        mergedSet.insert(aid);
-                    }
-                    
-                    // Rebuild merged chain using relation data to determine order
-                    QList<int> mergedList = mergedSet.values();
-                    chains[i] = AnimeChain(buildChainFromAid(mergedList.first(), mergedSet, true));
-                    chains.removeAt(j);
-                    merged = true;
-                    break;
-                }
-                
-                // Check if last anime of chain i connects to first anime of chain j (sequel relationship)
-                if (!chainI.isEmpty() && !chainJ.isEmpty()) {
-                    int lastI = chainI.last();
-                    int firstJ = chainJ.first();
-                    
-                    // Load relation data for both anime
-                    loadRelationDataForAnime(lastI);
-                    loadRelationDataForAnime(firstJ);
-                    
-                    CardCreationData dataI = m_cardCreationDataCache.value(lastI);
-                    CardCreationData dataJ = m_cardCreationDataCache.value(firstJ);
-                    
-                    // Check if they connect via sequel/prequel
-                    QStringList relAidListI = dataI.relaidlist.split('\'', Qt::SkipEmptyParts);
-                    QStringList relAidTypeI = dataI.relaidtype.split('\'', Qt::SkipEmptyParts);
-                    
-                    bool connects = false;
-                    for (int k = 0; k < relAidListI.size() && k < relAidTypeI.size(); ++k) {
-                        int relAid = relAidListI[k].toInt();
-                        int relType = relAidTypeI[k].toInt();
-                        
-                        // Check if lastI has sequel pointing to firstJ
-                        if (relType == 2 && relAid == firstJ) {  // Type 2 = Sequel
-                            connects = true;
-                            break;
+                    // If in different chain, mark both chains for merging
+                    if (otherChainIdx != chainIdx) {
+                        if (!chainMergeGroups.contains(chainIdx)) {
+                            chainMergeGroups[chainIdx] = QSet<int>();
                         }
-                    }
-                    
-                    if (connects) {
-                        LOG(QString("[MyListCardManager] Merging chains %1 and %2 (sequel connection: %3->%4)")
-                            .arg(i).arg(j).arg(lastI).arg(firstJ));
+                        chainMergeGroups[chainIdx].insert(otherChainIdx);
+                        chainsToMerge.insert(chainIdx);
+                        chainsToMerge.insert(otherChainIdx);
                         
-                        // Merge by appending chain j to chain i
-                        QList<int> mergedList = chainI;
-                        mergedList.append(chainJ);
-                        chains[i] = AnimeChain(mergedList);
-                        chains.removeAt(j);
-                        merged = true;
-                        break;
+                        LOG(QString("[MyListCardManager] Chain %1 (aid=%2) connects to chain %3 (aid=%4) via %5")
+                            .arg(chainIdx).arg(aid).arg(otherChainIdx).arg(relAid)
+                            .arg(relType == 1 ? "prequel" : "sequel"));
                     }
                 }
             }
         }
+    }
+    
+    // Perform merging if needed
+    if (!chainsToMerge.isEmpty()) {
+        LOG(QString("[MyListCardManager] Merging %1 chains that have connections").arg(chainsToMerge.size()));
+        
+        // Build connected components - chains that should be merged together
+        QMap<int, QSet<int>> mergeComponents;
+        for (int chainIdx : chainsToMerge) {
+            mergeComponents[chainIdx].insert(chainIdx);
+            if (chainMergeGroups.contains(chainIdx)) {
+                mergeComponents[chainIdx].unite(chainMergeGroups[chainIdx]);
+            }
+        }
+        
+        // Expand components transitively
+        bool expanded = true;
+        while (expanded) {
+            expanded = false;
+            for (auto it = mergeComponents.begin(); it != mergeComponents.end(); ++it) {
+                QSet<int> current = it.value();
+                QSet<int> newSet = current;
+                
+                for (int idx : current) {
+                    if (mergeComponents.contains(idx)) {
+                        newSet.unite(mergeComponents[idx]);
+                    }
+                }
+                
+                if (newSet.size() > current.size()) {
+                    it.value() = newSet;
+                    expanded = true;
+                }
+            }
+        }
+        
+        // Find unique merge groups
+        QSet<QSet<int>> uniqueMergeGroups;
+        for (const QSet<int>& component : mergeComponents.values()) {
+            uniqueMergeGroups.insert(component);
+        }
+        
+        // Create new merged chains
+        QList<AnimeChain> newChains;
+        QSet<int> processedChainIndices;
+        
+        for (const QSet<int>& group : uniqueMergeGroups) {
+            // Collect all anime from chains in this group
+            QSet<int> allAnime;
+            for (int chainIdx : group) {
+                processedChainIndices.insert(chainIdx);
+                for (int aid : chains[chainIdx].getAnimeIds()) {
+                    allAnime.insert(aid);
+                }
+            }
+            
+            // Rebuild merged chain using relation data for proper ordering
+            QList<int> mergedList = allAnime.values();
+            if (!mergedList.isEmpty()) {
+                LOG(QString("[MyListCardManager] Merging group of %1 chains with %2 total anime")
+                    .arg(group.size()).arg(allAnime.size()));
+                newChains.append(AnimeChain(buildChainFromAid(mergedList.first(), allAnime, true)));
+            }
+        }
+        
+        // Add unmerged chains
+        for (int i = 0; i < chains.size(); ++i) {
+            if (!processedChainIndices.contains(i)) {
+                newChains.append(chains[i]);
+            }
+        }
+        
+        chains = newChains;
     }
     
     LOG(QString("[MyListCardManager] After merging: %1 chains").arg(chains.size()));
