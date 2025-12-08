@@ -166,16 +166,17 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
             loadRelationDataForAnime(aid);
             CardCreationData data = m_cardCreationDataCache.value(aid);
             
-            QStringList relAidList = data.relaidlist.split('\'', Qt::SkipEmptyParts);
-            QStringList relAidType = data.relaidtype.split('\'', Qt::SkipEmptyParts);
+            // Use the new API to get all relations
+            QMap<int, RelationData::RelationType> relations = data.getAllRelations();
             
             // Check both prequel and sequel relations
-            for (int k = 0; k < relAidList.size() && k < relAidType.size(); ++k) {
-                int relAid = relAidList[k].toInt();
-                int relType = relAidType[k].toInt();
+            for (auto it = relations.constBegin(); it != relations.constEnd(); ++it) {
+                int relAid = it.key();
+                RelationData::RelationType relType = it.value();
                 
-                // Only interested in Prequel (1) and Sequel (2) relationships
-                if (relType != 1 && relType != 2) {
+                // Only interested in Prequel (2) and Sequel (1) relationships
+                if (relType != RelationData::RelationType::Sequel && 
+                    relType != RelationData::RelationType::Prequel) {
                     continue;
                 }
                 
@@ -194,7 +195,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                         
                         LOG(QString("[MyListCardManager] Chain %1 (aid=%2) connects to chain %3 (aid=%4) via %5")
                             .arg(chainIdx).arg(aid).arg(otherChainIdx).arg(relAid)
-                            .arg(relType == 1 ? "prequel" : "sequel"));
+                            .arg(relType == RelationData::RelationType::Sequel ? "sequel" : "prequel"));
                     }
                 }
             }
@@ -479,48 +480,18 @@ int MyListCardManager::findPrequelAid(int aid) const
     }
     
     const CardCreationData& data = m_cardCreationDataCache[aid];
-    if (data.relaidlist.isEmpty() || data.relaidtype.isEmpty()) {
-        return 0;
-    }
-    
-    QStringList aidList = data.relaidlist.split("'", Qt::SkipEmptyParts);
-    QStringList typeList = data.relaidtype.split("'", Qt::SkipEmptyParts);
-    
-    for (int i = 0; i < qMin(aidList.size(), typeList.size()); ++i) {
-        QString type = typeList[i].toLower();
-        // Type 2 = prequel
-        if (type == "2" || type.contains("prequel", Qt::CaseInsensitive)) {
-            return aidList[i].toInt();
-        }
-    }
-    
-    return 0;
+    return data.getPrequel();
 }
 
 int MyListCardManager::findSequelAid(int aid) const
 {
-    // Similar to findPrequelAid but looks for type 1 (sequel)
+    // Use cached relation data
     if (!m_cardCreationDataCache.contains(aid)) {
         return 0;
     }
     
     const CardCreationData& data = m_cardCreationDataCache[aid];
-    if (data.relaidlist.isEmpty() || data.relaidtype.isEmpty()) {
-        return 0;
-    }
-    
-    QStringList aidList = data.relaidlist.split("'", Qt::SkipEmptyParts);
-    QStringList typeList = data.relaidtype.split("'", Qt::SkipEmptyParts);
-    
-    for (int i = 0; i < qMin(aidList.size(), typeList.size()); ++i) {
-        QString type = typeList[i].toLower();
-        // Type 1 = sequel
-        if (type == "1" || type.contains("sequel", Qt::CaseInsensitive)) {
-            return aidList[i].toInt();
-        }
-    }
-    
-    return 0;
+    return data.getSequel();
 }
 
 void MyListCardManager::loadRelationDataForAnime(int aid) const
@@ -545,14 +516,13 @@ void MyListCardManager::loadRelationDataForAnime(int aid) const
     
     if (query.next()) {
         CardCreationData data;
-        data.relaidlist = query.value(0).toString();
-        data.relaidtype = query.value(1).toString();
+        data.setRelations(query.value(0).toString(), query.value(1).toString());
         
         // Store in cache (cast away const)
         mutableThis->m_cardCreationDataCache[aid] = data;
         
-        LOG(QString("[MyListCardManager] Loaded relation data for aid=%1 (relaidlist=%2)")
-            .arg(aid).arg(data.relaidlist.isEmpty() ? "empty" : "present"));
+        LOG(QString("[MyListCardManager] Loaded relation data for aid=%1 (has relations=%2)")
+            .arg(aid).arg(data.getAllRelations().isEmpty() ? "false" : "true"));
     } else {
         LOG(QString("[MyListCardManager] No anime found in database for aid=%1").arg(aid));
     }
@@ -1758,8 +1728,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
             data.tagWeightList = q.value(14).toString();
             data.isHidden = q.value(15).toInt() == 1;
             data.is18Restricted = q.value(16).toInt() == 1;
-            data.relaidlist = q.value(17).toString();
-            data.relaidtype = q.value(18).toString();
+            data.setRelations(q.value(17).toString(), q.value(18).toString());
             data.hasData = true;
         }
     }

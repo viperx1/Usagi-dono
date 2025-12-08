@@ -62,6 +62,7 @@ set(SOURCES
     src/cardepisodeinfo.cpp
     src/animestats.cpp
     src/cachedanimedata.cpp
+    src/relationdata.cpp
 )
 
 # Header files
@@ -110,6 +111,7 @@ set(HEADERS
     src/cardepisodeinfo.h
     src/animestats.h
     src/cachedanimedata.h
+    src/relationdata.h
 )
 
 # Create executable

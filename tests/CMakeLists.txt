@@ -1679,6 +1679,13 @@ set(MYLISTCARDMANAGER_TEST_HEADERS
     ../usagi/src/anidbgroupinfo.h
     ../usagi/src/applicationsettings.h
     ../usagi/src/sessioninfo.h
+    ../usagi/src/animechain.h
+    ../usagi/src/animestats.h
+    ../usagi/src/cachedanimedata.h
+    ../usagi/src/taginfo.h
+    ../usagi/src/cardfileinfo.h
+    ../usagi/src/cardepisodeinfo.h
+    ../usagi/src/relationdata.h
 )
 
 add_executable(test_mylistcardmanager ${MYLISTCARDMANAGER_TEST_SOURCES} ${MYLISTCARDMANAGER_TEST_HEADERS})
