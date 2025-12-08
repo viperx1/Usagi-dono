@@ -4156,32 +4156,11 @@ void Window::sortMylistCards(int sortIndex)
 	
 	// Handle nested sorting when series chain is enabled
 	if (seriesChainEnabled) {
-		LOG("[Window] Series chain enabled - delegating to MyListCardManager for chain sorting");
+		LOG("[Window] Series chain enabled - delegating to MyListCardManager for chain sorting (airdate descending)");
 		
-		// Map sortIndex to AnimeChain::SortCriteria
-		AnimeChain::SortCriteria criteria;
-		switch (sortIndex) {
-			case 0: // Anime Title
-				criteria = AnimeChain::SortCriteria::ByRepresentativeTitle;
-				break;
-			case 1: // Type
-				criteria = AnimeChain::SortCriteria::ByRepresentativeType;
-				break;
-			case 2: // Aired Date
-				criteria = AnimeChain::SortCriteria::ByRepresentativeDate;
-				break;
-			case 3: // Episodes (Count) - use chain length as proxy
-				criteria = AnimeChain::SortCriteria::ByChainLength;
-				break;
-			case 4: // Completion % - use ID (no direct mapping available)
-			case 5: // Last Played - use ID (no direct mapping available)
-			default:
-				criteria = AnimeChain::SortCriteria::ByRepresentativeId;
-				break;
-		}
-		
-		// MyListCardManager will sort chains externally while preserving internal order
-		cardManager->sortChains(criteria, sortAscending);
+		// Always sort chains by aired date descending (newest first)
+		// This ensures prequels appear before sequels chronologically
+		cardManager->sortChains(AnimeChain::SortCriteria::ByRepresentativeDate, false);  // false = descending
 		
 		// Get the updated anime ID list from card manager (already reordered)
 		animeIds = cardManager->getAnimeIdList();
