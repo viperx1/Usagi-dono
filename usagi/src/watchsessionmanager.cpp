@@ -436,53 +436,6 @@ int WatchSessionManager::findPrequelAid(int aid, const QString& relationType) co
     return 0;
 }
 
-QList<int> WatchSessionManager::getSeriesChain(int aid) const
-{
-    // NOTE: This method is only used internally by WatchSessionManager for session management.
-    // For UI chain display and other chain operations, use MyListCardManager::buildChainsFromAnimeIds()
-    // to maintain SOLID compliance (single source of truth for chain building).
-    
-    // Check series chain cache first
-    if (m_seriesChainCache.contains(aid)) {
-        return m_seriesChainCache[aid];
-    }
-    
-    QList<int> chain;
-    QSet<int> visited;
-    
-    // Start from original prequel
-    int currentAid = getOriginalPrequel(aid);
-    
-    // Follow sequel chain
-    while (currentAid > 0 && !visited.contains(currentAid)) {
-        chain.append(currentAid);
-        visited.insert(currentAid);
-        
-        loadAnimeRelations(currentAid);
-        
-        // Look for sequel (type code 1 or string "sequel")
-        int sequelAid = 0;
-        if (m_relationsCache.contains(currentAid)) {
-            for (const auto& rel : m_relationsCache[currentAid]) {
-                int relCode = rel.second.toInt();
-                if (relCode == RELATION_SEQUEL || rel.second.contains("sequel", Qt::CaseInsensitive)) {
-                    sequelAid = rel.first;
-                    break;
-                }
-            }
-        }
-        
-        currentAid = sequelAid;
-    }
-    
-    // Cache result for all AIDs in the chain (they share the same chain)
-    for (int chainAid : chain) {
-        m_seriesChainCache[chainAid] = chain;
-    }
-    
-    return chain;
-}
-
 // ========== File Marking ==========
 
 int WatchSessionManager::calculateDeletionScore(int lid) const
@@ -651,8 +604,45 @@ int WatchSessionManager::calculateDeletionScore(int lid) const
 
 std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(int aid) const
 {
-    // Get the series chain starting from the original prequel
-    QList<int> chain = getSeriesChain(aid);
+    // Build the series chain inline (instead of using deprecated getSeriesChain)
+    // This is the only place that needs chain traversal for internal session management
+    QList<int> chain;
+    QSet<int> visited;
+    
+    // Check cache first
+    if (m_seriesChainCache.contains(aid)) {
+        chain = m_seriesChainCache[aid];
+    } else {
+        // Start from original prequel
+        int currentAid = getOriginalPrequel(aid);
+        
+        // Follow sequel chain
+        while (currentAid > 0 && !visited.contains(currentAid)) {
+            chain.append(currentAid);
+            visited.insert(currentAid);
+            
+            loadAnimeRelations(currentAid);
+            
+            // Look for sequel (type code 1 or string "sequel")
+            int sequelAid = 0;
+            if (m_relationsCache.contains(currentAid)) {
+                for (const auto& rel : m_relationsCache[currentAid]) {
+                    int relCode = rel.second.toInt();
+                    if (relCode == RELATION_SEQUEL || rel.second.contains("sequel", Qt::CaseInsensitive)) {
+                        sequelAid = rel.first;
+                        break;
+                    }
+                }
+            }
+            
+            currentAid = sequelAid;
+        }
+        
+        // Cache result for all AIDs in the chain (they share the same chain)
+        for (int chainAid : chain) {
+            m_seriesChainCache[chainAid] = chain;
+        }
+    }
     
     // Find if any anime in the chain has an active session
     for (int chainAid : chain) {
