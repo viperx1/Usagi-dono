@@ -54,3 +54,4 @@ settings.dat
 # CMake build directory
 build/
 clazy-report.txt
+aqtinstall.log

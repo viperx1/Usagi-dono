@@ -421,7 +421,7 @@ Window::Window()
     connect(filterSidebar, &MyListFilterSidebar::collapseRequested, this, &Window::onToggleFilterBarClicked);
     
     // Wrap filter sidebar in a scroll area for vertical scrolling
-    filterSidebarScrollArea = new QScrollArea(this);
+    filterSidebarScrollArea = new QScrollArea(pageMylistParent);
     filterSidebarScrollArea->setWidget(filterSidebar);
     filterSidebarScrollArea->setWidgetResizable(true);
     filterSidebarScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -449,13 +449,13 @@ Window::Window()
     
     // Card view (only view mode available)
     // Use VirtualFlowLayout for efficient virtual scrolling
-    mylistCardScrollArea = new QScrollArea(this);
+    mylistCardScrollArea = new QScrollArea(pageMylistParent);
     mylistCardScrollArea->setWidgetResizable(true);
     mylistCardScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     mylistCardScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
     // Create virtual flow layout for efficient rendering of many cards
-    mylistVirtualLayout = new VirtualFlowLayout(this);
+    mylistVirtualLayout = new VirtualFlowLayout(pageMylistParent);
     mylistVirtualLayout->setSpacing(10, 10);
     mylistVirtualLayout->setItemSize(AnimeCard::getCardSize());
     mylistCardScrollArea->setWidget(mylistVirtualLayout);
