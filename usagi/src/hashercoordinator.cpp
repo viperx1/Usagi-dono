@@ -11,6 +11,7 @@
 #include <QAbstractItemView>
 #include <QEvent>
 #include <QKeyEvent>
+#include <QSplitter>
 
 // External hasher thread pool
 extern HasherThreadPool *hasherThreadPool;
@@ -52,7 +53,9 @@ void HasherCoordinator::createUI(QWidget *parent)
     m_hashes = new hashes_();
     m_hasherOutput = new QTextEdit;
     m_hasherFileState = new QComboBox;
+    m_hasherFileState->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     m_addToMyList = new QCheckBox("Add file(s) to MyList");
+    m_addToMyList->setChecked(true);  // Enable by default
     m_markWatched = new QCheckBox("Mark watched (no change)");
     QLabel *label1 = new QLabel("Set state:");
     m_buttonStart = new QPushButton("Start");
@@ -68,7 +71,6 @@ void HasherCoordinator::createUI(QWidget *parent)
     QBoxLayout *layout2 = new QBoxLayout(QBoxLayout::LeftToRight);
     QPushButton *movetodirbutton = new QPushButton("...");
     QPushButton *patternhelpbutton = new QPushButton("?");
-    QBoxLayout *progress = new QBoxLayout(QBoxLayout::TopToBottom);
     
     // Create progress bars for each thread
     int numThreads = m_hasherThreadPool->threadCount();
@@ -76,30 +78,54 @@ void HasherCoordinator::createUI(QWidget *parent)
         QProgressBar *threadProgress = new QProgressBar;
         threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
         m_threadProgressBars.append(threadProgress);
-        progress->addWidget(threadProgress);
     }
     
     m_progressTotal = new QProgressBar;
     m_progressTotalLabel = new QLabel;
-    QBoxLayout *progressTotalLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    progressTotalLayout->addWidget(m_progressTotal);
-    progressTotalLayout->addWidget(m_progressTotalLabel);
     
     // Setup hashes table
     m_hashes->setColumnCount(10);
     QStringList headers;
-    headers << "Filename" << "Status" << "Path" << "Size" << "Audio" << "File" << "MyList" << "Move" << "Rename" << "Hash";
+    headers << "Filename" << "Status" << "Path" << "LF" << "LL" << "RF" << "RL" << "Move" << "Rename" << "Hash";
     m_hashes->setHorizontalHeaderLabels(headers);
     m_hashes->hideColumn(2); // Hide path column
     m_hashes->hideColumn(9); // Hide hash column
     m_hashes->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_hashes->horizontalHeader()->setStretchLastSection(true);
     
-    // Add widgets to layout
-    m_pageHasher->addWidget(m_hashes, 1);
-    m_pageHasher->addLayout(m_pageHasherSettings);
-    m_pageHasher->addLayout(progress);
-    m_pageHasher->addWidget(m_hasherOutput, 0, Qt::AlignTop);
+    // Set tooltips for column headers (including hidden columns for completeness)
+    if (m_hashes->horizontalHeaderItem(0))
+        m_hashes->horizontalHeaderItem(0)->setToolTip("Name of the file");
+    if (m_hashes->horizontalHeaderItem(1))
+        m_hashes->horizontalHeaderItem(1)->setToolTip("Hashing progress (0=pending, 1=completed)");
+    if (m_hashes->horizontalHeaderItem(2))
+        m_hashes->horizontalHeaderItem(2)->setToolTip("Full path to the file (hidden)");
+    if (m_hashes->horizontalHeaderItem(3))
+        m_hashes->horizontalHeaderItem(3)->setToolTip("LF (Local File): Whether file info is in local database (0=no, 1=yes)");
+    if (m_hashes->horizontalHeaderItem(4))
+        m_hashes->horizontalHeaderItem(4)->setToolTip("LL (Local List/MyList): Whether file is in your MyList (0=no, 1=yes)");
+    if (m_hashes->horizontalHeaderItem(5))
+        m_hashes->horizontalHeaderItem(5)->setToolTip("RF (Remote File): AniDB FILE command API tag");
+    if (m_hashes->horizontalHeaderItem(6))
+        m_hashes->horizontalHeaderItem(6)->setToolTip("RL (Remote List): AniDB MYLIST command API tag");
+    if (m_hashes->horizontalHeaderItem(7))
+        m_hashes->horizontalHeaderItem(7)->setToolTip("Whether to move the file");
+    if (m_hashes->horizontalHeaderItem(8))
+        m_hashes->horizontalHeaderItem(8)->setToolTip("Whether to rename the file");
+    if (m_hashes->horizontalHeaderItem(9))
+        m_hashes->horizontalHeaderItem(9)->setToolTip("ED2K hash of the file (hidden)");
+    
+    // Set minimum heights and size policies
+    m_hashes->setMinimumHeight(100);
+    m_hashes->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Allow table to expand
+    
+    // Set hasher output to fixed size (~6 lines)
+    QFontMetrics fm(m_hasherOutput->font());
+    int lineHeight = fm.lineSpacing();
+    m_hasherOutput->setFixedHeight(lineHeight * 6 + 10);  // 6 lines + some padding
+    
+    // NOTE: Actual layout assembly happens in window.cpp to allow proper splitter arrangement
+    // with unknown files widget. This just creates the widgets.
     
     // Setup hasher settings layout
     layout1->addWidget(m_moveTo);
@@ -109,19 +135,33 @@ void HasherCoordinator::createUI(QWidget *parent)
     layout2->addWidget(m_renameToPattern, 1);
     layout2->addWidget(patternhelpbutton);
     
-    m_pageHasherSettings->addWidget(m_button1, 0, 0);
-    m_pageHasherSettings->addWidget(m_button2, 0, 1);
-    m_pageHasherSettings->addWidget(m_button3, 0, 2);
-    m_pageHasherSettings->addWidget(label1, 1, 0);
-    m_pageHasherSettings->addWidget(m_hasherFileState, 1, 1, 1, 2);
+    // Create horizontal layout for add file buttons (prevents stretching)
+    QBoxLayout *addButtonsLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    addButtonsLayout->addWidget(m_button1);
+    addButtonsLayout->addWidget(m_button2);
+    addButtonsLayout->addWidget(m_button3);
+    addButtonsLayout->addStretch(1);
+    
+    // Create horizontal layout for control buttons (prevents stretching)
+    QBoxLayout *controlButtonsLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    controlButtonsLayout->addWidget(m_buttonStart);
+    controlButtonsLayout->addWidget(m_buttonStop);
+    controlButtonsLayout->addWidget(m_buttonClear);
+    controlButtonsLayout->addStretch(1);
+    
+    // Create horizontal layout for file state (prevents stretching and centers)
+    QBoxLayout *fileStateLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    fileStateLayout->addWidget(label1);
+    fileStateLayout->addWidget(m_hasherFileState);
+    fileStateLayout->addStretch(1);
+    
+    m_pageHasherSettings->addLayout(addButtonsLayout, 0, 0, 1, 3);
+    m_pageHasherSettings->addLayout(fileStateLayout, 1, 0, 1, 3);
     m_pageHasherSettings->addWidget(m_addToMyList, 2, 0, 1, 3);
     m_pageHasherSettings->addWidget(m_markWatched, 3, 0, 1, 3);
     m_pageHasherSettings->addLayout(layout1, 4, 0, 1, 3);
     m_pageHasherSettings->addLayout(layout2, 5, 0, 1, 3);
-    m_pageHasherSettings->addWidget(m_buttonStart, 6, 0);
-    m_pageHasherSettings->addWidget(m_buttonStop, 6, 1);
-    m_pageHasherSettings->addWidget(m_buttonClear, 6, 2);
-    m_pageHasherSettings->addLayout(progressTotalLayout, 7, 0, 1, 3);
+    m_pageHasherSettings->addLayout(controlButtonsLayout, 6, 0, 1, 3);
     
     // Setup file state combo box
     m_hasherFileState->addItem("Unknown");
@@ -309,12 +349,8 @@ void HasherCoordinator::hashesInsertRow(QFileInfo file, Qt::CheckState renameSta
     item = new QTableWidgetItem(file.absoluteFilePath());
     m_hashes->setItem(row, 2, item);
     
-    // Size
-    item = new QTableWidgetItem(QString::number(file.size()));
-    m_hashes->setItem(row, 3, item);
-    
-    // Audio, File, MyList, Move, Rename columns
-    for(int i = 4; i < 9; i++)
+    // LF, LL, RF, RL, Move, Rename columns - all start with "?"
+    for(int i = 3; i < 9; i++)
     {
         item = new QTableWidgetItem("?");
         m_hashes->setItem(row, i, item);
@@ -492,6 +528,13 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
             m_hashes->item(i, 0)->setBackground(m_hashedFileColor);
             QTableWidgetItem *itemprogress = new QTableWidgetItem(QString("1"));
             m_hashes->setItem(i, 1, itemprogress);
+            
+            // Generate and output ed2k link (no encoding)
+            QString ed2kLink = QString("ed2k://|file|%1|%2|%3|/")
+                .arg(fileData.filename)
+                .arg(fileData.size)
+                .arg(fileData.hexdigest);
+            m_hasherOutput->append(ed2kLink);
             
             emit logMessage(QString("File hashed: %1").arg(fileData.filename));
             

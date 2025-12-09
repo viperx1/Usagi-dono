@@ -19,6 +19,11 @@
 #include <QTextStream>
 #include <QStyle>
 #include <QCoreApplication>
+#include <QDesktopServices>
+#include <QMenu>
+#include <QMouseEvent>
+#include <QContextMenuEvent>
+#include <QSplitter>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -220,18 +225,71 @@ Window::Window()
     hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
     unknownFiles = new unknown_files_(this); // Unknown files widget
     
-    // Add HasherCoordinator's widget to the page
-    pageHasher->addWidget(hasherCoordinator->getHasherPageWidget(), 1);
-    
-    // Add unknown files widget with a label (initially hidden)
+    // Create a container widget for unknown files with label
+    QWidget *unknownFilesContainer = new QWidget();
+    unknownFilesContainer->setObjectName("unknownFilesContainer");
+    unknownFilesContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Container must expand in splitter
+    QVBoxLayout *unknownFilesLayout = new QVBoxLayout(unknownFilesContainer);
+    unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
+    unknownFilesLayout->setSpacing(0);  // Remove spacing between label and table
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
     unknownFilesLabel->setObjectName("unknownFilesLabel");
-    pageHasher->addWidget(unknownFilesLabel);
-    pageHasher->addWidget(unknownFiles, 0, Qt::AlignTop);
+    unknownFilesLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    unknownFilesLayout->addWidget(unknownFilesLabel, 0);  // stretch factor 0 - fixed size
+    unknownFilesLayout->addWidget(unknownFiles, 1);  // stretch factor 1 - takes available space
+    unknownFiles->setMinimumHeight(60);  // Set minimum height to ensure it can be resized
+    unknownFiles->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Allow table to expand
+    
+    // Create the main hasher layout in the requested order:
+    // 1. hashes (fixed minimum - resizable)
+    // 2. unknown files (fixed minimum - resizable)
+    // 3. all hasher control (not resizable)
+    // 4. (collapse button for thread progress bars) total progress bar
+    // 5. thread progress bars
+    // 6. ed2k links (fixed size ~ 6 lines)
+    
+    // Create a splitter for resizable sections (hashes + unknown files)
+    QSplitter *topSplitter = new QSplitter(Qt::Vertical);
+    topSplitter->addWidget(hasherCoordinator->getHashesTable());
+    topSplitter->addWidget(unknownFilesContainer);
+    topSplitter->setStretchFactor(0, 3);  // Hashes table gets more space
+    topSplitter->setStretchFactor(1, 1);  // Unknown files gets less space
+    
+    // Create collapse button for thread progress bars
+    QPushButton *collapseThreadProgressButton = new QPushButton("▼");
+    collapseThreadProgressButton->setMaximumWidth(30);
+    collapseThreadProgressButton->setCheckable(true);
+    collapseThreadProgressButton->setChecked(false);  // Initially not collapsed (visible)
+    
+    // Create container for thread progress bars
+    QWidget *threadProgressContainer = new QWidget();
+    QVBoxLayout *threadProgressLayout = new QVBoxLayout(threadProgressContainer);
+    threadProgressLayout->setContentsMargins(0, 0, 0, 0);
+    for (QProgressBar *bar : hasherCoordinator->getThreadProgressBars()) {
+        threadProgressLayout->addWidget(bar);
+    }
+    
+    // Create total progress bar layout with collapse button
+    QHBoxLayout *totalProgressLayout = new QHBoxLayout();
+    totalProgressLayout->addWidget(collapseThreadProgressButton);
+    totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressBar());
+    totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressLabel());
+    
+    // Add everything to the main hasher page layout
+    pageHasher->addWidget(topSplitter, 1);  // Resizable section
+    pageHasher->addLayout(hasherCoordinator->getHasherSettings());  // Control section (not resizable)
+    pageHasher->addLayout(totalProgressLayout);  // Total progress with collapse button
+    pageHasher->addWidget(threadProgressContainer);  // Thread progress bars
+    pageHasher->addWidget(hasherCoordinator->getHasherOutput());  // ED2K links (fixed size)
+    
+    // Connect collapse button
+    connect(collapseThreadProgressButton, &QPushButton::toggled, [collapseThreadProgressButton, threadProgressContainer](bool checked) {
+        threadProgressContainer->setVisible(!checked);
+        collapseThreadProgressButton->setText(checked ? "▶" : "▼");
+    });
     
     // Hide unknown files section initially
-    unknownFilesLabel->hide();
-    unknownFiles->hide();
+    unknownFilesContainer->hide();
     
     // Connect HasherCoordinator signals
     connect(hasherCoordinator, &HasherCoordinator::hashingFinished, this, &Window::hasherFinished);
@@ -1738,7 +1796,82 @@ unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
     setColumnWidth(1, 300);
     setColumnWidth(2, 200);
     setColumnWidth(3, 290);  // Increased to accommodate Re-check and Delete buttons
-    setMaximumHeight(200); // Limit height so it doesn't dominate the UI
+    // Removed setMaximumHeight(200) to allow table to expand vertically with splitter
+    
+    // Set context menu policy
+    setContextMenuPolicy(Qt::DefaultContextMenu);
+}
+
+void unknown_files_::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    // Execute file on double-click
+    if (event->button() == Qt::LeftButton)
+    {
+        executeFile();
+    }
+    QTableWidget::mouseDoubleClickEvent(event);
+}
+
+void unknown_files_::contextMenuEvent(QContextMenuEvent *event)
+{
+    // Create context menu
+    QMenu contextMenu(this);
+    
+    QAction *executeAction = contextMenu.addAction("Execute");
+    QAction *openLocationAction = contextMenu.addAction("Open Location");
+    
+    QAction *selectedAction = contextMenu.exec(event->globalPos());
+    
+    if (selectedAction == executeAction)
+    {
+        executeFile();
+    }
+    else if (selectedAction == openLocationAction)
+    {
+        openFileLocation();
+    }
+}
+
+void unknown_files_::executeFile()
+{
+    int row = currentRow();
+    if (row < 0) return;
+    
+    // Get the file path from the window's unknownFilesData
+    Window *window = qobject_cast<Window*>(this->window());
+    if (!window) return;
+    
+    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
+    if (filesData.contains(row))
+    {
+        QString filePath = filesData[row].filepath();
+        if (!filePath.isEmpty())
+        {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
+        }
+    }
+}
+
+void unknown_files_::openFileLocation()
+{
+    int row = currentRow();
+    if (row < 0) return;
+    
+    // Get the file path from the window's unknownFilesData
+    Window *window = qobject_cast<Window*>(this->window());
+    if (!window) return;
+    
+    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
+    if (filesData.contains(row))
+    {
+        QString filePath = filesData[row].filepath();
+        if (!filePath.isEmpty())
+        {
+            QFileInfo fileInfo(filePath);
+            QString dirPath = fileInfo.absolutePath();
+            QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath));
+        }
+    }
 }
 
 bool unknown_files_::event(QEvent *e)
@@ -2000,11 +2133,10 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                         // Hide the widget if no more unknown files
                         if(unknownFiles->rowCount() == 0)
                         {
-                            unknownFiles->hide();
-                            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-                            if(unknownFilesLabel)
+                            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+                            if(unknownFilesContainer)
                             {
-                                unknownFilesLabel->hide();
+                                unknownFilesContainer->hide();
                             }
                         }
                         break;
@@ -2116,11 +2248,10 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 						// Hide the widget if no more unknown files
 						if(unknownFiles->rowCount() == 0)
 						{
-							unknownFiles->hide();
-							QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-							if(unknownFilesLabel)
+							QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+							if(unknownFilesContainer)
 							{
-								unknownFilesLabel->hide();
+								unknownFilesContainer->hide();
 							}
 						}
 						break;
@@ -2443,15 +2574,11 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& 
 
 void Window::unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
 {
-    // Show the unknown files widget if it's hidden
-    QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-    if(unknownFilesLabel && unknownFilesLabel->isHidden())
+    // Show the unknown files container if it's hidden
+    QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+    if(unknownFilesContainer && unknownFilesContainer->isHidden())
     {
-        unknownFilesLabel->show();
-    }
-    if(unknownFiles->isHidden())
-    {
-        unknownFiles->show();
+        unknownFilesContainer->show();
     }
     
     int row = unknownFiles->rowCount();
@@ -4800,11 +4927,10 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
         // Hide the widget if no more unknown files
         if(unknownFiles->rowCount() == 0)
         {
-            unknownFiles->hide();
-            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-            if(unknownFilesLabel)
+            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+            if(unknownFilesContainer)
             {
-                unknownFilesLabel->hide();
+                unknownFilesContainer->hide();
             }
         }
         
@@ -4854,11 +4980,10 @@ void Window::onUnknownFileNotAnimeClicked(int row)
     // Hide the widget if no more unknown files
     if(unknownFiles->rowCount() == 0)
     {
-        unknownFiles->hide();
-        QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-        if(unknownFilesLabel)
+        QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+        if(unknownFilesContainer)
         {
-            unknownFilesLabel->hide();
+            unknownFilesContainer->hide();
         }
     }
     
@@ -4932,7 +5057,7 @@ void Window::onUnknownFileDeleteClicked(int row)
         return;
     }
     
-    LocalFileInfo &fileInfo = unknownFilesData[row];
+    LocalFileInfo fileInfo = unknownFilesData[row];  // Copy, not reference, to avoid invalidation
     
     LOG(QString("Delete button clicked for file: %1").arg(fileInfo.filename()));
     
@@ -4965,6 +5090,16 @@ void Window::onUnknownFileDeleteClicked(int row)
         // Save scroll position before removing row
         int scrollPos = unknownFiles->verticalScrollBar()->value();
         
+        // Disconnect all button signals for this row to prevent use-after-free
+        QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
+        if (cellWidget) {
+            // Find all buttons in the cell widget and disconnect them
+            QList<QPushButton*> buttons = cellWidget->findChildren<QPushButton*>();
+            for (QPushButton* btn : buttons) {
+                disconnect(btn, nullptr, this, nullptr);
+            }
+        }
+        
         // Remove from UI anyway since file doesn't exist
         unknownFiles->removeRow(row);
         unknownFilesData.remove(row);
@@ -4988,13 +5123,15 @@ void Window::onUnknownFileDeleteClicked(int row)
         // Hide the widget if no more unknown files
         if(unknownFiles->rowCount() == 0)
         {
-            unknownFiles->hide();
-            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-            if(unknownFilesLabel)
+            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+            if(unknownFilesContainer)
             {
-                unknownFilesLabel->hide();
+                unknownFilesContainer->hide();
             }
         }
+        
+        // Process events to ensure all Qt table updates complete
+        QCoreApplication::processEvents();
         return;
     }
     
@@ -5014,6 +5151,16 @@ void Window::onUnknownFileDeleteClicked(int row)
     
     // Update database - remove from local_files table
     adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 3); // 3 = deleted
+    
+    // Disconnect all button signals for this row to prevent use-after-free
+    QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
+    if (cellWidget) {
+        // Find all buttons in the cell widget and disconnect them
+        QList<QPushButton*> buttons = cellWidget->findChildren<QPushButton*>();
+        for (QPushButton* btn : buttons) {
+            disconnect(btn, nullptr, this, nullptr);
+        }
+    }
     
     // Remove from unknown files widget
     unknownFiles->removeRow(row);
@@ -5038,15 +5185,17 @@ void Window::onUnknownFileDeleteClicked(int row)
     // Hide the widget if no more unknown files
     if(unknownFiles->rowCount() == 0)
     {
-        unknownFiles->hide();
-        QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-        if(unknownFilesLabel)
+        QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+        if(unknownFilesContainer)
         {
-            unknownFilesLabel->hide();
+            unknownFilesContainer->hide();
         }
     }
     
     LOG(QString("Successfully removed deleted file from UI: %1").arg(fileInfo.filename()));
+    
+    // Process pending events to ensure all table updates are complete before returning
+    QCoreApplication::processEvents();
 }
 
 // ========== Filter Bar Toggle Implementation ==========
