@@ -220,6 +220,16 @@ Window::Window()
     tabwidget->addTab(pageLogParent, "Log");
 	tabwidget->addTab(pageApiTesterParent, "ApiTester");
 
+    // Debug: Check children of tabwidget
+    LOG("Children of tabwidget:");
+    for (auto* w : tabwidget->findChildren<QWidget*>()) {
+        LOG(QString("  - %1 (parent: %2, objectName: %3, geometry: %4,%5 %6x%7)")
+            .arg(w->metaObject()->className())
+            .arg(w->parent() ? w->parent()->metaObject()->className() : "nullptr")
+            .arg(w->objectName())
+            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height()));
+    }
+
     // page hasher - Create HasherCoordinator to manage all hasher UI and logic
     hasherCoordinator = new HasherCoordinator(adbapi, this);
     hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
@@ -990,6 +1000,16 @@ Window::Window()
     
     // Load auto-start setting
     autoStartEnabled->setChecked(adbapi->getAutoStartEnabled());
+
+    // Debug: Check all direct children of Window
+    LOG("Direct children of Window:");
+    for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
+        LOG(QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7)")
+            .arg(w->metaObject()->className())
+            .arg(w->objectName())
+            .arg(w->isVisible())
+            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height()));
+    }
 
     // end
     this->setLayout(layout);
