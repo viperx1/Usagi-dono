@@ -193,28 +193,28 @@ Window::Window()
 
     // main layout
     layout = new QBoxLayout(QBoxLayout::TopToBottom, this);
-    tabwidget = new QTabWidget;
+    tabwidget = new QTabWidget(this);  // Give tabwidget proper parent
     tabwidget->setObjectName("tabwidget");
     loginbutton = new QPushButton("Login");
     loginbutton->setObjectName("loginbutton");
 
-    // pages
-    pageHasherParent = new QWidget;
+    // pages - Create with tabwidget as parent to avoid orphaned widgets
+    pageHasherParent = new QWidget(tabwidget);
     pageHasherParent->setObjectName("pageHasherParent");
     pageHasher = new QBoxLayout(QBoxLayout::TopToBottom, pageHasherParent);
-    pageMylistParent = new QWidget;
+    pageMylistParent = new QWidget(tabwidget);
     pageMylistParent->setObjectName("pageMylistParent");
     pageMylist = new QBoxLayout(QBoxLayout::TopToBottom, pageMylistParent);
-    pageNotifyParent = new QWidget;
+    pageNotifyParent = new QWidget(tabwidget);
     pageNotifyParent->setObjectName("pageNotifyParent");
     pageNotify = new QBoxLayout(QBoxLayout::TopToBottom, pageNotifyParent);
-    pageSettingsParent = new QWidget;
+    pageSettingsParent = new QWidget(tabwidget);
     pageSettingsParent->setObjectName("pageSettingsParent");
     pageSettings = new QGridLayout(pageSettingsParent);
-    pageLogParent = new QWidget;
+    pageLogParent = new QWidget(tabwidget);
     pageLogParent->setObjectName("pageLogParent");
     pageLog = new QBoxLayout(QBoxLayout::TopToBottom, pageLogParent);
-	pageApiTesterParent = new QWidget;
+	pageApiTesterParent = new QWidget(tabwidget);
 	pageApiTesterParent->setObjectName("pageApiTesterParent");
 	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
 
@@ -1011,7 +1011,6 @@ Window::Window()
 
     // Debug: Check all direct children of Window
     LOG("Direct children of Window:");
-    QWidget *mysteryWidget = nullptr;
     for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
         QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7, ptr: %8)")
             .arg(w->metaObject()->className())
@@ -1020,46 +1019,15 @@ Window::Window()
             .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height())
             .arg(QString::number(reinterpret_cast<quintptr>(w), 16));
         
-        // Check if this is one of our page parent widgets
-        if (w == pageMylistParent) widgetInfo += " [IS pageMylistParent!]";
-        if (w == pageHasherParent) widgetInfo += " [IS pageHasherParent!]";
-        if (w == pageNotifyParent) widgetInfo += " [IS pageNotifyParent!]";
-        if (w == pageSettingsParent) widgetInfo += " [IS pageSettingsParent!]";
-        if (w == pageLogParent) widgetInfo += " [IS pageLogParent!]";
-        if (w == pageApiTesterParent) widgetInfo += " [IS pageApiTesterParent!]";
+        // Check if this is one of our known widgets
         if (w == tabwidget) widgetInfo += " [IS tabwidget!]";
         if (w == loginbutton) widgetInfo += " [IS loginbutton!]";
-        if (w == filterSidebar) widgetInfo += " [IS filterSidebar!]";
         if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
-        
-        // Identify the mystery widget (QWidget with no name at 0,0 100x30)
-        if (QString(w->metaObject()->className()) == "QWidget" && 
-            w->objectName().isEmpty() && 
-            w->geometry().width() == 100 && w->geometry().height() == 30) {
-            widgetInfo += " [MYSTERY WIDGET!!!]";
-            mysteryWidget = w;
-        }
         
         LOG(widgetInfo);
     }
     
-    // If we found the mystery widget, try to identify its purpose
-    if (mysteryWidget) {
-        LOG(QString("Mystery widget details: parent=%1, hasLayout=%2, isHidden=%3, testAttribute(WA_WState_Created)=%4")
-            .arg(mysteryWidget->parent() ? mysteryWidget->parent()->metaObject()->className() : "nullptr")
-            .arg(mysteryWidget->layout() != nullptr)
-            .arg(mysteryWidget->isHidden())
-            .arg(mysteryWidget->testAttribute(Qt::WA_WState_Created)));
-        
-        // Try hiding it to see if that fixes the issue
-        LOG("Attempting to hide mystery widget...");
-        mysteryWidget->hide();
-        mysteryWidget->setVisible(false);
-        mysteryWidget->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-        LOG("Mystery widget hidden and set transparent for mouse events");
-    }
-    
-    // Also log the tabwidget's tab bar specifically
+    // Log the tabwidget's tab bar
     QTabBar *tabBar = tabwidget->tabBar();
     if (tabBar) {
         LOG(QString("TabBar info: parent=%1, objectName=%2, geometry=%3,%4 %5x%6, ptr=%7")
