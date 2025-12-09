@@ -230,12 +230,14 @@ Window::Window()
     unknownFilesContainer->setObjectName("unknownFilesContainer");
     QVBoxLayout *unknownFilesLayout = new QVBoxLayout(unknownFilesContainer);
     unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
+    unknownFilesLayout->setSpacing(0);  // Remove spacing between label and table
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
     unknownFilesLabel->setObjectName("unknownFilesLabel");
     unknownFilesLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    unknownFilesLayout->addWidget(unknownFilesLabel);
-    unknownFilesLayout->addWidget(unknownFiles);
+    unknownFilesLayout->addWidget(unknownFilesLabel, 0);  // stretch factor 0 - fixed size
+    unknownFilesLayout->addWidget(unknownFiles, 1);  // stretch factor 1 - takes available space
     unknownFiles->setMinimumHeight(60);  // Set minimum height to ensure it can be resized
+    unknownFiles->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Allow table to expand
     
     // Create the main hasher layout in the requested order:
     // 1. hashes (fixed minimum - resizable)
