@@ -152,9 +152,14 @@ void HasherCoordinator::createUI(QWidget *parent)
     controlButtonsLayout->addWidget(m_buttonClear);
     controlButtonsLayout->addStretch(1);
     
+    // Create horizontal layout for file state (prevents stretching and centers)
+    QBoxLayout *fileStateLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    fileStateLayout->addWidget(label1);
+    fileStateLayout->addWidget(m_hasherFileState);
+    fileStateLayout->addStretch(1);
+    
     m_pageHasherSettings->addLayout(addButtonsLayout, 0, 0, 1, 3);
-    m_pageHasherSettings->addWidget(label1, 1, 0);
-    m_pageHasherSettings->addWidget(m_hasherFileState, 1, 1, 1, 2);
+    m_pageHasherSettings->addLayout(fileStateLayout, 1, 0, 1, 3);
     m_pageHasherSettings->addWidget(m_addToMyList, 2, 0, 1, 3);
     m_pageHasherSettings->addWidget(m_markWatched, 3, 0, 1, 3);
     m_pageHasherSettings->addLayout(layout1, 4, 0, 1, 3);

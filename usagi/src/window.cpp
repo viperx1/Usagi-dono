@@ -5045,6 +5045,16 @@ void Window::onUnknownFileDeleteClicked(int row)
         // Save scroll position before removing row
         int scrollPos = unknownFiles->verticalScrollBar()->value();
         
+        // Disconnect all button signals for this row to prevent use-after-free
+        QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
+        if (cellWidget) {
+            // Find all buttons in the cell widget and disconnect them
+            QList<QPushButton*> buttons = cellWidget->findChildren<QPushButton*>();
+            for (QPushButton* btn : buttons) {
+                disconnect(btn, nullptr, this, nullptr);
+            }
+        }
+        
         // Remove from UI anyway since file doesn't exist
         unknownFiles->removeRow(row);
         unknownFilesData.remove(row);
@@ -5094,6 +5104,16 @@ void Window::onUnknownFileDeleteClicked(int row)
     
     // Update database - remove from local_files table
     adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 3); // 3 = deleted
+    
+    // Disconnect all button signals for this row to prevent use-after-free
+    QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
+    if (cellWidget) {
+        // Find all buttons in the cell widget and disconnect them
+        QList<QPushButton*> buttons = cellWidget->findChildren<QPushButton*>();
+        for (QPushButton* btn : buttons) {
+            disconnect(btn, nullptr, this, nullptr);
+        }
+    }
     
     // Remove from unknown files widget
     unknownFiles->removeRow(row);
