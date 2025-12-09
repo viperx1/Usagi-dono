@@ -423,7 +423,7 @@ Window::Window()
     QHBoxLayout *mylistContentLayout = new QHBoxLayout();
     
     // Create filter sidebar (now includes sorting controls)
-    filterSidebar = new MyListFilterSidebar(this);
+    filterSidebar = new MyListFilterSidebar(pageMylistParent);
     connect(filterSidebar, &MyListFilterSidebar::filterChanged, this, [this]() {
         applyMylistFilters();
         // Re-apply sorting after filtering to preserve sort order
@@ -1027,6 +1027,8 @@ Window::Window()
         if (w == pageApiTesterParent) widgetInfo += " [IS pageApiTesterParent!]";
         if (w == tabwidget) widgetInfo += " [IS tabwidget!]";
         if (w == loginbutton) widgetInfo += " [IS loginbutton!]";
+        if (w == filterSidebar) widgetInfo += " [IS filterSidebar!]";
+        if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
         
         LOG(widgetInfo);
     }
