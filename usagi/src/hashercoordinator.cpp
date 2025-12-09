@@ -95,11 +95,28 @@ void HasherCoordinator::createUI(QWidget *parent)
     m_hashes->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_hashes->horizontalHeader()->setStretchLastSection(true);
     
+    // Set tooltips for column headers
+    QHeaderView *header = m_hashes->horizontalHeader();
+    header->setToolTip("Filename");
+    m_hashes->horizontalHeaderItem(0)->setToolTip("Name of the file");
+    m_hashes->horizontalHeaderItem(1)->setToolTip("Hashing progress (0=pending, 1=completed)");
+    m_hashes->horizontalHeaderItem(3)->setToolTip("File size in bytes");
+    m_hashes->horizontalHeaderItem(4)->setToolTip("Whether file is in MyList (0=no, 1=yes)");
+    m_hashes->horizontalHeaderItem(5)->setToolTip("LF: Local File API tag - Shows AniDB FILE command status");
+    m_hashes->horizontalHeaderItem(6)->setToolTip("LL: Local List API tag - Shows AniDB MYLISTADD command status");
+    m_hashes->horizontalHeaderItem(7)->setToolTip("Whether to move the file");
+    m_hashes->horizontalHeaderItem(8)->setToolTip("Whether to rename the file");
+    
     // Add widgets to layout
-    m_pageHasher->addWidget(m_hashes, 1);
+    m_pageHasher->addWidget(m_hashes, 3);  // Stretch factor 3 for hashes table (allows vertical resizing)
     m_pageHasher->addLayout(m_pageHasherSettings);
     m_pageHasher->addLayout(progress);
-    m_pageHasher->addWidget(m_hasherOutput, 0, Qt::AlignTop);
+    m_pageHasher->addWidget(m_hasherOutput, 2);  // Stretch factor 2 for hasher output (allows vertical resizing)
+    m_pageHasher->addLayout(progressTotalLayout);  // Total progress bar at bottom (no stretch)
+    
+    // Set minimum heights to ensure widgets can be resized
+    m_hashes->setMinimumHeight(100);
+    m_hasherOutput->setMinimumHeight(60);
     
     // Setup hasher settings layout
     layout1->addWidget(m_moveTo);
@@ -109,19 +126,28 @@ void HasherCoordinator::createUI(QWidget *parent)
     layout2->addWidget(m_renameToPattern, 1);
     layout2->addWidget(patternhelpbutton);
     
-    m_pageHasherSettings->addWidget(m_button1, 0, 0);
-    m_pageHasherSettings->addWidget(m_button2, 0, 1);
-    m_pageHasherSettings->addWidget(m_button3, 0, 2);
+    // Create horizontal layout for add file buttons (prevents stretching)
+    QBoxLayout *addButtonsLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    addButtonsLayout->addWidget(m_button1);
+    addButtonsLayout->addWidget(m_button2);
+    addButtonsLayout->addWidget(m_button3);
+    addButtonsLayout->addStretch(1);
+    
+    // Create horizontal layout for control buttons (prevents stretching)
+    QBoxLayout *controlButtonsLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    controlButtonsLayout->addWidget(m_buttonStart);
+    controlButtonsLayout->addWidget(m_buttonStop);
+    controlButtonsLayout->addWidget(m_buttonClear);
+    controlButtonsLayout->addStretch(1);
+    
+    m_pageHasherSettings->addLayout(addButtonsLayout, 0, 0, 1, 3);
     m_pageHasherSettings->addWidget(label1, 1, 0);
     m_pageHasherSettings->addWidget(m_hasherFileState, 1, 1, 1, 2);
     m_pageHasherSettings->addWidget(m_addToMyList, 2, 0, 1, 3);
     m_pageHasherSettings->addWidget(m_markWatched, 3, 0, 1, 3);
     m_pageHasherSettings->addLayout(layout1, 4, 0, 1, 3);
     m_pageHasherSettings->addLayout(layout2, 5, 0, 1, 3);
-    m_pageHasherSettings->addWidget(m_buttonStart, 6, 0);
-    m_pageHasherSettings->addWidget(m_buttonStop, 6, 1);
-    m_pageHasherSettings->addWidget(m_buttonClear, 6, 2);
-    m_pageHasherSettings->addLayout(progressTotalLayout, 7, 0, 1, 3);
+    m_pageHasherSettings->addLayout(controlButtonsLayout, 6, 0, 1, 3);
     
     // Setup file state combo box
     m_hasherFileState->addItem("Unknown");
@@ -145,7 +171,7 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonStart, &QPushButton::clicked, this, &HasherCoordinator::startHashing);
     connect(m_buttonStop, &QPushButton::clicked, this, &HasherCoordinator::stopHashing);
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
-    connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
+    connect(m_markWatched, &QCheckBox::stateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
     
     // Connect to hasher thread pool
     connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
@@ -493,6 +519,13 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
             QTableWidgetItem *itemprogress = new QTableWidgetItem(QString("1"));
             m_hashes->setItem(i, 1, itemprogress);
             
+            // Generate and output ed2k link
+            QString ed2kLink = QString("ed2k://|file|%1|%2|%3|/")
+                .arg(fileData.filename)
+                .arg(fileData.size)
+                .arg(fileData.hexdigest);
+            m_hasherOutput->append(ed2kLink);
+            
             emit logMessage(QString("File hashed: %1").arg(fileData.filename));
             
             // Update the hash column (column 9) in the UI to reflect the newly computed hash
@@ -635,7 +668,7 @@ void HasherCoordinator::provideNextFileToHash()
     m_hasherThreadPool->addFile(QString());
 }
 
-void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
+void HasherCoordinator::onMarkWatchedStateChanged(int state)
 {
     switch(state)
     {

@@ -221,13 +221,14 @@ Window::Window()
     unknownFiles = new unknown_files_(this); // Unknown files widget
     
     // Add HasherCoordinator's widget to the page
-    pageHasher->addWidget(hasherCoordinator->getHasherPageWidget(), 1);
+    pageHasher->addWidget(hasherCoordinator->getHasherPageWidget(), 3);  // Increased stretch for main hasher widget
     
     // Add unknown files widget with a label (initially hidden)
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
     unknownFilesLabel->setObjectName("unknownFilesLabel");
     pageHasher->addWidget(unknownFilesLabel);
-    pageHasher->addWidget(unknownFiles, 0, Qt::AlignTop);
+    pageHasher->addWidget(unknownFiles, 1);  // Allow vertical resizing with stretch factor
+    unknownFiles->setMinimumHeight(60);  // Set minimum height to ensure it can be resized
     
     // Hide unknown files section initially
     unknownFilesLabel->hide();
