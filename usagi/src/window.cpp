@@ -5044,7 +5044,7 @@ void Window::onUnknownFileDeleteClicked(int row)
         return;
     }
     
-    LocalFileInfo &fileInfo = unknownFilesData[row];
+    LocalFileInfo fileInfo = unknownFilesData[row];  // Copy, not reference, to avoid invalidation
     
     LOG(QString("Delete button clicked for file: %1").arg(fileInfo.filename()));
     
@@ -5131,7 +5131,9 @@ void Window::onUnknownFileDeleteClicked(int row)
             }
         }
         
-        LOG(QString("DEBUG: [File not found path] Completed, returning"));
+        LOG(QString("DEBUG: [File not found path] Completed, processing events"));
+        QCoreApplication::processEvents();
+        LOG(QString("DEBUG: [File not found path] Events processed, returning"));
         return;
     }
     
@@ -5223,6 +5225,12 @@ void Window::onUnknownFileDeleteClicked(int row)
     
     LOG(QString("Successfully removed deleted file from UI: %1").arg(fileInfo.filename()));
     LOG(QString("DEBUG: onUnknownFileDeleteClicked completed successfully"));
+    LOG(QString("DEBUG: Processing pending events..."));
+    
+    // Process pending events to ensure all table updates are complete before returning
+    QCoreApplication::processEvents();
+    
+    LOG(QString("DEBUG: Events processed, delete handler exiting"));
 }
 
 // ========== Filter Bar Toggle Implementation ==========
