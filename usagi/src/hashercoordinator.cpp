@@ -71,7 +71,6 @@ void HasherCoordinator::createUI(QWidget *parent)
     QBoxLayout *layout2 = new QBoxLayout(QBoxLayout::LeftToRight);
     QPushButton *movetodirbutton = new QPushButton("...");
     QPushButton *patternhelpbutton = new QPushButton("?");
-    QBoxLayout *progress = new QBoxLayout(QBoxLayout::TopToBottom);
     
     // Create progress bars for each thread
     int numThreads = m_hasherThreadPool->threadCount();
@@ -79,14 +78,10 @@ void HasherCoordinator::createUI(QWidget *parent)
         QProgressBar *threadProgress = new QProgressBar;
         threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
         m_threadProgressBars.append(threadProgress);
-        progress->addWidget(threadProgress);
     }
     
     m_progressTotal = new QProgressBar;
     m_progressTotalLabel = new QLabel;
-    QBoxLayout *progressTotalLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    progressTotalLayout->addWidget(m_progressTotal);
-    progressTotalLayout->addWidget(m_progressTotalLabel);
     
     // Setup hashes table
     m_hashes->setColumnCount(10);
@@ -112,7 +107,7 @@ void HasherCoordinator::createUI(QWidget *parent)
     if (m_hashes->horizontalHeaderItem(5))
         m_hashes->horizontalHeaderItem(5)->setToolTip("RF (Remote File): AniDB FILE command API tag");
     if (m_hashes->horizontalHeaderItem(6))
-        m_hashes->horizontalHeaderItem(6)->setToolTip("RL (Remote List): AniDB MYLISTADD command API tag");
+        m_hashes->horizontalHeaderItem(6)->setToolTip("RL (Remote List): AniDB MYLIST command API tag");
     if (m_hashes->horizontalHeaderItem(7))
         m_hashes->horizontalHeaderItem(7)->setToolTip("Whether to move the file");
     if (m_hashes->horizontalHeaderItem(8))
@@ -120,22 +115,16 @@ void HasherCoordinator::createUI(QWidget *parent)
     if (m_hashes->horizontalHeaderItem(9))
         m_hashes->horizontalHeaderItem(9)->setToolTip("ED2K hash of the file (hidden)");
     
-    // Create a splitter to allow manual resizing between hashes table and hasher output
-    QSplitter *hasherSplitter = new QSplitter(Qt::Vertical);
-    hasherSplitter->addWidget(m_hashes);
-    hasherSplitter->addWidget(m_hasherOutput);
-    hasherSplitter->setStretchFactor(0, 3);  // Hashes table gets more space
-    hasherSplitter->setStretchFactor(1, 2);  // Hasher output gets less space
-    
-    // Set minimum heights to ensure widgets can be resized
+    // Set minimum heights
     m_hashes->setMinimumHeight(100);
-    m_hasherOutput->setMinimumHeight(60);
     
-    // Add widgets to layout
-    m_pageHasher->addWidget(hasherSplitter, 1);  // Splitter takes all available space
-    m_pageHasher->addLayout(m_pageHasherSettings);
-    m_pageHasher->addLayout(progress);
-    m_pageHasher->addLayout(progressTotalLayout);  // Total progress bar just below thread progress bars
+    // Set hasher output to fixed size (~6 lines)
+    QFontMetrics fm(m_hasherOutput->font());
+    int lineHeight = fm.lineSpacing();
+    m_hasherOutput->setFixedHeight(lineHeight * 6 + 10);  // 6 lines + some padding
+    
+    // NOTE: Actual layout assembly happens in window.cpp to allow proper splitter arrangement
+    // with unknown files widget. This just creates the widgets.
     
     // Setup hasher settings layout
     layout1->addWidget(m_moveTo);

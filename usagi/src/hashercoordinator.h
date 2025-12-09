@@ -59,6 +59,17 @@ public:
     // Get the hashes table widget for external access
     hashes_* getHashesTable() const { return m_hashes; }
     
+    // Get hasher output widget
+    QTextEdit* getHasherOutput() const { return m_hasherOutput; }
+    
+    // Get hasher settings layout
+    QGridLayout* getHasherSettings() const { return m_pageHasherSettings; }
+    
+    // Get progress bars
+    QVector<QProgressBar*> getThreadProgressBars() const { return m_threadProgressBars; }
+    QProgressBar* getTotalProgressBar() const { return m_progressTotal; }
+    QLabel* getTotalProgressLabel() const { return m_progressTotalLabel; }
+    
     // Public accessors for UI widgets (needed by Window for backward compatibility)
     QCheckBox* getRenameTo() const { return m_renameTo; }
     QPushButton* getButtonStart() const { return m_buttonStart; }

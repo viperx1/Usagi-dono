@@ -236,14 +236,53 @@ Window::Window()
     unknownFilesLayout->addWidget(unknownFiles);
     unknownFiles->setMinimumHeight(60);  // Set minimum height to ensure it can be resized
     
-    // Create a splitter to allow manual resizing between hasher and unknown files
-    QSplitter *mainHasherSplitter = new QSplitter(Qt::Vertical);
-    mainHasherSplitter->addWidget(hasherCoordinator->getHasherPageWidget());
-    mainHasherSplitter->addWidget(unknownFilesContainer);
-    mainHasherSplitter->setStretchFactor(0, 3);  // Hasher widget gets more space
-    mainHasherSplitter->setStretchFactor(1, 1);  // Unknown files gets less space
+    // Create the main hasher layout in the requested order:
+    // 1. hashes (fixed minimum - resizable)
+    // 2. unknown files (fixed minimum - resizable)
+    // 3. all hasher control (not resizable)
+    // 4. (collapse button for thread progress bars) total progress bar
+    // 5. thread progress bars
+    // 6. ed2k links (fixed size ~ 6 lines)
     
-    pageHasher->addWidget(mainHasherSplitter, 1);
+    // Create a splitter for resizable sections (hashes + unknown files)
+    QSplitter *topSplitter = new QSplitter(Qt::Vertical);
+    topSplitter->addWidget(hasherCoordinator->getHashesTable());
+    topSplitter->addWidget(unknownFilesContainer);
+    topSplitter->setStretchFactor(0, 3);  // Hashes table gets more space
+    topSplitter->setStretchFactor(1, 1);  // Unknown files gets less space
+    
+    // Create collapse button for thread progress bars
+    QPushButton *collapseThreadProgressButton = new QPushButton("▼");
+    collapseThreadProgressButton->setMaximumWidth(30);
+    collapseThreadProgressButton->setCheckable(true);
+    collapseThreadProgressButton->setChecked(false);  // Initially not collapsed (visible)
+    
+    // Create container for thread progress bars
+    QWidget *threadProgressContainer = new QWidget();
+    QVBoxLayout *threadProgressLayout = new QVBoxLayout(threadProgressContainer);
+    threadProgressLayout->setContentsMargins(0, 0, 0, 0);
+    for (QProgressBar *bar : hasherCoordinator->getThreadProgressBars()) {
+        threadProgressLayout->addWidget(bar);
+    }
+    
+    // Create total progress bar layout with collapse button
+    QHBoxLayout *totalProgressLayout = new QHBoxLayout();
+    totalProgressLayout->addWidget(collapseThreadProgressButton);
+    totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressBar());
+    totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressLabel());
+    
+    // Add everything to the main hasher page layout
+    pageHasher->addWidget(topSplitter, 1);  // Resizable section
+    pageHasher->addLayout(hasherCoordinator->getHasherSettings());  // Control section (not resizable)
+    pageHasher->addLayout(totalProgressLayout);  // Total progress with collapse button
+    pageHasher->addWidget(threadProgressContainer);  // Thread progress bars
+    pageHasher->addWidget(hasherCoordinator->getHasherOutput());  // ED2K links (fixed size)
+    
+    // Connect collapse button
+    connect(collapseThreadProgressButton, &QPushButton::toggled, [collapseThreadProgressButton, threadProgressContainer](bool checked) {
+        threadProgressContainer->setVisible(!checked);
+        collapseThreadProgressButton->setText(checked ? "▶" : "▼");
+    });
     
     // Hide unknown files section initially
     unknownFilesContainer->hide();
