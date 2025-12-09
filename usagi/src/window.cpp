@@ -232,6 +232,7 @@ Window::Window()
     unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
     unknownFilesLabel->setObjectName("unknownFilesLabel");
+    unknownFilesLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     unknownFilesLayout->addWidget(unknownFilesLabel);
     unknownFilesLayout->addWidget(unknownFiles);
     unknownFiles->setMinimumHeight(60);  // Set minimum height to ensure it can be resized
