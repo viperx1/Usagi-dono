@@ -1012,11 +1012,12 @@ Window::Window()
     // Debug: Check all direct children of Window
     LOG("Direct children of Window:");
     for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
-        QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7)")
+        QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7, ptr: %8)")
             .arg(w->metaObject()->className())
             .arg(w->objectName())
             .arg(w->isVisible())
-            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height());
+            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height())
+            .arg(QString::number(reinterpret_cast<quintptr>(w), 16));
         
         // Check if this is one of our page parent widgets
         if (w == pageMylistParent) widgetInfo += " [IS pageMylistParent!]";
@@ -1031,6 +1032,16 @@ Window::Window()
         if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
         
         LOG(widgetInfo);
+    }
+    
+    // Also log the tabwidget's tab bar specifically
+    QTabBar *tabBar = tabwidget->tabBar();
+    if (tabBar) {
+        LOG(QString("TabBar info: parent=%1, objectName=%2, geometry=%3,%4 %5x%6, ptr=%7")
+            .arg(tabBar->parent() ? tabBar->parent()->metaObject()->className() : "nullptr")
+            .arg(tabBar->objectName())
+            .arg(tabBar->x()).arg(tabBar->y()).arg(tabBar->width()).arg(tabBar->height())
+            .arg(QString::number(reinterpret_cast<quintptr>(tabBar), 16)));
     }
 
     // end
@@ -1357,6 +1368,24 @@ void Window::startupInitialization()
 {
     // This slot is called 1 second after the window is constructed
     // to allow the UI to be fully initialized before loading data
+    
+    // Debug: Check direct children again after window is shown
+    LOG("Direct children of Window AFTER show:");
+    for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
+        QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7, ptr: %8)")
+            .arg(w->metaObject()->className())
+            .arg(w->objectName())
+            .arg(w->isVisible())
+            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height())
+            .arg(QString::number(reinterpret_cast<quintptr>(w), 16));
+        
+        // Check if this is one of our known widgets
+        if (w == tabwidget) widgetInfo += " [IS tabwidget!]";
+        if (w == loginbutton) widgetInfo += " [IS loginbutton!]";
+        if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
+        
+        LOG(widgetInfo);
+    }
     
     // DEBUG: Print database info for specific lid values as requested in issue
     LOG("DEBUG: Printing database information for requested lid values...");
