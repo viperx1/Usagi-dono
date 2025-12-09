@@ -52,7 +52,9 @@ void HasherCoordinator::createUI(QWidget *parent)
     m_hashes = new hashes_();
     m_hasherOutput = new QTextEdit;
     m_hasherFileState = new QComboBox;
+    m_hasherFileState->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     m_addToMyList = new QCheckBox("Add file(s) to MyList");
+    m_addToMyList->setChecked(true);  // Enable by default
     m_markWatched = new QCheckBox("Mark watched (no change)");
     QLabel *label1 = new QLabel("Set state:");
     m_buttonStart = new QPushButton("Start");
@@ -121,8 +123,8 @@ void HasherCoordinator::createUI(QWidget *parent)
     m_pageHasher->addWidget(m_hashes, 3);  // Stretch factor 3 for hashes table (allows vertical resizing)
     m_pageHasher->addLayout(m_pageHasherSettings);
     m_pageHasher->addLayout(progress);
+    m_pageHasher->addLayout(progressTotalLayout);  // Total progress bar just below thread progress bars
     m_pageHasher->addWidget(m_hasherOutput, 2);  // Stretch factor 2 for hasher output (allows vertical resizing)
-    m_pageHasher->addLayout(progressTotalLayout);  // Total progress bar at bottom (no stretch)
     
     // Set minimum heights to ensure widgets can be resized
     m_hashes->setMinimumHeight(100);
@@ -181,7 +183,7 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonStart, &QPushButton::clicked, this, &HasherCoordinator::startHashing);
     connect(m_buttonStop, &QPushButton::clicked, this, &HasherCoordinator::stopHashing);
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
-    connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
+    connect(m_markWatched, &QCheckBox::stateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
     
     // Connect to hasher thread pool
     connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
@@ -345,12 +347,8 @@ void HasherCoordinator::hashesInsertRow(QFileInfo file, Qt::CheckState renameSta
     item = new QTableWidgetItem(file.absoluteFilePath());
     m_hashes->setItem(row, 2, item);
     
-    // Size
-    item = new QTableWidgetItem(QString::number(file.size()));
-    m_hashes->setItem(row, 3, item);
-    
-    // Audio, File, MyList, Move, Rename columns
-    for(int i = 4; i < 9; i++)
+    // LF, LL, RF, RL, Move, Rename columns - all start with "?"
+    for(int i = 3; i < 9; i++)
     {
         item = new QTableWidgetItem("?");
         m_hashes->setItem(row, i, item);
@@ -529,10 +527,9 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
             QTableWidgetItem *itemprogress = new QTableWidgetItem(QString("1"));
             m_hashes->setItem(i, 1, itemprogress);
             
-            // Generate and output ed2k link with URL-encoded filename
-            QString encodedFilename = QUrl::toPercentEncoding(fileData.filename);
+            // Generate and output ed2k link (no encoding)
             QString ed2kLink = QString("ed2k://|file|%1|%2|%3|/")
-                .arg(encodedFilename)
+                .arg(fileData.filename)
                 .arg(fileData.size)
                 .arg(fileData.hexdigest);
             m_hasherOutput->append(ed2kLink);
@@ -679,7 +676,7 @@ void HasherCoordinator::provideNextFileToHash()
     m_hasherThreadPool->addFile(QString());
 }
 
-void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
+void HasherCoordinator::onMarkWatchedStateChanged(int state)
 {
     switch(state)
     {

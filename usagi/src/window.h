@@ -66,6 +66,7 @@ class MyListCardManager;
 class VirtualFlowLayout;
 class WatchSessionManager;
 class HasherCoordinator;
+class Window;  // Forward declaration for friend access
 
 class hashes_ : public QTableWidget
 {
@@ -81,6 +82,14 @@ class unknown_files_ : public QTableWidget
 public:
     unknown_files_(QWidget *parent = nullptr);
     bool event(QEvent *e) override;
+    
+protected:
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
+    
+private slots:
+    void executeFile();
+    void openFileLocation();
 };
 
 // Worker thread for loading mylist anime IDs
@@ -407,6 +416,10 @@ public:
     void hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash = QString());
     void loadUnboundFiles();
 	int parseMylistExport(const QString &tarGzPath);
+    
+    // Getter for unknown files data (used by unknown_files_ widget)
+    const QMap<int, LocalFileInfo>& getUnknownFilesData() const { return unknownFilesData; }
+    
     Window();
 	~Window();
 private:

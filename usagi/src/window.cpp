@@ -19,6 +19,10 @@
 #include <QTextStream>
 #include <QStyle>
 #include <QCoreApplication>
+#include <QDesktopServices>
+#include <QMenu>
+#include <QMouseEvent>
+#include <QContextMenuEvent>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -1740,6 +1744,81 @@ unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
     setColumnWidth(2, 200);
     setColumnWidth(3, 290);  // Increased to accommodate Re-check and Delete buttons
     setMaximumHeight(200); // Limit height so it doesn't dominate the UI
+    
+    // Set context menu policy
+    setContextMenuPolicy(Qt::DefaultContextMenu);
+}
+
+void unknown_files_::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    // Execute file on double-click
+    if (event->button() == Qt::LeftButton)
+    {
+        executeFile();
+    }
+    QTableWidget::mouseDoubleClickEvent(event);
+}
+
+void unknown_files_::contextMenuEvent(QContextMenuEvent *event)
+{
+    // Create context menu
+    QMenu contextMenu(this);
+    
+    QAction *executeAction = contextMenu.addAction("Execute");
+    QAction *openLocationAction = contextMenu.addAction("Open Location");
+    
+    QAction *selectedAction = contextMenu.exec(event->globalPos());
+    
+    if (selectedAction == executeAction)
+    {
+        executeFile();
+    }
+    else if (selectedAction == openLocationAction)
+    {
+        openFileLocation();
+    }
+}
+
+void unknown_files_::executeFile()
+{
+    int row = currentRow();
+    if (row < 0) return;
+    
+    // Get the file path from the window's unknownFilesData
+    Window *window = qobject_cast<Window*>(this->window());
+    if (!window) return;
+    
+    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
+    if (filesData.contains(row))
+    {
+        QString filePath = filesData[row].filepath();
+        if (!filePath.isEmpty())
+        {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
+        }
+    }
+}
+
+void unknown_files_::openFileLocation()
+{
+    int row = currentRow();
+    if (row < 0) return;
+    
+    // Get the file path from the window's unknownFilesData
+    Window *window = qobject_cast<Window*>(this->window());
+    if (!window) return;
+    
+    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
+    if (filesData.contains(row))
+    {
+        QString filePath = filesData[row].filepath();
+        if (!filePath.isEmpty())
+        {
+            QFileInfo fileInfo(filePath);
+            QString dirPath = fileInfo.absolutePath();
+            QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath));
+        }
+    }
 }
 
 bool unknown_files_::event(QEvent *e)
