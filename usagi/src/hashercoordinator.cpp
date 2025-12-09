@@ -510,8 +510,6 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
             // Process file identification immediately instead of batching
             if (m_addToMyList->checkState() > 0)
             {
-                LOG(QString("Processing freshly hashed file: %1 (addToMylist=true)").arg(fileData.filename));
-                
                 // Update hash in database with status=1 immediately
                 m_adbapi->updateLocalFileHash(filePath, fileData.hexdigest, 1);
                 
@@ -522,11 +520,6 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
                 // immediately after each file is hashed rather than waiting for the entire batch
                 std::bitset<2> li = m_adbapi->LocalIdentify(fileData.size, fileData.hexdigest);
                 
-                LOG(QString("LocalIdentify results for %1: inDB=%2, inMylist=%3")
-                    .arg(fileData.filename,
-                         li[AniDBApi::LI_FILE_IN_DB] ? "true" : "false",
-                         li[AniDBApi::LI_FILE_IN_MYLIST] ? "true" : "false"));
-                
                 // Update UI with LocalIdentify results
                 m_hashes->item(i, 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0")); // File in database
                 
@@ -535,12 +528,11 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
                 {
                     tag = m_adbapi->File(fileData.size, fileData.hexdigest);
                     m_hashes->item(i, 5)->setText(tag);
-                    LOG(QString("File not in local DB - queuing File() API call with tag: %1").arg(tag));
+                    // File info not in local DB yet - File() API call queued to fetch from AniDB
                 }
                 else
                 {
                     m_hashes->item(i, 5)->setText("0");
-                    LOG(QString("File already in local DB - updating status to 2"));
                     // File is in local DB (previously fetched from AniDB)
                     // Update status to 2 (in anidb) to prevent re-detection
                     m_adbapi->UpdateLocalFileStatus(filePath, 2);
@@ -551,12 +543,11 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
                 {
                     tag = m_adbapi->MylistAdd(fileData.size, fileData.hexdigest, m_markWatched->checkState(), m_hasherFileState->currentIndex(), m_storage->text());
                     m_hashes->item(i, 6)->setText(tag);
-                    LOG(QString("File not in mylist - queuing MylistAdd() API call with tag: %1").arg(tag));
+                    // Status will be updated when MylistAdd completes (via UpdateLocalPath)
                 }
                 else
                 {
                     m_hashes->item(i, 6)->setText("0");
-                    LOG(QString("File already in mylist - linking local file"));
                     // File already in mylist - link the local_file and update status
                     m_adbapi->LinkLocalFileToMylist(fileData.size, fileData.hexdigest, filePath);
                 }
@@ -716,16 +707,9 @@ void HasherCoordinator::processPendingHashedFiles()
     // Process files in small batches to keep UI responsive
     int processed = 0;
     
-    LOG(QString("processPendingHashedFiles: Processing batch, queue size=%1").arg(m_pendingHashedFilesQueue.size()));
-    
     while (!m_pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
         HashingTask task = m_pendingHashedFilesQueue.takeFirst();
         processed++;
-        
-        LOG(QString("Processing already-hashed file %1/%2: %3 (addToMylist=%4)")
-            .arg(processed)
-            .arg(m_pendingHashedFilesQueue.size() + processed)
-            .arg(task.filename(), task.addToMylist() ? "true" : "false"));
         
         // Mark as hashed in UI (use pre-allocated color object)
         m_hashes->item(task.rowIndex(), 0)->setBackground(m_hashedFileColor);
@@ -739,11 +723,6 @@ void HasherCoordinator::processPendingHashedFiles()
             // Perform LocalIdentify
             std::bitset<2> li = m_adbapi->LocalIdentify(task.fileSize(), task.hash());
             
-            LOG(QString("LocalIdentify results for %1: inDB=%2, inMylist=%3")
-                .arg(task.filename(),
-                     li[AniDBApi::LI_FILE_IN_DB] ? "true" : "false",
-                     li[AniDBApi::LI_FILE_IN_MYLIST] ? "true" : "false"));
-            
             // Update UI with LocalIdentify results
             m_hashes->item(task.rowIndex(), 3)->setText(QString((li[AniDBApi::LI_FILE_IN_DB])?"1":"0"));
             
@@ -751,10 +730,10 @@ void HasherCoordinator::processPendingHashedFiles()
             if(li[AniDBApi::LI_FILE_IN_DB] == 0) {
                 tag = m_adbapi->File(task.fileSize(), task.hash());
                 m_hashes->item(task.rowIndex(), 5)->setText(tag);
-                LOG(QString("File not in local DB - queuing File() API call with tag: %1").arg(tag));
+                // File info not in local DB yet - File() API call queued to fetch from AniDB
+                // Status will be updated to 2 when subsequent MylistAdd completes (via UpdateLocalPath)
             } else {
                 m_hashes->item(task.rowIndex(), 5)->setText("0");
-                LOG(QString("File already in local DB - updating status to 2"));
                 // File is in local DB (previously fetched from AniDB)
                 // Update status to 2 (in anidb) to prevent re-detection
                 m_adbapi->UpdateLocalFileStatus(task.filePath(), 2);
@@ -767,10 +746,9 @@ void HasherCoordinator::processPendingHashedFiles()
                 int fileState = task.useUserSettings() ? task.fileState() : 1;
                 tag = m_adbapi->MylistAdd(task.fileSize(), task.hash(), markWatched, fileState, m_storage->text());
                 m_hashes->item(task.rowIndex(), 6)->setText(tag);
-                LOG(QString("File not in mylist - queuing MylistAdd() API call with tag: %1").arg(tag));
+                // Status will be updated when MylistAdd completes (via UpdateLocalPath)
             } else {
                 m_hashes->item(task.rowIndex(), 6)->setText("0");
-                LOG(QString("File already in mylist - updating status to 2"));
                 // File already in mylist - no API call needed
                 // Update status to 2 (in anidb) to prevent re-detection
                 m_adbapi->UpdateLocalFileStatus(task.filePath(), 2);
@@ -783,8 +761,6 @@ void HasherCoordinator::processPendingHashedFiles()
     // Stop timer if queue is empty
     if (m_pendingHashedFilesQueue.isEmpty()) {
         m_hashedFilesProcessingTimer->stop();
-        LOG(QString("Finished processing all already-hashed files (processed %1 files in this session)").arg(processed));
-    } else {
-        LOG(QString("Batch complete: processed %1 files, %2 files remaining in queue").arg(processed).arg(m_pendingHashedFilesQueue.size()));
+        LOG("Finished processing all already-hashed files");
     }
 }
