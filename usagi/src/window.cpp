@@ -194,20 +194,28 @@ Window::Window()
     // main layout
     layout = new QBoxLayout(QBoxLayout::TopToBottom, this);
     tabwidget = new QTabWidget;
+    tabwidget->setObjectName("tabwidget");
     loginbutton = new QPushButton("Login");
+    loginbutton->setObjectName("loginbutton");
 
     // pages
     pageHasherParent = new QWidget;
+    pageHasherParent->setObjectName("pageHasherParent");
     pageHasher = new QBoxLayout(QBoxLayout::TopToBottom, pageHasherParent);
     pageMylistParent = new QWidget;
+    pageMylistParent->setObjectName("pageMylistParent");
     pageMylist = new QBoxLayout(QBoxLayout::TopToBottom, pageMylistParent);
     pageNotifyParent = new QWidget;
+    pageNotifyParent->setObjectName("pageNotifyParent");
     pageNotify = new QBoxLayout(QBoxLayout::TopToBottom, pageNotifyParent);
     pageSettingsParent = new QWidget;
+    pageSettingsParent->setObjectName("pageSettingsParent");
     pageSettings = new QGridLayout(pageSettingsParent);
     pageLogParent = new QWidget;
+    pageLogParent->setObjectName("pageLogParent");
     pageLog = new QBoxLayout(QBoxLayout::TopToBottom, pageLogParent);
 	pageApiTesterParent = new QWidget;
+	pageApiTesterParent->setObjectName("pageApiTesterParent");
 	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
 
     layout->addWidget(tabwidget, 1);
@@ -1004,11 +1012,23 @@ Window::Window()
     // Debug: Check all direct children of Window
     LOG("Direct children of Window:");
     for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
-        LOG(QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7)")
+        QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7)")
             .arg(w->metaObject()->className())
             .arg(w->objectName())
             .arg(w->isVisible())
-            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height()));
+            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height());
+        
+        // Check if this is one of our page parent widgets
+        if (w == pageMylistParent) widgetInfo += " [IS pageMylistParent!]";
+        if (w == pageHasherParent) widgetInfo += " [IS pageHasherParent!]";
+        if (w == pageNotifyParent) widgetInfo += " [IS pageNotifyParent!]";
+        if (w == pageSettingsParent) widgetInfo += " [IS pageSettingsParent!]";
+        if (w == pageLogParent) widgetInfo += " [IS pageLogParent!]";
+        if (w == pageApiTesterParent) widgetInfo += " [IS pageApiTesterParent!]";
+        if (w == tabwidget) widgetInfo += " [IS tabwidget!]";
+        if (w == loginbutton) widgetInfo += " [IS loginbutton!]";
+        
+        LOG(widgetInfo);
     }
 
     // end
