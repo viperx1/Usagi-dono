@@ -530,7 +530,7 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
             m_hashes->setItem(i, 1, itemprogress);
             
             // Generate and output ed2k link with URL-encoded filename
-            QString encodedFilename = QString(QUrl::toPercentEncoding(fileData.filename));
+            QString encodedFilename = QUrl::toPercentEncoding(fileData.filename);
             QString ed2kLink = QString("ed2k://|file|%1|%2|%3|/")
                 .arg(encodedFilename)
                 .arg(fileData.size)
