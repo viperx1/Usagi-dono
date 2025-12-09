@@ -228,6 +228,7 @@ Window::Window()
     // Create a container widget for unknown files with label
     QWidget *unknownFilesContainer = new QWidget();
     unknownFilesContainer->setObjectName("unknownFilesContainer");
+    unknownFilesContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Container must expand in splitter
     QVBoxLayout *unknownFilesLayout = new QVBoxLayout(unknownFilesContainer);
     unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
     unknownFilesLayout->setSpacing(0);  // Remove spacing between label and table

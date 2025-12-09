@@ -115,8 +115,9 @@ void HasherCoordinator::createUI(QWidget *parent)
     if (m_hashes->horizontalHeaderItem(9))
         m_hashes->horizontalHeaderItem(9)->setToolTip("ED2K hash of the file (hidden)");
     
-    // Set minimum heights
+    // Set minimum heights and size policies
     m_hashes->setMinimumHeight(100);
+    m_hashes->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Allow table to expand
     
     // Set hasher output to fixed size (~6 lines)
     QFontMetrics fm(m_hasherOutput->font());
