@@ -100,7 +100,7 @@ public slots:
     void provideNextFileToHash();
     
     // Settings change handlers
-    void onMarkWatchedStateChanged(int state);
+    void onMarkWatchedStateChanged(Qt::CheckState state);
     
 private:
     // UI Creation

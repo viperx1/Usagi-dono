@@ -23,6 +23,7 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
+#include <QSplitter>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -224,19 +225,28 @@ Window::Window()
     hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
     unknownFiles = new unknown_files_(this); // Unknown files widget
     
-    // Add HasherCoordinator's widget to the page
-    pageHasher->addWidget(hasherCoordinator->getHasherPageWidget(), 3);  // Increased stretch for main hasher widget
-    
-    // Add unknown files widget with a label (initially hidden)
+    // Create a container widget for unknown files with label
+    QWidget *unknownFilesContainer = new QWidget();
+    unknownFilesContainer->setObjectName("unknownFilesContainer");
+    QVBoxLayout *unknownFilesLayout = new QVBoxLayout(unknownFilesContainer);
+    unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
     unknownFilesLabel->setObjectName("unknownFilesLabel");
-    pageHasher->addWidget(unknownFilesLabel);
-    pageHasher->addWidget(unknownFiles, 1);  // Allow vertical resizing with stretch factor
+    unknownFilesLayout->addWidget(unknownFilesLabel);
+    unknownFilesLayout->addWidget(unknownFiles);
     unknownFiles->setMinimumHeight(60);  // Set minimum height to ensure it can be resized
     
+    // Create a splitter to allow manual resizing between hasher and unknown files
+    QSplitter *mainHasherSplitter = new QSplitter(Qt::Vertical);
+    mainHasherSplitter->addWidget(hasherCoordinator->getHasherPageWidget());
+    mainHasherSplitter->addWidget(unknownFilesContainer);
+    mainHasherSplitter->setStretchFactor(0, 3);  // Hasher widget gets more space
+    mainHasherSplitter->setStretchFactor(1, 1);  // Unknown files gets less space
+    
+    pageHasher->addWidget(mainHasherSplitter, 1);
+    
     // Hide unknown files section initially
-    unknownFilesLabel->hide();
-    unknownFiles->hide();
+    unknownFilesContainer->hide();
     
     // Connect HasherCoordinator signals
     connect(hasherCoordinator, &HasherCoordinator::hashingFinished, this, &Window::hasherFinished);
@@ -2080,11 +2090,10 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                         // Hide the widget if no more unknown files
                         if(unknownFiles->rowCount() == 0)
                         {
-                            unknownFiles->hide();
-                            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-                            if(unknownFilesLabel)
+                            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+                            if(unknownFilesContainer)
                             {
-                                unknownFilesLabel->hide();
+                                unknownFilesContainer->hide();
                             }
                         }
                         break;
@@ -2196,11 +2205,10 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 						// Hide the widget if no more unknown files
 						if(unknownFiles->rowCount() == 0)
 						{
-							unknownFiles->hide();
-							QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-							if(unknownFilesLabel)
+							QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+							if(unknownFilesContainer)
 							{
-								unknownFilesLabel->hide();
+								unknownFilesContainer->hide();
 							}
 						}
 						break;
@@ -2523,15 +2531,11 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& 
 
 void Window::unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
 {
-    // Show the unknown files widget if it's hidden
-    QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-    if(unknownFilesLabel && unknownFilesLabel->isHidden())
+    // Show the unknown files container if it's hidden
+    QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+    if(unknownFilesContainer && unknownFilesContainer->isHidden())
     {
-        unknownFilesLabel->show();
-    }
-    if(unknownFiles->isHidden())
-    {
-        unknownFiles->show();
+        unknownFilesContainer->show();
     }
     
     int row = unknownFiles->rowCount();
@@ -4880,11 +4884,10 @@ void Window::onUnknownFileBindClicked(int row, const QString& epno)
         // Hide the widget if no more unknown files
         if(unknownFiles->rowCount() == 0)
         {
-            unknownFiles->hide();
-            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-            if(unknownFilesLabel)
+            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+            if(unknownFilesContainer)
             {
-                unknownFilesLabel->hide();
+                unknownFilesContainer->hide();
             }
         }
         
@@ -4934,11 +4937,10 @@ void Window::onUnknownFileNotAnimeClicked(int row)
     // Hide the widget if no more unknown files
     if(unknownFiles->rowCount() == 0)
     {
-        unknownFiles->hide();
-        QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-        if(unknownFilesLabel)
+        QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+        if(unknownFilesContainer)
         {
-            unknownFilesLabel->hide();
+            unknownFilesContainer->hide();
         }
     }
     
@@ -5078,11 +5080,10 @@ void Window::onUnknownFileDeleteClicked(int row)
         // Hide the widget if no more unknown files
         if(unknownFiles->rowCount() == 0)
         {
-            unknownFiles->hide();
-            QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-            if(unknownFilesLabel)
+            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+            if(unknownFilesContainer)
             {
-                unknownFilesLabel->hide();
+                unknownFilesContainer->hide();
             }
         }
         
@@ -5141,11 +5142,10 @@ void Window::onUnknownFileDeleteClicked(int row)
     // Hide the widget if no more unknown files
     if(unknownFiles->rowCount() == 0)
     {
-        unknownFiles->hide();
-        QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
-        if(unknownFilesLabel)
+        QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
+        if(unknownFilesContainer)
         {
-            unknownFilesLabel->hide();
+            unknownFilesContainer->hide();
         }
     }
     

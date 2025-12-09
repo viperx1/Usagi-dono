@@ -11,6 +11,7 @@
 #include <QAbstractItemView>
 #include <QEvent>
 #include <QKeyEvent>
+#include <QSplitter>
 
 // External hasher thread pool
 extern HasherThreadPool *hasherThreadPool;
@@ -119,16 +120,22 @@ void HasherCoordinator::createUI(QWidget *parent)
     if (m_hashes->horizontalHeaderItem(9))
         m_hashes->horizontalHeaderItem(9)->setToolTip("ED2K hash of the file (hidden)");
     
-    // Add widgets to layout
-    m_pageHasher->addWidget(m_hashes, 3);  // Stretch factor 3 for hashes table (allows vertical resizing)
-    m_pageHasher->addLayout(m_pageHasherSettings);
-    m_pageHasher->addLayout(progress);
-    m_pageHasher->addLayout(progressTotalLayout);  // Total progress bar just below thread progress bars
-    m_pageHasher->addWidget(m_hasherOutput, 2);  // Stretch factor 2 for hasher output (allows vertical resizing)
+    // Create a splitter to allow manual resizing between hashes table and hasher output
+    QSplitter *hasherSplitter = new QSplitter(Qt::Vertical);
+    hasherSplitter->addWidget(m_hashes);
+    hasherSplitter->addWidget(m_hasherOutput);
+    hasherSplitter->setStretchFactor(0, 3);  // Hashes table gets more space
+    hasherSplitter->setStretchFactor(1, 2);  // Hasher output gets less space
     
     // Set minimum heights to ensure widgets can be resized
     m_hashes->setMinimumHeight(100);
     m_hasherOutput->setMinimumHeight(60);
+    
+    // Add widgets to layout
+    m_pageHasher->addWidget(hasherSplitter, 1);  // Splitter takes all available space
+    m_pageHasher->addLayout(m_pageHasherSettings);
+    m_pageHasher->addLayout(progress);
+    m_pageHasher->addLayout(progressTotalLayout);  // Total progress bar just below thread progress bars
     
     // Setup hasher settings layout
     layout1->addWidget(m_moveTo);
@@ -188,7 +195,7 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonStart, &QPushButton::clicked, this, &HasherCoordinator::startHashing);
     connect(m_buttonStop, &QPushButton::clicked, this, &HasherCoordinator::stopHashing);
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
-    connect(m_markWatched, &QCheckBox::stateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
+    connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
     
     // Connect to hasher thread pool
     connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
@@ -681,7 +688,7 @@ void HasherCoordinator::provideNextFileToHash()
     m_hasherThreadPool->addFile(QString());
 }
 
-void HasherCoordinator::onMarkWatchedStateChanged(int state)
+void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
 {
     switch(state)
     {
