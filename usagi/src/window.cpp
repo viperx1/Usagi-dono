@@ -1782,75 +1782,43 @@ void unknown_files_::contextMenuEvent(QContextMenuEvent *event)
 void unknown_files_::executeFile()
 {
     int row = currentRow();
-    LOG(QString("DEBUG: [executeFile] Called with currentRow=%1").arg(row));
-    if (row < 0) {
-        LOG(QString("DEBUG: [executeFile] Row < 0, returning"));
-        return;
-    }
+    if (row < 0) return;
     
     // Get the file path from the window's unknownFilesData
     Window *window = qobject_cast<Window*>(this->window());
-    if (!window) {
-        LOG(QString("DEBUG: [executeFile] No window found"));
-        return;
-    }
+    if (!window) return;
     
-    LOG(QString("DEBUG: [executeFile] Getting filesData"));
     const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
-    LOG(QString("DEBUG: [executeFile] filesData size=%1, contains row %2: %3").arg(filesData.size()).arg(row).arg(filesData.contains(row) ? "yes" : "no"));
-    
     if (filesData.contains(row))
     {
         QString filePath = filesData[row].filepath();
-        LOG(QString("DEBUG: [executeFile] filePath=%1").arg(filePath));
         if (!filePath.isEmpty())
         {
-            LOG(QString("DEBUG: [executeFile] Opening file with QDesktopServices"));
             QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
-            LOG(QString("DEBUG: [executeFile] File opened successfully"));
         }
-    } else {
-        LOG(QString("DEBUG: [executeFile] Row %1 not found in filesData").arg(row));
     }
-    LOG(QString("DEBUG: [executeFile] Completed"));
 }
 
 void unknown_files_::openFileLocation()
 {
     int row = currentRow();
-    LOG(QString("DEBUG: [openFileLocation] Called with currentRow=%1").arg(row));
-    if (row < 0) {
-        LOG(QString("DEBUG: [openFileLocation] Row < 0, returning"));
-        return;
-    }
+    if (row < 0) return;
     
     // Get the file path from the window's unknownFilesData
     Window *window = qobject_cast<Window*>(this->window());
-    if (!window) {
-        LOG(QString("DEBUG: [openFileLocation] No window found"));
-        return;
-    }
+    if (!window) return;
     
-    LOG(QString("DEBUG: [openFileLocation] Getting filesData"));
     const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
-    LOG(QString("DEBUG: [openFileLocation] filesData size=%1, contains row %2: %3").arg(filesData.size()).arg(row).arg(filesData.contains(row) ? "yes" : "no"));
-    
     if (filesData.contains(row))
     {
         QString filePath = filesData[row].filepath();
-        LOG(QString("DEBUG: [openFileLocation] filePath=%1").arg(filePath));
         if (!filePath.isEmpty())
         {
             QFileInfo fileInfo(filePath);
             QString dirPath = fileInfo.absolutePath();
-            LOG(QString("DEBUG: [openFileLocation] Opening directory: %1").arg(dirPath));
             QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath));
-            LOG(QString("DEBUG: [openFileLocation] Directory opened successfully"));
         }
-    } else {
-        LOG(QString("DEBUG: [openFileLocation] Row %1 not found in filesData").arg(row));
     }
-    LOG(QString("DEBUG: [openFileLocation] Completed"));
 }
 
 bool unknown_files_::event(QEvent *e)
@@ -5074,12 +5042,8 @@ void Window::onUnknownFileDeleteClicked(int row)
         QMessageBox::warning(this, "File Not Found", 
             QString("The file no longer exists:\n%1").arg(fileInfo.filepath()));
         
-        LOG(QString("DEBUG: [File not found path] About to save scroll position, row=%1").arg(row));
-        
         // Save scroll position before removing row
         int scrollPos = unknownFiles->verticalScrollBar()->value();
-        
-        LOG(QString("DEBUG: [File not found path] Disconnecting buttons for row %1").arg(row));
         
         // Disconnect all button signals for this row to prevent use-after-free
         QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
@@ -5089,16 +5053,11 @@ void Window::onUnknownFileDeleteClicked(int row)
             for (QPushButton* btn : buttons) {
                 disconnect(btn, nullptr, this, nullptr);
             }
-            LOG(QString("DEBUG: [File not found path] Disconnected %1 buttons").arg(buttons.size()));
         }
-        
-        LOG(QString("DEBUG: [File not found path] About to remove row %1").arg(row));
         
         // Remove from UI anyway since file doesn't exist
         unknownFiles->removeRow(row);
         unknownFilesData.remove(row);
-        
-        LOG(QString("DEBUG: [File not found path] Row removed, updating indices"));
         
         // Update row indices in unknownFilesData map
         QMap<int, LocalFileInfo> newMap;
@@ -5113,12 +5072,8 @@ void Window::onUnknownFileDeleteClicked(int row)
         }
         unknownFilesData = newMap;
         
-        LOG(QString("DEBUG: [File not found path] Indices updated, restoring scroll"));
-        
         // Restore scroll position
         unknownFiles->verticalScrollBar()->setValue(scrollPos);
-        
-        LOG(QString("DEBUG: [File not found path] Checking if should hide widget"));
         
         // Hide the widget if no more unknown files
         if(unknownFiles->rowCount() == 0)
@@ -5131,9 +5086,8 @@ void Window::onUnknownFileDeleteClicked(int row)
             }
         }
         
-        LOG(QString("DEBUG: [File not found path] Completed, processing events"));
+        // Process events to ensure all Qt table updates complete
         QCoreApplication::processEvents();
-        LOG(QString("DEBUG: [File not found path] Events processed, returning"));
         return;
     }
     
@@ -5148,45 +5102,25 @@ void Window::onUnknownFileDeleteClicked(int row)
     
     LOG(QString("Successfully deleted file: %1").arg(fileInfo.filepath()));
     
-    LOG(QString("DEBUG: About to save scroll position, row=%1, rowCount=%2").arg(row).arg(unknownFiles->rowCount()));
-    
     // Save scroll position before removing row
     int scrollPos = unknownFiles->verticalScrollBar()->value();
-    
-    LOG(QString("DEBUG: Scroll position saved: %1").arg(scrollPos));
     
     // Update database - remove from local_files table
     adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 3); // 3 = deleted
     
-    LOG(QString("DEBUG: Database updated, about to disconnect buttons for row %1").arg(row));
-    
     // Disconnect all button signals for this row to prevent use-after-free
     QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
     if (cellWidget) {
-        LOG(QString("DEBUG: Found cell widget, disconnecting buttons"));
         // Find all buttons in the cell widget and disconnect them
         QList<QPushButton*> buttons = cellWidget->findChildren<QPushButton*>();
-        LOG(QString("DEBUG: Found %1 buttons to disconnect").arg(buttons.size()));
         for (QPushButton* btn : buttons) {
             disconnect(btn, nullptr, this, nullptr);
         }
-        LOG(QString("DEBUG: All buttons disconnected"));
-    } else {
-        LOG(QString("DEBUG: No cell widget found for row %1, column 3").arg(row));
     }
-    
-    LOG(QString("DEBUG: About to remove row %1, current rowCount=%2").arg(row).arg(unknownFiles->rowCount()));
     
     // Remove from unknown files widget
     unknownFiles->removeRow(row);
-    
-    LOG(QString("DEBUG: Row removed, new rowCount=%1").arg(unknownFiles->rowCount()));
-    LOG(QString("DEBUG: About to remove from unknownFilesData, current size=%1").arg(unknownFilesData.size()));
-    
     unknownFilesData.remove(row);
-    
-    LOG(QString("DEBUG: Removed from unknownFilesData, new size=%1").arg(unknownFilesData.size()));
-    LOG(QString("DEBUG: About to update row indices in map"));
     
     // Update row indices in unknownFilesData map
     QMap<int, LocalFileInfo> newMap;
@@ -5201,36 +5135,24 @@ void Window::onUnknownFileDeleteClicked(int row)
     }
     unknownFilesData = newMap;
     
-    LOG(QString("DEBUG: Row indices updated, newMap size=%1").arg(newMap.size()));
-    LOG(QString("DEBUG: About to restore scroll position"));
-    
     // Restore scroll position
     unknownFiles->verticalScrollBar()->setValue(scrollPos);
-    
-    LOG(QString("DEBUG: Scroll position restored"));
-    LOG(QString("DEBUG: Checking if should hide widget, rowCount=%1").arg(unknownFiles->rowCount()));
     
     // Hide the widget if no more unknown files
     if(unknownFiles->rowCount() == 0)
     {
-        LOG(QString("DEBUG: Hiding unknown files widget"));
         unknownFiles->hide();
         QWidget *unknownFilesLabel = this->findChild<QWidget*>("unknownFilesLabel");
         if(unknownFilesLabel)
         {
             unknownFilesLabel->hide();
         }
-        LOG(QString("DEBUG: Unknown files widget hidden"));
     }
     
     LOG(QString("Successfully removed deleted file from UI: %1").arg(fileInfo.filename()));
-    LOG(QString("DEBUG: onUnknownFileDeleteClicked completed successfully"));
-    LOG(QString("DEBUG: Processing pending events..."));
     
     // Process pending events to ensure all table updates are complete before returning
     QCoreApplication::processEvents();
-    
-    LOG(QString("DEBUG: Events processed, delete handler exiting"));
 }
 
 // ========== Filter Bar Toggle Implementation ==========
