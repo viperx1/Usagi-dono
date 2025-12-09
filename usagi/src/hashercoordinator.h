@@ -20,6 +20,7 @@
 #include <QList>
 #include <QRegularExpression>
 #include <QTableWidget>
+#include <QUrl>
 #include "hash/ed2k.h"
 #include "hashingtask.h"
 #include "progresstracker.h"
@@ -99,7 +100,7 @@ public slots:
     void provideNextFileToHash();
     
     // Settings change handlers
-    void onMarkWatchedStateChanged(int state);
+    void onMarkWatchedStateChanged(Qt::CheckState state);
     
 private:
     // UI Creation

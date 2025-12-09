@@ -88,24 +88,34 @@ void HasherCoordinator::createUI(QWidget *parent)
     // Setup hashes table
     m_hashes->setColumnCount(10);
     QStringList headers;
-    headers << "Filename" << "Status" << "Path" << "Size" << "Audio" << "File" << "MyList" << "Move" << "Rename" << "Hash";
+    headers << "Filename" << "Status" << "Path" << "In DB" << "In MyList" << "File" << "MyList" << "Move" << "Rename" << "Hash";
     m_hashes->setHorizontalHeaderLabels(headers);
     m_hashes->hideColumn(2); // Hide path column
     m_hashes->hideColumn(9); // Hide hash column
     m_hashes->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_hashes->horizontalHeader()->setStretchLastSection(true);
     
-    // Set tooltips for column headers
-    QHeaderView *header = m_hashes->horizontalHeader();
-    header->setToolTip("Filename");
-    m_hashes->horizontalHeaderItem(0)->setToolTip("Name of the file");
-    m_hashes->horizontalHeaderItem(1)->setToolTip("Hashing progress (0=pending, 1=completed)");
-    m_hashes->horizontalHeaderItem(3)->setToolTip("File size in bytes");
-    m_hashes->horizontalHeaderItem(4)->setToolTip("Whether file is in MyList (0=no, 1=yes)");
-    m_hashes->horizontalHeaderItem(5)->setToolTip("LF: Local File API tag - Shows AniDB FILE command status");
-    m_hashes->horizontalHeaderItem(6)->setToolTip("LL: Local List API tag - Shows AniDB MYLISTADD command status");
-    m_hashes->horizontalHeaderItem(7)->setToolTip("Whether to move the file");
-    m_hashes->horizontalHeaderItem(8)->setToolTip("Whether to rename the file");
+    // Set tooltips for column headers (including hidden columns for completeness)
+    if (m_hashes->horizontalHeaderItem(0))
+        m_hashes->horizontalHeaderItem(0)->setToolTip("Name of the file");
+    if (m_hashes->horizontalHeaderItem(1))
+        m_hashes->horizontalHeaderItem(1)->setToolTip("Hashing progress (0=pending, 1=completed)");
+    if (m_hashes->horizontalHeaderItem(2))
+        m_hashes->horizontalHeaderItem(2)->setToolTip("Full path to the file (hidden)");
+    if (m_hashes->horizontalHeaderItem(3))
+        m_hashes->horizontalHeaderItem(3)->setToolTip("Whether file info is in local database (0=no, 1=yes)");
+    if (m_hashes->horizontalHeaderItem(4))
+        m_hashes->horizontalHeaderItem(4)->setToolTip("Whether file is in your MyList (0=no, 1=yes)");
+    if (m_hashes->horizontalHeaderItem(5))
+        m_hashes->horizontalHeaderItem(5)->setToolTip("File column (LF) - Local File API tag: Shows AniDB FILE command status");
+    if (m_hashes->horizontalHeaderItem(6))
+        m_hashes->horizontalHeaderItem(6)->setToolTip("MyList column (LL) - Local List API tag: Shows AniDB MYLISTADD command status");
+    if (m_hashes->horizontalHeaderItem(7))
+        m_hashes->horizontalHeaderItem(7)->setToolTip("Whether to move the file");
+    if (m_hashes->horizontalHeaderItem(8))
+        m_hashes->horizontalHeaderItem(8)->setToolTip("Whether to rename the file");
+    if (m_hashes->horizontalHeaderItem(9))
+        m_hashes->horizontalHeaderItem(9)->setToolTip("ED2K hash of the file (hidden)");
     
     // Add widgets to layout
     m_pageHasher->addWidget(m_hashes, 3);  // Stretch factor 3 for hashes table (allows vertical resizing)
@@ -171,7 +181,7 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonStart, &QPushButton::clicked, this, &HasherCoordinator::startHashing);
     connect(m_buttonStop, &QPushButton::clicked, this, &HasherCoordinator::stopHashing);
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
-    connect(m_markWatched, &QCheckBox::stateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
+    connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
     
     // Connect to hasher thread pool
     connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
@@ -519,9 +529,11 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
             QTableWidgetItem *itemprogress = new QTableWidgetItem(QString("1"));
             m_hashes->setItem(i, 1, itemprogress);
             
-            // Generate and output ed2k link
+            // Generate and output ed2k link with URL-encoded filename
+            // Use fromLatin1 since percent-encoding produces ASCII characters only
+            QString encodedFilename = QString::fromLatin1(QUrl::toPercentEncoding(fileData.filename));
             QString ed2kLink = QString("ed2k://|file|%1|%2|%3|/")
-                .arg(fileData.filename)
+                .arg(encodedFilename)
                 .arg(fileData.size)
                 .arg(fileData.hexdigest);
             m_hasherOutput->append(ed2kLink);
@@ -668,7 +680,7 @@ void HasherCoordinator::provideNextFileToHash()
     m_hasherThreadPool->addFile(QString());
 }
 
-void HasherCoordinator::onMarkWatchedStateChanged(int state)
+void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
 {
     switch(state)
     {
