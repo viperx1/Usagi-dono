@@ -88,7 +88,7 @@ void HasherCoordinator::createUI(QWidget *parent)
     // Setup hashes table
     m_hashes->setColumnCount(10);
     QStringList headers;
-    headers << "Filename" << "Status" << "Path" << "In DB" << "In MyList" << "File" << "MyList" << "Move" << "Rename" << "Hash";
+    headers << "Filename" << "Status" << "Path" << "LF" << "LL" << "RF" << "RL" << "Move" << "Rename" << "Hash";
     m_hashes->setHorizontalHeaderLabels(headers);
     m_hashes->hideColumn(2); // Hide path column
     m_hashes->hideColumn(9); // Hide hash column
@@ -103,13 +103,13 @@ void HasherCoordinator::createUI(QWidget *parent)
     if (m_hashes->horizontalHeaderItem(2))
         m_hashes->horizontalHeaderItem(2)->setToolTip("Full path to the file (hidden)");
     if (m_hashes->horizontalHeaderItem(3))
-        m_hashes->horizontalHeaderItem(3)->setToolTip("Whether file info is in local database (0=no, 1=yes)");
+        m_hashes->horizontalHeaderItem(3)->setToolTip("LF (Local File): Whether file info is in local database (0=no, 1=yes)");
     if (m_hashes->horizontalHeaderItem(4))
-        m_hashes->horizontalHeaderItem(4)->setToolTip("Whether file is in your MyList (0=no, 1=yes)");
+        m_hashes->horizontalHeaderItem(4)->setToolTip("LL (Local List/MyList): Whether file is in your MyList (0=no, 1=yes)");
     if (m_hashes->horizontalHeaderItem(5))
-        m_hashes->horizontalHeaderItem(5)->setToolTip("File column (LF) - Local File API tag: Shows AniDB FILE command status");
+        m_hashes->horizontalHeaderItem(5)->setToolTip("RF (Remote File): AniDB FILE command API tag");
     if (m_hashes->horizontalHeaderItem(6))
-        m_hashes->horizontalHeaderItem(6)->setToolTip("MyList column (LL) - Local List API tag: Shows AniDB MYLISTADD command status");
+        m_hashes->horizontalHeaderItem(6)->setToolTip("RL (Remote List): AniDB MYLISTADD command API tag");
     if (m_hashes->horizontalHeaderItem(7))
         m_hashes->horizontalHeaderItem(7)->setToolTip("Whether to move the file");
     if (m_hashes->horizontalHeaderItem(8))
@@ -530,8 +530,7 @@ void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData
             m_hashes->setItem(i, 1, itemprogress);
             
             // Generate and output ed2k link with URL-encoded filename
-            // Use fromLatin1 since percent-encoding produces ASCII characters only
-            QString encodedFilename = QString::fromLatin1(QUrl::toPercentEncoding(fileData.filename));
+            QString encodedFilename = QString(QUrl::toPercentEncoding(fileData.filename));
             QString ed2kLink = QString("ed2k://|file|%1|%2|%3|/")
                 .arg(encodedFilename)
                 .arg(fileData.size)
