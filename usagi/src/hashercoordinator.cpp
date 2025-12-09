@@ -714,8 +714,8 @@ void HasherCoordinator::processPendingHashedFiles()
         // Update hash in database with status=1
         m_adbapi->updateLocalFileHash(task.filePath(), task.hash(), 1);
         
-        // If adding to mylist and logged in, perform API calls
-        if (task.addToMylist() && m_adbapi->LoggedIn()) {
+        // If adding to mylist, perform API calls (API methods handle auth internally)
+        if (task.addToMylist()) {
             // Perform LocalIdentify
             std::bitset<2> li = m_adbapi->LocalIdentify(task.fileSize(), task.hash());
             
@@ -749,9 +749,6 @@ void HasherCoordinator::processPendingHashedFiles()
                 // Update status to 2 (in anidb) to prevent re-detection
                 m_adbapi->UpdateLocalFileStatus(task.filePath(), 2);
             }
-        } else {
-            // Not logged in - mark as fully processed to prevent re-detection
-            m_adbapi->UpdateLocalFileStatus(task.filePath(), 2);
         }
     }
     
