@@ -13,3 +13,4 @@ Follow SOLID class design principles to the best of your ability:
 
 Do not hesitate to create a new class when a larger amount of already written code would suggest it.
 Never keep legacy code. Always replace it with new changes.
+All generated code must match the exact target framework/library version provided. Using or referencing any other version is not permitted under any circumstances.
