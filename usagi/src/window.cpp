@@ -1796,7 +1796,7 @@ unknown_files_::unknown_files_(QWidget *parent) : QTableWidget(parent)
     setColumnWidth(1, 300);
     setColumnWidth(2, 200);
     setColumnWidth(3, 290);  // Increased to accommodate Re-check and Delete buttons
-    setMaximumHeight(200); // Limit height so it doesn't dominate the UI
+    // Removed setMaximumHeight(200) to allow table to expand vertically with splitter
     
     // Set context menu policy
     setContextMenuPolicy(Qt::DefaultContextMenu);
