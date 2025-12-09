@@ -1011,6 +1011,7 @@ Window::Window()
 
     // Debug: Check all direct children of Window
     LOG("Direct children of Window:");
+    QWidget *mysteryWidget = nullptr;
     for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
         QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7, ptr: %8)")
             .arg(w->metaObject()->className())
@@ -1031,7 +1032,31 @@ Window::Window()
         if (w == filterSidebar) widgetInfo += " [IS filterSidebar!]";
         if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
         
+        // Identify the mystery widget (QWidget with no name at 0,0 100x30)
+        if (QString(w->metaObject()->className()) == "QWidget" && 
+            w->objectName().isEmpty() && 
+            w->geometry().width() == 100 && w->geometry().height() == 30) {
+            widgetInfo += " [MYSTERY WIDGET!!!]";
+            mysteryWidget = w;
+        }
+        
         LOG(widgetInfo);
+    }
+    
+    // If we found the mystery widget, try to identify its purpose
+    if (mysteryWidget) {
+        LOG(QString("Mystery widget details: parent=%1, hasLayout=%2, isHidden=%3, testAttribute(WA_WState_Created)=%4")
+            .arg(mysteryWidget->parent() ? mysteryWidget->parent()->metaObject()->className() : "nullptr")
+            .arg(mysteryWidget->layout() != nullptr)
+            .arg(mysteryWidget->isHidden())
+            .arg(mysteryWidget->testAttribute(Qt::WA_WState_Created)));
+        
+        // Try hiding it to see if that fixes the issue
+        LOG("Attempting to hide mystery widget...");
+        mysteryWidget->hide();
+        mysteryWidget->setVisible(false);
+        mysteryWidget->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        LOG("Mystery widget hidden and set transparent for mouse events");
     }
     
     // Also log the tabwidget's tab bar specifically
