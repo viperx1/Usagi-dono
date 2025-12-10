@@ -43,13 +43,10 @@ void HasherCoordinator::createUI(QWidget *parent)
 {
     // Create main page widget
     m_pageHasherParent = new QWidget(parent);
-    m_pageHasher = new QBoxLayout(QBoxLayout::TopToBottom);  // Don't pass parent to constructor
-    m_pageHasherParent->setLayout(m_pageHasher);  // Set layout explicitly
+    m_pageHasher = new QBoxLayout(QBoxLayout::TopToBottom, m_pageHasherParent);
     
     // Create hasher widgets
-    // Create container widget for settings layout to prevent orphaned layout
-    m_pageHasherSettingsParent = new QWidget(m_pageHasherParent);
-    m_pageHasherSettings = new QGridLayout();
+    m_pageHasherSettings = new QGridLayout;
     m_button1 = new QPushButton("Add files...");
     m_button2 = new QPushButton("Add directories...");
     m_button3 = new QPushButton("Last directory");
@@ -165,9 +162,6 @@ void HasherCoordinator::createUI(QWidget *parent)
     m_pageHasherSettings->addLayout(layout1, 4, 0, 1, 3);
     m_pageHasherSettings->addLayout(layout2, 5, 0, 1, 3);
     m_pageHasherSettings->addLayout(controlButtonsLayout, 6, 0, 1, 3);
-    
-    // Set layout on container widget
-    m_pageHasherSettingsParent->setLayout(m_pageHasherSettings);
     
     // Setup file state combo box
     m_hasherFileState->addItem("Unknown");

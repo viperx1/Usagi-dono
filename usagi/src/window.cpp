@@ -191,43 +191,24 @@ Window::Window()
     this->setMinimumSize(800, 600);
 //    this->setFixedHeight(600);
 
-    // main layout - Don't pass parent to constructor, use setLayout() instead
-    layout = new QBoxLayout(QBoxLayout::TopToBottom);
-    tabwidget = new QTabWidget(this);  // Give tabwidget proper parent
-    tabwidget->setObjectName("tabwidget");
+    // main layout
+    layout = new QBoxLayout(QBoxLayout::TopToBottom, this);
+    tabwidget = new QTabWidget;
     loginbutton = new QPushButton("Login");
-    loginbutton->setObjectName("loginbutton");
 
-    // pages - Create with tabwidget as parent to avoid orphaned widgets
-    pageHasherParent = new QWidget(tabwidget);
-    pageHasherParent->setObjectName("pageHasherParent");
-    pageHasher = new QBoxLayout(QBoxLayout::TopToBottom);
-    pageHasherParent->setLayout(pageHasher);
-    
-    pageMylistParent = new QWidget(tabwidget);
-    pageMylistParent->setObjectName("pageMylistParent");
-    pageMylist = new QBoxLayout(QBoxLayout::TopToBottom);
-    pageMylistParent->setLayout(pageMylist);
-    
-    pageNotifyParent = new QWidget(tabwidget);
-    pageNotifyParent->setObjectName("pageNotifyParent");
-    pageNotify = new QBoxLayout(QBoxLayout::TopToBottom);
-    pageNotifyParent->setLayout(pageNotify);
-    
-    pageSettingsParent = new QWidget(tabwidget);
-    pageSettingsParent->setObjectName("pageSettingsParent");
-    pageSettings = new QGridLayout();
-    pageSettingsParent->setLayout(pageSettings);
-    
-    pageLogParent = new QWidget(tabwidget);
-    pageLogParent->setObjectName("pageLogParent");
-    pageLog = new QBoxLayout(QBoxLayout::TopToBottom);
-    pageLogParent->setLayout(pageLog);
-    
-	pageApiTesterParent = new QWidget(tabwidget);
-	pageApiTesterParent->setObjectName("pageApiTesterParent");
-	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom);
-	pageApiTesterParent->setLayout(pageApiTester);
+    // pages
+    pageHasherParent = new QWidget;
+    pageHasher = new QBoxLayout(QBoxLayout::TopToBottom, pageHasherParent);
+    pageMylistParent = new QWidget;
+    pageMylist = new QBoxLayout(QBoxLayout::TopToBottom, pageMylistParent);
+    pageNotifyParent = new QWidget;
+    pageNotify = new QBoxLayout(QBoxLayout::TopToBottom, pageNotifyParent);
+    pageSettingsParent = new QWidget;
+    pageSettings = new QGridLayout(pageSettingsParent);
+    pageLogParent = new QWidget;
+    pageLog = new QBoxLayout(QBoxLayout::TopToBottom, pageLogParent);
+	pageApiTesterParent = new QWidget;
+	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
 
     layout->addWidget(tabwidget, 1);
 
@@ -239,27 +220,16 @@ Window::Window()
     tabwidget->addTab(pageLogParent, "Log");
 	tabwidget->addTab(pageApiTesterParent, "ApiTester");
 
-    // Debug: Check children of tabwidget
-    LOG("Children of tabwidget:");
-    for (auto* w : tabwidget->findChildren<QWidget*>()) {
-        LOG(QString("  - %1 (parent: %2, objectName: %3, geometry: %4,%5 %6x%7)")
-            .arg(w->metaObject()->className())
-            .arg(w->parent() ? w->parent()->metaObject()->className() : "nullptr")
-            .arg(w->objectName())
-            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height()));
-    }
-
     // page hasher - Create HasherCoordinator to manage all hasher UI and logic
     hasherCoordinator = new HasherCoordinator(adbapi, pageHasherParent);
     hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
     unknownFiles = new unknown_files_(this); // Unknown files widget
     
     // Create a container widget for unknown files with label
-    QWidget *unknownFilesContainer = new QWidget(this);  // Give it Window as parent
+    QWidget *unknownFilesContainer = new QWidget();
     unknownFilesContainer->setObjectName("unknownFilesContainer");
     unknownFilesContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Container must expand in splitter
-    QVBoxLayout *unknownFilesLayout = new QVBoxLayout();
-    unknownFilesContainer->setLayout(unknownFilesLayout);
+    QVBoxLayout *unknownFilesLayout = new QVBoxLayout(unknownFilesContainer);
     unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
     unknownFilesLayout->setSpacing(0);  // Remove spacing between label and table
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
@@ -292,26 +262,23 @@ Window::Window()
     collapseThreadProgressButton->setChecked(false);  // Initially not collapsed (visible)
     
     // Create container for thread progress bars
-    QWidget *threadProgressContainer = new QWidget(this);  // Give it Window as parent
-    QVBoxLayout *threadProgressLayout = new QVBoxLayout();
-    threadProgressContainer->setLayout(threadProgressLayout);
+    QWidget *threadProgressContainer = new QWidget();
+    QVBoxLayout *threadProgressLayout = new QVBoxLayout(threadProgressContainer);
     threadProgressLayout->setContentsMargins(0, 0, 0, 0);
     for (QProgressBar *bar : hasherCoordinator->getThreadProgressBars()) {
         threadProgressLayout->addWidget(bar);
     }
     
-    // Create total progress bar layout with collapse button - wrap in container widget
-    QWidget *totalProgressContainer = new QWidget(pageHasherParent);
+    // Create total progress bar layout with collapse button
     QHBoxLayout *totalProgressLayout = new QHBoxLayout();
-    totalProgressContainer->setLayout(totalProgressLayout);
     totalProgressLayout->addWidget(collapseThreadProgressButton);
     totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressBar());
     totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressLabel());
     
     // Add everything to the main hasher page layout
     pageHasher->addWidget(topSplitter, 1);  // Resizable section
-    pageHasher->addWidget(hasherCoordinator->getHasherSettings());  // Control section (not resizable) - now a widget
-    pageHasher->addWidget(totalProgressContainer);  // Total progress with collapse button - now a widget
+    pageHasher->addLayout(hasherCoordinator->getHasherSettings());  // Control section (not resizable)
+    pageHasher->addLayout(totalProgressLayout);  // Total progress with collapse button
     pageHasher->addWidget(threadProgressContainer);  // Thread progress bars
     pageHasher->addWidget(hasherCoordinator->getHasherOutput());  // ED2K links (fixed size)
     
@@ -434,12 +401,11 @@ Window::Window()
         }
     });
     
-    // Create container widget and horizontal layout for sidebar and card view
-    QWidget *mylistContentContainer = new QWidget(pageMylistParent);
+    // Create horizontal layout for sidebar and card view
     QHBoxLayout *mylistContentLayout = new QHBoxLayout();
     
     // Create filter sidebar (now includes sorting controls)
-    filterSidebar = new MyListFilterSidebar(pageMylistParent);
+    filterSidebar = new MyListFilterSidebar(this);
     connect(filterSidebar, &MyListFilterSidebar::filterChanged, this, [this]() {
         applyMylistFilters();
         // Re-apply sorting after filtering to preserve sort order
@@ -455,7 +421,7 @@ Window::Window()
     connect(filterSidebar, &MyListFilterSidebar::collapseRequested, this, &Window::onToggleFilterBarClicked);
     
     // Wrap filter sidebar in a scroll area for vertical scrolling
-    filterSidebarScrollArea = new QScrollArea(pageMylistParent);
+    filterSidebarScrollArea = new QScrollArea(this);
     filterSidebarScrollArea->setWidget(filterSidebar);
     filterSidebarScrollArea->setWidgetResizable(true);
     filterSidebarScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -483,13 +449,13 @@ Window::Window()
     
     // Card view (only view mode available)
     // Use VirtualFlowLayout for efficient virtual scrolling
-    mylistCardScrollArea = new QScrollArea(pageMylistParent);
+    mylistCardScrollArea = new QScrollArea(this);
     mylistCardScrollArea->setWidgetResizable(true);
     mylistCardScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     mylistCardScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
     // Create virtual flow layout for efficient rendering of many cards
-    mylistVirtualLayout = new VirtualFlowLayout(pageMylistParent);
+    mylistVirtualLayout = new VirtualFlowLayout(this);
     mylistVirtualLayout->setSpacing(10, 10);
     mylistVirtualLayout->setItemSize(AnimeCard::getCardSize());
     mylistCardScrollArea->setWidget(mylistVirtualLayout);
@@ -502,8 +468,7 @@ Window::Window()
     cardViewLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
     mylistContentLayout->addLayout(cardViewLayout, 1);  // Give card view layout stretch factor of 1
     
-    mylistContentContainer->setLayout(mylistContentLayout);
-    pageMylist->addWidget(mylistContentContainer);
+    pageMylist->addLayout(mylistContentLayout);
     
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
@@ -542,16 +507,14 @@ Window::Window()
     settingsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     settingsScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
-    QWidget *settingsContainer = new QWidget(pageSettingsParent);  // Give it pageSettingsParent as parent
-    QVBoxLayout *settingsMainLayout = new QVBoxLayout();
-    settingsContainer->setLayout(settingsMainLayout);
+    QWidget *settingsContainer = new QWidget();
+    QVBoxLayout *settingsMainLayout = new QVBoxLayout(settingsContainer);
     settingsMainLayout->setSpacing(10);
     settingsMainLayout->setContentsMargins(10, 10, 10, 10);
     
     // Login Settings Group
     QGroupBox *loginGroup = new QGroupBox("Login Credentials");
-    QGridLayout *loginLayout = new QGridLayout();
-    loginGroup->setLayout(loginLayout);
+    QGridLayout *loginLayout = new QGridLayout(loginGroup);
     labelLogin = new QLabel("Username:");
     editLogin = new QLineEdit;
 	editLogin->setText(adbapi->getUsername());
@@ -567,8 +530,7 @@ Window::Window()
     
     // Directory Watcher Group
     QGroupBox *watcherGroup = new QGroupBox("Directory Watcher");
-    QVBoxLayout *watcherLayout = new QVBoxLayout();
-    watcherGroup->setLayout(watcherLayout);
+    QVBoxLayout *watcherLayout = new QVBoxLayout(watcherGroup);
     watcherEnabled = new QCheckBox("Enable Directory Watcher");
     watcherAutoStart = new QCheckBox("Auto-start on application launch");
     watcherStatusLabel = new QLabel("Status: Not watching");
@@ -586,16 +548,14 @@ Window::Window()
     
     // Auto-fetch Group
     QGroupBox *autoFetchGroup = new QGroupBox("Auto-fetch");
-    QVBoxLayout *autoFetchLayout = new QVBoxLayout();
-    autoFetchGroup->setLayout(autoFetchLayout);
+    QVBoxLayout *autoFetchLayout = new QVBoxLayout(autoFetchGroup);
     autoFetchEnabled = new QCheckBox("Automatically download anime titles and other data on startup");
     autoFetchLayout->addWidget(autoFetchEnabled);
     settingsMainLayout->addWidget(autoFetchGroup);
     
     // Playback Group
     QGroupBox *playbackGroup = new QGroupBox("Playback");
-    QHBoxLayout *playbackLayout = new QHBoxLayout();
-    playbackGroup->setLayout(playbackLayout);
+    QHBoxLayout *playbackLayout = new QHBoxLayout(playbackGroup);
     mediaPlayerPath = new QLineEdit;
     mediaPlayerBrowseButton = new QPushButton("Browse...");
     playbackLayout->addWidget(new QLabel("Media Player:"));
@@ -605,8 +565,7 @@ Window::Window()
     
     // Session Manager Group
     QGroupBox *sessionGroup = new QGroupBox("Session Manager");
-    QGridLayout *sessionLayout = new QGridLayout();
-    sessionGroup->setLayout(sessionLayout);
+    QGridLayout *sessionLayout = new QGridLayout(sessionGroup);
     sessionAheadBufferSpinBox = new QSpinBox();
     sessionAheadBufferSpinBox->setMinimum(1);
     sessionAheadBufferSpinBox->setMaximum(20);
@@ -640,8 +599,7 @@ Window::Window()
     
     // File Deletion Group
     QGroupBox *deletionGroup = new QGroupBox("File Deletion");
-    QVBoxLayout *deletionLayout = new QVBoxLayout();
-    deletionGroup->setLayout(deletionLayout);
+    QVBoxLayout *deletionLayout = new QVBoxLayout(deletionGroup);
     sessionEnableAutoDeletionCheckbox = new QCheckBox("Enable automatic file deletion");
     sessionEnableAutoDeletionCheckbox->setToolTip("When enabled, files marked for deletion will be automatically deleted");
     sessionEnableAutoDeletionCheckbox->setChecked(false);  // Default: disabled for safety
@@ -656,8 +614,7 @@ Window::Window()
     
     // System Tray Group
     QGroupBox *trayGroup = new QGroupBox("System Tray");
-    QVBoxLayout *trayLayout = new QVBoxLayout();
-    trayGroup->setLayout(trayLayout);
+    QVBoxLayout *trayLayout = new QVBoxLayout(trayGroup);
     trayMinimizeToTray = new QCheckBox("Minimize to tray");
     trayMinimizeToTray->setToolTip("Minimize the application to system tray instead of taskbar");
     trayCloseToTray = new QCheckBox("Close to tray");
@@ -671,8 +628,7 @@ Window::Window()
     
     // Auto-start Group
     QGroupBox *autoStartGroup = new QGroupBox("Application Startup");
-    QVBoxLayout *autoStartLayout = new QVBoxLayout();
-    autoStartGroup->setLayout(autoStartLayout);
+    QVBoxLayout *autoStartLayout = new QVBoxLayout(autoStartGroup);
     autoStartEnabled = new QCheckBox("Start with operating system");
     autoStartEnabled->setToolTip("Automatically start the application when you log in");
     autoStartLayout->addWidget(autoStartEnabled);
@@ -680,8 +636,7 @@ Window::Window()
     
     // File Marking Preferences Group
     QGroupBox *fileMarkingGroup = new QGroupBox("File Marking Preferences");
-    QGridLayout *fileMarkingLayout = new QGridLayout();
-    fileMarkingGroup->setLayout(fileMarkingLayout);
+    QGridLayout *fileMarkingLayout = new QGridLayout(fileMarkingGroup);
     
     QLabel *audioLangLabel = new QLabel("Preferred Audio Languages:");
     audioLangLabel->setToolTip("Comma-separated list of preferred audio languages (e.g., japanese,english)\n"
@@ -746,8 +701,7 @@ Window::Window()
     
     // Hasher Filter Group
     QGroupBox *hasherFilterGroup = new QGroupBox("Hasher File Filter");
-    QVBoxLayout *hasherFilterLayout = new QVBoxLayout();
-    hasherFilterGroup->setLayout(hasherFilterLayout);
+    QVBoxLayout *hasherFilterLayout = new QVBoxLayout(hasherFilterGroup);
     
     QLabel *hasherFilterLabel = new QLabel("File masks to ignore (comma-separated):");
     hasherFilterLabel->setToolTip("Files matching these patterns will be ignored when adding for hashing.\n"
@@ -1036,57 +990,6 @@ Window::Window()
     
     // Load auto-start setting
     autoStartEnabled->setChecked(adbapi->getAutoStartEnabled());
-
-    // Debug: Check all direct children of Window
-    LOG("Direct children of Window:");
-    QWidget *mysteryWidget = nullptr;
-    for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
-        QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7, ptr: %8)")
-            .arg(w->metaObject()->className())
-            .arg(w->objectName())
-            .arg(w->isVisible())
-            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height())
-            .arg(QString::number(reinterpret_cast<quintptr>(w), 16));
-        
-        // Check if this is one of our known widgets
-        if (w == tabwidget) widgetInfo += " [IS tabwidget!]";
-        if (w == loginbutton) widgetInfo += " [IS loginbutton!]";
-        if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
-        
-        // Identify potential mystery widget (unnamed QWidget)
-        if (QString(w->metaObject()->className()) == "QWidget" && w->objectName().isEmpty()) {
-            widgetInfo += " [POTENTIAL MYSTERY]";
-            mysteryWidget = w;
-        }
-        
-        LOG(widgetInfo);
-    }
-    
-    // If we found a mystery widget, log detailed parent information
-    if (mysteryWidget) {
-        LOG(QString("Mystery widget parent details: parent=%1 at address=%2")
-            .arg(mysteryWidget->parent() ? mysteryWidget->parent()->metaObject()->className() : "NULL")
-            .arg(reinterpret_cast<quintptr>(mysteryWidget->parent()), 0, 16));
-        
-        LOG("=== Object Tree Dump (mystery widget) ===");
-        mysteryWidget->dumpObjectTree();
-        LOG("=== Object Info Dump (mystery widget) ===");
-        mysteryWidget->dumpObjectInfo();
-    }
-    
-    // Log the entire Window object tree for comprehensive view
-    LOG("=== Full Window Object Tree ===");
-    this->dumpObjectTree();
-    
-    // Log the tabwidget's tab bar
-    QTabBar *tabBar = tabwidget->tabBar();
-    if (tabBar) {
-        LOG(QString("TabBar info: parent=%1, objectName=%2, geometry=%3,%4 %5x%6, ptr=%7")
-            .arg(tabBar->parent() ? tabBar->parent()->metaObject()->className() : "nullptr")
-            .arg(tabBar->objectName())
-            .arg(tabBar->x()).arg(tabBar->y()).arg(tabBar->width()).arg(tabBar->height())
-            .arg(QString::number(reinterpret_cast<quintptr>(tabBar), 16)));
-    }
 
     // end
     this->setLayout(layout);
@@ -1412,24 +1315,6 @@ void Window::startupInitialization()
 {
     // This slot is called 1 second after the window is constructed
     // to allow the UI to be fully initialized before loading data
-    
-    // Debug: Check direct children again after window is shown
-    LOG("Direct children of Window AFTER show:");
-    for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
-        QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7, ptr: %8)")
-            .arg(w->metaObject()->className())
-            .arg(w->objectName())
-            .arg(w->isVisible())
-            .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height())
-            .arg(QString::number(reinterpret_cast<quintptr>(w), 16));
-        
-        // Check if this is one of our known widgets
-        if (w == tabwidget) widgetInfo += " [IS tabwidget!]";
-        if (w == loginbutton) widgetInfo += " [IS loginbutton!]";
-        if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
-        
-        LOG(widgetInfo);
-    }
     
     // DEBUG: Print database info for specific lid values as requested in issue
     LOG("DEBUG: Printing database information for requested lid values...");
@@ -2726,9 +2611,8 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     unknownFiles->setCellWidget(row, 2, episodeInput);
     
     // Column 3: Action buttons (Bind and Not Anime in a container)
-    QWidget *actionContainer = new QWidget(this);  // Give it Window as temporary parent
-    QHBoxLayout *actionLayout = new QHBoxLayout();
-    actionContainer->setLayout(actionLayout);
+    QWidget *actionContainer = new QWidget();
+    QHBoxLayout *actionLayout = new QHBoxLayout(actionContainer);
     actionLayout->setContentsMargins(2, 2, 2, 2);
     actionLayout->setSpacing(4);
     

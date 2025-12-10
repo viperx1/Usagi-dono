@@ -63,7 +63,7 @@ public:
     QTextEdit* getHasherOutput() const { return m_hasherOutput; }
     
     // Get hasher settings layout
-    QWidget* getHasherSettings() const { return m_pageHasherSettingsParent; }
+    QGridLayout* getHasherSettings() const { return m_pageHasherSettings; }
     
     // Get progress bars
     QVector<QProgressBar*> getThreadProgressBars() const { return m_threadProgressBars; }
