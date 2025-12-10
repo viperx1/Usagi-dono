@@ -66,6 +66,7 @@ set(SOURCES
     src/relationdata.cpp
     src/trayiconmanager.cpp
     src/unknownfilesmanager.cpp
+    src/directorywatchermanager.cpp
 )
 
 # Header files
@@ -118,6 +119,7 @@ set(HEADERS
     src/relationdata.h
     src/trayiconmanager.h
     src/unknownfilesmanager.h
+    src/directorywatchermanager.h
 )
 
 # Create executable

@@ -43,7 +43,6 @@
 #include "anidbapi.h"
 #include "epno.h"
 #include "aired.h"
-#include "directorywatcher.h"
 #include "playbackmanager.h"
 #include "animecard.h"
 #include "flowlayout.h"
@@ -69,6 +68,7 @@ class WatchSessionManager;
 class HasherCoordinator;
 class TrayIconManager;
 class UnknownFilesManager;
+class DirectoryWatcherManager;
 class Window;  // Forward declaration for friend access
 
 class hashes_ : public QTableWidget
@@ -236,13 +236,6 @@ private:
     QPushButton *buttonSaveSettings;
     QPushButton *buttonRequestMylistExport;
     
-    // Directory watcher settings
-    QCheckBox *watcherEnabled;
-    QLineEdit *watcherDirectory;
-    QPushButton *watcherBrowseButton;
-    QCheckBox *watcherAutoStart;
-    QLabel *watcherStatusLabel;
-    
     // Auto-fetch settings
     QCheckBox *autoFetchEnabled;
     
@@ -280,14 +273,14 @@ private:
 	QTextEdit *logOutput;
 
 	// page apitester
-	QLineEdit *apitesterInput;
-	QTextEdit *apitesterOutput;
-	
-	// Directory watcher
-	DirectoryWatcher *directoryWatcher;
-	
-	// Playback manager and UI
-	PlaybackManager *playbackManager;
+    QLineEdit *apitesterInput;
+    QTextEdit *apitesterOutput;
+    
+    // Directory watcher
+    DirectoryWatcherManager *directoryWatcherManager;
+    
+    // Playback manager and UI
+    PlaybackManager *playbackManager;
 	QMap<int, int> m_playingItems; // lid -> animation frame (0, 1, 2)
 	QTimer *m_animationTimer;
 	
@@ -367,8 +360,6 @@ public slots:
     void checkAndRequestChainRelations(int aid);  // Check and request missing relation data for anime's chain
     
     // Directory watcher slots
-    void onWatcherEnabledChanged(int state);
-    void onWatcherBrowseClicked();
     void onWatcherNewFilesDetected(const QStringList &filePaths);
     
     // Playback slots
