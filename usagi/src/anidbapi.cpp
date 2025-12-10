@@ -3609,7 +3609,7 @@ void AniDBApi::batchUpdateLocalFileHashes(const QList<QPair<QString, QString>>& 
 	QSqlQuery query(db);
 	query.prepare("UPDATE `local_files` SET `ed2k_hash` = ?, `file_size` = ?, `status` = ? WHERE `path` = ?");
 	
-	int successCount = 0;
+	[[maybe_unused]] int successCount = 0;
 	int failCount = 0;
 	bool hasFailure = false;
 	
