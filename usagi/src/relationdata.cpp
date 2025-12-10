@@ -31,7 +31,7 @@ void RelationData::setRelations(const QString& aidList, const QString& typeList)
 int RelationData::getPrequel() const
 {
     // Find first prequel (type 2)
-    for (auto it = m_relationCache.constBegin(); it != m_relationCache.constEnd(); ++it) {
+    for (QMap<int, RelationType>::const_iterator it = m_relationCache.constBegin(); it != m_relationCache.constEnd(); ++it) {
         if (it.value() == RelationType::Prequel) {
             return it.key();
         }
@@ -43,7 +43,7 @@ int RelationData::getPrequel() const
 int RelationData::getSequel() const
 {
     // Find first sequel (type 1)
-    for (auto it = m_relationCache.constBegin(); it != m_relationCache.constEnd(); ++it) {
+    for (QMap<int, RelationType>::const_iterator it = m_relationCache.constBegin(); it != m_relationCache.constEnd(); ++it) {
         if (it.value() == RelationType::Sequel) {
             return it.key();
         }
@@ -55,7 +55,7 @@ int RelationData::getSequel() const
 QList<int> RelationData::getRelatedAnimeByType(RelationType type) const
 {
     QList<int> result;
-    for (auto it = m_relationCache.constBegin(); it != m_relationCache.constEnd(); ++it) {
+    for (QMap<int, RelationType>::const_iterator it = m_relationCache.constBegin(); it != m_relationCache.constEnd(); ++it) {
         if (it.value() == type) {
             result.append(it.key());
         }
