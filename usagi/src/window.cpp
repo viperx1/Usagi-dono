@@ -300,8 +300,10 @@ Window::Window()
         threadProgressLayout->addWidget(bar);
     }
     
-    // Create total progress bar layout with collapse button
+    // Create total progress bar layout with collapse button - wrap in container widget
+    QWidget *totalProgressContainer = new QWidget(pageHasherParent);
     QHBoxLayout *totalProgressLayout = new QHBoxLayout();
+    totalProgressContainer->setLayout(totalProgressLayout);
     totalProgressLayout->addWidget(collapseThreadProgressButton);
     totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressBar());
     totalProgressLayout->addWidget(hasherCoordinator->getTotalProgressLabel());
@@ -309,7 +311,7 @@ Window::Window()
     // Add everything to the main hasher page layout
     pageHasher->addWidget(topSplitter, 1);  // Resizable section
     pageHasher->addWidget(hasherCoordinator->getHasherSettings());  // Control section (not resizable) - now a widget
-    pageHasher->addLayout(totalProgressLayout);  // Total progress with collapse button
+    pageHasher->addWidget(totalProgressContainer);  // Total progress with collapse button - now a widget
     pageHasher->addWidget(threadProgressContainer);  // Thread progress bars
     pageHasher->addWidget(hasherCoordinator->getHasherOutput());  // ED2K links (fixed size)
     
