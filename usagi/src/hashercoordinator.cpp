@@ -43,7 +43,8 @@ void HasherCoordinator::createUI(QWidget *parent)
 {
     // Create main page widget
     m_pageHasherParent = new QWidget(parent);
-    m_pageHasher = new QBoxLayout(QBoxLayout::TopToBottom, m_pageHasherParent);
+    m_pageHasher = new QBoxLayout(QBoxLayout::TopToBottom);  // Don't pass parent to constructor
+    m_pageHasherParent->setLayout(m_pageHasher);  // Set layout explicitly
     
     // Create hasher widgets
     m_pageHasherSettings = new QGridLayout;
