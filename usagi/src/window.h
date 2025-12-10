@@ -51,8 +51,6 @@
 #include "mylistfiltersidebar.h"
 #include "watchsessionmanager.h"
 #include "uicolors.h"
-#include "autofetchmanager.h"
-#include "traysettingsmanager.h"
 #include "localfileinfo.h"
 #include "progresstracker.h"
 #include "hashingtask.h"

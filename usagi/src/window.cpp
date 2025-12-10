@@ -7,6 +7,8 @@
 #include "logger.h"
 #include "aired.h"
 #include "directorywatchermanager.h"
+#include "autofetchmanager.h"
+#include "traysettingsmanager.h"
 #include <QElapsedTimer>
 #include <QThread>
 #include <QSqlDatabase>
