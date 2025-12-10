@@ -572,6 +572,39 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     // handle refreshing the layout after sorting completes.
 }
 
+void MyListCardManager::updateSeriesChainConnections(bool chainModeEnabled)
+{
+    QMutexLocker locker(&m_mutex);
+    
+    for (AnimeCard* card : m_cards) {
+        if (card) {
+            card->setSeriesChainInfo(0, 0);
+        }
+    }
+    
+    if (!chainModeEnabled || m_chainList.isEmpty()) {
+        return;
+    }
+    
+    for (const AnimeChain& chain : std::as_const(m_chainList)) {
+        const QList<int> chainAnimeIds = chain.getAnimeIds();
+        
+        for (int i = 0; i < chainAnimeIds.size(); ++i) {
+            const int currentAid = chainAnimeIds[i];
+            const int prequelAid = (i > 0) ? chainAnimeIds[i - 1] : 0;
+            const int sequelAid = (i < chainAnimeIds.size() - 1) ? chainAnimeIds[i + 1] : 0;
+            
+            AnimeCard* card = m_cards.value(currentAid, nullptr);
+            if (card) {
+                card->setSeriesChainInfo(prequelAid, sequelAid);
+            } else {
+                LOG(QString("[MyListCardManager] WARNING: Card not found for aid=%1 when updating chain connections")
+                    .arg(currentAid));
+            }
+        }
+    }
+}
+
 AnimeChain MyListCardManager::getChainForAnime(int aid) const
 {
     QMutexLocker locker(&m_mutex);
