@@ -59,6 +59,7 @@
 #include "backgrounddatabaseworker.h"
 #include "hashercoordinator.h"
 #include "trayiconmanager.h"
+#include "unknownfilesmanager.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -67,6 +68,7 @@ class VirtualFlowLayout;
 class WatchSessionManager;
 class HasherCoordinator;
 class TrayIconManager;
+class UnknownFilesManager;
 class Window;  // Forward declaration for friend access
 
 class hashes_ : public QTableWidget
@@ -205,7 +207,9 @@ private:
 	QWidget *pageApiTesterParent;
 
 	// page hasher
+	// Hasher and Unknown Files Management
 	HasherCoordinator *hasherCoordinator;  // Manages all hasher UI and logic
+	UnknownFilesManager *unknownFilesManager;  // Manages unknown files UI and logic
 
     // page mylist (card view only)
     QScrollArea *mylistCardScrollArea;
@@ -377,14 +381,6 @@ public slots:
     void onFileMarkedAsLocallyWatched(int lid);
     void onAnimationTimerTimeout();
     
-    // Unknown files slots
-    void onUnknownFileAnimeSearchChanged(int row);
-    void onUnknownFileEpisodeSelected(int row);
-    void onUnknownFileBindClicked(int row, const QString& epno);
-    void onUnknownFileNotAnimeClicked(int row);
-    void onUnknownFileRecheckClicked(int row);
-    void onUnknownFileDeleteClicked(int row);
-    
     // Filter bar toggle slot
     void onToggleFilterBarClicked();
     
@@ -407,21 +403,16 @@ private slots:
 public:
 	// page hasher
     hashes_ *hashes;
-    unknown_files_ *unknownFiles;
-    void unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size);
     void hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& preloadedHash = QString());
     void loadUnboundFiles();
 	int parseMylistExport(const QString &tarGzPath);
     
-    // Getter for unknown files data (used by unknown_files_ widget)
-    const QMap<int, LocalFileInfo>& getUnknownFilesData() const { return unknownFilesData; }
+    // Getter for unknown files manager (for unknown_files_ widget access)
+    UnknownFilesManager* getUnknownFilesManager() const { return unknownFilesManager; }
     
     Window();
 	~Window();
 private:
-    // Unknown files data structure - now using LocalFileInfo class
-    QMap<int, LocalFileInfo> unknownFilesData; // row index -> file data
-    
     // Cached anime titles for unknown files widget (to avoid repeated DB queries)
     QStringList cachedAnimeTitles;
     QMap<QString, int> cachedTitleToAid;

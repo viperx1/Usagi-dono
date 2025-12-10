@@ -222,22 +222,9 @@ Window::Window()
     // page hasher - Create HasherCoordinator to manage all hasher UI and logic
     hasherCoordinator = new HasherCoordinator(adbapi, pageHasherParent);
     hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
-    unknownFiles = new unknown_files_(this); // Unknown files widget
     
-    // Create a container widget for unknown files with label
-    QWidget *unknownFilesContainer = new QWidget();
-    unknownFilesContainer->setObjectName("unknownFilesContainer");
-    unknownFilesContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Container must expand in splitter
-    QVBoxLayout *unknownFilesLayout = new QVBoxLayout(unknownFilesContainer);
-    unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
-    unknownFilesLayout->setSpacing(0);  // Remove spacing between label and table
-    QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
-    unknownFilesLabel->setObjectName("unknownFilesLabel");
-    unknownFilesLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    unknownFilesLayout->addWidget(unknownFilesLabel, 0);  // stretch factor 0 - fixed size
-    unknownFilesLayout->addWidget(unknownFiles, 1);  // stretch factor 1 - takes available space
-    unknownFiles->setMinimumHeight(60);  // Set minimum height to ensure it can be resized
-    unknownFiles->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Allow table to expand
+    // Create UnknownFilesManager to manage all unknown files UI and logic
+    unknownFilesManager = new UnknownFilesManager(adbapi, hasherCoordinator, this);
     
     // Create the main hasher layout in the requested order:
     // 1. hashes (fixed minimum - resizable)
@@ -250,7 +237,7 @@ Window::Window()
     // Create a splitter for resizable sections (hashes + unknown files)
     QSplitter *topSplitter = new QSplitter(Qt::Vertical);
     topSplitter->addWidget(hasherCoordinator->getHashesTable());
-    topSplitter->addWidget(unknownFilesContainer);
+    topSplitter->addWidget(unknownFilesManager->getContainerWidget());
     topSplitter->setStretchFactor(0, 3);  // Hashes table gets more space
     topSplitter->setStretchFactor(1, 1);  // Unknown files gets less space
     
@@ -287,12 +274,18 @@ Window::Window()
         collapseThreadProgressButton->setText(checked ? "▶" : "▼");
     });
     
-    // Hide unknown files section initially
-    unknownFilesContainer->hide();
+    // Hide unknown files section initially (it's already hidden in the manager, but hiding the container too)
+    unknownFilesManager->getContainerWidget()->hide();
     
     // Connect HasherCoordinator signals
     connect(hasherCoordinator, &HasherCoordinator::hashingFinished, this, &Window::hasherFinished);
     connect(hasherCoordinator, &HasherCoordinator::logMessage, this, &Window::getNotifyLogAppend);
+    
+    // Connect UnknownFilesManager signals
+    connect(unknownFilesManager, &UnknownFilesManager::logMessage, this, &Window::getNotifyLogAppend);
+    connect(unknownFilesManager, &UnknownFilesManager::fileNeedsHashing, this, [this](const QFileInfo& fileInfo, Qt::CheckState renameState, const QString& preloadedHash) {
+        hashesinsertrow(fileInfo, renameState, preloadedHash);
+    });
     
     // Connect hasher thread pool signals to HasherCoordinator
     connect(hasherThreadPool, &HasherThreadPool::requestNextFile, hasherCoordinator, &HasherCoordinator::provideNextFileToHash);
@@ -1381,7 +1374,7 @@ void Window::loadUnboundFiles()
     loadAnimeTitlesCache();
     
     // Disable updates during bulk insertion for performance
-    unknownFiles->setUpdatesEnabled(false);
+    unknownFilesManager->setUpdatesEnabled(false);
     
     // Add each unbound file to the unknown files widget
     for(const FileHashInfo& fileInfo : std::as_const(unboundFiles))
@@ -1396,11 +1389,11 @@ void Window::loadUnboundFiles()
             fileSize = qFileInfo.size();
         }
         
-        unknownFilesInsertRow(filename, fileInfo.path(), fileInfo.hash(), fileSize);
+        unknownFilesManager->insertFile(filename, fileInfo.path(), fileInfo.hash(), fileSize);
     }
     
     // Re-enable updates after bulk insertion
-    unknownFiles->setUpdatesEnabled(true);
+    unknownFilesManager->setUpdatesEnabled(true);
     
     LOG(QString("Successfully loaded %1 unbound files").arg(unboundFiles.size()));
 }
@@ -1580,6 +1573,9 @@ void Window::onAnimeTitlesLoadingFinished(const QStringList &titles, const QMap<
     // Store the data in member variables
     cachedAnimeTitles = titles;
     cachedTitleToAid = titleToAid;
+    
+    // Update unknown files manager cache
+    unknownFilesManager->setAnimeTitlesCache(titles, titleToAid);
 }
 
 // Called when unbound files loading finishes (in UI thread)
@@ -1593,15 +1589,15 @@ void Window::onUnboundFilesLoadingFinished(const QList<LocalFileInfo> &files)
     }
     
     // Disable updates during bulk insertion for performance
-    unknownFiles->setUpdatesEnabled(false);
+    unknownFilesManager->setUpdatesEnabled(false);
     
     // Add each unbound file to the unknown files widget
     for (const LocalFileInfo& fileInfo : std::as_const(files)) {
-        unknownFilesInsertRow(fileInfo.filename(), fileInfo.filepath(), fileInfo.hash(), fileInfo.size());
+        unknownFilesManager->insertFile(fileInfo.filename(), fileInfo.filepath(), fileInfo.hash(), fileInfo.size());
     }
     
     // Re-enable updates after bulk insertion
-    unknownFiles->setUpdatesEnabled(true);
+    unknownFilesManager->setUpdatesEnabled(true);
     
     LOG(QString("Successfully added %1 unbound files to UI").arg(files.size()));
 }
@@ -1861,11 +1857,11 @@ void unknown_files_::executeFile()
     int row = currentRow();
     if (row < 0) return;
     
-    // Get the file path from the window's unknownFilesData
+    // Get the file path from the window's unknownFilesManager->getFilesData()
     Window *window = qobject_cast<Window*>(this->window());
     if (!window) return;
     
-    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
+    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesManager()->getFilesData();
     if (filesData.contains(row))
     {
         QString filePath = filesData[row].filepath();
@@ -1881,11 +1877,11 @@ void unknown_files_::openFileLocation()
     int row = currentRow();
     if (row < 0) return;
     
-    // Get the file path from the window's unknownFilesData
+    // Get the file path from the window's unknownFilesManager->getFilesData()
     Window *window = qobject_cast<Window*>(this->window());
     if (!window) return;
     
-    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesData();
+    const QMap<int, LocalFileInfo>& filesData = window->getUnknownFilesManager()->getFilesData();
     if (filesData.contains(row))
     {
         QString filePath = filesData[row].filepath();
@@ -2147,41 +2143,6 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 }
                 
                 // Remove from unknown files widget if present (re-check succeeded)
-                for(int row = 0; row < unknownFiles->rowCount(); ++row)
-                {
-                    QTableWidgetItem *item = unknownFiles->item(row, 0);
-                    if(item && item->toolTip() == localPath)
-                    {
-                        LOG(QString("Re-check succeeded (310), removing from unknown files: %1").arg(item->text()));
-                        unknownFiles->removeRow(row);
-                        unknownFilesData.remove(row);
-                        
-                        // Update row indices in unknownFilesData map
-                        QMap<int, LocalFileInfo> newMap;
-                        for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
-                        {
-                            int oldRow = it.key();
-                            if(oldRow > row) {
-                                newMap[oldRow - 1] = it.value();
-                            } else {
-                                newMap[oldRow] = it.value();
-                            }
-                        }
-                        unknownFilesData = newMap;
-                        
-                        // Hide the widget if no more unknown files
-                        if(unknownFiles->rowCount() == 0)
-                        {
-                            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
-                            if(unknownFilesContainer)
-                            {
-                                unknownFilesContainer->hide();
-                            }
-                        }
-                        break;
-                    }
-                }
-                
                 return;
             }
             if(code == 320)
@@ -2201,10 +2162,11 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 QString hash = hashes->item(i, 9)->text();
                 
                 // Check if file is already in unknown files widget (avoid duplicates)
+                QTableWidget *unknownFilesTable = unknownFilesManager->getTableWidget();
                 bool alreadyExists = false;
-                for(int row = 0; row < unknownFiles->rowCount(); ++row)
+                for(int row = 0; row < unknownFilesTable->rowCount(); ++row)
                 {
-                    QTableWidgetItem *item = unknownFiles->item(row, 0);
+                    QTableWidgetItem *item = unknownFilesTable->item(row, 0);
                     if(item && item->toolTip() == filepath)
                     {
                         alreadyExists = true;
@@ -2218,7 +2180,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                     QFileInfo fileInfo(filepath);
                     qint64 fileSize = fileInfo.size();
                     
-                    unknownFilesInsertRow(filename, filepath, hash, fileSize);
+                    unknownFilesManager->insertFile(filename, filepath, hash, fileSize);
                     LOG(QString("Added unknown file to manual binding widget: %1").arg(filename));
                 }
                 else
@@ -2261,41 +2223,6 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 						.arg(lid).arg(localPath).arg(code));
 				}
 				
-				// Remove from unknown files widget if present (re-check succeeded)
-				for(int row = 0; row < unknownFiles->rowCount(); ++row)
-				{
-					QTableWidgetItem *item = unknownFiles->item(row, 0);
-					if(item && item->toolTip() == localPath)
-					{
-						LOG(QString("Re-check succeeded (311/210), removing from unknown files: %1").arg(item->text()));
-						unknownFiles->removeRow(row);
-						unknownFilesData.remove(row);
-						
-						// Update row indices in unknownFilesData map
-						QMap<int, LocalFileInfo> newMap;
-						for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
-						{
-							int oldRow = it.key();
-							if(oldRow > row) {
-								newMap[oldRow - 1] = it.value();
-							} else {
-								newMap[oldRow] = it.value();
-							}
-						}
-						unknownFilesData = newMap;
-						
-						// Hide the widget if no more unknown files
-						if(unknownFiles->rowCount() == 0)
-						{
-							QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
-							if(unknownFilesContainer)
-							{
-								unknownFilesContainer->hide();
-							}
-						}
-						break;
-					}
-				}
 				
 				return;
 			}
@@ -2605,239 +2532,6 @@ void Window::hashesinsertrow(QFileInfo file, Qt::CheckState ren, const QString& 
 {
 	// Delegate to HasherCoordinator which owns the hashes table and hasher logic
 	hasherCoordinator->hashesInsertRow(file, ren, preloadedHash);
-}
-
-void Window::unknownFilesInsertRow(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
-{
-    // Show the unknown files container if it's hidden
-    QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
-    if(unknownFilesContainer && unknownFilesContainer->isHidden())
-    {
-        unknownFilesContainer->show();
-    }
-    
-    int row = unknownFiles->rowCount();
-    unknownFiles->insertRow(row);
-    
-    // Column 0: Filename
-    QTableWidgetItem *filenameItem = new QTableWidgetItem(filename);
-    filenameItem->setToolTip(filepath);
-    unknownFiles->setItem(row, 0, filenameItem);
-    
-    // Column 1: Anime search field (using QLineEdit with autocomplete)
-    QLineEdit *animeSearch = new QLineEdit();
-    animeSearch->setPlaceholderText("Search anime title...");
-    
-    // Load anime titles cache if not already loaded
-    loadAnimeTitlesCache();
-    
-    // Use cached anime titles for completer (avoid repeated DB queries)
-    QCompleter *completer = new QCompleter(cachedAnimeTitles, animeSearch);
-    completer->setCaseSensitivity(Qt::CaseInsensitive);
-    completer->setFilterMode(Qt::MatchContains);
-    animeSearch->setCompleter(completer);
-    
-    unknownFiles->setCellWidget(row, 1, animeSearch);
-    
-    // Column 2: Episode input (QLineEdit with suggestions, allows manual entry)
-    QLineEdit *episodeInput = new QLineEdit();
-    episodeInput->setPlaceholderText("Enter episode number...");
-    episodeInput->setEnabled(false);
-    unknownFiles->setCellWidget(row, 2, episodeInput);
-    
-    // Column 3: Action buttons (Bind and Not Anime in a container)
-    QWidget *actionContainer = new QWidget();
-    QHBoxLayout *actionLayout = new QHBoxLayout(actionContainer);
-    actionLayout->setContentsMargins(2, 2, 2, 2);
-    actionLayout->setSpacing(4);
-    
-    QPushButton *bindButton = new QPushButton("Bind");
-    bindButton->setEnabled(false);
-    // Store filepath in button property for later lookup
-    bindButton->setProperty("filepath", filepath);
-    
-    QPushButton *notAnimeButton = new QPushButton("Not Anime");
-    // Store filepath in button property for later lookup
-    notAnimeButton->setProperty("filepath", filepath);
-    
-    QPushButton *recheckButton = new QPushButton("Re-check");
-    // Store filepath in button property for later lookup
-    recheckButton->setProperty("filepath", filepath);
-    recheckButton->setToolTip("Re-validate this file against AniDB (in case it was added since last check)");
-    
-    QPushButton *deleteButton = new QPushButton("Delete");
-    // Store filepath in button property for later lookup
-    deleteButton->setProperty("filepath", filepath);
-    deleteButton->setToolTip("Delete this file from the filesystem");
-    deleteButton->setStyleSheet("QPushButton { color: red; }");
-    
-    actionLayout->addWidget(bindButton);
-    actionLayout->addWidget(notAnimeButton);
-    actionLayout->addWidget(recheckButton);
-    actionLayout->addWidget(deleteButton);
-    actionContainer->setLayout(actionLayout);
-    
-    unknownFiles->setCellWidget(row, 3, actionContainer);
-    
-    // Store file data using LocalFileInfo class
-    LocalFileInfo fileInfo(filename, filepath, hash, size);
-    fileInfo.setSelectedAid(-1);
-    fileInfo.setSelectedEid(-1);
-    unknownFilesData[row] = fileInfo;
-    
-    // Connect anime search to populate episode suggestions
-    connect(animeSearch, &QLineEdit::textChanged, this, [this, filepath, animeSearch, episodeInput, bindButton]() {
-        QString searchText = animeSearch->text();
-        
-        // Find current row by filepath (stable identifier)
-        int currentRow = -1;
-        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
-            QTableWidgetItem *item = unknownFiles->item(i, 0);
-            if(item && item->toolTip() == filepath) {
-                currentRow = i;
-                break;
-            }
-        }
-        
-        if(currentRow < 0 || !unknownFilesData.contains(currentRow)) return;
-        
-        // Check if the text matches a valid anime from autocomplete (use cached data)
-        if(cachedTitleToAid.contains(searchText))
-        {
-            int aid = cachedTitleToAid[searchText];
-            unknownFilesData[currentRow].setSelectedAid(aid);
-            
-            // Enable episode input
-            episodeInput->setEnabled(true);
-            episodeInput->setPlaceholderText("Enter episode number (e.g., 1, S1, etc.)...");
-            
-            // Optionally, we could add a completer with episode numbers from database
-            // For now, just allow manual entry
-        }
-        else
-        {
-            // Clear episode selection if anime is not valid
-            episodeInput->clear();
-            episodeInput->setEnabled(false);
-            episodeInput->setPlaceholderText("Select anime first...");
-            bindButton->setEnabled(false);
-            unknownFilesData[currentRow].setSelectedAid(-1);
-        }
-    });
-    
-    // Connect episode input to enable bind button when text is entered
-    connect(episodeInput, &QLineEdit::textChanged, this, [this, filepath, episodeInput, bindButton]() {
-        // Find current row by filepath (stable identifier)
-        int currentRow = -1;
-        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
-            QTableWidgetItem *item = unknownFiles->item(i, 0);
-            if(item && item->toolTip() == filepath) {
-                currentRow = i;
-                break;
-            }
-        }
-        
-        if(currentRow < 0 || !unknownFilesData.contains(currentRow)) return;
-        
-        QString epnoText = episodeInput->text().trimmed();
-        if(!epnoText.isEmpty() && unknownFilesData[currentRow].selectedAid() > 0)
-        {
-            bindButton->setEnabled(true);
-        }
-        else
-        {
-            bindButton->setEnabled(false);
-        }
-    });
-    
-    // Connect bind button - use filepath to find current row dynamically
-    connect(bindButton, &QPushButton::clicked, this, [this, bindButton, episodeInput, filepath]() {
-        // Find current row by filepath
-        int currentRow = -1;
-        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
-            QTableWidgetItem *item = unknownFiles->item(i, 0);
-            if(item && item->toolTip() == filepath) {
-                currentRow = i;
-                break;
-            }
-        }
-        
-        if(currentRow >= 0) {
-            onUnknownFileBindClicked(currentRow, episodeInput->text().trimmed());
-        }
-    });
-    
-    // Connect "Not Anime" button - use filepath to find current row dynamically
-    connect(notAnimeButton, &QPushButton::clicked, this, [this, notAnimeButton, filepath]() {
-        LOG("Not Anime button clicked");
-        LOG(QString("Not Anime button filepath: %1").arg(filepath));
-        
-        // Find current row by filepath
-        int currentRow = -1;
-        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
-            QTableWidgetItem *item = unknownFiles->item(i, 0);
-            if(item && item->toolTip() == filepath) {
-                currentRow = i;
-                break;
-            }
-        }
-        
-        LOG(QString("Not Anime button found row: %1").arg(currentRow));
-        
-        if(currentRow >= 0) {
-            onUnknownFileNotAnimeClicked(currentRow);
-        } else {
-            LOG("ERROR: Could not find row for filepath");
-        }
-    });
-    
-    // Connect "Re-check" button - use filepath to find current row dynamically
-    connect(recheckButton, &QPushButton::clicked, this, [this, recheckButton, filepath]() {
-        LOG("Re-check button clicked");
-        LOG(QString("Re-check button filepath: %1").arg(filepath));
-        
-        // Find current row by filepath
-        int currentRow = -1;
-        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
-            QTableWidgetItem *item = unknownFiles->item(i, 0);
-            if(item && item->toolTip() == filepath) {
-                currentRow = i;
-                break;
-            }
-        }
-        
-        LOG(QString("Re-check button found row: %1").arg(currentRow));
-        
-        if(currentRow >= 0) {
-            onUnknownFileRecheckClicked(currentRow);
-        } else {
-            LOG("ERROR: Could not find row for filepath");
-        }
-    });
-    
-    // Connect "Delete" button - use filepath to find current row dynamically
-    connect(deleteButton, &QPushButton::clicked, this, [this, deleteButton, filepath]() {
-        LOG("Delete button clicked");
-        LOG(QString("Delete button filepath: %1").arg(filepath));
-        
-        // Find current row by filepath
-        int currentRow = -1;
-        for(int i = 0; i < unknownFiles->rowCount(); ++i) {
-            QTableWidgetItem *item = unknownFiles->item(i, 0);
-            if(item && item->toolTip() == filepath) {
-                currentRow = i;
-                break;
-            }
-        }
-        
-        LOG(QString("Delete button found row: %1").arg(currentRow));
-        
-        if(currentRow >= 0) {
-            onUnknownFileDeleteClicked(currentRow);
-        } else {
-            LOG("ERROR: Could not find row for filepath");
-        }
-    });
 }
 
 void Window::loadMylistFromDatabase()
@@ -4845,379 +4539,6 @@ void Window::onResetWatchSession(int aid)
 	if (cardManager) {
 		cardManager->updateCardAnimeInfo(aid);
 	}
-}
-
-// Unknown files handling slots
-void Window::onUnknownFileAnimeSearchChanged(int /*row*/)
-{
-    // This is handled by the lambda in unknownFilesInsertRow
-    // Placeholder for future enhancements
-}
-
-void Window::onUnknownFileEpisodeSelected(int /*row*/)
-{
-    // This is handled by the lambda in unknownFilesInsertRow
-    // Placeholder for future enhancements
-}
-
-void Window::onUnknownFileBindClicked(int row, const QString& epno)
-{
-    if(!unknownFilesData.contains(row))
-    {
-        LOG(QString("Error: Unknown file data not found for row %1").arg(row));
-        return;
-    }
-    
-    LocalFileInfo &fileInfo = unknownFilesData[row];
-    
-    if(fileInfo.selectedAid() <= 0)
-    {
-        LOG(QString("Error: Invalid anime selection for row %1").arg(row));
-        QMessageBox::warning(this, "Invalid Selection", "Please select an anime before binding.");
-        return;
-    }
-    
-    if(epno.isEmpty())
-    {
-        LOG(QString("Error: Empty episode number for row %1").arg(row));
-        QMessageBox::warning(this, "Invalid Episode", "Please enter an episode number.");
-        return;
-    }
-    
-    LOG(QString("Binding unknown file: %1 to anime %2, episode %3")
-        .arg(fileInfo.filename())
-        .arg(fileInfo.selectedAid())
-        .arg(epno));
-    
-    // Use default settings for unknown file submission
-    // Note: Hasher settings (markwatched, hasherFileState, storage) are now in HasherCoordinator
-    // For unknown files widget, we use reasonable defaults:
-    int viewed = -1; // no change (since we don't have access to markwatched widget)
-    int state = 1; // Internal (HDD) - reasonable default
-    QString storageStr = ""; // Empty storage
-    
-    // Prepare the "other" field with file details
-    // Note: The AniDB API has an undocumented length limit for the 'other' field
-    // Testing shows ~100 chars works reliably, so we truncate to stay safe
-    QString otherField = QString("File: %1\nHash: %2\nSize: %3")
-        .arg(fileInfo.filename(), fileInfo.hash())
-        .arg(fileInfo.size());
-    
-    // Truncate if too long (limit to 100 chars to stay within API limits)
-    if(otherField.length() > 100)
-    {
-        otherField = otherField.left(97) + "...";
-        LOG(QString("Truncated 'other' field to 100 chars for API compatibility"));
-    }
-    
-    // Add to mylist via API using generic parameter
-    // Note: Always add unknown files to mylist when user clicks submit button
-    if(adbapi->LoggedIn())
-    {
-        LOG(QString("Adding unknown file to mylist using generic: aid=%1, epno=%2")
-            .arg(fileInfo.selectedAid())
-            .arg(epno));
-        
-        adbapi->MylistAddGeneric(fileInfo.selectedAid(), epno, viewed, state, storageStr, otherField);
-        
-        // Mark the file in local_files as bound to anime (binding_status 1)
-        adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 1);
-        
-        // Reload mylist to show the newly bound file
-        // Note: This happens immediately, before the API response. 
-        // The actual entry will appear after the API confirms (210 response)
-        // but we refresh the display to pick up the binding_status change
-        loadMylistAsCards();
-        
-        // Remove from unknown files widget after successful binding
-        unknownFiles->removeRow(row);
-        unknownFilesData.remove(row);
-        
-        // Update row indices in unknownFilesData map
-        QMap<int, LocalFileInfo> newMap;
-        for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
-        {
-            int oldRow = it.key();
-            if(oldRow > row) {
-                newMap[oldRow - 1] = it.value();
-            } else {
-                newMap[oldRow] = it.value();
-            }
-        }
-        unknownFilesData = newMap;
-        
-        // Hide the widget if no more unknown files
-        if(unknownFiles->rowCount() == 0)
-        {
-            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
-            if(unknownFilesContainer)
-            {
-                unknownFilesContainer->hide();
-            }
-        }
-        
-        LOG(QString("Successfully bound unknown file to anime %1, episode %2")
-            .arg(fileInfo.selectedAid())
-            .arg(epno));
-    }
-    else
-    {
-        QMessageBox::warning(this, "Cannot Add", 
-            "Please enable 'Add file(s) to MyList' and ensure you are logged in.");
-    }
-}
-
-void Window::onUnknownFileNotAnimeClicked(int row)
-{
-    if(!unknownFilesData.contains(row))
-    {
-        LOG(QString("Error: Unknown file data not found for row %1").arg(row));
-        return;
-    }
-    
-    LocalFileInfo &fileInfo = unknownFilesData[row];
-    
-    LOG(QString("Marking file as not anime: %1").arg(fileInfo.filename()));
-    
-    // Mark the file in local_files as not anime (binding_status 2)
-    adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 2);
-    
-    // Remove from unknown files widget
-    unknownFiles->removeRow(row);
-    unknownFilesData.remove(row);
-    
-    // Update row indices in unknownFilesData map
-    QMap<int, LocalFileInfo> newMap;
-    for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
-    {
-        int oldRow = it.key();
-        if(oldRow > row) {
-            newMap[oldRow - 1] = it.value();
-        } else {
-            newMap[oldRow] = it.value();
-        }
-    }
-    unknownFilesData = newMap;
-    
-    // Hide the widget if no more unknown files
-    if(unknownFiles->rowCount() == 0)
-    {
-        QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
-        if(unknownFilesContainer)
-        {
-            unknownFilesContainer->hide();
-        }
-    }
-    
-    LOG(QString("Successfully marked file as not anime: %1").arg(fileInfo.filename()));
-}
-
-void Window::onUnknownFileRecheckClicked(int row)
-{
-    if(!unknownFilesData.contains(row))
-    {
-        LOG(QString("Error: Unknown file data not found for row %1").arg(row));
-        return;
-    }
-    
-    LocalFileInfo &fileInfo = unknownFilesData[row];
-    
-    LOG(QString("Re-checking file against AniDB: %1").arg(fileInfo.filename()));
-    LOG(QString("Hash: %1, Size: %2").arg(fileInfo.hash()).arg(fileInfo.size()));
-    
-    // Check if file is already in hashes table
-    bool fileInHashesTable = false;
-    int hashesRow = -1;
-    for(int i = 0; i < hashes->rowCount(); ++i)
-    {
-        QString hashPath = hashes->item(i, 2)->text();
-        if(hashPath == fileInfo.filepath())
-        {
-            fileInHashesTable = true;
-            hashesRow = i;
-            break;
-        }
-    }
-    
-    // If file is not in hashes table, add it first
-    if(!fileInHashesTable)
-    {
-        LOG(QString("File not in hashes table, adding: %1").arg(fileInfo.filename()));
-        QFileInfo qFileInfo(fileInfo.filepath());
-        hashesinsertrow(qFileInfo, Qt::Unchecked, fileInfo.hash());
-        hashesRow = hashes->rowCount() - 1;
-    }
-    else
-    {
-        LOG(QString("File already in hashes table at row %1").arg(hashesRow));
-    }
-    
-    // Call MylistAdd API with the hash and size
-    // The response will be handled by getNotifyMylistAdd
-    QString tag = adbapi->MylistAdd(fileInfo.size(), fileInfo.hash(), 
-                                     hasherCoordinator->getMarkWatched()->checkState(), 
-                                     hasherCoordinator->getHasherFileState()->currentIndex(), 
-                                     hasherCoordinator->getStorage()->text());
-    
-    // Store the tag in the hashes table for response matching
-    if(hashesRow >= 0 && hashesRow < hashes->rowCount())
-    {
-        hashes->item(hashesRow, 6)->setText(tag);
-        // Update progress indicator to show it's being checked
-        hashes->item(hashesRow, 1)->setText("1"); // Checking
-        LOG(QString("Sent re-check request with tag: %1").arg(tag));
-    }
-    
-    LOG(QString("Re-check initiated for file: %1").arg(fileInfo.filename()));
-}
-
-void Window::onUnknownFileDeleteClicked(int row)
-{
-    if(!unknownFilesData.contains(row))
-    {
-        LOG(QString("Error: Unknown file data not found for row %1").arg(row));
-        return;
-    }
-    
-    LocalFileInfo fileInfo = unknownFilesData[row];  // Copy, not reference, to avoid invalidation
-    
-    LOG(QString("Delete button clicked for file: %1").arg(fileInfo.filename()));
-    
-    // Show confirmation dialog to prevent accidental deletion
-    QMessageBox::StandardButton reply = QMessageBox::question(
-        this, 
-        "Confirm File Deletion",
-        QString("Are you sure you want to permanently delete this file?\n\n"
-                "File: %1\n\n"
-                "This action cannot be undone!")
-            .arg(fileInfo.filename()),
-        QMessageBox::Yes | QMessageBox::No,
-        QMessageBox::No  // Default to No for safety
-    );
-    
-    if(reply != QMessageBox::Yes)
-    {
-        LOG(QString("File deletion cancelled by user: %1").arg(fileInfo.filename()));
-        return;
-    }
-    
-    // Attempt to delete the physical file
-    QFile file(fileInfo.filepath());
-    if(!file.exists())
-    {
-        LOG(QString("Error: File does not exist: %1").arg(fileInfo.filepath()));
-        QMessageBox::warning(this, "File Not Found", 
-            QString("The file no longer exists:\n%1").arg(fileInfo.filepath()));
-        
-        // Save scroll position before removing row
-        int scrollPos = unknownFiles->verticalScrollBar()->value();
-        
-        // Disconnect all button signals for this row to prevent use-after-free
-        QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
-        if (cellWidget) {
-            // Find all buttons in the cell widget and disconnect them
-            QList<QPushButton*> buttons = cellWidget->findChildren<QPushButton*>();
-            for (QPushButton* btn : buttons) {
-                disconnect(btn, nullptr, this, nullptr);
-            }
-        }
-        
-        // Remove from UI anyway since file doesn't exist
-        unknownFiles->removeRow(row);
-        unknownFilesData.remove(row);
-        
-        // Update row indices in unknownFilesData map
-        QMap<int, LocalFileInfo> newMap;
-        for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
-        {
-            int oldRow = it.key();
-            if(oldRow > row) {
-                newMap[oldRow - 1] = it.value();
-            } else {
-                newMap[oldRow] = it.value();
-            }
-        }
-        unknownFilesData = newMap;
-        
-        // Restore scroll position
-        unknownFiles->verticalScrollBar()->setValue(scrollPos);
-        
-        // Hide the widget if no more unknown files
-        if(unknownFiles->rowCount() == 0)
-        {
-            QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
-            if(unknownFilesContainer)
-            {
-                unknownFilesContainer->hide();
-            }
-        }
-        
-        // Process events to ensure all Qt table updates complete
-        QCoreApplication::processEvents();
-        return;
-    }
-    
-    if(!file.remove())
-    {
-        LOG(QString("Error: Failed to delete file: %1").arg(file.errorString()));
-        QMessageBox::critical(this, "Delete Failed", 
-            QString("Failed to delete file:\n%1\n\nError: %2")
-                .arg(fileInfo.filepath(), file.errorString()));
-        return;
-    }
-    
-    LOG(QString("Successfully deleted file: %1").arg(fileInfo.filepath()));
-    
-    // Save scroll position before removing row
-    int scrollPos = unknownFiles->verticalScrollBar()->value();
-    
-    // Update database - remove from local_files table
-    adbapi->UpdateLocalFileBindingStatus(fileInfo.filepath(), 3); // 3 = deleted
-    
-    // Disconnect all button signals for this row to prevent use-after-free
-    QWidget *cellWidget = unknownFiles->cellWidget(row, 3);
-    if (cellWidget) {
-        // Find all buttons in the cell widget and disconnect them
-        QList<QPushButton*> buttons = cellWidget->findChildren<QPushButton*>();
-        for (QPushButton* btn : buttons) {
-            disconnect(btn, nullptr, this, nullptr);
-        }
-    }
-    
-    // Remove from unknown files widget
-    unknownFiles->removeRow(row);
-    unknownFilesData.remove(row);
-    
-    // Update row indices in unknownFilesData map
-    QMap<int, LocalFileInfo> newMap;
-    for(auto it = unknownFilesData.begin(); it != unknownFilesData.end(); ++it)
-    {
-        int oldRow = it.key();
-        if(oldRow > row) {
-            newMap[oldRow - 1] = it.value();
-        } else {
-            newMap[oldRow] = it.value();
-        }
-    }
-    unknownFilesData = newMap;
-    
-    // Restore scroll position
-    unknownFiles->verticalScrollBar()->setValue(scrollPos);
-    
-    // Hide the widget if no more unknown files
-    if(unknownFiles->rowCount() == 0)
-    {
-        QWidget *unknownFilesContainer = this->findChild<QWidget*>("unknownFilesContainer");
-        if(unknownFilesContainer)
-        {
-            unknownFilesContainer->hide();
-        }
-    }
-    
-    LOG(QString("Successfully removed deleted file from UI: %1").arg(fileInfo.filename()));
-    
-    // Process pending events to ensure all table updates are complete before returning
-    QCoreApplication::processEvents();
 }
 
 // ========== Filter Bar Toggle Implementation ==========
