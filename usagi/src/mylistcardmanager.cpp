@@ -1703,7 +1703,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                                 "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted, "
                                 "a.relaidlist, a.relaidtype "
                                 "FROM anime a "
-                                "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 "
+                                "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 AND at.language = 'x-jat' "
                                 "WHERE a.aid IN (%1)").arg(aidsList);
     
     QSqlQuery q(db);
@@ -1736,7 +1736,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     LOG(QString("[MyListCardManager] Step 1: Loaded anime data for %1 anime in %2 ms")
         .arg(m_cardCreationDataCache.size()).arg(step1Elapsed));
     
-    // Step 2: Load anime titles for anime without anime table data
+    // Step 2: Load anime titles for anime without anime table data OR with empty animeTitle
+    // This fills in titles from anime_titles table when anime table is missing/incomplete
     qint64 step2Start = timer.elapsed();
     QString titlesQuery = QString("SELECT aid, title FROM anime_titles "
                                  "WHERE aid IN (%1) AND type = 1 AND language = 'x-jat'").arg(aidsList);
@@ -1746,12 +1747,15 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
             int aid = tq.value(0).toInt();
             QString title = tq.value(1).toString();
             
-            // Only set if not already in cache or if it doesn't have data yet
-            if (!m_cardCreationDataCache.contains(aid) || !m_cardCreationDataCache[aid].hasData) {
+            // Set if not already in cache OR if animeTitle is empty (even when hasData=true)
+            // This ensures we fill missing titles from anime_titles table
+            if (!m_cardCreationDataCache.contains(aid)) {
                 CardCreationData& data = m_cardCreationDataCache[aid];
                 data.animeTitle = title;
-                // Mark as having at least minimal data so filtering can work
                 data.hasData = true;
+            } else if (m_cardCreationDataCache[aid].animeTitle.isEmpty()) {
+                // Fill empty animeTitle even when other data exists
+                m_cardCreationDataCache[aid].animeTitle = title;
             }
         }
     }
