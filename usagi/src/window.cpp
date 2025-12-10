@@ -1011,6 +1011,7 @@ Window::Window()
 
     // Debug: Check all direct children of Window
     LOG("Direct children of Window:");
+    QWidget *mysteryWidget = nullptr;
     for (auto* w : this->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
         QString widgetInfo = QString("  - %1 (objectName: %2, visible: %3, geometry: %4,%5 %6x%7, ptr: %8)")
             .arg(w->metaObject()->className())
@@ -1024,8 +1025,30 @@ Window::Window()
         if (w == loginbutton) widgetInfo += " [IS loginbutton!]";
         if (w == trayIconMenu) widgetInfo += " [IS trayIconMenu!]";
         
+        // Identify potential mystery widget (unnamed QWidget)
+        if (QString(w->metaObject()->className()) == "QWidget" && w->objectName().isEmpty()) {
+            widgetInfo += " [POTENTIAL MYSTERY]";
+            mysteryWidget = w;
+        }
+        
         LOG(widgetInfo);
     }
+    
+    // If we found a mystery widget, log detailed parent information
+    if (mysteryWidget) {
+        LOG(QString("Mystery widget parent details: parent=%1 at address=%2")
+            .arg(mysteryWidget->parent() ? mysteryWidget->parent()->metaObject()->className() : "NULL")
+            .arg(reinterpret_cast<quintptr>(mysteryWidget->parent()), 0, 16));
+        
+        LOG("=== Object Tree Dump (mystery widget) ===");
+        mysteryWidget->dumpObjectTree();
+        LOG("=== Object Info Dump (mystery widget) ===");
+        mysteryWidget->dumpObjectInfo();
+    }
+    
+    // Log the entire Window object tree for comprehensive view
+    LOG("=== Full Window Object Tree ===");
+    this->dumpObjectTree();
     
     // Log the tabwidget's tab bar
     QTabBar *tabBar = tabwidget->tabBar();
