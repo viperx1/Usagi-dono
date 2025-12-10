@@ -171,6 +171,7 @@ Window::Window()
     watchSessionManager = nullptr;
     directoryWatcherManager = nullptr;
     autoFetchManager = nullptr;
+    traySettingsManager = nullptr;
 	
     safeclose = new QTimer;
     safeclose->setInterval(100);
@@ -593,18 +594,8 @@ Window::Window()
     settingsMainLayout->addWidget(deletionGroup);
     
     // System Tray Group
-    QGroupBox *trayGroup = new QGroupBox("System Tray");
-    QVBoxLayout *trayLayout = new QVBoxLayout(trayGroup);
-    trayMinimizeToTray = new QCheckBox("Minimize to tray");
-    trayMinimizeToTray->setToolTip("Minimize the application to system tray instead of taskbar");
-    trayCloseToTray = new QCheckBox("Close to tray");
-    trayCloseToTray->setToolTip("Hide to system tray when closing the window instead of exiting");
-    trayStartMinimized = new QCheckBox("Start minimized to tray");
-    trayStartMinimized->setToolTip("Start the application minimized to system tray");
-    trayLayout->addWidget(trayMinimizeToTray);
-    trayLayout->addWidget(trayCloseToTray);
-    trayLayout->addWidget(trayStartMinimized);
-    settingsMainLayout->addWidget(trayGroup);
+    traySettingsManager = new TraySettingsManager(this);
+    settingsMainLayout->addWidget(traySettingsManager->getSettingsGroup());
     
     // Auto-start Group
     QGroupBox *autoStartGroup = new QGroupBox("Application Startup");
@@ -933,31 +924,11 @@ Window::Window()
     connect(trayIconManager, &TrayIconManager::logMessage, 
             this, &Window::getNotifyLogAppend);
     
-    // Load tray settings from database and apply to tray manager
-    bool minimizeToTray = adbapi->getTrayMinimizeToTray();
-    bool closeToTray = adbapi->getTrayCloseToTray();
-    bool startMinimized = adbapi->getTrayStartMinimized();
-    
-    trayIconManager->setMinimizeToTrayEnabled(minimizeToTray);
-    trayIconManager->setCloseToTrayEnabled(closeToTray);
-    trayIconManager->setStartMinimizedEnabled(startMinimized);
-    
-    // Update UI checkboxes to match loaded settings
-    if (!trayIconManager->isSystemTrayAvailable()) {
-        // Disable tray checkboxes in UI if system tray not available
-        trayMinimizeToTray->setEnabled(false);
-        trayMinimizeToTray->setToolTip("System tray not available on this platform");
-        trayCloseToTray->setEnabled(false);
-        trayCloseToTray->setToolTip("System tray not available on this platform");
-        trayStartMinimized->setEnabled(false);
-        trayStartMinimized->setToolTip("System tray not available on this platform");
-    } else {
-        trayMinimizeToTray->setChecked(minimizeToTray);
-        trayCloseToTray->setChecked(closeToTray);
-        trayStartMinimized->setChecked(startMinimized);
+    if (traySettingsManager) {
+        traySettingsManager->applyAvailability(trayIconManager);
+        traySettingsManager->loadSettingsFromApi(adbapi, trayIconManager);
         
-        // If start minimized is enabled, hide the window on startup
-        if (startMinimized && trayIconManager->isTrayIconVisible()) {
+        if (traySettingsManager->isStartMinimizedEnabled() && trayIconManager->isTrayIconVisible()) {
             this->hide();
             LOG("Application started minimized to tray");
         }
@@ -1971,21 +1942,11 @@ void Window::saveSettings()
 	// Save media player path
 	PlaybackManager::setMediaPlayerPath(mediaPlayerPath->text());
 	
-	// Save tray settings and update tray manager
-	bool minimizeToTray = trayMinimizeToTray->isChecked();
-	bool closeToTray = trayCloseToTray->isChecked();
-	bool startMinimized = trayStartMinimized->isChecked();
-	
-	adbapi->setTrayMinimizeToTray(minimizeToTray);
-	adbapi->setTrayCloseToTray(closeToTray);
-	adbapi->setTrayStartMinimized(startMinimized);
-	
-	// Update tray icon manager with new settings
-	trayIconManager->setMinimizeToTrayEnabled(minimizeToTray);
-	trayIconManager->setCloseToTrayEnabled(closeToTray);
-	trayIconManager->setStartMinimizedEnabled(startMinimized);
-	
-	LOG("Tray settings saved");
+    // Save tray settings and update tray manager
+    if (traySettingsManager) {
+        traySettingsManager->saveSettingsToApi(adbapi, trayIconManager);
+        LOG("Tray settings saved");
+    }
 	
 	// Save auto-start settings
 	bool autoStartWasEnabled = adbapi->getAutoStartEnabled();

@@ -52,6 +52,7 @@
 #include "watchsessionmanager.h"
 #include "uicolors.h"
 #include "autofetchmanager.h"
+#include "traysettingsmanager.h"
 #include "localfileinfo.h"
 #include "progresstracker.h"
 #include "hashingtask.h"
@@ -71,6 +72,7 @@ class TrayIconManager;
 class UnknownFilesManager;
 class DirectoryWatcherManager;
 class AutoFetchManager;
+class TraySettingsManager;
 class Window;  // Forward declaration for friend access
 
 class hashes_ : public QTableWidget
@@ -242,9 +244,7 @@ private:
     AutoFetchManager *autoFetchManager;
     
     // Tray settings
-    QCheckBox *trayMinimizeToTray;
-    QCheckBox *trayCloseToTray;
-    QCheckBox *trayStartMinimized;
+    TraySettingsManager *traySettingsManager;
     
     // Auto-start settings
     QCheckBox *autoStartEnabled;
