@@ -933,7 +933,7 @@ QString CrashLog::getStackTrace()
     // This ensures debug symbols are found whether in PDB files or embedded in executable
     // TRUE parameter: automatically enumerate and load symbols for all loaded modules
     // This allows resolving symbols from Qt libraries and other DLLs in the stack trace
-    BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    [[maybe_unused]] BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
     
     WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
     
