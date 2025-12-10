@@ -308,7 +308,7 @@ Window::Window()
     
     // Add everything to the main hasher page layout
     pageHasher->addWidget(topSplitter, 1);  // Resizable section
-    pageHasher->addLayout(hasherCoordinator->getHasherSettings());  // Control section (not resizable)
+    pageHasher->addWidget(hasherCoordinator->getHasherSettings());  // Control section (not resizable) - now a widget
     pageHasher->addLayout(totalProgressLayout);  // Total progress with collapse button
     pageHasher->addWidget(threadProgressContainer);  // Thread progress bars
     pageHasher->addWidget(hasherCoordinator->getHasherOutput());  // ED2K links (fixed size)
