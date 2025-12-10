@@ -255,7 +255,7 @@ Window::Window()
     unknownFiles = new unknown_files_(this); // Unknown files widget
     
     // Create a container widget for unknown files with label
-    QWidget *unknownFilesContainer = new QWidget();
+    QWidget *unknownFilesContainer = new QWidget(this);  // Give it Window as parent
     unknownFilesContainer->setObjectName("unknownFilesContainer");
     unknownFilesContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Container must expand in splitter
     QVBoxLayout *unknownFilesLayout = new QVBoxLayout();
@@ -292,7 +292,7 @@ Window::Window()
     collapseThreadProgressButton->setChecked(false);  // Initially not collapsed (visible)
     
     // Create container for thread progress bars
-    QWidget *threadProgressContainer = new QWidget();
+    QWidget *threadProgressContainer = new QWidget(this);  // Give it Window as parent
     QVBoxLayout *threadProgressLayout = new QVBoxLayout();
     threadProgressContainer->setLayout(threadProgressLayout);
     threadProgressLayout->setContentsMargins(0, 0, 0, 0);
@@ -538,7 +538,7 @@ Window::Window()
     settingsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     settingsScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
-    QWidget *settingsContainer = new QWidget();
+    QWidget *settingsContainer = new QWidget(pageSettingsParent);  // Give it pageSettingsParent as parent
     QVBoxLayout *settingsMainLayout = new QVBoxLayout();
     settingsContainer->setLayout(settingsMainLayout);
     settingsMainLayout->setSpacing(10);
@@ -2722,7 +2722,7 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     unknownFiles->setCellWidget(row, 2, episodeInput);
     
     // Column 3: Action buttons (Bind and Not Anime in a container)
-    QWidget *actionContainer = new QWidget();
+    QWidget *actionContainer = new QWidget(this);  // Give it Window as temporary parent
     QHBoxLayout *actionLayout = new QHBoxLayout();
     actionContainer->setLayout(actionLayout);
     actionLayout->setContentsMargins(2, 2, 2, 2);
