@@ -444,7 +444,7 @@ private:
     QString getFilePathForPlayback(int lid);
     int getPlaybackResumePosition(int lid);
     void startPlaybackForFile(int lid);
-    void updateUIForWatchedFile(int lid);  // Update anime card for a watched file
+    void updateUIForWatchedFile(int lid);  // Update anime card for watched file
     
     // Icon helper method
     QIcon loadUsagiIcon();  // Loads usagi.png from various paths, falls back to default icon

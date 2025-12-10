@@ -2544,7 +2544,6 @@ void Window::getNotifyEpisodeUpdated(int eid, int aid)
 	// Episode data was updated in the database, update only the specific episode item
 	LOG(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
 	
-	// Update card manager
 	if (cardManager) {
 		cardManager->onEpisodeUpdated(eid, aid);
 		// Backward compatibility: update animeCards list
@@ -2563,9 +2562,7 @@ void Window::getNotifyAnimeUpdated(int aid)
 	// Update alternative titles cache for this anime
 	updateAnimeAlternativeTitlesInCache(aid);
 	
-	// Update card view
 	if (cardManager) {
-		// Use card manager for efficient update
 		cardManager->onAnimeUpdated(aid);
 		// Backward compatibility: update animeCards list
 		animeCards = cardManager->getAllCards();
@@ -2597,7 +2594,6 @@ void Window::updateEpisodeInTree(int eid, int aid)
 
 void Window::updateOrAddMylistEntry(int lid)
 {
-	// Update or add a single mylist entry using card manager
 	if (cardManager) {
 		cardManager->updateOrAddMylistEntry(lid);
 		// Backward compatibility: update animeCards list
