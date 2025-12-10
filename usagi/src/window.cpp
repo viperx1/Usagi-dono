@@ -191,8 +191,8 @@ Window::Window()
     this->setMinimumSize(800, 600);
 //    this->setFixedHeight(600);
 
-    // main layout
-    layout = new QBoxLayout(QBoxLayout::TopToBottom, this);
+    // main layout - Don't pass parent to constructor, use setLayout() instead
+    layout = new QBoxLayout(QBoxLayout::TopToBottom);
     tabwidget = new QTabWidget(this);  // Give tabwidget proper parent
     tabwidget->setObjectName("tabwidget");
     loginbutton = new QPushButton("Login");
