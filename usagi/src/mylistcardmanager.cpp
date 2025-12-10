@@ -1978,9 +1978,6 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     
     if (aid > 0) {
         LOG(QString("[MyListCardManager] Requesting play button update for aid=%1").arg(aid));
-        // Emit signal to update play buttons in tree view
-        emit playButtonsNeedUpdate(aid);
-        
         // Update the card immediately to reflect the change
         updateCardFromDatabase(aid);
     }
@@ -2032,9 +2029,6 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
     
     // Emit signal for API update (will be handled by Window to call anidb->UpdateFile)
     emit fileNeedsApiUpdate(lid, size, ed2k, 1);
-    
-    // Emit signal to update play buttons in tree view
-    emit playButtonsNeedUpdate(aid);
     
     // Update the card immediately to reflect the change
     updateCardFromDatabase(aid);
