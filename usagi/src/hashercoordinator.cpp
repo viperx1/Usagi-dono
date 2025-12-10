@@ -678,7 +678,7 @@ void HasherCoordinator::provideNextFileToHash()
     m_hasherThreadPool->addFile(QString());
 }
 
-void HasherCoordinator::onMarkWatchedStateChanged(int state)
+void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
 {
     switch(state)
     {
