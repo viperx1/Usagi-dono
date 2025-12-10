@@ -21,7 +21,6 @@ TraySettingsManager::TraySettingsManager(QObject *parent)
     m_trayCloseToTray = new QCheckBox("Close to tray", m_settingsGroup);
     m_trayStartMinimized = new QCheckBox("Start minimized to tray", m_settingsGroup);
     m_layout = new QVBoxLayout(m_settingsGroup);
-{
     m_trayMinimizeToTray->setToolTip(kTooltipMinimize);
     m_trayCloseToTray->setToolTip(kTooltipClose);
     m_trayStartMinimized->setToolTip(kTooltipStartMinimized);
@@ -29,6 +28,7 @@ TraySettingsManager::TraySettingsManager(QObject *parent)
     m_layout->addWidget(m_trayMinimizeToTray);
     m_layout->addWidget(m_trayCloseToTray);
     m_layout->addWidget(m_trayStartMinimized);
+
 }
 
 TraySettingsManager::~TraySettingsManager() = default;
