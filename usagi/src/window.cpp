@@ -250,7 +250,7 @@ Window::Window()
     }
 
     // page hasher - Create HasherCoordinator to manage all hasher UI and logic
-    hasherCoordinator = new HasherCoordinator(adbapi, this);
+    hasherCoordinator = new HasherCoordinator(adbapi, pageHasherParent);
     hashes = hasherCoordinator->getHashesTable();  // Get reference to hashes table for compatibility
     unknownFiles = new unknown_files_(this); // Unknown files widget
     
