@@ -94,6 +94,13 @@ public:
      */
     int getOriginalPrequel(int aid) const;
     
+    /**
+     * @brief Get the complete series chain for an anime
+     * @param aid Anime ID
+     * @return Ordered list of anime IDs in the series (from prequel to final sequel)
+     */
+    QList<int> getSeriesChain(int aid) const;
+    
     // ========== File Marking ==========
     
     /**
