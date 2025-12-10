@@ -5,7 +5,6 @@
 #include "hasherthread.h"
 #include "crashlog.h"
 #include "logger.h"
-#include "playbuttondelegate.h"
 #include "aired.h"
 #include <QElapsedTimer>
 #include <QThread>
@@ -905,9 +904,6 @@ Window::Window()
         }
     });
     
-    // Initialize play button delegate (kept for card view compatibility)
-    playButtonDelegate = new PlayButtonDelegate(this);
-    
     // Setup animation timer for play button animation
     m_animationTimer = new QTimer(this);
     m_animationTimer->setInterval(300);  // 300ms between animation frames
@@ -1729,13 +1725,6 @@ void Window::restoreMylistSorting()
     LOG(QString("Restored %1 mylist filter settings from database").arg(settings.size()));
 }
 
-void Window::onMylistSortChanged(int column, Qt::SortOrder order)
-{
-    Q_UNUSED(column);
-    Q_UNUSED(order);
-    // This slot was for tree view sorting - no longer used with card view only
-}
-
 
 void Window::hasherFinished()
 {
@@ -2555,7 +2544,7 @@ void Window::getNotifyEpisodeUpdated(int eid, int aid)
 	// Episode data was updated in the database, update only the specific episode item
 	LOG(QString("Episode data received for EID %1 (AID %2), updating field...").arg(eid).arg(aid));
 	
-	// Update card manager (tree view has been removed)
+	// Update card manager
 	if (cardManager) {
 		cardManager->onEpisodeUpdated(eid, aid);
 		// Backward compatibility: update animeCards list
@@ -2574,7 +2563,7 @@ void Window::getNotifyAnimeUpdated(int aid)
 	// Update alternative titles cache for this anime
 	updateAnimeAlternativeTitlesInCache(aid);
 	
-	// Update card view (tree view has been removed)
+	// Update card view
 	if (cardManager) {
 		// Use card manager for efficient update
 		cardManager->onAnimeUpdated(aid);
@@ -2608,7 +2597,7 @@ void Window::updateEpisodeInTree(int eid, int aid)
 
 void Window::updateOrAddMylistEntry(int lid)
 {
-	// Update or add a single mylist entry using card manager (tree view removed)
+	// Update or add a single mylist entry using card manager
 	if (cardManager) {
 		cardManager->updateOrAddMylistEntry(lid);
 		// Backward compatibility: update animeCards list
@@ -2857,7 +2846,6 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
 
 void Window::loadMylistFromDatabase()
 {
-	// Always use card view (tree view has been removed)
 	loadMylistAsCards();
 }
 
@@ -3417,17 +3405,6 @@ void Window::onPlaybackPositionUpdated(int lid, int position, int duration)
 	// The position is already saved by PlaybackManager, no need to do anything here
 }
 
-void Window::updatePlayButtonForItem(QTreeWidgetItem *item)
-{
-	// Tree view has been removed - this function is now a no-op
-	Q_UNUSED(item);
-}
-
-void Window::updatePlayButtonsInTree(QTreeWidgetItem *rootItem)
-{
-	// Tree view has been removed - this function is now a no-op
-	Q_UNUSED(rootItem);
-}
 
 void Window::onPlaybackCompleted(int lid)
 {
@@ -3439,7 +3416,7 @@ void Window::onPlaybackCompleted(int lid)
 		m_animationTimer->stop();
 	}
 	
-	// Update tree view and anime card
+	// Update anime card
 	updateUIForWatchedFile(lid);
 }
 
@@ -3458,13 +3435,13 @@ void Window::onFileMarkedAsLocallyWatched(int lid)
 {
 	LOG(QString("File marked as locally watched via chunk tracking: LID %1 - Updating UI").arg(lid));
 	
-	// Update tree view and anime card
+	// Update anime card
 	updateUIForWatchedFile(lid);
 }
 
 void Window::updateUIForWatchedFile(int lid)
 {
-	// Update anime card (tree view has been removed)
+	// Update anime card
 	if (cardManager) {
 		cardManager->updateOrAddMylistEntry(lid);
 	}
@@ -3562,7 +3539,6 @@ void Window::startPlaybackForFile(int lid)
 	}
 }
 
-// Toggle between card view and tree view
 // Sort cards based on selected criterion
 void Window::sortMylistCards(int sortIndex)
 {

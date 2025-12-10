@@ -62,7 +62,6 @@
 //#include "hasherthread.h"
 
 // Forward declarations
-class PlayButtonDelegate;
 class MyListCardManager;
 class VirtualFlowLayout;
 class WatchSessionManager;
@@ -208,7 +207,7 @@ private:
 	// page hasher
 	HasherCoordinator *hasherCoordinator;  // Manages all hasher UI and logic
 
-    // page mylist (card view only - tree view removed)
+    // page mylist (card view only)
     QScrollArea *mylistCardScrollArea;
     QWidget *mylistCardContainer;
     FlowLayout *mylistCardLayout;
@@ -285,7 +284,6 @@ private:
 	
 	// Playback manager and UI
 	PlaybackManager *playbackManager;
-	PlayButtonDelegate *playButtonDelegate;
 	QMap<int, int> m_playingItems; // lid -> animation frame (0, 1, 2)
 	QTimer *m_animationTimer;
 	
@@ -352,7 +350,6 @@ public slots:
     void requestMylistExportManually();
     void saveMylistSorting();
     void restoreMylistSorting();
-    void onMylistSortChanged(int column, Qt::SortOrder order);
     
     // MyList card view slots
     void sortMylistCards(int sortIndex);
@@ -447,10 +444,7 @@ private:
     QString getFilePathForPlayback(int lid);
     int getPlaybackResumePosition(int lid);
     void startPlaybackForFile(int lid);
-    void updatePlayButtonForItem(QTreeWidgetItem *item);
-    void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
-    bool isItemPlaying(QTreeWidgetItem *item) const;
-    void updateUIForWatchedFile(int lid);  // Update tree view and anime card for a watched file
+    void updateUIForWatchedFile(int lid);  // Update anime card for a watched file
     
     // Icon helper method
     QIcon loadUsagiIcon();  // Loads usagi.png from various paths, falls back to default icon
