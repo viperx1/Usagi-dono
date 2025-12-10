@@ -434,7 +434,8 @@ Window::Window()
         }
     });
     
-    // Create horizontal layout for sidebar and card view
+    // Create container widget and horizontal layout for sidebar and card view
+    QWidget *mylistContentContainer = new QWidget(pageMylistParent);
     QHBoxLayout *mylistContentLayout = new QHBoxLayout();
     
     // Create filter sidebar (now includes sorting controls)
@@ -501,7 +502,8 @@ Window::Window()
     cardViewLayout->addWidget(mylistCardScrollArea, 1);  // Give card area stretch factor of 1
     mylistContentLayout->addLayout(cardViewLayout, 1);  // Give card view layout stretch factor of 1
     
-    pageMylist->addLayout(mylistContentLayout);
+    mylistContentContainer->setLayout(mylistContentLayout);
+    pageMylist->addWidget(mylistContentContainer);
     
     // Add progress status label
     mylistStatusLabel = new QLabel("MyList Status: Ready");
