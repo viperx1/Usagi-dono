@@ -13,4 +13,4 @@ Follow SOLID class design principles to the best of your ability:
 
 Do not hesitate to create a new class when a larger amount of already written code would suggest it.
 Never keep legacy code, even for backwards compatibility. Always replace it with new changes.
-Write code for Qt6.8 only. Never install any other Qt versions. Other versions are strictly prohibited.
+Write code for Qt6.8 only. Do not build th project if available Qt version is different than 6.8.
