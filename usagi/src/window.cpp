@@ -25,6 +25,7 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
+#include <QWindowStateChangeEvent>
 #include <QSplitter>
 #include <algorithm>
 #include <functional>
@@ -277,7 +278,7 @@ Window::Window()
     pageHasher->addWidget(hasherCoordinator->getHasherOutput());  // ED2K links (fixed size)
     
     // Connect collapse button
-    connect(collapseThreadProgressButton, &QPushButton::toggled, [collapseThreadProgressButton, threadProgressContainer](bool checked) {
+    connect(collapseThreadProgressButton, &QPushButton::toggled, this, [collapseThreadProgressButton, threadProgressContainer](bool checked) {
         threadProgressContainer->setVisible(!checked);
         collapseThreadProgressButton->setText(checked ? "▶" : "▼");
     });
@@ -1914,6 +1915,13 @@ void Window::changeEvent(QEvent *event)
     if (event->type() == QEvent::WindowStateChange) {
         if (isMinimized() && trayIconManager->isMinimizeToTrayEnabled() && 
             trayIconManager->isSystemTrayAvailable() && trayIconManager->isTrayIconVisible()) {
+            // Save window state and geometry before hiding
+            // Use QWindowStateChangeEvent to get the previous state (before minimize)
+            auto *stateEvent = static_cast<QWindowStateChangeEvent *>(event);
+            windowStateBeforeHide = stateEvent->oldState();
+            // Use normalGeometry() which returns the correct geometry even when minimized
+            windowGeometryBeforeHide = this->normalGeometry();
+            
             // Hide window and show in tray
             this->hide();
             event->ignore();
@@ -4360,12 +4368,16 @@ void Window::onTrayShowHideRequested()
     if (this->isVisible()) {
         // Store the current window state and geometry before hiding
         windowStateBeforeHide = this->windowState();
-        windowGeometryBeforeHide = this->geometry();
+        // Use normalGeometry() which returns the correct geometry even when maximized
+        windowGeometryBeforeHide = this->normalGeometry();
         this->hide();
         LOG("Window hidden to tray");
     } else {
         // Restore the previous window state and geometry
-        this->setGeometry(windowGeometryBeforeHide);
+        // Only set geometry if it's valid (non-empty and has positive dimensions)
+        if (windowGeometryBeforeHide.isValid() && !windowGeometryBeforeHide.isEmpty()) {
+            this->setGeometry(windowGeometryBeforeHide);
+        }
         this->setWindowState(windowStateBeforeHide);
         this->show();
         this->activateWindow();
