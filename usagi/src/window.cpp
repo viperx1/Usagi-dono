@@ -4137,24 +4137,6 @@ void Window::applyMylistFilters()
 	
 	QList<int> filteredAnimeIds;
 	int totalCount = allAnimeIds.size();
-	
-	// When chain display is enabled, build chains from ALL mylist anime FIRST
-	// This allows forming complete chains even when some anime don't match the filter
-	QList<AnimeChain> prebuiltChains;
-	if (showSeriesChain) {
-		LOG(QString("[Window] Pre-building chains from ALL %1 mylist anime before filtering").arg(totalCount));
-		// Use only mylist anime for chain building
-		QList<int> mylistIds;
-		for (int aid : allAnimeIds) {
-			if (mylistAnimeIdSet.contains(aid)) {
-				mylistIds.append(aid);
-			}
-		}
-		LOG(QString("[Window] Building chains from %1 mylist anime").arg(mylistIds.size()));
-		prebuiltChains = cardManager->buildChainsFromAnimeIds(mylistIds);
-		LOG(QString("[Window] Pre-built %1 chains before filtering").arg(prebuiltChains.size()));
-	}
-	
 	// Apply filters to determine which anime to show
 	// Use cached data when card widgets don't exist (virtual scrolling)
 	for (int aid : allAnimeIds) {
@@ -4270,127 +4252,29 @@ void Window::applyMylistFilters()
 		}
 	}
 	
-	// When chain display is enabled, expand filtered results to include complete chains
-	// If a chain has at least one visible anime, include ALL anime from that chain
-	if (showSeriesChain && !prebuiltChains.isEmpty()) {
-		LOG(QString("[Window] Expanding filtered results to include complete chains (before: %1 anime)").arg(filteredAnimeIds.size()));
-		
-		QSet<int> filteredSet = QSet<int>(filteredAnimeIds.begin(), filteredAnimeIds.end());
-		QSet<int> expandedSet = filteredSet;
-		
-		// For each chain, if it contains any visible anime, include all anime from that chain
-		for (const AnimeChain& chain : prebuiltChains) {
-			QList<int> chainAnimeIds = chain.getAnimeIds();
-			
-			// Check if this chain has at least one visible anime
-			bool hasVisibleAnime = false;
-			for (int aid : chainAnimeIds) {
-				if (filteredSet.contains(aid)) {
-					hasVisibleAnime = true;
-					break;
-				}
-			}
-			
-			// If chain has visible anime, include ALL anime from the chain
-			if (hasVisibleAnime) {
-				for (int aid : chainAnimeIds) {
-					expandedSet.insert(aid);
-				}
-			}
-		}
-		
-		// Rebuild filteredAnimeIds from expanded set
-		// Preserve original order where possible
-		QList<int> expandedList;
-		for (int aid : filteredAnimeIds) {
-			if (expandedSet.contains(aid)) {
-				expandedList.append(aid);
-				expandedSet.remove(aid);
-			}
-		}
-		// Add remaining anime from chains (those not in original filtered list)
-		for (int aid : expandedSet) {
-			expandedList.append(aid);
-		}
-		
-		filteredAnimeIds = expandedList;
-		LOG(QString("[Window] After chain expansion: %1 anime").arg(filteredAnimeIds.size()));
-	}
+	// Update the card manager with the filtered list and chain mode flag
+	// This will build chains if showSeriesChain is true and expand them as needed
+	cardManager->setAnimeIdList(filteredAnimeIds, showSeriesChain);
 	
-	// Chain building and sorting is now handled by MyListCardManager
-	// The old WatchSessionManager-based chain building code has been removed
-	// MyListCardManager will build chains when setAnimeIdList() is called with chain mode enabled
+	QList<int> displayAnimeIds = cardManager->getAnimeIdList();
 	
-	// FINAL VALIDATION: Ensure all anime in the final filtered list have card creation data preloaded
-	// This is critical because the chain grouping and filtering logic above may have added anime
-	// that weren't in the original preload after chain expansion
+	// FINAL VALIDATION: Ensure all anime in the final display list have card creation data preloaded
 	QList<int> missingDataAnime;
-	for (int aid : std::as_const(filteredAnimeIds)) {
+	for (int aid : std::as_const(displayAnimeIds)) {
 		if (!cardManager->hasCachedData(aid)) {
 			missingDataAnime.append(aid);
 		}
 	}
 	
 	if (!missingDataAnime.isEmpty()) {
-		LOG(QString("[Window] FINAL PRELOAD: Found %1 anime in filteredAnimeIds without cached data, preloading now").arg(missingDataAnime.size()));
+		LOG(QString("[Window] FINAL PRELOAD: Found %1 anime in display list without cached data, preloading now").arg(missingDataAnime.size()));
 		cardManager->preloadCardCreationData(missingDataAnime);
 	} else {
-		LOG(QString("[Window] FINAL VALIDATION: All %1 anime in filteredAnimeIds have cached data").arg(filteredAnimeIds.size()));
+		LOG(QString("[Window] FINAL VALIDATION: All %1 anime in display list have cached data").arg(displayAnimeIds.size()));
 	}
 	
-	// Update the card manager with the filtered list and chain mode flag
-	// This will build chains if showSeriesChain is true
-	cardManager->setAnimeIdList(filteredAnimeIds, showSeriesChain);
-	
-	// Update series chain connection info for cards
-	// MUST be done AFTER setAnimeIdList so chains are built first
-	// First, clear all chain info
-	for (AnimeCard* card : cardManager->getAllCards()) {
-		card->setSeriesChainInfo(0, 0);
-	}
-	
-	// If series chain display is enabled, set prequel/sequel info for arrow connections
-	// Use the chains already built by MyListCardManager for consistency
-	if (showSeriesChain) {
-		LOG("[Window] Setting chain connection info for series chain display from MyListCardManager chains");
-		QList<AnimeChain> chains = cardManager->getChains();
-		
-		LOG(QString("[Window] Retrieved %1 chains from MyListCardManager").arg(chains.size()));
-		
-		// Iterate through each chain and set prequel/sequel connections
-		for (const AnimeChain& chain : chains) {
-			QList<int> chainAnimeIds = chain.getAnimeIds();
-			
-			LOG(QString("[Window] Processing chain with %1 anime: %2")
-				.arg(chainAnimeIds.size())
-				.arg([&chainAnimeIds]() {
-					QStringList aidStrings;
-					for (int aid : chainAnimeIds) {
-						aidStrings.append(QString::number(aid));
-					}
-					return aidStrings.join(", ");
-				}()));
-			
-			// For each anime in the chain, set its prequel and sequel
-			for (int i = 0; i < chainAnimeIds.size(); ++i) {
-				int currentAid = chainAnimeIds[i];
-				int prequelAid = (i > 0) ? chainAnimeIds[i - 1] : 0;
-				int sequelAid = (i < chainAnimeIds.size() - 1) ? chainAnimeIds[i + 1] : 0;
-				
-				// Set the chain info on the card if it exists
-				AnimeCard* card = cardManager->getCard(currentAid);
-				if (card) {
-					card->setSeriesChainInfo(prequelAid, sequelAid);
-					LOG(QString("[Window] Set chain info for aid=%1: prequel=%2, sequel=%3")
-						.arg(currentAid).arg(prequelAid).arg(sequelAid));
-				} else {
-					LOG(QString("[Window] WARNING: Card not found for aid=%1 in chain").arg(currentAid));
-				}
-			}
-		}
-		
-		LOG(QString("[Window] Set chain connections for %1 chains").arg(chains.size()));
-	}
+	// Update chain connections directly via card manager
+	cardManager->updateSeriesChainConnections(showSeriesChain);
 	
 	// If using virtual scrolling, refresh the layout
 	if (mylistVirtualLayout) {
@@ -4408,7 +4292,7 @@ void Window::applyMylistFilters()
 		}
 		
 		// Add only visible cards back to layout
-		for (int aid : filteredAnimeIds) {
+		for (int aid : displayAnimeIds) {
 			AnimeCard* card = cardsMap.value(aid);
 			if (card) {
 				mylistCardLayout->addWidget(card);
@@ -4418,7 +4302,7 @@ void Window::applyMylistFilters()
 	}
 	
 	// Update status label
-	mylistStatusLabel->setText(QString("MyList Status: Showing %1 of %2 anime").arg(filteredAnimeIds.size()).arg(totalCount));
+	mylistStatusLabel->setText(QString("MyList Status: Showing %1 of %2 anime").arg(displayAnimeIds.size()).arg(totalCount));
 }
 
 // Download poster image for an anime

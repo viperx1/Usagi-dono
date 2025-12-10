@@ -71,6 +71,9 @@ public:
     // Sort chains using specified criteria
     void sortChains(AnimeChain::SortCriteria criteria, bool ascending);
     
+    // Update series chain connections on existing cards (prequel/sequel arrows)
+    void updateSeriesChainConnections(bool chainModeEnabled);
+    
     // Get chains (for inspection/debugging)
     QList<AnimeChain> getChains() const { return m_chainList; }
     
