@@ -19,9 +19,9 @@ extern HasherThreadPool *hasherThreadPool;
 HasherCoordinator::HasherCoordinator(AniDBApi *adbapi, QWidget *parent)
     : QObject(parent)
     , m_adbapi(adbapi)
-    , m_hasherThreadPool(hasherThreadPool)
     , m_totalHashParts(0)
     , m_completedHashParts(0)
+    , m_hasherThreadPool(hasherThreadPool)
 {
     m_hashedFileColor = QColor(Qt::yellow);
     
@@ -185,7 +185,7 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonStart, &QPushButton::clicked, this, &HasherCoordinator::startHashing);
     connect(m_buttonStop, &QPushButton::clicked, this, &HasherCoordinator::stopHashing);
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
-    connect(m_markWatched, &QCheckBox::stateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
+    connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
     
     // Connect to hasher thread pool
     connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
@@ -330,7 +330,7 @@ void HasherCoordinator::updateFilterCache()
     }
 }
 
-void HasherCoordinator::hashesInsertRow(QFileInfo file, Qt::CheckState renameState, const QString& preloadedHash)
+void HasherCoordinator::hashesInsertRow(QFileInfo file, Qt::CheckState /*renameState*/, const QString& preloadedHash)
 {
     int row = m_hashes->rowCount();
     m_hashes->insertRow(row);
@@ -506,7 +506,7 @@ void HasherCoordinator::clearHasher()
     m_hashes->setRowCount(0);
 }
 
-void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData)
+void HasherCoordinator::onFileHashed(int /*threadId*/, ed2k::ed2kfilestruct fileData)
 {
     for(int i=0; i<m_hashes->rowCount(); i++)
     {
@@ -678,7 +678,7 @@ void HasherCoordinator::provideNextFileToHash()
     m_hasherThreadPool->addFile(QString());
 }
 
-void HasherCoordinator::onMarkWatchedStateChanged(int state)
+void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
 {
     switch(state)
     {

@@ -139,7 +139,7 @@ QByteArray QAESEncryption::getPadding(int currSize, int alignment)
         return QByteArray(size,size);
         break;
     case Padding::ISO:
-        return QByteArray (size-1, 0x00).prepend(0x80);
+        return QByteArray (size-1, 0x00).prepend(static_cast<char>(0x80));
         break;
     default:
         return QByteArray(size, 0x00);

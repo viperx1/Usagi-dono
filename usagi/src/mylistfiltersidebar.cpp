@@ -343,7 +343,7 @@ void MyListFilterSidebar::resizeEvent(QResizeEvent *event)
     // Position collapse button on the right side, ignoring layout
     if (m_collapseButton) {
         int buttonWidth = m_collapseButton->width();
-        int buttonHeight = m_collapseButton->height();
+        [[maybe_unused]] int buttonHeight = m_collapseButton->height();
         // Position at top-right corner with some margin
         m_collapseButton->move(width() - buttonWidth - 10, 0);
     }

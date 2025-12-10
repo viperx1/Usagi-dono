@@ -722,7 +722,7 @@ void MyListCardManager::updateCardAnimeInfo(int aid)
     }
 }
 
-void MyListCardManager::updateCardEpisode(int aid, int eid)
+void MyListCardManager::updateCardEpisode(int aid, int /*eid*/)
 {
     // Defer to full card update for now
     // Could be optimized to only update specific episode in the future
@@ -1478,7 +1478,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
     LOG(QString("[MyListCardManager] Loaded %1 episode entries for aid=%2").arg(episodes.size()).arg(aid));
 }
 
-void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int aid, const QList<EpisodeCacheEntry>& episodes)
+void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*/, const QList<EpisodeCacheEntry>& episodes)
 {
     // Load episodes from the provided cache data - NO SQL QUERIES
     // Group files by episode

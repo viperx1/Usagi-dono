@@ -330,7 +330,7 @@ Window::Window()
         }
     });
     
-    connect(cardManager, &MyListCardManager::cardCreated, this, [this](int aid, AnimeCard *card) {
+    connect(cardManager, &MyListCardManager::cardCreated, this, [this](int /*aid*/, AnimeCard *card) {
         // Connect individual card signals
         connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
         connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
@@ -4848,13 +4848,13 @@ void Window::onResetWatchSession(int aid)
 }
 
 // Unknown files handling slots
-void Window::onUnknownFileAnimeSearchChanged(int row)
+void Window::onUnknownFileAnimeSearchChanged(int /*row*/)
 {
     // This is handled by the lambda in unknownFilesInsertRow
     // Placeholder for future enhancements
 }
 
-void Window::onUnknownFileEpisodeSelected(int row)
+void Window::onUnknownFileEpisodeSelected(int /*row*/)
 {
     // This is handled by the lambda in unknownFilesInsertRow
     // Placeholder for future enhancements

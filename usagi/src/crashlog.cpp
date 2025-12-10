@@ -44,16 +44,16 @@ static void safeWrite(int fd, const char* str)
         
         // Use _write directly to avoid encoding issues with _get_osfhandle + WriteFile
         // This ensures single-byte ASCII/UTF-8 output without UTF-16LE conversion
-        _write(fd, str, (unsigned int)len);
+        [[maybe_unused]] int result = _write(fd, str, (unsigned int)len);
 #else
-        write(fd, str, len);
+        [[maybe_unused]] ssize_t result = write(fd, str, len);
 #endif
     }
 }
 
 // Safe function to convert a pointer address to hex string
 // Uses only async-signal-safe operations
-static void pointerToHex(void* ptr, char* buffer, size_t bufSize)
+[[maybe_unused]] static void pointerToHex(void* ptr, char* buffer, size_t bufSize)
 {
     if (!buffer || bufSize < 19) return; // Need at least "0x" + 16 hex digits + null
     
@@ -933,7 +933,7 @@ QString CrashLog::getStackTrace()
     // This ensures debug symbols are found whether in PDB files or embedded in executable
     // TRUE parameter: automatically enumerate and load symbols for all loaded modules
     // This allows resolving symbols from Qt libraries and other DLLs in the stack trace
-    BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
+    [[maybe_unused]] BOOL symInitResult = SymInitialize(process, searchPath[0] != '\0' ? searchPath : NULL, TRUE);
     
     WORD frames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
     
