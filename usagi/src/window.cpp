@@ -258,7 +258,8 @@ Window::Window()
     QWidget *unknownFilesContainer = new QWidget();
     unknownFilesContainer->setObjectName("unknownFilesContainer");
     unknownFilesContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Container must expand in splitter
-    QVBoxLayout *unknownFilesLayout = new QVBoxLayout(unknownFilesContainer);
+    QVBoxLayout *unknownFilesLayout = new QVBoxLayout();
+    unknownFilesContainer->setLayout(unknownFilesLayout);
     unknownFilesLayout->setContentsMargins(0, 0, 0, 0);
     unknownFilesLayout->setSpacing(0);  // Remove spacing between label and table
     QLabel *unknownFilesLabel = new QLabel("Unknown Files (not in AniDB database):");
@@ -292,7 +293,8 @@ Window::Window()
     
     // Create container for thread progress bars
     QWidget *threadProgressContainer = new QWidget();
-    QVBoxLayout *threadProgressLayout = new QVBoxLayout(threadProgressContainer);
+    QVBoxLayout *threadProgressLayout = new QVBoxLayout();
+    threadProgressContainer->setLayout(threadProgressLayout);
     threadProgressLayout->setContentsMargins(0, 0, 0, 0);
     for (QProgressBar *bar : hasherCoordinator->getThreadProgressBars()) {
         threadProgressLayout->addWidget(bar);
@@ -537,13 +539,15 @@ Window::Window()
     settingsScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
     QWidget *settingsContainer = new QWidget();
-    QVBoxLayout *settingsMainLayout = new QVBoxLayout(settingsContainer);
+    QVBoxLayout *settingsMainLayout = new QVBoxLayout();
+    settingsContainer->setLayout(settingsMainLayout);
     settingsMainLayout->setSpacing(10);
     settingsMainLayout->setContentsMargins(10, 10, 10, 10);
     
     // Login Settings Group
     QGroupBox *loginGroup = new QGroupBox("Login Credentials");
-    QGridLayout *loginLayout = new QGridLayout(loginGroup);
+    QGridLayout *loginLayout = new QGridLayout();
+    loginGroup->setLayout(loginLayout);
     labelLogin = new QLabel("Username:");
     editLogin = new QLineEdit;
 	editLogin->setText(adbapi->getUsername());
@@ -559,7 +563,8 @@ Window::Window()
     
     // Directory Watcher Group
     QGroupBox *watcherGroup = new QGroupBox("Directory Watcher");
-    QVBoxLayout *watcherLayout = new QVBoxLayout(watcherGroup);
+    QVBoxLayout *watcherLayout = new QVBoxLayout();
+    watcherGroup->setLayout(watcherLayout);
     watcherEnabled = new QCheckBox("Enable Directory Watcher");
     watcherAutoStart = new QCheckBox("Auto-start on application launch");
     watcherStatusLabel = new QLabel("Status: Not watching");
@@ -577,14 +582,16 @@ Window::Window()
     
     // Auto-fetch Group
     QGroupBox *autoFetchGroup = new QGroupBox("Auto-fetch");
-    QVBoxLayout *autoFetchLayout = new QVBoxLayout(autoFetchGroup);
+    QVBoxLayout *autoFetchLayout = new QVBoxLayout();
+    autoFetchGroup->setLayout(autoFetchLayout);
     autoFetchEnabled = new QCheckBox("Automatically download anime titles and other data on startup");
     autoFetchLayout->addWidget(autoFetchEnabled);
     settingsMainLayout->addWidget(autoFetchGroup);
     
     // Playback Group
     QGroupBox *playbackGroup = new QGroupBox("Playback");
-    QHBoxLayout *playbackLayout = new QHBoxLayout(playbackGroup);
+    QHBoxLayout *playbackLayout = new QHBoxLayout();
+    playbackGroup->setLayout(playbackLayout);
     mediaPlayerPath = new QLineEdit;
     mediaPlayerBrowseButton = new QPushButton("Browse...");
     playbackLayout->addWidget(new QLabel("Media Player:"));
@@ -594,7 +601,8 @@ Window::Window()
     
     // Session Manager Group
     QGroupBox *sessionGroup = new QGroupBox("Session Manager");
-    QGridLayout *sessionLayout = new QGridLayout(sessionGroup);
+    QGridLayout *sessionLayout = new QGridLayout();
+    sessionGroup->setLayout(sessionLayout);
     sessionAheadBufferSpinBox = new QSpinBox();
     sessionAheadBufferSpinBox->setMinimum(1);
     sessionAheadBufferSpinBox->setMaximum(20);
@@ -628,7 +636,8 @@ Window::Window()
     
     // File Deletion Group
     QGroupBox *deletionGroup = new QGroupBox("File Deletion");
-    QVBoxLayout *deletionLayout = new QVBoxLayout(deletionGroup);
+    QVBoxLayout *deletionLayout = new QVBoxLayout();
+    deletionGroup->setLayout(deletionLayout);
     sessionEnableAutoDeletionCheckbox = new QCheckBox("Enable automatic file deletion");
     sessionEnableAutoDeletionCheckbox->setToolTip("When enabled, files marked for deletion will be automatically deleted");
     sessionEnableAutoDeletionCheckbox->setChecked(false);  // Default: disabled for safety
@@ -643,7 +652,8 @@ Window::Window()
     
     // System Tray Group
     QGroupBox *trayGroup = new QGroupBox("System Tray");
-    QVBoxLayout *trayLayout = new QVBoxLayout(trayGroup);
+    QVBoxLayout *trayLayout = new QVBoxLayout();
+    trayGroup->setLayout(trayLayout);
     trayMinimizeToTray = new QCheckBox("Minimize to tray");
     trayMinimizeToTray->setToolTip("Minimize the application to system tray instead of taskbar");
     trayCloseToTray = new QCheckBox("Close to tray");
@@ -657,7 +667,8 @@ Window::Window()
     
     // Auto-start Group
     QGroupBox *autoStartGroup = new QGroupBox("Application Startup");
-    QVBoxLayout *autoStartLayout = new QVBoxLayout(autoStartGroup);
+    QVBoxLayout *autoStartLayout = new QVBoxLayout();
+    autoStartGroup->setLayout(autoStartLayout);
     autoStartEnabled = new QCheckBox("Start with operating system");
     autoStartEnabled->setToolTip("Automatically start the application when you log in");
     autoStartLayout->addWidget(autoStartEnabled);
@@ -665,7 +676,8 @@ Window::Window()
     
     // File Marking Preferences Group
     QGroupBox *fileMarkingGroup = new QGroupBox("File Marking Preferences");
-    QGridLayout *fileMarkingLayout = new QGridLayout(fileMarkingGroup);
+    QGridLayout *fileMarkingLayout = new QGridLayout();
+    fileMarkingGroup->setLayout(fileMarkingLayout);
     
     QLabel *audioLangLabel = new QLabel("Preferred Audio Languages:");
     audioLangLabel->setToolTip("Comma-separated list of preferred audio languages (e.g., japanese,english)\n"
@@ -730,7 +742,8 @@ Window::Window()
     
     // Hasher Filter Group
     QGroupBox *hasherFilterGroup = new QGroupBox("Hasher File Filter");
-    QVBoxLayout *hasherFilterLayout = new QVBoxLayout(hasherFilterGroup);
+    QVBoxLayout *hasherFilterLayout = new QVBoxLayout();
+    hasherFilterGroup->setLayout(hasherFilterLayout);
     
     QLabel *hasherFilterLabel = new QLabel("File masks to ignore (comma-separated):");
     hasherFilterLabel->setToolTip("Files matching these patterns will be ignored when adding for hashing.\n"
@@ -2710,7 +2723,8 @@ void Window::unknownFilesInsertRow(const QString& filename, const QString& filep
     
     // Column 3: Action buttons (Bind and Not Anime in a container)
     QWidget *actionContainer = new QWidget();
-    QHBoxLayout *actionLayout = new QHBoxLayout(actionContainer);
+    QHBoxLayout *actionLayout = new QHBoxLayout();
+    actionContainer->setLayout(actionLayout);
     actionLayout->setContentsMargins(2, 2, 2, 2);
     actionLayout->setSpacing(4);
     
