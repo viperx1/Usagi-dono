@@ -1655,6 +1655,12 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/truncatedresponseinfo.cpp
     ../usagi/src/replywaiter.cpp
     ../usagi/src/filehashinfo.cpp
+    ../usagi/src/animestats.cpp
+    ../usagi/src/cachedanimedata.cpp
+    ../usagi/src/taginfo.cpp
+    ../usagi/src/cardfileinfo.cpp
+    ../usagi/src/cardepisodeinfo.cpp
+    ../usagi/src/relationdata.cpp
 )
 
 set(MYLISTCARDMANAGER_TEST_HEADERS
