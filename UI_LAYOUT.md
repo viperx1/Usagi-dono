@@ -1,226 +1,135 @@
 # MyList Tab UI Layout
 
-## Before Changes
-```
-+----------------------------------------------------------+
-|                      MyList Tab                          |
-+----------------------------------------------------------+
-|                                                          |
-|  [Load MyList from Database]                             |
-|                                                          |
-|  +----------------------------------------------------+  |
-|  |                                                    |  |
-|  |           (Empty Tree View)                       |  |
-|  |        No entries to display                      |  |
-|  |                                                    |  |
-|  +----------------------------------------------------+  |
-|                                                          |
-+----------------------------------------------------------+
-```
+## Current Layout (Card View)
 
-## After Changes
 ```
-+----------------------------------------------------------+
-|                      MyList Tab                          |
-+----------------------------------------------------------+
-|                                                          |
-|  +----------------------------------------------------+  |
-|  | [Load MyList from Database] [Fetch MyList Stats]  |  |
-|  |                             [Import MyList]        |  |
-|  +----------------------------------------------------+  |
-|                                                          |
-|  +----------------------------------------------------+  |
-|  | Anime Name            | Episode  | State | Viewed  |  |
-|  +----------------------------------------------------+  |
-|  | ▼ Cowboy Bebop                                     |  |
-|  |     | Episode 1 - Asteroid Blues    | HDD  | Yes   |  |
-|  |     | Episode 2 - Stray Dog Strut   | HDD  | Yes   |  |
-|  |     | Episode 3 - Honky Tonk Women  | HDD  | No    |  |
-|  | ▼ Ghost in the Shell: SAC                         |  |
-|  |     | Episode 1 - Section 9        | HDD  | Yes   |  |
-|  |     | Episode 2 - Proof of Justice | HDD  | No    |  |
-|  +----------------------------------------------------+  |
-|                                                          |
-+----------------------------------------------------------+
++------------------------------------------------------------------------------+
+|                              MyList Tab                                      |
++------------------------------------------------------------------------------+
+|  [Load MyList]  [Fetch Stats]  [Import]  [Sort ▼]  [Search: ______]        |
++------------------------------------------------------------------------------+
+| +-----------+  +-----------------------------------------------------------+ |
+| | FILTER    |  |                    Card View Area                         | |
+| | SIDEBAR   |  |                                                           | |
+| |           |  |  +----------------------------------------------------+   | |
+| | Status:   |  |  | Cowboy Bebop                          [▼] [Play ▶] |   | |
+| | [✓] All   |  |  | Type: TV Series | Episodes: 26 | Score: 8.76       |   | |
+| | [ ] Watch |  |  | Progress: 20/26 episodes                           |   | |
+| | [ ] Compl |  |  | +------------------------------------------------+ |   | |
+| |           |  |  | | Ep 21: Boogie Woogie Feng Shui   [▶] [✓]     | |   | |
+| | Type:     |  |  | | Ep 22: Cowboy Funk               [▶] [ ]     | |   | |
+| | [✓] All   |  |  | +------------------------------------------------+ |   | |
+| | [ ] TV    |  |  +----------------------------------------------------+   | |
+| | [ ] OVA   |  |                                                           | |
+| | [ ] Movie |  |  +----------------------------------------------------+   | |
+| |           |  |  | Ghost in the Shell: SAC           [▼] [Play ▶] |   | |
+| | Sort:     |  |  | Type: TV Series | Episodes: 26 | Score: 8.50       |   | |
+| | • Title   |  |  | Progress: 26/26 episodes (Complete)                |   | |
+| | ○ Rating  |  |  | Collapsed view - click ▼ to expand episodes        |   | |
+| | ○ Year    |  |  +----------------------------------------------------+   | |
+| |           |  |                                                           | |
+| +-----------+  +-----------------------------------------------------------+ |
++------------------------------------------------------------------------------+
 ```
 
-## Button Functions
+## Main Components
 
-### 1. Load MyList from Database (Existing)
-- Loads data from SQLite database
-- Displays in hierarchical tree view
-- Shows: Anime → Episodes
-- Columns: Name, Episode, State, Viewed, Storage, LID
+### Top Toolbar
+- **Load MyList**: Loads data from SQLite database into card view
+- **Fetch Stats**: Gets statistics from AniDB API (total entries, watched count, etc.)
+- **Import**: Opens file dialog to import MyList from XML/CSV export
+- **Sort**: Dropdown to sort cards (by title, rating, year, etc.)
+- **Search**: Filter cards by anime title
 
-### 2. Fetch MyList Stats from API (NEW)
-- Sends MYLISTSTATS command to AniDB UDP API
-- Returns statistics:
-  - Total entries
-  - Watched count
-  - Total file size
-  - Watched file size
-  - Percentages
-- Displays in log output
-- Provides instructions for full import
+### Left Sidebar (Filter Panel)
+Collapsible sidebar with filtering options:
+- **Status Filters**: All, Currently Watching, Completed, On Hold, Dropped, Plan to Watch
+- **Type Filters**: All, TV Series, OVA, Movie, Special, ONA, Music Video
+- **Sort Options**: Title (A-Z), Rating (High-Low), Year (Recent-Old), Episodes (Most-Least)
+- **Additional Filters**: 
+  - Has Files checkbox
+  - Has Unwatched Episodes checkbox
+  - Series chains checkbox
 
-### 3. Import MyList from File (NEW)
-- Opens file dialog
-- Supports formats:
-  - XML (*.xml)
-  - CSV/TXT (*.csv, *.txt)
-  - Auto-detect
-- Parses and imports to database
-- Shows success message with count
-- Auto-refreshes tree view
+### Card View Area (Main Content)
+Scrollable area displaying anime cards in a vertical list:
+
+#### Anime Card (Collapsed)
+- **Title**: Anime name with preferred language
+- **Metadata**: Type, episode count, AniDB rating
+- **Progress**: Episodes watched / total episodes
+- **Expand Button**: Click to show episode list
+- **Play Button**: Plays next unwatched episode (or first episode if all watched)
+
+#### Anime Card (Expanded)
+Shows all episodes in the anime:
+- **Episode List**: Each episode shows:
+  - Episode number and title
+  - Play button (▶) for unwatched, checkmark (✓) for watched
+  - File state indicator (HDD, CD/DVD, Deleted)
+- **Episode Tree**: Groups episodes by type (Normal, Special, OP/ED, etc.)
+- **Actions**: Mark watched, delete file, download (if available)
 
 ## User Workflow
 
-### Initial Setup (First Time Users)
-```
-1. Click [Fetch MyList Stats from API]
-   → Log shows: "MYLISTSTATS command sent"
-   → Log shows: "To get actual entries, export from anidb.net..."
-
-2. Open browser → https://anidb.net
-   → Login
-   → Navigate to MyList
-   → Click "Export"
-   → Download mylist.xml or mylist.csv
-
-3. Click [Import MyList from File]
-   → Select downloaded file
-   → Log shows: "Successfully imported 245 mylist entries"
-   → Tree view auto-refreshes
-
-4. View imported data
-   → Tree shows all anime
-   → Expand anime to see episodes
-   → All data displayed correctly
-```
+### Initial Setup
+1. Click **Load MyList** to load from database (if previously imported)
+2. If empty, click **Fetch Stats** to get overview from AniDB
+3. Export MyList from https://anidb.net (MyList → Export)
+4. Click **Import** and select the downloaded XML/CSV file
+5. Cards appear in the main view showing all anime
 
 ### Regular Use
-```
-1. Click [Load MyList from Database]
-   → Displays current mylist
-   
-2. After adding new entries (via hashing)
-   → Click refresh to update display
-   
-3. To sync with AniDB
-   → Export from AniDB
-   → Import file
-   → Database updated
-```
+- **Browse**: Scroll through anime cards
+- **Filter**: Use sidebar to narrow down selection
+- **Search**: Type in search box to find specific anime
+- **Expand**: Click ▼ on a card to see all episodes
+- **Play**: Click play button to watch episodes
+- **Track Progress**: Watch status updates automatically after playback
 
-## Import Dialog
+## Card View Features
 
-```
-+----------------------------------------------------------+
-|                   Import MyList Export                   |
-+----------------------------------------------------------+
-|                                                          |
-|  Look in: [Downloads                            ] [▼]   |
-|                                                          |
-|  +----------------------------------------------------+  |
-|  | Name                           | Type      | Size  |  |
-|  |----------------------------------------------------|  |
-|  | mylist_export.xml             | XML File  | 250KB |  |
-|  | mylist_export.csv             | CSV File  | 180KB |  |
-|  | mylist_backup.txt             | Text File | 175KB |  |
-|  +----------------------------------------------------+  |
-|                                                          |
-|  File name: [mylist_export.xml                       ]  |
-|                                                          |
-|  Files of type: [MyList Files (*.xml *.txt *.csv)]  [▼] |
-|                                                          |
-|                             [  Open  ]  [  Cancel  ]     |
-+----------------------------------------------------------+
-```
+### Visual Design
+- **Modern Card Layout**: Clean, card-based interface instead of tree view
+- **Virtual Scrolling**: Efficient rendering of large anime collections
+- **Responsive Layout**: Cards adapt to window size
+- **Color Coding**: Visual indicators for watch status
+- **Expandable Details**: Click to expand/collapse episode lists
 
-## Log Output Examples
+### Episode Display
+Each episode in an expanded card shows:
+- **Episode Number**: Type-specific numbering (S1, T1, etc.)
+- **Title**: Episode title from AniDB (in selected language)
+- **Status**: Play icon (▶) or watched checkmark (✓)
+- **File Info**: State (HDD/CD/Deleted) and storage path
+- **Actions**: Quick access to play, mark watched, or delete
 
-### Fetch Stats
-```
-[2024-10-11 02:15:23] Fetching mylist statistics from API...
-[2024-10-11 02:15:23] MYLISTSTATS command sent. Note: To get actual mylist entries, 
-                      use 'Import MyList from File' with an export from 
-                      https://anidb.net/perl-bin/animedb.pl?show=mylist&do=export
-[2024-10-11 02:15:25] MYLISTSTATS: 245|180|1234567890|987654321|80|73|2150
-```
+### Filtering and Sorting
+- **Real-time Filtering**: Cards update instantly when filters change
+- **Multiple Sort Options**: By title, rating, year, episode count
+- **Search**: Text-based search across anime titles
+- **Status-based Filters**: Show only watching, completed, etc.
+- **Type Filters**: TV, OVA, Movie, Special
 
-### Import Success
-```
-[2024-10-11 02:16:45] Successfully imported 245 mylist entries
-[2024-10-11 02:16:45] Loaded 245 mylist entries for 87 anime
-```
+### Watch Session Integration
+- **Series Chains**: Tracks sequel relationships between anime
+- **Continue Watching**: Automatically selects next episode to watch
+- **Progress Tracking**: Shows X/Y episodes watched
+- **Session Reset**: Reset watch session to start from beginning
 
-### Import Error
-```
-[2024-10-11 02:17:12] Error: Cannot open file /path/to/nonexistent.xml
-```
+## Technical Implementation
 
-### Load Empty Database
-```
-[2024-10-11 02:18:00] Loaded 0 mylist entries for 0 anime
-```
+### Classes
+- **MyListCardManager**: Manages card creation, filtering, and data
+- **AnimeCard**: Individual anime card widget with episode list
+- **MyListFilterSidebar**: Filter controls and settings
+- **VirtualCardLayout**: Efficient layout for large card collections
+- **WatchSessionManager**: Tracks watch sessions and series chains
 
-## Data Display Columns
-
-```
-+----------------+---------------------------+---------+---------+------------------+--------+
-| Anime Name     | Episode                   | State   | Viewed  | Storage          | LID    |
-+----------------+---------------------------+---------+---------+------------------+--------+
-| Cowboy Bebop   | Episode 1 - Asteroid...  | HDD     | Yes     | /anime/cb01.mkv  | 123456 |
-|                | Episode 2 - Stray Dog... | HDD     | Yes     | /anime/cb02.mkv  | 123457 |
-|                | Episode 3 - Honky Ton... | HDD     | No      | /anime/cb03.mkv  | 123458 |
-+----------------+---------------------------+---------+---------+------------------+--------+
-```
-
-## State Values
-
-- **Unknown** - State 0
-- **HDD** - State 1 (on hard disk)
-- **CD/DVD** - State 2 (on optical media)
-- **Deleted** - State 3 (removed/deleted)
-
-## Viewed Values
-
-- **Yes** - Has non-zero viewdate
-- **No** - Empty or zero viewdate
-
-## Tree View Features
-
-- ✅ Hierarchical display (Anime → Episodes)
-- ✅ Expandable/collapsible anime entries
-- ✅ Sortable columns
-- ✅ Alternating row colors
-- ✅ No edit triggers (read-only display)
-- ✅ Auto-expand after load
-- ✅ Episode names when available
-- ✅ Fallback to "Anime #[aid]" for missing names
-
-## Keyboard Shortcuts
-
-- **Space** - Expand/collapse selected item
-- **Ctrl+A** - Select all
-- **Arrow Keys** - Navigate tree
-- **Home/End** - First/last item
-
-## Context Menu (Future Enhancement)
-
-Right-click on entry could show:
-- View Details
-- Mark as Watched/Unwatched
-- Change State
-- Edit Storage Location
-- Remove from MyList
-- Query AniDB for Updates
-
-## Accessibility
-
-- Clear button labels
-- Helpful log messages
-- Visual feedback on actions
-- Error messages in log
-- Success confirmation
-- Progress indication
+### Database
+Cards display data from:
+- **mylist** table: Core mylist entries
+- **anime** table: Anime metadata (title, type, episodes)
+- **episode** table: Episode information
+- **file** table: File details and paths
+- **watch_sessions** table: Watch progress tracking
