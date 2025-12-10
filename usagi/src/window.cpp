@@ -6,6 +6,9 @@
 #include "crashlog.h"
 #include "logger.h"
 #include "aired.h"
+#include "directorywatchermanager.h"
+#include "autofetchmanager.h"
+#include "traysettingsmanager.h"
 #include <QElapsedTimer>
 #include <QThread>
 #include <QSqlDatabase>
@@ -163,9 +166,14 @@ Window::Window()
 	// Initialize anime titles cache flag
 	animeTitlesCacheLoaded = false;
 	
-	// Initialize window state for tray restore
-	windowStateBeforeHide = Qt::WindowNoState;
-	exitingFromTray = false;
+    // Initialize window state for tray restore
+    windowStateBeforeHide = Qt::WindowNoState;
+    exitingFromTray = false;
+    playbackManager = nullptr;
+    watchSessionManager = nullptr;
+    directoryWatcherManager = nullptr;
+    autoFetchManager = nullptr;
+    traySettingsManager = nullptr;
 	
     safeclose = new QTimer;
     safeclose->setInterval(100);
@@ -521,29 +529,12 @@ Window::Window()
     settingsMainLayout->addWidget(loginGroup);
     
     // Directory Watcher Group
-    QGroupBox *watcherGroup = new QGroupBox("Directory Watcher");
-    QVBoxLayout *watcherLayout = new QVBoxLayout(watcherGroup);
-    watcherEnabled = new QCheckBox("Enable Directory Watcher");
-    watcherAutoStart = new QCheckBox("Auto-start on application launch");
-    watcherStatusLabel = new QLabel("Status: Not watching");
-    QHBoxLayout *watcherDirLayout = new QHBoxLayout();
-    watcherDirectory = new QLineEdit;
-    watcherBrowseButton = new QPushButton("Browse...");
-    watcherDirLayout->addWidget(new QLabel("Watch Directory:"));
-    watcherDirLayout->addWidget(watcherDirectory, 1);
-    watcherDirLayout->addWidget(watcherBrowseButton);
-    watcherLayout->addWidget(watcherEnabled);
-    watcherLayout->addLayout(watcherDirLayout);
-    watcherLayout->addWidget(watcherAutoStart);
-    watcherLayout->addWidget(watcherStatusLabel);
-    settingsMainLayout->addWidget(watcherGroup);
+    directoryWatcherManager = new DirectoryWatcherManager(adbapi, this);
+    settingsMainLayout->addWidget(directoryWatcherManager->getSettingsGroup());
     
     // Auto-fetch Group
-    QGroupBox *autoFetchGroup = new QGroupBox("Auto-fetch");
-    QVBoxLayout *autoFetchLayout = new QVBoxLayout(autoFetchGroup);
-    autoFetchEnabled = new QCheckBox("Automatically download anime titles and other data on startup");
-    autoFetchLayout->addWidget(autoFetchEnabled);
-    settingsMainLayout->addWidget(autoFetchGroup);
+    autoFetchManager = new AutoFetchManager(adbapi, this);
+    settingsMainLayout->addWidget(autoFetchManager->getSettingsGroup());
     
     // Playback Group
     QGroupBox *playbackGroup = new QGroupBox("Playback");
@@ -605,18 +596,8 @@ Window::Window()
     settingsMainLayout->addWidget(deletionGroup);
     
     // System Tray Group
-    QGroupBox *trayGroup = new QGroupBox("System Tray");
-    QVBoxLayout *trayLayout = new QVBoxLayout(trayGroup);
-    trayMinimizeToTray = new QCheckBox("Minimize to tray");
-    trayMinimizeToTray->setToolTip("Minimize the application to system tray instead of taskbar");
-    trayCloseToTray = new QCheckBox("Close to tray");
-    trayCloseToTray->setToolTip("Hide to system tray when closing the window instead of exiting");
-    trayStartMinimized = new QCheckBox("Start minimized to tray");
-    trayStartMinimized->setToolTip("Start the application minimized to system tray");
-    trayLayout->addWidget(trayMinimizeToTray);
-    trayLayout->addWidget(trayCloseToTray);
-    trayLayout->addWidget(trayStartMinimized);
-    settingsMainLayout->addWidget(trayGroup);
+    traySettingsManager = new TraySettingsManager(this);
+    settingsMainLayout->addWidget(traySettingsManager->getSettingsGroup());
     
     // Auto-start Group
     QGroupBox *autoStartGroup = new QGroupBox("Application Startup");
@@ -730,12 +711,12 @@ Window::Window()
     pageSettings->setRowStretch(0, 1);
     pageSettings->setColumnStretch(0, 1);
 
-	// page settings - signals
+    // page settings - signals
     connect(buttonSaveSettings, SIGNAL(clicked()), this, SLOT(saveSettings()));
     connect(buttonRequestMylistExport, SIGNAL(clicked()), this, SLOT(requestMylistExportManually()));
-    connect(watcherEnabled, SIGNAL(stateChanged(int)), this, SLOT(onWatcherEnabledChanged(int)));
-    connect(watcherBrowseButton, SIGNAL(clicked()), this, SLOT(onWatcherBrowseClicked()));
     connect(mediaPlayerBrowseButton, SIGNAL(clicked()), this, SLOT(onMediaPlayerBrowseClicked()));
+    connect(directoryWatcherManager, &DirectoryWatcherManager::newFilesDetected,
+            this, &Window::onWatcherNewFilesDetected);
     
     // Session manager settings signals - update WatchSessionManager when settings change
     connect(sessionAheadBufferSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int value) {
@@ -804,11 +785,6 @@ Window::Window()
 	connect(adbapi, SIGNAL(notifyAnimeUpdated(int)), this, SLOT(getNotifyAnimeUpdated(int)));
     connect(loginbutton, SIGNAL(clicked()), this, SLOT(ButtonLoginClick()));
     
-    // Initialize directory watcher
-    directoryWatcher = new DirectoryWatcher(this);
-    connect(directoryWatcher, &DirectoryWatcher::newFilesDetected, 
-            this, &Window::onWatcherNewFilesDetected);
-    
     // Initialize playback manager
     playbackManager = new PlaybackManager(this);
     connect(playbackManager, &PlaybackManager::playbackPositionUpdated,
@@ -825,6 +801,9 @@ Window::Window()
     // Initialize watch session manager
     watchSessionManager = new WatchSessionManager(this);
     LOG("[Window] WatchSessionManager initialized");
+    if (directoryWatcherManager) {
+        directoryWatcherManager->setWatchSessionManager(watchSessionManager);
+    }
     
     // Connect card manager to watch session manager for file marks
     cardManager->setWatchSessionManager(watchSessionManager);
@@ -915,29 +894,14 @@ Window::Window()
     unboundFilesLoadingThread = nullptr;
     
     // Load directory watcher settings from database
-    bool watcherEnabledSetting = adbapi->getWatcherEnabled();
-    QString watcherDir = adbapi->getWatcherDirectory();
-    bool watcherAutoStartSetting = adbapi->getWatcherAutoStart();
+    if (directoryWatcherManager) {
+        directoryWatcherManager->loadSettingsFromApi();
+    }
     
     // Load auto-fetch settings from database
-    bool autoFetchEnabledSetting = adbapi->getAutoFetchEnabled();
-    
-    // Block signals while setting UI values to prevent premature slot activation
-    watcherEnabled->blockSignals(true);
-    watcherDirectory->blockSignals(true);
-    watcherAutoStart->blockSignals(true);
-    autoFetchEnabled->blockSignals(true);
-    
-    watcherEnabled->setChecked(watcherEnabledSetting);
-    watcherDirectory->setText(watcherDir);
-    watcherAutoStart->setChecked(watcherAutoStartSetting);
-    autoFetchEnabled->setChecked(autoFetchEnabledSetting);
-    
-    // Restore signal connections
-    watcherEnabled->blockSignals(false);
-    watcherDirectory->blockSignals(false);
-    watcherAutoStart->blockSignals(false);
-    autoFetchEnabled->blockSignals(false);
+    if (autoFetchManager) {
+        autoFetchManager->loadSettingsFromApi();
+    }
     
     // Load media player path from settings
     QString playerPath = PlaybackManager::getMediaPlayerPath();
@@ -949,23 +913,8 @@ Window::Window()
     startupTimer->start();
 
     // Auto-start directory watcher if enabled
-    if (watcherEnabledSetting && watcherAutoStartSetting && !watcherDir.isEmpty()) {
-        directoryWatcher->startWatching(watcherDir);
-        watcherStatusLabel->setText("Status: Watching " + watcherDir);
-        // Sync WatchSessionManager's watched path with directory watcher
-        if (watchSessionManager) {
-            watchSessionManager->setWatchedPath(watcherDir);
-        }
-    } else if (watcherEnabledSetting && !watcherDir.isEmpty()) {
-        // If watcher is enabled but auto-start is not, just update status
-        watcherStatusLabel->setText("Status: Enabled (not auto-started)");
-        // Still set the path for WatchSessionManager even if watcher is not auto-started
-        if (watchSessionManager) {
-            watchSessionManager->setWatchedPath(watcherDir);
-        }
-    } else if (watcherEnabledSetting && watcherDir.isEmpty()) {
-        // If watcher is enabled but no directory is set
-        watcherStatusLabel->setText("Status: Enabled (no directory set)");
+    if (directoryWatcherManager) {
+        directoryWatcherManager->applyStartupBehavior();
     }
     
     // Initialize system tray manager
@@ -977,31 +926,11 @@ Window::Window()
     connect(trayIconManager, &TrayIconManager::logMessage, 
             this, &Window::getNotifyLogAppend);
     
-    // Load tray settings from database and apply to tray manager
-    bool minimizeToTray = adbapi->getTrayMinimizeToTray();
-    bool closeToTray = adbapi->getTrayCloseToTray();
-    bool startMinimized = adbapi->getTrayStartMinimized();
-    
-    trayIconManager->setMinimizeToTrayEnabled(minimizeToTray);
-    trayIconManager->setCloseToTrayEnabled(closeToTray);
-    trayIconManager->setStartMinimizedEnabled(startMinimized);
-    
-    // Update UI checkboxes to match loaded settings
-    if (!trayIconManager->isSystemTrayAvailable()) {
-        // Disable tray checkboxes in UI if system tray not available
-        trayMinimizeToTray->setEnabled(false);
-        trayMinimizeToTray->setToolTip("System tray not available on this platform");
-        trayCloseToTray->setEnabled(false);
-        trayCloseToTray->setToolTip("System tray not available on this platform");
-        trayStartMinimized->setEnabled(false);
-        trayStartMinimized->setToolTip("System tray not available on this platform");
-    } else {
-        trayMinimizeToTray->setChecked(minimizeToTray);
-        trayCloseToTray->setChecked(closeToTray);
-        trayStartMinimized->setChecked(startMinimized);
+    if (traySettingsManager) {
+        traySettingsManager->applyAvailability(trayIconManager);
+        traySettingsManager->loadSettingsFromApi(adbapi, trayIconManager);
         
-        // If start minimized is enabled, hide the window on startup
-        if (startMinimized && trayIconManager->isTrayIconVisible()) {
+        if (traySettingsManager->isStartMinimizedEnabled() && trayIconManager->isTrayIconVisible()) {
             this->hide();
             LOG("Application started minimized to tray");
         }
@@ -1023,11 +952,6 @@ Window::Window()
 
 Window::~Window()
 {
-    // Stop directory watcher on cleanup
-    if (directoryWatcher) {
-        directoryWatcher->stopWatching();
-    }
-    
     // Clean up hasher thread pool
     if (hasherThreadPool) {
         hasherThreadPool->stop();
@@ -2006,33 +1930,25 @@ void Window::saveSettings()
 	LOG("Saving settings - username: " + editLogin->text());
 	adbapi->setUsername(editLogin->text());
 	adbapi->setPassword(editPassword->text());
+    
+    // Save directory watcher settings to database
+    if (directoryWatcherManager) {
+        directoryWatcherManager->saveSettingsToApi();
+    }
 	
-	// Save directory watcher settings to database
-	adbapi->setWatcherEnabled(watcherEnabled->isChecked());
-	adbapi->setWatcherDirectory(watcherDirectory->text());
-	adbapi->setWatcherAutoStart(watcherAutoStart->isChecked());
-	
-	// Save auto-fetch settings to database
-	adbapi->setAutoFetchEnabled(autoFetchEnabled->isChecked());
+    // Save auto-fetch settings to database
+    if (autoFetchManager) {
+        autoFetchManager->saveSettingsToApi();
+    }
 	
 	// Save media player path
 	PlaybackManager::setMediaPlayerPath(mediaPlayerPath->text());
 	
-	// Save tray settings and update tray manager
-	bool minimizeToTray = trayMinimizeToTray->isChecked();
-	bool closeToTray = trayCloseToTray->isChecked();
-	bool startMinimized = trayStartMinimized->isChecked();
-	
-	adbapi->setTrayMinimizeToTray(minimizeToTray);
-	adbapi->setTrayCloseToTray(closeToTray);
-	adbapi->setTrayStartMinimized(startMinimized);
-	
-	// Update tray icon manager with new settings
-	trayIconManager->setMinimizeToTrayEnabled(minimizeToTray);
-	trayIconManager->setCloseToTrayEnabled(closeToTray);
-	trayIconManager->setStartMinimizedEnabled(startMinimized);
-	
-	LOG("Tray settings saved");
+    // Save tray settings and update tray manager
+    if (traySettingsManager) {
+        traySettingsManager->saveSettingsToApi(adbapi, trayIconManager);
+        LOG("Tray settings saved");
+    }
 	
 	// Save auto-start settings
 	bool autoStartWasEnabled = adbapi->getAutoStartEnabled();
@@ -2871,54 +2787,6 @@ void Window::requestMylistExportManually()
 	LOG("Manually requesting MyList export...");
 	mylistStatusLabel->setText("MyList Status: Requesting export...");
 	adbapi->MylistExport("xml-plain-cs");
-}
-
-void Window::onWatcherEnabledChanged(int state)
-{
-	if (state == Qt::Checked) {
-		QString dir = watcherDirectory->text();
-		if (!dir.isEmpty() && QDir(dir).exists()) {
-			directoryWatcher->startWatching(dir);
-			watcherStatusLabel->setText("Status: Watching " + dir);
-			LOG("Directory watcher started: " + dir);
-			// Sync WatchSessionManager's watched path with directory watcher
-			if (watchSessionManager) {
-				watchSessionManager->setWatchedPath(dir);
-			}
-		} else if (dir.isEmpty()) {
-			watcherStatusLabel->setText("Status: Enabled (no directory set)");
-			LOG("Directory watcher enabled but no directory specified");
-		} else {
-			watcherStatusLabel->setText("Status: Enabled (invalid directory)");
-			LOG("Directory watcher enabled but directory is invalid: " + dir);
-		}
-	} else {
-		directoryWatcher->stopWatching();
-		watcherStatusLabel->setText("Status: Not watching");
-		LOG("Directory watcher stopped");
-	}
-}
-
-void Window::onWatcherBrowseClicked()
-{
-	QString dir = QFileDialog::getExistingDirectory(this, "Select Directory to Watch",
-		watcherDirectory->text().isEmpty() ? QDir::homePath() : watcherDirectory->text());
-	
-	if (!dir.isEmpty()) {
-		watcherDirectory->setText(dir);
-		
-		// If watcher is enabled, restart with new directory
-		if (watcherEnabled->isChecked()) {
-			directoryWatcher->startWatching(dir);
-			watcherStatusLabel->setText("Status: Watching " + dir);
-			LOG("Directory watcher changed to: " + dir);
-		}
-		
-		// Sync WatchSessionManager's watched path with directory watcher
-		if (watchSessionManager) {
-			watchSessionManager->setWatchedPath(dir);
-		}
-	}
 }
 
 void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
