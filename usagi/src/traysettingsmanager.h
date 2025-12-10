@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QGroupBox>
 #include <QCheckBox>
+#include <QVBoxLayout>
 
 class AniDBApi;          // Provides persistence for user settings
 class TrayIconManager;   // Controls system tray icon visibility/behavior

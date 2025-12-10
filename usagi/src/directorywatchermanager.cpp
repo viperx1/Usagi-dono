@@ -26,7 +26,7 @@ DirectoryWatcherManager::DirectoryWatcherManager(AniDBApi *api, QObject *parent)
 {
     createUi();
 
-    connect(m_watcherEnabled, &QCheckBox::stateChanged,
+    connect(m_watcherEnabled, &QCheckBox::checkStateChanged,
             this, &DirectoryWatcherManager::onWatcherEnabledChanged);
     connect(m_watcherBrowseButton, &QPushButton::clicked,
             this, &DirectoryWatcherManager::onWatcherBrowseClicked);
@@ -129,9 +129,9 @@ QString DirectoryWatcherManager::watchedDirectory() const
     return m_watcherDirectory->text();
 }
 
-void DirectoryWatcherManager::onWatcherEnabledChanged(int state)
+void DirectoryWatcherManager::onWatcherEnabledChanged(Qt::CheckState state)
 {
-    if (state == Qt::Checked) {
+    if (state == Qt::CheckState::Checked) {
         const QString dir = m_watcherDirectory->text();
         if (!dir.isEmpty() && QDir(dir).exists()) {
             startWatching(dir);

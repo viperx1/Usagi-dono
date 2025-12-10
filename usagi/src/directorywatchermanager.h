@@ -46,7 +46,7 @@ signals:
     void newFilesDetected(const QStringList &filePaths);
 
 public slots:
-    void onWatcherEnabledChanged(int state);
+    void onWatcherEnabledChanged(Qt::CheckState state);
     void onWatcherBrowseClicked();
 
 private:
