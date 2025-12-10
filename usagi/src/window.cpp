@@ -201,22 +201,33 @@ Window::Window()
     // pages - Create with tabwidget as parent to avoid orphaned widgets
     pageHasherParent = new QWidget(tabwidget);
     pageHasherParent->setObjectName("pageHasherParent");
-    pageHasher = new QBoxLayout(QBoxLayout::TopToBottom, pageHasherParent);
+    pageHasher = new QBoxLayout(QBoxLayout::TopToBottom);
+    pageHasherParent->setLayout(pageHasher);
+    
     pageMylistParent = new QWidget(tabwidget);
     pageMylistParent->setObjectName("pageMylistParent");
-    pageMylist = new QBoxLayout(QBoxLayout::TopToBottom, pageMylistParent);
+    pageMylist = new QBoxLayout(QBoxLayout::TopToBottom);
+    pageMylistParent->setLayout(pageMylist);
+    
     pageNotifyParent = new QWidget(tabwidget);
     pageNotifyParent->setObjectName("pageNotifyParent");
-    pageNotify = new QBoxLayout(QBoxLayout::TopToBottom, pageNotifyParent);
+    pageNotify = new QBoxLayout(QBoxLayout::TopToBottom);
+    pageNotifyParent->setLayout(pageNotify);
+    
     pageSettingsParent = new QWidget(tabwidget);
     pageSettingsParent->setObjectName("pageSettingsParent");
-    pageSettings = new QGridLayout(pageSettingsParent);
+    pageSettings = new QGridLayout();
+    pageSettingsParent->setLayout(pageSettings);
+    
     pageLogParent = new QWidget(tabwidget);
     pageLogParent->setObjectName("pageLogParent");
-    pageLog = new QBoxLayout(QBoxLayout::TopToBottom, pageLogParent);
+    pageLog = new QBoxLayout(QBoxLayout::TopToBottom);
+    pageLogParent->setLayout(pageLog);
+    
 	pageApiTesterParent = new QWidget(tabwidget);
 	pageApiTesterParent->setObjectName("pageApiTesterParent");
-	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
+	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom);
+	pageApiTesterParent->setLayout(pageApiTester);
 
     layout->addWidget(tabwidget, 1);
 
