@@ -111,11 +111,7 @@ public slots:
     void provideNextFileToHash();
     
     // Settings change handlers
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     void onMarkWatchedStateChanged(Qt::CheckState state);
-#else
-    void onMarkWatchedStateChanged(int state);
-#endif
     
 private:
     // UI Creation

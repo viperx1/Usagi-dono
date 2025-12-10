@@ -185,11 +185,7 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonStart, &QPushButton::clicked, this, &HasherCoordinator::startHashing);
     connect(m_buttonStop, &QPushButton::clicked, this, &HasherCoordinator::stopHashing);
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
-#else
-    connect(m_markWatched, &QCheckBox::stateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
-#endif
     
     // Connect to hasher thread pool
     connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
@@ -682,11 +678,7 @@ void HasherCoordinator::provideNextFileToHash()
     m_hasherThreadPool->addFile(QString());
 }
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
 void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
-#else
-void HasherCoordinator::onMarkWatchedStateChanged(int state)
-#endif
 {
     switch(state)
     {
