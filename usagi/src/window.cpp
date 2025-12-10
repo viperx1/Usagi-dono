@@ -170,6 +170,7 @@ Window::Window()
     playbackManager = nullptr;
     watchSessionManager = nullptr;
     directoryWatcherManager = nullptr;
+    autoFetchManager = nullptr;
 	
     safeclose = new QTimer;
     safeclose->setInterval(100);
@@ -529,11 +530,8 @@ Window::Window()
     settingsMainLayout->addWidget(directoryWatcherManager->getSettingsGroup());
     
     // Auto-fetch Group
-    QGroupBox *autoFetchGroup = new QGroupBox("Auto-fetch");
-    QVBoxLayout *autoFetchLayout = new QVBoxLayout(autoFetchGroup);
-    autoFetchEnabled = new QCheckBox("Automatically download anime titles and other data on startup");
-    autoFetchLayout->addWidget(autoFetchEnabled);
-    settingsMainLayout->addWidget(autoFetchGroup);
+    autoFetchManager = new AutoFetchManager(adbapi, this);
+    settingsMainLayout->addWidget(autoFetchManager->getSettingsGroup());
     
     // Playback Group
     QGroupBox *playbackGroup = new QGroupBox("Playback");
@@ -908,15 +906,9 @@ Window::Window()
     }
     
     // Load auto-fetch settings from database
-    bool autoFetchEnabledSetting = adbapi->getAutoFetchEnabled();
-    
-    // Block signals while setting UI values to prevent premature slot activation
-    autoFetchEnabled->blockSignals(true);
-    
-    autoFetchEnabled->setChecked(autoFetchEnabledSetting);
-    
-    // Restore signal connections
-    autoFetchEnabled->blockSignals(false);
+    if (autoFetchManager) {
+        autoFetchManager->loadSettingsFromApi();
+    }
     
     // Load media player path from settings
     QString playerPath = PlaybackManager::getMediaPlayerPath();
@@ -1971,8 +1963,10 @@ void Window::saveSettings()
         directoryWatcherManager->saveSettingsToApi();
     }
 	
-	// Save auto-fetch settings to database
-	adbapi->setAutoFetchEnabled(autoFetchEnabled->isChecked());
+    // Save auto-fetch settings to database
+    if (autoFetchManager) {
+        autoFetchManager->saveSettingsToApi();
+    }
 	
 	// Save media player path
 	PlaybackManager::setMediaPlayerPath(mediaPlayerPath->text());

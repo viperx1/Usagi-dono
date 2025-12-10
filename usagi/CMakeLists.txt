@@ -66,6 +66,7 @@ set(SOURCES
     src/relationdata.cpp
     src/trayiconmanager.cpp
     src/unknownfilesmanager.cpp
+    src/autofetchmanager.cpp
     src/directorywatchermanager.cpp
 )
 
@@ -119,6 +120,7 @@ set(HEADERS
     src/relationdata.h
     src/trayiconmanager.h
     src/unknownfilesmanager.h
+    src/autofetchmanager.h
     src/directorywatchermanager.h
 )
 

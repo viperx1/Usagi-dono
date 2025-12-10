@@ -51,6 +51,7 @@
 #include "mylistfiltersidebar.h"
 #include "watchsessionmanager.h"
 #include "uicolors.h"
+#include "autofetchmanager.h"
 #include "localfileinfo.h"
 #include "progresstracker.h"
 #include "hashingtask.h"
@@ -69,6 +70,7 @@ class HasherCoordinator;
 class TrayIconManager;
 class UnknownFilesManager;
 class DirectoryWatcherManager;
+class AutoFetchManager;
 class Window;  // Forward declaration for friend access
 
 class hashes_ : public QTableWidget
@@ -237,7 +239,7 @@ private:
     QPushButton *buttonRequestMylistExport;
     
     // Auto-fetch settings
-    QCheckBox *autoFetchEnabled;
+    AutoFetchManager *autoFetchManager;
     
     // Tray settings
     QCheckBox *trayMinimizeToTray;
