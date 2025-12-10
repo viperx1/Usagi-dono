@@ -902,7 +902,6 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 		// Get the original ANIME command to extract amask
 		QString q = QString("SELECT `str` FROM `packets` WHERE `tag` = %1").arg(Tag);
 		QSqlQuery query(db);
-		unsigned int fmask = 0;  // Not used for ANIME commands
 		uint64_t amask = 0;
 		QString amaskString;
 		QString animeCmd;  // Declare here so it's available throughout the entire block
@@ -2913,7 +2912,7 @@ QString AniDBApi::GetRequestedExportTemplate()
 	return requestedExportTemplate;
 }
 
-int AniDBApi::Send(QString str, QString msgtype, QString tag)
+int AniDBApi::Send(QString str, QString /*msgtype*/, QString tag)
 {
 	// Ensure socket is created
 	if(Socket == nullptr)

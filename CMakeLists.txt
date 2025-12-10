@@ -20,6 +20,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ==========================================================
+# 🚨 COMPILER WARNINGS
+# ==========================================================
+
+# Enable comprehensive warnings and treat them as errors
+set(WARNING_FLAGS "-Wall -Wextra -Wpedantic -Werror")
+
+# Apply warning flags globally
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARNING_FLAGS}")
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${WARNING_FLAGS}")
+
+# ==========================================================
 # 🧩 DEBUG SYMBOLS & CRASH TRACE SUPPORT
 # ==========================================================
 

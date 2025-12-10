@@ -153,6 +153,9 @@ private:
     
     hashes_ *m_hashes;  // Hash table widget
     
+    // Reference to AniDBApi (not owned)
+    AniDBApi *m_adbapi;
+    
     // Progress tracking
     ProgressTracker m_hashingProgress;
     int m_totalHashParts;
@@ -172,9 +175,6 @@ private:
     // Filter cache
     QString m_cachedFilterMasks;
     QList<QRegularExpression> m_cachedFilterRegexes;
-    
-    // Reference to AniDBApi (not owned)
-    AniDBApi *m_adbapi;
     
     // Reference to HasherThreadPool (not owned, accessed via extern)
     HasherThreadPool *m_hasherThreadPool;

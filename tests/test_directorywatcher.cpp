@@ -158,7 +158,7 @@ void TestDirectoryWatcher::testProcessedFilesTracking()
     QVERIFY(spy.count() >= 1);
     
     // Record the initial count
-    int initialCount = spy.count();
+    [[maybe_unused]] int initialCount = spy.count();
     
     // Stop and restart watcher
     watcher.stopWatching();

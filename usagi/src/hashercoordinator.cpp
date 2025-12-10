@@ -19,9 +19,9 @@ extern HasherThreadPool *hasherThreadPool;
 HasherCoordinator::HasherCoordinator(AniDBApi *adbapi, QWidget *parent)
     : QObject(parent)
     , m_adbapi(adbapi)
-    , m_hasherThreadPool(hasherThreadPool)
     , m_totalHashParts(0)
     , m_completedHashParts(0)
+    , m_hasherThreadPool(hasherThreadPool)
 {
     m_hashedFileColor = QColor(Qt::yellow);
     
@@ -330,7 +330,7 @@ void HasherCoordinator::updateFilterCache()
     }
 }
 
-void HasherCoordinator::hashesInsertRow(QFileInfo file, Qt::CheckState renameState, const QString& preloadedHash)
+void HasherCoordinator::hashesInsertRow(QFileInfo file, Qt::CheckState /*renameState*/, const QString& preloadedHash)
 {
     int row = m_hashes->rowCount();
     m_hashes->insertRow(row);
@@ -506,7 +506,7 @@ void HasherCoordinator::clearHasher()
     m_hashes->setRowCount(0);
 }
 
-void HasherCoordinator::onFileHashed(int threadId, ed2k::ed2kfilestruct fileData)
+void HasherCoordinator::onFileHashed(int /*threadId*/, ed2k::ed2kfilestruct fileData)
 {
     for(int i=0; i<m_hashes->rowCount(); i++)
     {

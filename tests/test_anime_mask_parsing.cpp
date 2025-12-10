@@ -20,7 +20,7 @@
 class TestableAniDBApi : public AniDBApi
 {
 public:
-    TestableAniDBApi(QString dbPath) : AniDBApi("testclient", 1)
+    TestableAniDBApi(QString /*dbPath*/) : AniDBApi("testclient", 1)
     {
         // Initialize with test database
     }

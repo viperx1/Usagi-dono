@@ -264,7 +264,7 @@ void TestMyListCardManager::testIndividualUpdate()
     manager->createCard(2);
     
     // Get initial card pointers
-    AnimeCard *card1 = manager->getCard(1);
+    [[maybe_unused]] AnimeCard *card1 = manager->getCard(1);
     AnimeCard *card2 = manager->getCard(2);
     
     // Update only card 1
