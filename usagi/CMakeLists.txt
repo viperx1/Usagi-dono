@@ -64,6 +64,7 @@ set(SOURCES
     src/animestats.cpp
     src/cachedanimedata.cpp
     src/relationdata.cpp
+    src/trayiconmanager.cpp
 )
 
 # Header files
@@ -114,6 +115,7 @@ set(HEADERS
     src/animestats.h
     src/cachedanimedata.h
     src/relationdata.h
+    src/trayiconmanager.h
 )
 
 # Create executable

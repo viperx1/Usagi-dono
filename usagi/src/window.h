@@ -58,6 +58,7 @@
 #include "animemetadatacache.h"
 #include "backgrounddatabaseworker.h"
 #include "hashercoordinator.h"
+#include "trayiconmanager.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -66,6 +67,7 @@ class MyListCardManager;
 class VirtualFlowLayout;
 class WatchSessionManager;
 class HasherCoordinator;
+class TrayIconManager;
 class Window;  // Forward declaration for friend access
 
 class hashes_ : public QTableWidget
@@ -290,12 +292,10 @@ private:
 	// Watch session manager
 	WatchSessionManager *watchSessionManager;
 	
-	// System tray icon
-	QSystemTrayIcon *trayIcon;
-	QMenu *trayIconMenu;
-	bool closeToTrayEnabled;
-	bool minimizeToTrayEnabled;
-	bool startMinimizedEnabled;
+	// System tray manager
+	TrayIconManager *trayIconManager;
+	
+	// Window state before hiding to tray
 	bool exitingFromTray;  // Flag to indicate exit was triggered from tray menu
 	Qt::WindowStates windowStateBeforeHide;  // Store window state before hiding to tray
 	QRect windowGeometryBeforeHide;  // Store window geometry before hiding to tray
@@ -392,9 +392,8 @@ public slots:
     void onToggleFilterBarClicked();
     
     // System tray slots
-    void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
-    void onTrayShowHideAction();
-    void onTrayExitAction();
+    void onTrayShowHideRequested();
+    void onTrayExitRequested();
     
     // Application quit handler (for external termination)
     void onApplicationAboutToQuit();
@@ -452,12 +451,6 @@ private:
     void updatePlayButtonsInTree(QTreeWidgetItem *rootItem = nullptr);
     bool isItemPlaying(QTreeWidgetItem *item) const;
     void updateUIForWatchedFile(int lid);  // Update tree view and anime card for a watched file
-    
-    // System tray helper methods
-    void createTrayIcon();
-    void updateTrayIconVisibility();
-    void loadTraySettings();
-    void saveTraySettings();
     
     // Icon helper method
     QIcon loadUsagiIcon();  // Loads usagi.png from various paths, falls back to default icon
