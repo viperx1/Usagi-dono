@@ -503,6 +503,11 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         currentAid = prequelAid;
     }
     
+    // Ensure the final anime from backward traversal is also tracked
+    if (expandChain && currentAid > 0 && !backwardTraversedAnime.contains(currentAid)) {
+        backwardTraversedAnime.insert(currentAid);
+    }
+    
     // Now build chain forward from the last anime in our filtered set
     // (or from the first prequel if expanding)
     visited.clear();
