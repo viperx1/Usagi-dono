@@ -395,10 +395,10 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 animeToAdd.insert(prequelAid);
                 currentAid = prequelAid;
             } else {
-                // Check all initial anime (availableAids) to find which has currentAid as sequel
+                // Check ALL cached anime to find which has currentAid as sequel
                 // This uses cached relationship data - no database queries
                 int reversePrequelAid = 0;
-                for (int aid : availableAids) {
+                for (int aid : m_cardCreationDataCache.keys()) {
                     if (!animeToAdd.contains(aid)) {
                         loadRelationDataForAnime(aid);
                         if (findSequelAid(aid) == currentAid) {
