@@ -101,6 +101,10 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     // Add all anime from chains (including expanded ones not in original aids list)
                     if (!finalAnimeIds.contains(aid)) {
                         finalAnimeIds.append(aid);
+                        // Check if this anime lacks cached data and needs preloading
+                        if (!m_cardCreationDataCache.contains(aid)) {
+                            expandedAnimeNeedingData.append(aid);
+                        }
                     }
                 }
             }
@@ -117,6 +121,15 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         m_orderedAnimeIds = finalAnimeIds;
         LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs, chain mode %2")
             .arg(finalAnimeIds.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
+    }
+    
+    // Preload data for expanded anime that lack cached data
+    // This must happen BEFORE updating the virtual layout to avoid "No card creation data" errors
+    if (!expandedAnimeNeedingData.isEmpty()) {
+        LOG(QString("[MyListCardManager] Preloading card data for %1 expanded anime in chains")
+            .arg(expandedAnimeNeedingData.size()));
+        preloadCardCreationData(expandedAnimeNeedingData);
+        LOG("[MyListCardManager] Expanded anime data preload complete");
     }
     
     // Update virtual layout AFTER releasing the mutex to avoid deadlock
