@@ -368,9 +368,20 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     
     LOG(QString("[MyListCardManager] After merging: %1 chains").arg(chains.size()));
     
+    // Build reverse lookup map ONCE: sequel_id → prequel_id
+    // This provides O(1) lookups instead of O(n) iteration through all cache (performance optimization)
+    QMap<int, int> sequelToPrequelMap;
+    for (int aid : m_cardCreationDataCache.keys()) {
+        loadRelationDataForAnime(aid);
+        int sequelAid = findSequelAid(aid);
+        if (sequelAid > 0) {
+            sequelToPrequelMap[sequelAid] = aid;
+        }
+    }
+    
     // Expand chains to include related anime (prequels/sequels) not in the initial input
     // This allows showing complete series even when some anime aren't in mylist
-    // NOTE: Database relationships may be unidirectional, so we need to query both directions
+    // NOTE: Database relationships may be unidirectional, so we use both direct and reverse lookups
     QList<AnimeChain> expandedChains;
     for (const AnimeChain& chain : chains) {
         QList<int> chainAnime = chain.getAnimeIds();
@@ -395,20 +406,9 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 animeToAdd.insert(prequelAid);
                 currentAid = prequelAid;
             } else {
-                // Check ALL cached anime to find which has currentAid as sequel
-                // This uses cached relationship data - no database queries
-                int reversePrequelAid = 0;
-                for (int aid : m_cardCreationDataCache.keys()) {
-                    if (!animeToAdd.contains(aid)) {
-                        loadRelationDataForAnime(aid);
-                        if (findSequelAid(aid) == currentAid) {
-                            reversePrequelAid = aid;
-                            break;
-                        }
-                    }
-                }
-                
-                if (reversePrequelAid > 0) {
+                // Use reverse lookup map for O(1) lookup (instead of O(n) iteration through all cache)
+                int reversePrequelAid = sequelToPrequelMap.value(currentAid, 0);
+                if (reversePrequelAid > 0 && !animeToAdd.contains(reversePrequelAid)) {
                     animeToAdd.insert(reversePrequelAid);
                     currentAid = reversePrequelAid;
                 } else {
