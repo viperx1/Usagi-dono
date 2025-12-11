@@ -170,8 +170,9 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         .arg(aids.size()).arg(availableAids.size()));
     
     // Create single-anime chains initially - merging will handle connections
-    for (int aid : aids) {
-        // Create a single-anime chain for each input anime
+    // Use availableAids (unique set) instead of aids to avoid duplicate chains
+    for (int aid : availableAids) {
+        // Create a single-anime chain for each unique input anime
         QList<int> singleAnimeChain;
         singleAnimeChain.append(aid);
         chains.append(AnimeChain(singleAnimeChain));
