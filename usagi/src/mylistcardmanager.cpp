@@ -347,8 +347,8 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                             orderedChain.append(aid);
                         }
                     }
-                    LOG(QString("[MyListCardManager] WARNING: Topological sort incomplete (%1/%2), appended remaining anime")
-                        .arg(orderedChain.size() - (allAnime.size() - orderedChain.size()))
+                    LOG(QString("[MyListCardManager] WARNING: Topological sort incomplete, added %1 disconnected anime (total: %2)")
+                        .arg(allAnime.size() - orderedChain.size() + (allAnime.size() - orderedChain.size()))
                         .arg(allAnime.size()));
                 }
                 
