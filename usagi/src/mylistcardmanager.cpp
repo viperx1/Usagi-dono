@@ -80,7 +80,7 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
 {
     QList<int> finalAnimeIds;
-    QList<int> expandedAnimeNeedingData;
+    QList<int> missingDataAnime;
     
     {
         QMutexLocker locker(&m_mutex);
@@ -101,6 +101,10 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     // Add all anime from chains (including expanded ones not in original aids list)
                     if (!finalAnimeIds.contains(aid)) {
                         finalAnimeIds.append(aid);
+                        // Collect anime that lack card creation data cache for incremental preloading
+                        if (!m_cardCreationDataCache.contains(aid)) {
+                            missingDataAnime.append(aid);
+                        }
                     }
                 }
             }
@@ -117,6 +121,36 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         m_orderedAnimeIds = finalAnimeIds;
         LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs, chain mode %2")
             .arg(finalAnimeIds.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
+    }
+    
+    // Preload data for anime missing from cache (incremental preloading)
+    // Now safe because preloadCardCreationData no longer clears the entire cache
+    if (!missingDataAnime.isEmpty()) {
+        LOG(QString("[MyListCardManager] Preloading card creation data for %1 anime missing from cache")
+            .arg(missingDataAnime.size()));
+        preloadCardCreationData(missingDataAnime);
+        
+        // Verify that preloading succeeded
+        QList<int> stillMissing;
+        for (int aid : std::as_const(missingDataAnime)) {
+            if (!m_cardCreationDataCache.contains(aid)) {
+                stillMissing.append(aid);
+            }
+        }
+        
+        if (!stillMissing.isEmpty()) {
+            QStringList aidStrings;
+            int sampleCount = std::min(10, static_cast<int>(stillMissing.size()));
+            for (int i = 0; i < sampleCount; ++i) {
+                aidStrings.append(QString::number(stillMissing[i]));
+            }
+            QString sampleAids = stillMissing.size() <= 10 ? aidStrings.join(", ") : 
+                                 QString("%1...").arg(aidStrings.join(", "));
+            LOG(QString("[MyListCardManager] WARNING: Failed to preload data for %1 anime (sample: %2)")
+                .arg(stillMissing.size()).arg(sampleAids));
+        } else {
+            LOG("[MyListCardManager] Card creation data preload complete");
+        }
     }
     
     // Update virtual layout AFTER releasing the mutex to avoid deadlock
@@ -256,12 +290,69 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 }
             }
             
-            // Rebuild merged chain using relation data for proper ordering
-            QList<int> mergedList = allAnime.values();
-            if (!mergedList.isEmpty()) {
+            // Order merged chain using topological sort based on prequel/sequel relationships
+            if (!allAnime.isEmpty()) {
                 LOG(QString("[MyListCardManager] Merging group of %1 chains with %2 total anime")
                     .arg(group.size()).arg(allAnime.size()));
-                newChains.append(AnimeChain(buildChainFromAid(mergedList.first(), allAnime, true)));
+                
+                // Build adjacency graph: aid -> list of sequels
+                QMap<int, QList<int>> graph;
+                QMap<int, int> inDegree;  // Count of prequels for each anime
+                
+                // Initialize
+                for (int aid : allAnime) {
+                    graph[aid] = QList<int>();
+                    inDegree[aid] = 0;
+                    loadRelationDataForAnime(aid);
+                }
+                
+                // Build graph edges based on sequel relationships
+                for (int aid : allAnime) {
+                    int sequelAid = findSequelAid(aid);
+                    if (sequelAid > 0 && allAnime.contains(sequelAid)) {
+                        graph[aid].append(sequelAid);
+                        inDegree[sequelAid]++;
+                    }
+                }
+                
+                // Topological sort using Kahn's algorithm
+                QList<int> orderedChain;
+                QList<int> queue;
+                
+                // Start with anime that have no prequels (in-degree = 0)
+                for (int aid : allAnime) {
+                    if (inDegree[aid] == 0) {
+                        queue.append(aid);
+                    }
+                }
+                
+                while (!queue.isEmpty()) {
+                    // Process anime with no remaining prequels
+                    int current = queue.takeFirst();
+                    orderedChain.append(current);
+                    
+                    // Reduce in-degree for all sequels
+                    for (int sequel : graph[current]) {
+                        inDegree[sequel]--;
+                        if (inDegree[sequel] == 0) {
+                            queue.append(sequel);
+                        }
+                    }
+                }
+                
+                // If not all anime were added (cycle or disconnected components), add remaining
+                if (orderedChain.size() < allAnime.size()) {
+                    for (int aid : allAnime) {
+                        if (!orderedChain.contains(aid)) {
+                            orderedChain.append(aid);
+                        }
+                    }
+                    LOG(QString("[MyListCardManager] WARNING: Topological sort incomplete, added %1 disconnected anime (total: %2)")
+                        .arg(allAnime.size() - orderedChain.size() + (allAnime.size() - orderedChain.size()))
+                        .arg(allAnime.size()));
+                }
+                
+                newChains.append(AnimeChain(orderedChain));
             }
         }
         
@@ -277,19 +368,128 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     
     LOG(QString("[MyListCardManager] After merging: %1 chains").arg(chains.size()));
     
+    // Build reverse lookup map ONCE: sequel_id → prequel_id
+    // This provides O(1) lookups instead of O(n) iteration through all cache (performance optimization)
+    QMap<int, int> sequelToPrequelMap;
+    for (int aid : m_cardCreationDataCache.keys()) {
+        loadRelationDataForAnime(aid);
+        int sequelAid = findSequelAid(aid);
+        if (sequelAid > 0) {
+            sequelToPrequelMap[sequelAid] = aid;
+        }
+    }
+    
     // Expand chains to include related anime (prequels/sequels) not in the initial input
     // This allows showing complete series even when some anime aren't in mylist
+    // NOTE: Database relationships may be unidirectional, so we use both direct and reverse lookups
     QList<AnimeChain> expandedChains;
     for (const AnimeChain& chain : chains) {
-        QSet<int> chainAnimeSet;
-        for (int aid : chain.getAnimeIds()) {
-            chainAnimeSet.insert(aid);
+        QList<int> chainAnime = chain.getAnimeIds();
+        if (chainAnime.isEmpty()) {
+            continue;
         }
         
-        // Use buildChainFromAid to expand this chain with related anime
-        // Pass the chainAnimeSet as available aids so it can expand beyond initial input
-        QList<int> expandedChain = buildChainFromAid(chain.getAnimeIds().first(), chainAnimeSet, true);
-        expandedChains.append(AnimeChain(expandedChain));
+        // Find prequels and sequels to add
+        QSet<int> animeToAdd;
+        for (int aid : chainAnime) {
+            animeToAdd.insert(aid);
+        }
+        
+        // Traverse backward from the first anime to find prequels
+        int currentAid = chainAnime.first();
+        QSet<int> visited;
+        while (currentAid > 0 && !visited.contains(currentAid)) {
+            visited.insert(currentAid);
+            loadRelationDataForAnime(currentAid);
+            int prequelAid = findPrequelAid(currentAid);
+            if (prequelAid > 0 && !animeToAdd.contains(prequelAid)) {
+                animeToAdd.insert(prequelAid);
+                currentAid = prequelAid;
+            } else {
+                // Use reverse lookup map for O(1) lookup (instead of O(n) iteration through all cache)
+                int reversePrequelAid = sequelToPrequelMap.value(currentAid, 0);
+                if (reversePrequelAid > 0 && !animeToAdd.contains(reversePrequelAid)) {
+                    animeToAdd.insert(reversePrequelAid);
+                    currentAid = reversePrequelAid;
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        // Traverse forward from the last anime to find sequels
+        currentAid = chainAnime.last();
+        visited.clear();
+        while (currentAid > 0 && !visited.contains(currentAid)) {
+            visited.insert(currentAid);
+            loadRelationDataForAnime(currentAid);
+            int sequelAid = findSequelAid(currentAid);
+            if (sequelAid > 0 && !animeToAdd.contains(sequelAid)) {
+                animeToAdd.insert(sequelAid);
+                currentAid = sequelAid;
+            } else {
+                break;
+            }
+        }
+        
+        // If we found additional anime, use topological sort to order them
+        if (animeToAdd.size() > chainAnime.size()) {
+            // Build adjacency graph for ordering
+            QMap<int, QList<int>> graph;
+            QMap<int, int> inDegree;
+            
+            // Initialize
+            for (int aid : animeToAdd) {
+                graph[aid] = QList<int>();
+                inDegree[aid] = 0;
+                loadRelationDataForAnime(aid);
+            }
+            
+            // Build graph edges
+            for (int aid : animeToAdd) {
+                int sequelAid = findSequelAid(aid);
+                if (sequelAid > 0 && animeToAdd.contains(sequelAid)) {
+                    graph[aid].append(sequelAid);
+                    inDegree[sequelAid]++;
+                }
+            }
+            
+            // Topological sort
+            QList<int> expandedChain;
+            QList<int> queue;
+            
+            for (int aid : animeToAdd) {
+                if (inDegree[aid] == 0) {
+                    queue.append(aid);
+                }
+            }
+            
+            while (!queue.isEmpty()) {
+                int current = queue.takeFirst();
+                expandedChain.append(current);
+                
+                for (int sequel : graph[current]) {
+                    inDegree[sequel]--;
+                    if (inDegree[sequel] == 0) {
+                        queue.append(sequel);
+                    }
+                }
+            }
+            
+            // Add any remaining (disconnected or cyclic)
+            if (expandedChain.size() < animeToAdd.size()) {
+                for (int aid : animeToAdd) {
+                    if (!expandedChain.contains(aid)) {
+                        expandedChain.append(aid);
+                    }
+                }
+            }
+            
+            expandedChains.append(AnimeChain(expandedChain));
+        } else {
+            // No expansion needed, keep original chain
+            expandedChains.append(chain);
+        }
     }
     chains = expandedChains;
     
@@ -358,6 +558,7 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
 {
     QList<int> chain;
     QSet<int> visited;
+    QSet<int> backwardTraversedAnime;  // Track anime found during backward traversal
     const int MAX_CHAIN_LENGTH = 20;  // Safety limit to prevent infinite loops
     
     // Find the original prequel (first in chain)
@@ -380,6 +581,11 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
             break;  // Cycle detected
         }
         visited.insert(currentAid);
+        
+        // Track all anime found during backward traversal when expanding
+        if (expandChain) {
+            backwardTraversedAnime.insert(currentAid);
+        }
         
         if (visited.size() > MAX_CHAIN_LENGTH) {
             LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping backward traversal").arg(MAX_CHAIN_LENGTH));
@@ -409,14 +615,16 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         currentAid = prequelAid;
     }
     
+    // Ensure the final anime from backward traversal is also tracked
+    if (expandChain && currentAid > 0 && !backwardTraversedAnime.contains(currentAid)) {
+        backwardTraversedAnime.insert(currentAid);
+    }
+    
     // Now build chain forward from the last anime in our filtered set
     // (or from the first prequel if expanding)
     visited.clear();
     int chainStart = expandChain ? currentAid : lastAvailableAid;
     currentAid = chainStart;
-    
-    // Track if we've added startAid to ensure it's always included
-    bool startAidAdded = false;
     
     while (currentAid > 0 && !visited.contains(currentAid)) {
         // When expanding, include all anime in chain
@@ -424,10 +632,6 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         if (expandChain || availableAids.contains(currentAid)) {
             chain.append(currentAid);
             visited.insert(currentAid);
-            
-            if (currentAid == startAid) {
-                startAidAdded = true;
-            }
             
             if (visited.size() > MAX_CHAIN_LENGTH) {
                 LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping forward traversal").arg(MAX_CHAIN_LENGTH));
@@ -456,17 +660,84 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         }
     }
     
-    // CRITICAL FIX: Ensure startAid is in the chain
-    // If we started from a prequel but couldn't reach startAid via sequel relationships,
-    // append startAid to the chain to keep it with its prequel.
-    // This handles database inconsistencies where prequel->sequel relationships are not bidirectional.
-    if (!startAidAdded && (expandChain || availableAids.contains(startAid))) {
-        LOG(QString("[MyListCardManager] WARNING: startAid=%1 not reachable from chainStart=%2 via sequel relationships, appending to chain")
-            .arg(startAid).arg(chainStart));
+    // CRITICAL FIX: Ensure all anime from backward traversal and availableAids are in the chain
+    // If we couldn't reach some anime via sequel relationships due to database inconsistencies,
+    // append them in the correct order based on their prequel relationships
+    if (expandChain || !availableAids.isEmpty()) {
+        QSet<int> chainSet;
+        for (int aid : chain) {
+            chainSet.insert(aid);
+        }
         
-        // Append the starting anime to the chain it belongs to (based on its prequel relationship)
-        // This keeps related anime together even when sequel relationships are broken
-        chain.append(startAid);
+        // Collect all anime that should be in the chain
+        QSet<int> shouldBeInChain;
+        
+        // Add anime from backward traversal (when expanding)
+        if (expandChain) {
+            for (int aid : backwardTraversedAnime) {
+                shouldBeInChain.insert(aid);
+            }
+        }
+        
+        // Add anime from availableAids
+        for (int aid : availableAids) {
+            shouldBeInChain.insert(aid);
+        }
+        
+        // Find anime that should be in chain but are not
+        QList<int> missingAnime;
+        for (int aid : shouldBeInChain) {
+            if (!chainSet.contains(aid)) {
+                missingAnime.append(aid);
+            }
+        }
+        
+        // If there are missing anime, try to add them in the correct order
+        if (!missingAnime.isEmpty()) {
+            LOG(QString("[MyListCardManager] WARNING: %1 anime should be in chain but not reachable from chainStart=%2 via sequel relationships")
+                .arg(missingAnime.size()).arg(chainStart));
+            
+            // Sort missing anime by their position in the chain (using prequel/sequel relationships)
+            // For each missing anime, traverse to find where it should be inserted
+            for (int missingAid : missingAnime) {
+                loadRelationDataForAnime(missingAid);
+                
+                // Find the position to insert this anime
+                // Check both directions: is any anime in chain its sequel, or is missing anime a prequel of any in chain
+                int insertAfterIndex = -1;
+                int insertBeforeIndex = -1;
+                
+                for (int i = 0; i < chain.size(); ++i) {
+                    // Check if chain[i] is the prequel of missing anime (missing should come after chain[i])
+                    if (findSequelAid(chain[i]) == missingAid) {
+                        insertAfterIndex = i;
+                        break;
+                    }
+                    // Check if missing anime is the prequel of chain[i] (missing should come before chain[i])
+                    if (findSequelAid(missingAid) == chain[i]) {
+                        insertBeforeIndex = i;
+                        break;
+                    }
+                }
+                
+                if (insertAfterIndex >= 0) {
+                    // Insert after the prequel
+                    chain.insert(insertAfterIndex + 1, missingAid);
+                    LOG(QString("[MyListCardManager] Inserted aid=%1 after aid=%2 (sequel relationship)")
+                        .arg(missingAid).arg(chain[insertAfterIndex]));
+                } else if (insertBeforeIndex >= 0) {
+                    // Insert before the sequel
+                    chain.insert(insertBeforeIndex, missingAid);
+                    LOG(QString("[MyListCardManager] Inserted aid=%1 before aid=%2 (prequel relationship)")
+                        .arg(missingAid).arg(chain[insertBeforeIndex]));
+                } else {
+                    // Couldn't find a good position, append at the end
+                    chain.append(missingAid);
+                    LOG(QString("[MyListCardManager] Appended aid=%1 at end (no relationship found)")
+                        .arg(missingAid));
+                }
+            }
+        }
     }
     
     return chain;
@@ -493,6 +764,8 @@ int MyListCardManager::findSequelAid(int aid) const
     const CardCreationData& data = m_cardCreationDataCache[aid];
     return data.getSequel();
 }
+
+
 
 void MyListCardManager::loadRelationDataForAnime(int aid) const
 {
@@ -597,10 +870,9 @@ void MyListCardManager::updateSeriesChainConnections(bool chainModeEnabled)
             AnimeCard* card = m_cards.value(currentAid, nullptr);
             if (card) {
                 card->setSeriesChainInfo(prequelAid, sequelAid);
-            } else {
-                LOG(QString("[MyListCardManager] WARNING: Card not found for aid=%1 when updating chain connections")
-                    .arg(currentAid));
             }
+            // Note: No warning if card not found - with virtual scrolling, cards are created on-demand
+            // Chain info will be set in createCard() when the card is actually created
         }
     }
 }
@@ -1313,8 +1585,22 @@ AnimeCard* MyListCardManager::createCard(int aid)
     card->setStatistics(data.stats.normalEpisodes(), totalNormalEpisodes, 
                        data.stats.normalViewed(), data.stats.otherEpisodes(), data.stats.otherViewed());
     
-    // Add to cache first (before layout to avoid triggering layout updates prematurely)
+    // Set series chain info if chain mode is enabled
     QMutexLocker locker(&m_mutex);
+    if (m_chainModeEnabled && !m_chainList.isEmpty()) {
+        int chainIndex = m_aidToChainIndex.value(aid, -1);
+        if (chainIndex >= 0 && chainIndex < m_chainList.size()) {
+            const QList<int> chainAnimeIds = m_chainList[chainIndex].getAnimeIds();
+            int aidIndex = chainAnimeIds.indexOf(aid);
+            if (aidIndex >= 0) {
+                int prequelAid = (aidIndex > 0) ? chainAnimeIds[aidIndex - 1] : 0;
+                int sequelAid = (aidIndex < chainAnimeIds.size() - 1) ? chainAnimeIds[aidIndex + 1] : 0;
+                card->setSeriesChainInfo(prequelAid, sequelAid);
+            }
+        }
+    }
+    
+    // Add to cache (mutex already locked above)
     m_cards[aid] = card;
     
     // Add to layout only if not using virtual scrolling
@@ -1714,8 +2000,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         return;
     }
     
-    // Clear the cache before repopulating
-    m_cardCreationDataCache.clear();
+    // Don't clear the cache - just add/update entries for the requested anime
+    // This allows incremental preloading without losing previously loaded data
     
     // Build IN clause for bulk queries
     // Note: aids come from internal database queries (not user input) and are converted
