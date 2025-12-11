@@ -93,17 +93,11 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             // Chains should have been built once after preloadCardCreationData completed
             
             // If build is in progress, wait for it to complete
-            if (m_chainBuildInProgress) {
+            while (m_chainBuildInProgress) {
                 LOG("[MyListCardManager] Chain build in progress, waiting for completion...");
-                locker.unlock();
-                
-                // Wait for build to complete by acquiring and releasing the mutex
-                // The build holds the mutex while working, so this blocks until it's done
-                QMutexLocker waitLocker(&m_mutex);
-                waitLocker.unlock();
-                
-                // Re-acquire the lock for the rest of the function
-                locker.relock();
+                // Wait for the builder to signal completion
+                // This releases the mutex while waiting and re-acquires it when woken up
+                m_chainBuildComplete.wait(&m_mutex);
                 LOG("[MyListCardManager] Chain build completed, continuing with setAnimeIdList");
             }
             
@@ -2048,6 +2042,9 @@ void MyListCardManager::buildChainsFromCache()
     
     m_chainsBuilt = true;
     m_chainBuildInProgress = false;
+    
+    // Wake up any threads waiting for chain build to complete
+    m_chainBuildComplete.wakeAll();
     
     LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
         .arg(m_chainList.size())

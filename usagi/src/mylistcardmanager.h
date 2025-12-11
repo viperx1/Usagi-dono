@@ -410,6 +410,7 @@ private:
     
     // Thread safety
     mutable QMutex m_mutex;
+    QWaitCondition m_chainBuildComplete;    // Wait condition for chain build completion
     
     // Flag to track if initial loading is complete
     bool m_initialLoadComplete;
