@@ -109,6 +109,7 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     .arg(m_chainList.size()));
                 
                 // Filter chains to only include those with at least one anime from the input list
+                // IMPORTANT: Never modify m_chainList - it's the master list from cache
                 QSet<int> inputAidSet(aids.begin(), aids.end());
                 QList<AnimeChain> filteredChains;
                 
@@ -127,14 +128,12 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     }
                 }
                 
-                // Update to use filtered chains
-                m_chainList = filteredChains;
-                
                 // Build aid -> chain index map and collect all anime IDs from filtered chains
+                // Use filteredChains (local variable) - never modify m_chainList
                 m_aidToChainIndex.clear();
                 finalAnimeIds.clear();
-                for (int i = 0; i < m_chainList.size(); ++i) {
-                    for (int aid : m_chainList[i].getAnimeIds()) {
+                for (int i = 0; i < filteredChains.size(); ++i) {
+                    for (int aid : filteredChains[i].getAnimeIds()) {
                         m_aidToChainIndex[aid] = i;
                         // Add all anime from chains (including expanded ones not in original aids list)
                         if (!finalAnimeIds.contains(aid)) {
@@ -143,8 +142,8 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     }
                 }
                 
-                LOG(QString("[MyListCardManager] Filtered to %1 chains containing %2 anime from input list")
-                    .arg(m_chainList.size()).arg(finalAnimeIds.size()));
+                LOG(QString("[MyListCardManager] Filtered to %1 chains containing %2 anime (preserving original %3 chains)")
+                    .arg(filteredChains.size()).arg(finalAnimeIds.size()).arg(m_chainList.size()));
             }
         } else {
             // Normal mode: clear chain data
