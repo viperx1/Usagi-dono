@@ -61,7 +61,7 @@ bool AnimeChain::canMergeWith(const AnimeChain& other) const
 }
 
 // Merge another chain into this one
-bool AnimeChain::mergeWith(const AnimeChain& other, RelationLookupFunc lookupFunc)
+bool AnimeChain::mergeWith(const AnimeChain& other, RelationLookupFunc /*lookupFunc*/)
 {
     if (other.isEmpty()) {
         return false;
