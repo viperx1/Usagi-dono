@@ -610,10 +610,9 @@ void MyListCardManager::updateSeriesChainConnections(bool chainModeEnabled)
             AnimeCard* card = m_cards.value(currentAid, nullptr);
             if (card) {
                 card->setSeriesChainInfo(prequelAid, sequelAid);
-            } else {
-                LOG(QString("[MyListCardManager] WARNING: Card not found for aid=%1 when updating chain connections")
-                    .arg(currentAid));
             }
+            // Note: No warning if card not found - with virtual scrolling, cards are created on-demand
+            // Chain info will be set in createCard() when the card is actually created
         }
     }
 }
