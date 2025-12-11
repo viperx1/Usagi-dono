@@ -67,12 +67,12 @@ bool AnimeChain::mergeWith(const AnimeChain& other, RelationLookupFunc /*lookupF
         return false;
     }
     
-    // Add all anime from other chain
+    // Use QSet to ensure no duplicates when merging
+    QSet<int> uniqueAnime(m_animeIds.begin(), m_animeIds.end());
     for (int aid : other.m_animeIds) {
-        if (!m_animeIds.contains(aid)) {
-            m_animeIds.append(aid);
-        }
+        uniqueAnime.insert(aid);
     }
+    m_animeIds = uniqueAnime.values();
     
     // Merge relation data
     for (auto it = other.m_relations.constBegin(); it != other.m_relations.constEnd(); ++it) {

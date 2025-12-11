@@ -77,7 +77,7 @@ QList<int> MyListCardManager::getAnimeIdList() const
 
 void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 {
-    setAnimeIdList(aids, false);  // Default: chain mode disabled
+    setAnimeIdList(aids, true);  // Default: chain mode enabled (will auto-disable if chains not built)
 }
 
 void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
@@ -231,8 +231,8 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                             chains[i].mergeWith(chains[otherIdx], relationLookup);
                             deletedChains.insert(otherIdx);
                             
-                            // Update map: all anime from other chain now belong to this chain
-                            for (int aid2 : chains[otherIdx].getAnimeIds()) {
+                            // Rebuild map for all anime in merged chain to ensure consistency
+                            for (int aid2 : chains[i].getAnimeIds()) {
                                 animeToChainIdx[aid2] = i;
                             }
                             changed = true;
@@ -255,8 +255,8 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                             chains[i].mergeWith(chains[otherIdx], relationLookup);
                             deletedChains.insert(otherIdx);
                             
-                            // Update map: all anime from other chain now belong to this chain
-                            for (int aid2 : chains[otherIdx].getAnimeIds()) {
+                            // Rebuild map for all anime in merged chain to ensure consistency
+                            for (int aid2 : chains[i].getAnimeIds()) {
                                 animeToChainIdx[aid2] = i;
                             }
                             changed = true;
