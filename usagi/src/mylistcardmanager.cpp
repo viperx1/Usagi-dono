@@ -503,19 +503,12 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
     int chainStart = expandChain ? currentAid : lastAvailableAid;
     currentAid = chainStart;
     
-    // Track if we've added startAid to ensure it's always included
-    bool startAidAdded = false;
-    
     while (currentAid > 0 && !visited.contains(currentAid)) {
         // When expanding, include all anime in chain
         // When not expanding, only include anime in availableAids
         if (expandChain || availableAids.contains(currentAid)) {
             chain.append(currentAid);
             visited.insert(currentAid);
-            
-            if (currentAid == startAid) {
-                startAidAdded = true;
-            }
             
             if (visited.size() > MAX_CHAIN_LENGTH) {
                 LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping forward traversal").arg(MAX_CHAIN_LENGTH));
