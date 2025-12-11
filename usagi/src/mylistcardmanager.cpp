@@ -141,7 +141,8 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         
         if (!stillMissing.isEmpty()) {
             QStringList aidStrings;
-            for (int i = 0; i < std::min(10, stillMissing.size()); ++i) {
+            int sampleCount = std::min(10, static_cast<int>(stillMissing.size()));
+            for (int i = 0; i < sampleCount; ++i) {
                 aidStrings.append(QString::number(stillMissing[i]));
             }
             QString sampleAids = stillMissing.size() <= 10 ? aidStrings.join(", ") : 
