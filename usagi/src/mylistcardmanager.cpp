@@ -221,6 +221,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                     // Expand: add prequel to chain
                     currentChain.insert(prequelAid);
                     allProcessedAnime.insert(prequelAid);
+                    animeToChain[prequelAid] = currentChain;  // Add to map so it can be found
                     changed = true;
                 }
             } else {
@@ -235,6 +236,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                     } else if (!allProcessedAnime.contains(reversePrequelAid)) {
                         currentChain.insert(reversePrequelAid);
                         allProcessedAnime.insert(reversePrequelAid);
+                        animeToChain[reversePrequelAid] = currentChain;  // Add to map so it can be found
                         changed = true;
                     }
                 }
@@ -253,6 +255,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                     // Expand: add sequel to chain
                     currentChain.insert(sequelAid);
                     allProcessedAnime.insert(sequelAid);
+                    animeToChain[sequelAid] = currentChain;  // Add to map so it can be found
                     changed = true;
                 }
             }
