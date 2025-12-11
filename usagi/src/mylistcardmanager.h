@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QSet>
 #include <QMutex>
+#include <QWaitCondition>
 #include <QTimer>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
@@ -136,7 +137,12 @@ public:
     
     // Comprehensive preload function that loads ALL data needed for card creation
     // This should be called BEFORE any cards are created to eliminate all SQL queries from createCard()
+    // After preloading, automatically builds chains from the complete cached dataset
     void preloadCardCreationData(const QList<int>& aids);
+    
+    // Build chains once from all cached anime data (called automatically after preloadCardCreationData)
+    // This ensures chains are built only once with complete data, preventing duplicates
+    void buildChainsFromCache();
     
     // Create a card for an anime (data must be preloaded first via preloadCardCreationData)
     AnimeCard* createCard(int aid);
@@ -169,6 +175,9 @@ signals:
     
     // Emitted when a NEW anime is added to mylist (not during initial load)
     void newAnimeAdded(int aid);
+    
+    // Emitted to update progress status during data loading
+    void progressUpdate(const QString& message);
     
 public slots:
     // Slot to handle episode updates from API
@@ -381,10 +390,13 @@ private:
     QList<int> m_orderedAnimeIds;
     
     // Chain support
-    QList<AnimeChain> m_chainList;          // List of chains
+    QList<AnimeChain> m_chainList;          // List of chains (built once from complete cache)
     QMap<int, int> m_aidToChainIndex;       // Anime ID -> chain index mapping
     bool m_chainModeEnabled;                // Is chain mode active
     QSet<int> m_expandedChainAnimeIds;      // Anime IDs added by chain expansion (not in original mylist)
+    bool m_chainsBuilt;                     // Flag to track if chains have been built from cache
+    bool m_chainBuildInProgress;            // Flag to track if chain building is currently in progress
+    bool m_dataReady;                       // Flag to track if ALL data is loaded and processed (preload + chains)
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;
@@ -403,6 +415,7 @@ private:
     
     // Thread safety
     mutable QMutex m_mutex;
+    QWaitCondition m_dataReadyCondition;    // Wait condition for data ready (preload + chain build complete)
     
     // Flag to track if initial loading is complete
     bool m_initialLoadComplete;

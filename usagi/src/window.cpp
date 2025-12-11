@@ -324,6 +324,11 @@ Window::Window()
         animeCards = cardManager->getAllCards();  // Update legacy list for backward compatibility
     });
     
+    // Connect progress update signal to status label
+    connect(cardManager, &MyListCardManager::progressUpdate, this, [this](const QString& message) {
+        mylistStatusLabel->setText(QString("MyList Status: %1").arg(message));
+    });
+    
     // Connect signal for brand new anime added to mylist (after initial load)
     connect(cardManager, &MyListCardManager::newAnimeAdded, this, [this](int aid) {
         LOG(QString("[Window] New anime aid=%1 added to mylist, auto-starting session").arg(aid));

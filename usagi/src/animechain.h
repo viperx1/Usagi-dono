@@ -5,22 +5,22 @@
 #include <QString>
 #include <QPair>
 #include <QMap>
+#include <functional>
 
 // Forward declaration - use full namespace path in MyListCardManager
 class MyListCardManager;
 
 /**
- * AnimeChain - Data structure for managing anime series chains
+ * AnimeChain - Manages anime series chains with relation data
  * 
- * This is a data layer (not a widget) that represents a series of related anime
- * (prequels/sequels) and provides helper methods for chain-based operations
- * like sorting and filtering.
+ * This class encapsulates chain building logic and holds relation data
+ * for efficient merging and expansion operations.
  * 
  * Design principles:
- * - Pure data structure with no UI logic
- * - Stores ordered list of anime IDs from prequel to sequel (immutable internal order)
- * - Provides comparison operators for external sorting
- * - Used to simplify sorting/filtering logic when chain mode is enabled
+ * - Holds anime IDs AND their prequel/sequel relations
+ * - Provides interface for checking relations and merging chains
+ * - No internal gaps allowed - all relations must be resolved
+ * - Can expand to include related anime not in original input
  */
 class AnimeChain
 {
@@ -38,12 +38,18 @@ public:
     template<typename T>
     using CardDataMap = QMap<int, T>;
     
+    // Relation lookup function type: aid -> (prequel_aid, sequel_aid)
+    using RelationLookupFunc = std::function<QPair<int,int>(int)>;
+    
     AnimeChain() = default;
     
-    // Construct from a list of anime IDs (should be ordered prequel to sequel)
+    // Construct from a single anime ID with relation lookup function
+    explicit AnimeChain(int aid, RelationLookupFunc lookupFunc);
+    
+    // Construct from a list of anime IDs (for backward compatibility)
     explicit AnimeChain(const QList<int>& animeIds) : m_animeIds(animeIds) {}
     
-    // Get the list of anime IDs in this chain (ordered from prequel to sequel, immutable)
+    // Get the list of anime IDs in this chain (ordered from prequel to sequel)
     QList<int> getAnimeIds() const { return m_animeIds; }
     
     // Get the first (representative) anime ID for external sorting
@@ -65,6 +71,27 @@ public:
     // Check if chain contains a specific anime ID
     bool contains(int aid) const { return m_animeIds.contains(aid); }
     
+    // Get unbound relations for an anime (not already in this chain)
+    // Returns (prequel_aid, sequel_aid) where 0 means no relation
+    QPair<int,int> getUnboundRelations(int aid) const;
+    
+    // Check if this chain can merge with an anime (has connecting relation)
+    bool canMergeWith(int aid) const;
+    
+    // Check if this chain can merge with another chain
+    bool canMergeWith(const AnimeChain& other) const;
+    
+    // Merge another chain into this one
+    // Returns true if successful, false if chains don't connect
+    bool mergeWith(const AnimeChain& other, RelationLookupFunc lookupFunc);
+    
+    // Expand chain by following unbound relations
+    // Continues until no more relations can be found
+    void expand(RelationLookupFunc lookupFunc);
+    
+    // Order the anime IDs in the chain from prequel to sequel
+    void orderChain();
+    
     // Comparison operators for sorting (default: by representative ID)
     bool operator<(const AnimeChain& other) const;
     bool operator>(const AnimeChain& other) const;
@@ -85,7 +112,8 @@ public:
         const QMap<int, QPair<QString, QString>>& relationData);
     
 private:
-    QList<int> m_animeIds;  // Ordered list of anime IDs (prequel to sequel, immutable)
+    QList<int> m_animeIds;  // Ordered list of anime IDs (prequel to sequel)
+    QMap<int, QPair<int,int>> m_relations;  // aid -> (prequel_aid, sequel_aid)
 };
 
 // Template implementation must be in header
