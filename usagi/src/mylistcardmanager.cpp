@@ -173,11 +173,11 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         return QPair<int,int>(findPrequelAid(aid), findSequelAid(aid));
     };
     
-    // Build anime-to-chain-index map for fast lookups
+    // Map: anime ID -> chain index (which chain this anime belongs to)
     QMap<int, int> animeToChainIdx;
     QList<AnimeChain> chains;
     
-    // Create initial chains and build map
+    // Create initial chains - one per anime
     int idx = 0;
     for (int aid : availableAids) {
         AnimeChain chain(aid, relationLookup);
@@ -188,133 +188,95 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     
     LOG(QString("[MyListCardManager] Created %1 initial chains").arg(chains.size()));
     
-    // Merge chains based on relations - single pass
-    QSet<int> mergedIndices;
+    // Track which chain indices have been merged (deleted)
+    QSet<int> deletedChains;
+    
+    // Process each chain: expand and merge as needed
     for (int i = 0; i < chains.size(); i++) {
-        if (mergedIndices.contains(i)) {
-            continue;
+        if (deletedChains.contains(i)) {
+            continue;  // This chain was already merged into another
         }
         
-        // Check this chain's relations
-        QList<int> animeIds = chains[i].getAnimeIds();
-        for (int aid : animeIds) {
-            auto unbound = chains[i].getUnboundRelations(aid);
+        // Expand this chain to include all related anime
+        // The expand method will add related anime not yet in the chain
+        QSet<int> processed;
+        bool changed = true;
+        int iterations = 0;
+        const int MAX_ITERATIONS = 100;
+        
+        while (changed && iterations < MAX_ITERATIONS) {
+            changed = false;
+            iterations++;
             
-            // Check prequel
-            if (unbound.first > 0 && animeToChainIdx.contains(unbound.first)) {
-                int otherIdx = animeToChainIdx[unbound.first];
-                if (otherIdx != i && !mergedIndices.contains(otherIdx)) {
-                    // Merge otherIdx into i
-                    chains[i].mergeWith(chains[otherIdx], relationLookup);
-                    mergedIndices.insert(otherIdx);
-                    
-                    // Update map for all anime in merged chain
-                    for (int aid2 : chains[otherIdx].getAnimeIds()) {
-                        animeToChainIdx[aid2] = i;
+            QList<int> currentAnime = chains[i].getAnimeIds();
+            for (int aid : currentAnime) {
+                if (processed.contains(aid)) {
+                    continue;
+                }
+                processed.insert(aid);
+                
+                auto unbound = chains[i].getUnboundRelations(aid);
+                
+                // Process prequel
+                if (unbound.first > 0) {
+                    if (animeToChainIdx.contains(unbound.first)) {
+                        // Prequel is in another chain - merge that chain into this one
+                        int otherIdx = animeToChainIdx[unbound.first];
+                        if (otherIdx != i && !deletedChains.contains(otherIdx)) {
+                            chains[i].mergeWith(chains[otherIdx], relationLookup);
+                            deletedChains.insert(otherIdx);
+                            
+                            // Update map: all anime from other chain now belong to this chain
+                            for (int aid2 : chains[otherIdx].getAnimeIds()) {
+                                animeToChainIdx[aid2] = i;
+                            }
+                            changed = true;
+                        }
+                    } else {
+                        // Prequel not in any chain yet - add it via expanding
+                        AnimeChain prequelChain(unbound.first, relationLookup);
+                        chains[i].mergeWith(prequelChain, relationLookup);
+                        animeToChainIdx[unbound.first] = i;
+                        changed = true;
+                    }
+                }
+                
+                // Process sequel
+                if (unbound.second > 0) {
+                    if (animeToChainIdx.contains(unbound.second)) {
+                        // Sequel is in another chain - merge that chain into this one
+                        int otherIdx = animeToChainIdx[unbound.second];
+                        if (otherIdx != i && !deletedChains.contains(otherIdx)) {
+                            chains[i].mergeWith(chains[otherIdx], relationLookup);
+                            deletedChains.insert(otherIdx);
+                            
+                            // Update map: all anime from other chain now belong to this chain
+                            for (int aid2 : chains[otherIdx].getAnimeIds()) {
+                                animeToChainIdx[aid2] = i;
+                            }
+                            changed = true;
+                        }
+                    } else {
+                        // Sequel not in any chain yet - add it via expanding
+                        AnimeChain sequelChain(unbound.second, relationLookup);
+                        chains[i].mergeWith(sequelChain, relationLookup);
+                        animeToChainIdx[unbound.second] = i;
+                        changed = true;
                     }
                 }
             }
-            
-            // Check sequel
-            if (unbound.second > 0 && animeToChainIdx.contains(unbound.second)) {
-                int otherIdx = animeToChainIdx[unbound.second];
-                if (otherIdx != i && !mergedIndices.contains(otherIdx)) {
-                    // Merge otherIdx into i
-                    chains[i].mergeWith(chains[otherIdx], relationLookup);
-                    mergedIndices.insert(otherIdx);
-                    
-                    // Update map for all anime in merged chain
-                    for (int aid2 : chains[otherIdx].getAnimeIds()) {
-                        animeToChainIdx[aid2] = i;
-                    }
-                }
-            }
         }
     }
     
-    // Remove merged chains
-    QList<AnimeChain> mergedChains;
+    // Remove deleted chains
+    QList<AnimeChain> finalChains;
     for (int i = 0; i < chains.size(); i++) {
-        if (!mergedIndices.contains(i)) {
-            mergedChains.append(chains[i]);
-        }
-    }
-    chains = mergedChains;
-    
-    LOG(QString("[MyListCardManager] After merging: %1 chains").arg(chains.size()));
-    
-    // Expand each chain to include related anime
-    for (AnimeChain& chain : chains) {
-        chain.expand(relationLookup);
-    }
-    
-    LOG(QString("[MyListCardManager] After expansion: %1 chains").arg(chains.size()));
-    
-    // Rebuild anime-to-chain map after expansion
-    animeToChainIdx.clear();
-    for (int i = 0; i < chains.size(); i++) {
-        for (int aid : chains[i].getAnimeIds()) {
-            if (animeToChainIdx.contains(aid)) {
-                // Duplicate found - need to merge
-                int otherIdx = animeToChainIdx[aid];
-                if (otherIdx != i) {
-                    LOG(QString("[MyListCardManager] Found overlap: anime %1 in chains %2 and %3")
-                        .arg(aid).arg(otherIdx).arg(i));
-                }
-            }
-            animeToChainIdx[aid] = i;
+        if (!deletedChains.contains(i)) {
+            finalChains.append(chains[i]);
         }
     }
     
-    // Merge chains that share anime after expansion
-    mergedIndices.clear();
-    QMap<int, QSet<int>> chainsToMerge;  // chain index -> set of indices to merge with it
-    
-    for (int i = 0; i < chains.size(); i++) {
-        for (int j = i + 1; j < chains.size(); j++) {
-            // Check if chains share any anime
-            bool hasOverlap = false;
-            for (int aid : chains[j].getAnimeIds()) {
-                if (chains[i].contains(aid)) {
-                    hasOverlap = true;
-                    break;
-                }
-            }
-            
-            if (hasOverlap) {
-                if (!chainsToMerge.contains(i)) {
-                    chainsToMerge[i] = QSet<int>();
-                }
-                chainsToMerge[i].insert(j);
-            }
-        }
-    }
-    
-    // Perform merges
-    for (auto it = chainsToMerge.constBegin(); it != chainsToMerge.constEnd(); ++it) {
-        int targetIdx = it.key();
-        if (mergedIndices.contains(targetIdx)) {
-            continue;
-        }
-        
-        for (int sourceIdx : it.value()) {
-            if (!mergedIndices.contains(sourceIdx)) {
-                chains[targetIdx].mergeWith(chains[sourceIdx], relationLookup);
-                mergedIndices.insert(sourceIdx);
-            }
-        }
-    }
-    
-    // Remove merged chains
-    mergedChains.clear();
-    for (int i = 0; i < chains.size(); i++) {
-        if (!mergedIndices.contains(i)) {
-            mergedChains.append(chains[i]);
-        }
-    }
-    chains = mergedChains;
-    
-    LOG(QString("[MyListCardManager] Final chain count: %1").arg(chains.size()));
+    LOG(QString("[MyListCardManager] Final chain count: %1").arg(finalChains.size()));
     
     // Verify total anime count and find duplicates
     int totalAnimeInChains = 0;
