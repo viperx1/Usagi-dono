@@ -714,6 +714,9 @@ void MyListCardManager::clearAllCards()
 {
     QMutexLocker locker(&m_mutex);
     
+    // Reset data ready flag when clearing
+    m_dataReady = false;
+    
     // Clear virtual layout if used
     if (m_virtualLayout) {
         m_virtualLayout->clear();
@@ -1297,6 +1300,15 @@ void MyListCardManager::updateCardAiredDates(AnimeCard* card, const QString& sta
 
 AnimeCard* MyListCardManager::createCard(int aid)
 {
+    // Wait for ALL data to be ready before creating cards
+    {
+        QMutexLocker locker(&m_mutex);
+        while (!m_dataReady) {
+            LOG("[MyListCardManager] createCard: Waiting for data to be ready...");
+            m_dataReadyCondition.wait(&m_mutex);
+        }
+    }
+    
     // Check if card already exists - prevent duplicates
     if (hasCard(aid)) {
         LOG(QString("[MyListCardManager] Card already exists for aid=%1, skipping duplicate creation").arg(aid));
