@@ -324,8 +324,8 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     QSet<int> allAnimeInChains;
     QMap<int, int> animeOccurrences;  // Track how many times each anime appears
     
-    for (int chainIdx = 0; chainIdx < chains.size(); ++chainIdx) {
-        const AnimeChain& chain = chains[chainIdx];
+    for (int chainIdx = 0; chainIdx < finalChains.size(); ++chainIdx) {
+        const AnimeChain& chain = finalChains[chainIdx];
         for (int aid : chain.getAnimeIds()) {
             totalAnimeInChains++;
             allAnimeInChains.insert(aid);
@@ -339,43 +339,40 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         }
     }
     
-    if (totalAnimeInChains != availableAids.size()) {
-        LOG(QString("[MyListCardManager] WARNING: Chain building mismatch! Input: %1 unique anime, Chains contain: %2 anime (%3 unique)")
-            .arg(availableAids.size()).arg(totalAnimeInChains).arg(allAnimeInChains.size()));
-            
-        // Log which anime are extra
-        QSet<int> extraAnime = allAnimeInChains - availableAids;
-        if (!extraAnime.isEmpty()) {
-            QStringList extraList;
-            for (int aid : extraAnime) {
-                extraList.append(QString::number(aid));
-            }
-            LOG(QString("[MyListCardManager] Extra anime in chains (NOT in input): %1").arg(extraList.join(", ")));
-        }
-        
-        // Log which anime are missing
-        QSet<int> missingAnime = availableAids - allAnimeInChains;
-        if (!missingAnime.isEmpty()) {
-            QStringList missingList;
-            for (int aid : missingAnime) {
-                missingList.append(QString::number(aid));
-            }
-            LOG(QString("[MyListCardManager] Missing anime from chains: %1").arg(missingList.join(", ")));
-        }
-        
-        // Log duplicates
-        QStringList duplicates;
-        for (QMap<int, int>::const_iterator it = animeOccurrences.constBegin(); it != animeOccurrences.constEnd(); ++it) {
-            if (it.value() > 1) {
-                duplicates.append(QString("%1(x%2)").arg(it.key()).arg(it.value()));
-            }
-        }
-        if (!duplicates.isEmpty()) {
-            LOG(QString("[MyListCardManager] Duplicate anime in chains: %1").arg(duplicates.join(", ")));
-        }
+    if (totalAnimeInChains != allAnimeInChains.size()) {
+        LOG(QString("[MyListCardManager] ERROR: Duplicate anime detected! Total slots: %1, Unique anime: %2")
+            .arg(totalAnimeInChains).arg(allAnimeInChains.size()));
     }
     
-    return chains;
+    // Log expansion results
+    QSet<int> expandedAnime = allAnimeInChains - availableAids;
+    if (!expandedAnime.isEmpty()) {
+        LOG(QString("[MyListCardManager] Chain expansion added %1 anime not in original input")
+            .arg(expandedAnime.size()));
+    }
+    
+    // Verify no anime from input was lost
+    QSet<int> missingAnime = availableAids - allAnimeInChains;
+    if (!missingAnime.isEmpty()) {
+        QStringList missingList;
+        for (int aid : missingAnime) {
+            missingList.append(QString::number(aid));
+        }
+        LOG(QString("[MyListCardManager] ERROR: Missing anime from chains: %1").arg(missingList.join(", ")));
+    }
+    
+    // Log duplicates
+    QStringList duplicates;
+    for (QMap<int, int>::const_iterator it = animeOccurrences.constBegin(); it != animeOccurrences.constEnd(); ++it) {
+        if (it.value() > 1) {
+            duplicates.append(QString("%1(x%2)").arg(it.key()).arg(it.value()));
+        }
+    }
+    if (!duplicates.isEmpty()) {
+        LOG(QString("[MyListCardManager] ERROR: Duplicate anime in chains: %1").arg(duplicates.join(", ")));
+    }
+    
+    return finalChains;
 }
 
 QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& availableAids, bool expandChain) const
