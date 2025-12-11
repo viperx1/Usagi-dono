@@ -585,18 +585,25 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
             LOG(QString("[MyListCardManager] WARNING: %1 anime should be in chain but not reachable from chainStart=%2 via sequel relationships")
                 .arg(missingAnime.size()).arg(chainStart));
             
-            // Sort missing anime by their position in the chain (using prequel relationships)
-            // For each missing anime, traverse backward to find where it should be inserted
+            // Sort missing anime by their position in the chain (using prequel/sequel relationships)
+            // For each missing anime, traverse to find where it should be inserted
             for (int missingAid : missingAnime) {
                 loadRelationDataForAnime(missingAid);
                 
                 // Find the position to insert this anime
-                // Check if any anime in the chain is its prequel
+                // Check both directions: is any anime in chain its sequel, or is missing anime a prequel of any in chain
                 int insertAfterIndex = -1;
+                int insertBeforeIndex = -1;
+                
                 for (int i = 0; i < chain.size(); ++i) {
+                    // Check if chain[i] is the prequel of missing anime (missing should come after chain[i])
                     if (findSequelAid(chain[i]) == missingAid) {
-                        // Found the prequel, insert after this position
                         insertAfterIndex = i;
+                        break;
+                    }
+                    // Check if missing anime is the prequel of chain[i] (missing should come before chain[i])
+                    if (findSequelAid(missingAid) == chain[i]) {
+                        insertBeforeIndex = i;
                         break;
                     }
                 }
@@ -604,12 +611,17 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
                 if (insertAfterIndex >= 0) {
                     // Insert after the prequel
                     chain.insert(insertAfterIndex + 1, missingAid);
-                    LOG(QString("[MyListCardManager] Inserted aid=%1 after aid=%2 based on prequel relationship")
+                    LOG(QString("[MyListCardManager] Inserted aid=%1 after aid=%2 (sequel relationship)")
                         .arg(missingAid).arg(chain[insertAfterIndex]));
+                } else if (insertBeforeIndex >= 0) {
+                    // Insert before the sequel
+                    chain.insert(insertBeforeIndex, missingAid);
+                    LOG(QString("[MyListCardManager] Inserted aid=%1 before aid=%2 (prequel relationship)")
+                        .arg(missingAid).arg(chain[insertBeforeIndex]));
                 } else {
                     // Couldn't find a good position, append at the end
                     chain.append(missingAid);
-                    LOG(QString("[MyListCardManager] Appended aid=%1 at end (no prequel relationship found)")
+                    LOG(QString("[MyListCardManager] Appended aid=%1 at end (no relationship found)")
                         .arg(missingAid));
                 }
             }
