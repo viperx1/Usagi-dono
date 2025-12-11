@@ -25,6 +25,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_chainModeEnabled(false)  // Initialize chain mode as disabled
     , m_chainsBuilt(false)  // Chains not built yet
     , m_chainBuildInProgress(false)  // No build in progress initially
+    , m_dataReady(false)  // Data not ready initially
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
@@ -85,6 +86,13 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
     
     {
         QMutexLocker locker(&m_mutex);
+        
+        // Wait for ALL data to be ready (preload + chain building complete)
+        while (!m_dataReady) {
+            LOG("[MyListCardManager] Waiting for data to be ready (preload + chain building)...");
+            m_dataReadyCondition.wait(&m_mutex);
+        }
+        
         m_chainModeEnabled = chainModeEnabled;
         m_expandedChainAnimeIds.clear();
         
@@ -92,60 +100,52 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             // Use pre-built chains from cache instead of rebuilding
             // Chains should have been built once after preloadCardCreationData completed
             
-            // If build is in progress, wait for it to complete
-            while (m_chainBuildInProgress) {
-                LOG("[MyListCardManager] Chain build in progress, waiting for completion...");
-                // Wait for the builder to signal completion
-                // This releases the mutex while waiting and re-acquires it when woken up
-                m_chainBuildComplete.wait(&m_mutex);
-                LOG("[MyListCardManager] Chain build completed, continuing with setAnimeIdList");
-            }
-            
             if (!m_chainsBuilt || m_chainList.isEmpty()) {
-                LOG("[MyListCardManager] ERROR: Chain mode enabled but chains not built. Call preloadCardCreationData first!");
-                return;
-            }
-            
-            LOG(QString("[MyListCardManager] Using pre-built chains: %1 chains available")
-                .arg(m_chainList.size()));
-            
-            // Filter chains to only include those with at least one anime from the input list
-            QSet<int> inputAidSet(aids.begin(), aids.end());
-            QList<AnimeChain> filteredChains;
-            
-            for (const AnimeChain& chain : std::as_const(m_chainList)) {
-                // Check if this chain contains any anime from the input list
-                bool hasInputAnime = false;
-                for (int aid : chain.getAnimeIds()) {
-                    if (inputAidSet.contains(aid)) {
-                        hasInputAnime = true;
-                        break;
+                LOG("[MyListCardManager] ERROR: Chain mode enabled but chains not built!");
+                m_chainModeEnabled = false;
+                finalAnimeIds = aids;
+            } else {
+                LOG(QString("[MyListCardManager] Using pre-built chains: %1 chains available")
+                    .arg(m_chainList.size()));
+                
+                // Filter chains to only include those with at least one anime from the input list
+                QSet<int> inputAidSet(aids.begin(), aids.end());
+                QList<AnimeChain> filteredChains;
+                
+                for (const AnimeChain& chain : std::as_const(m_chainList)) {
+                    // Check if this chain contains any anime from the input list
+                    bool hasInputAnime = false;
+                    for (int aid : chain.getAnimeIds()) {
+                        if (inputAidSet.contains(aid)) {
+                            hasInputAnime = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasInputAnime) {
+                        filteredChains.append(chain);
                     }
                 }
                 
-                if (hasInputAnime) {
-                    filteredChains.append(chain);
-                }
-            }
-            
-            // Update to use filtered chains
-            m_chainList = filteredChains;
-            
-            // Build aid -> chain index map and collect all anime IDs from filtered chains
-            m_aidToChainIndex.clear();
-            finalAnimeIds.clear();
-            for (int i = 0; i < m_chainList.size(); ++i) {
-                for (int aid : m_chainList[i].getAnimeIds()) {
-                    m_aidToChainIndex[aid] = i;
-                    // Add all anime from chains (including expanded ones not in original aids list)
-                    if (!finalAnimeIds.contains(aid)) {
-                        finalAnimeIds.append(aid);
+                // Update to use filtered chains
+                m_chainList = filteredChains;
+                
+                // Build aid -> chain index map and collect all anime IDs from filtered chains
+                m_aidToChainIndex.clear();
+                finalAnimeIds.clear();
+                for (int i = 0; i < m_chainList.size(); ++i) {
+                    for (int aid : m_chainList[i].getAnimeIds()) {
+                        m_aidToChainIndex[aid] = i;
+                        // Add all anime from chains (including expanded ones not in original aids list)
+                        if (!finalAnimeIds.contains(aid)) {
+                            finalAnimeIds.append(aid);
+                        }
                     }
                 }
+                
+                LOG(QString("[MyListCardManager] Filtered to %1 chains containing %2 anime from input list")
+                    .arg(m_chainList.size()).arg(finalAnimeIds.size()));
             }
-            
-            LOG(QString("[MyListCardManager] Filtered to %1 chains containing %2 anime from input list")
-                .arg(m_chainList.size()).arg(finalAnimeIds.size()));
         } else {
             // Normal mode: clear chain data
             m_chainList.clear();
@@ -684,6 +684,12 @@ int MyListCardManager::getChainIndexForAnime(int aid) const
 AnimeCard* MyListCardManager::createCardForIndex(int index)
 {
     QMutexLocker locker(&m_mutex);
+    
+    // Wait for ALL data to be ready before creating cards
+    while (!m_dataReady) {
+        LOG("[MyListCardManager] createCardForIndex: Waiting for data to be ready...");
+        m_dataReadyCondition.wait(&m_mutex);
+    }
     
     if (index < 0 || index >= m_orderedAnimeIds.size()) {
         LOG(QString("[MyListCardManager] createCardForIndex: index %1 out of range (size=%2)")
@@ -1777,6 +1783,14 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         return;
     }
     
+    // Mark data as NOT ready at start of preload
+    {
+        QMutexLocker locker(&m_mutex);
+        m_dataReady = false;
+    }
+    
+    emit progressUpdate(QString("Loading data for %1 anime...").arg(aids.size()));
+    
     QElapsedTimer timer;
     timer.start();
     
@@ -1842,6 +1856,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     qint64 step1Elapsed = timer.elapsed() - step1Start;
     LOG(QString("[MyListCardManager] Step 1: Loaded anime data for %1 anime in %2 ms")
         .arg(m_cardCreationDataCache.size()).arg(step1Elapsed));
+    emit progressUpdate(QString("Loaded anime data (%1 of 3)...").arg(1));
     
     // Step 2: Load anime titles for anime without anime table data OR with empty animeTitle
     // This fills in titles from anime_titles table when anime table is missing/incomplete
@@ -1936,6 +1951,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     }
     qint64 step3Elapsed = timer.elapsed() - step3Start;
     LOG(QString("[MyListCardManager] Step 3: Loaded statistics in %1 ms").arg(step3Elapsed));
+    emit progressUpdate(QString("Loaded statistics (%1 of 3)...").arg(2));
     
     // Step 4: Load episode details
     qint64 step4Start = timer.elapsed();
@@ -1987,6 +2003,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         totalEpisodes += data.episodes.size();
     }
     LOG(QString("[MyListCardManager] Step 4: Loaded %1 episodes in %2 ms").arg(totalEpisodes).arg(step4Elapsed));
+    emit progressUpdate(QString("Loaded episodes (%1 of 3)...").arg(3));
     
     qint64 totalElapsed = timer.elapsed();
     LOG(QString("[MyListCardManager] Comprehensive preload complete: %1 anime with full data in %2 ms")
@@ -2018,6 +2035,8 @@ void MyListCardManager::buildChainsFromCache()
         m_chainBuildInProgress = true;
     } // Release mutex before the actual building work
     
+    emit progressUpdate("Building anime chains...");
+    
     // Get all anime IDs from the cache (need to lock again to access cache)
     QList<int> allCachedAids;
     {
@@ -2030,7 +2049,8 @@ void MyListCardManager::buildChainsFromCache()
         LOG("[MyListCardManager] buildChainsFromCache: No anime in cache, skipping chain building");
         m_chainsBuilt = false;
         m_chainBuildInProgress = false;
-        m_chainBuildComplete.wakeAll();
+        m_dataReady = true;  // Set data ready even if no chains (no anime to display)
+        m_dataReadyCondition.wakeAll();
         return;
     }
     
@@ -2039,6 +2059,8 @@ void MyListCardManager::buildChainsFromCache()
     
     // Build chains from ALL cached anime (this is the expensive operation, done without holding mutex)
     QList<AnimeChain> newChains = buildChainsFromAnimeIds(allCachedAids);
+    
+    emit progressUpdate(QString("Processed %1 chains...").arg(newChains.size()));
     
     // Now lock and update the member variables
     {
@@ -2056,15 +2078,18 @@ void MyListCardManager::buildChainsFromCache()
         
         m_chainsBuilt = true;
         m_chainBuildInProgress = false;
+        m_dataReady = true;  // Mark ALL data as ready (preload + chain build complete)
         
         LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
             .arg(m_chainList.size())
             .arg(m_aidToChainIndex.size()));
     } // Release mutex before waking threads
     
-    // Wake up any threads waiting for chain build to complete
+    emit progressUpdate("Data ready!");
+    
+    // Wake up any threads waiting for data to be ready
     // Do this AFTER releasing the mutex so waiting threads don't immediately block again
-    m_chainBuildComplete.wakeAll();
+    m_dataReadyCondition.wakeAll();
 }
 
 void MyListCardManager::onHideCardRequested(int aid)

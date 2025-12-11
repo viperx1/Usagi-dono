@@ -176,6 +176,9 @@ signals:
     // Emitted when a NEW anime is added to mylist (not during initial load)
     void newAnimeAdded(int aid);
     
+    // Emitted to update progress status during data loading
+    void progressUpdate(const QString& message);
+    
 public slots:
     // Slot to handle episode updates from API
     void onEpisodeUpdated(int eid, int aid);
@@ -393,6 +396,7 @@ private:
     QSet<int> m_expandedChainAnimeIds;      // Anime IDs added by chain expansion (not in original mylist)
     bool m_chainsBuilt;                     // Flag to track if chains have been built from cache
     bool m_chainBuildInProgress;            // Flag to track if chain building is currently in progress
+    bool m_dataReady;                       // Flag to track if ALL data is loaded and processed (preload + chains)
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;
@@ -411,7 +415,7 @@ private:
     
     // Thread safety
     mutable QMutex m_mutex;
-    QWaitCondition m_chainBuildComplete;    // Wait condition for chain build completion
+    QWaitCondition m_dataReadyCondition;    // Wait condition for data ready (preload + chain build complete)
     
     // Flag to track if initial loading is complete
     bool m_initialLoadComplete;
