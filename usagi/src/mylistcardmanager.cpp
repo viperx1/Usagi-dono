@@ -89,10 +89,10 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         
         if (chainModeEnabled) {
             // Use pre-built chains from cache instead of rebuilding
-            // Chains were already built once after preloadCardCreationData completed
+            // Chains should have been built once after preloadCardCreationData completed
             if (!m_chainsBuilt || m_chainList.isEmpty()) {
-                LOG("[MyListCardManager] WARNING: Chain mode enabled but chains not built yet. Building now from cache...");
-                buildChainsFromCache();
+                LOG("[MyListCardManager] ERROR: Chain mode enabled but chains not built. Call preloadCardCreationData first!");
+                return;
             }
             
             LOG(QString("[MyListCardManager] Using pre-built chains: %1 chains available")
@@ -1989,6 +1989,12 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
 void MyListCardManager::buildChainsFromCache()
 {
     QMutexLocker locker(&m_mutex);
+    
+    // Prevent rebuilding if chains are already built
+    if (m_chainsBuilt && !m_chainList.isEmpty()) {
+        LOG("[MyListCardManager] Chains already built from cache, skipping rebuild");
+        return;
+    }
     
     // Get all anime IDs from the cache
     QList<int> allCachedAids = m_cardCreationDataCache.keys();
