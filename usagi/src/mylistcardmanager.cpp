@@ -446,6 +446,7 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
 {
     QList<int> chain;
     QSet<int> visited;
+    QSet<int> backwardTraversedAnime;  // Track anime found during backward traversal
     const int MAX_CHAIN_LENGTH = 20;  // Safety limit to prevent infinite loops
     
     // Find the original prequel (first in chain)
@@ -468,6 +469,11 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
             break;  // Cycle detected
         }
         visited.insert(currentAid);
+        
+        // Track all anime found during backward traversal when expanding
+        if (expandChain) {
+            backwardTraversedAnime.insert(currentAid);
+        }
         
         if (visited.size() > MAX_CHAIN_LENGTH) {
             LOG(QString("[MyListCardManager] WARNING: Chain too long (>%1), stopping backward traversal").arg(MAX_CHAIN_LENGTH));
@@ -537,7 +543,7 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         }
     }
     
-    // CRITICAL FIX: Ensure all anime from availableAids are in the chain
+    // CRITICAL FIX: Ensure all anime from backward traversal and availableAids are in the chain
     // If we couldn't reach some anime via sequel relationships due to database inconsistencies,
     // append them in the correct order based on their prequel relationships
     if (expandChain || !availableAids.isEmpty()) {
@@ -546,9 +552,24 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
             chainSet.insert(aid);
         }
         
-        // Find anime in availableAids that are not in the chain
-        QList<int> missingAnime;
+        // Collect all anime that should be in the chain
+        QSet<int> shouldBeInChain;
+        
+        // Add anime from backward traversal (when expanding)
+        if (expandChain) {
+            for (int aid : backwardTraversedAnime) {
+                shouldBeInChain.insert(aid);
+            }
+        }
+        
+        // Add anime from availableAids
         for (int aid : availableAids) {
+            shouldBeInChain.insert(aid);
+        }
+        
+        // Find anime that should be in chain but are not
+        QList<int> missingAnime;
+        for (int aid : shouldBeInChain) {
             if (!chainSet.contains(aid)) {
                 missingAnime.append(aid);
             }
@@ -556,7 +577,7 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         
         // If there are missing anime, try to add them in the correct order
         if (!missingAnime.isEmpty()) {
-            LOG(QString("[MyListCardManager] WARNING: %1 anime from availableAids not reachable from chainStart=%2 via sequel relationships")
+            LOG(QString("[MyListCardManager] WARNING: %1 anime should be in chain but not reachable from chainStart=%2 via sequel relationships")
                 .arg(missingAnime.size()).arg(chainStart));
             
             // Sort missing anime by their position in the chain (using prequel relationships)
