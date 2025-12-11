@@ -313,17 +313,71 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     
     // Expand chains to include related anime (prequels/sequels) not in the initial input
     // This allows showing complete series even when some anime aren't in mylist
+    // NOTE: We expand by adding missing prequels/sequels, not by rebuilding the chain
+    // This preserves the merged chain structure even when sequel relationships are broken
     QList<AnimeChain> expandedChains;
     for (const AnimeChain& chain : chains) {
-        QSet<int> chainAnimeSet;
-        for (int aid : chain.getAnimeIds()) {
-            chainAnimeSet.insert(aid);
+        QList<int> chainAnime = chain.getAnimeIds();
+        if (chainAnime.isEmpty()) {
+            continue;
         }
         
-        // Use buildChainFromAid to expand this chain with related anime
-        // Pass the chainAnimeSet as available aids so it can expand beyond initial input
-        QList<int> expandedChain = buildChainFromAid(chain.getAnimeIds().first(), chainAnimeSet, true);
-        expandedChains.append(AnimeChain(expandedChain));
+        // Find prequels and sequels to add
+        QSet<int> animeToAdd;
+        for (int aid : chainAnime) {
+            animeToAdd.insert(aid);
+        }
+        
+        // Traverse backward from the first anime to find prequels
+        int currentAid = chainAnime.first();
+        QSet<int> visited;
+        while (currentAid > 0 && !visited.contains(currentAid)) {
+            visited.insert(currentAid);
+            loadRelationDataForAnime(currentAid);
+            int prequelAid = findPrequelAid(currentAid);
+            if (prequelAid > 0 && !animeToAdd.contains(prequelAid)) {
+                animeToAdd.insert(prequelAid);
+                currentAid = prequelAid;
+            } else {
+                break;
+            }
+        }
+        
+        // Traverse forward from the last anime to find sequels
+        currentAid = chainAnime.last();
+        visited.clear();
+        while (currentAid > 0 && !visited.contains(currentAid)) {
+            visited.insert(currentAid);
+            loadRelationDataForAnime(currentAid);
+            int sequelAid = findSequelAid(currentAid);
+            if (sequelAid > 0 && !animeToAdd.contains(sequelAid)) {
+                animeToAdd.insert(sequelAid);
+                currentAid = sequelAid;
+            } else {
+                break;
+            }
+        }
+        
+        // If we found additional anime, rebuild the chain from the first prequel
+        if (animeToAdd.size() > chainAnime.size()) {
+            // Find the ultimate prequel (the one with no prequel)
+            QList<int> allAnime = animeToAdd.values();
+            int firstAid = chainAnime.first();
+            for (int aid : allAnime) {
+                loadRelationDataForAnime(aid);
+                if (findPrequelAid(aid) == 0 || !animeToAdd.contains(findPrequelAid(aid))) {
+                    firstAid = aid;
+                    break;
+                }
+            }
+            
+            // Rebuild chain from first anime
+            QList<int> expandedChain = buildChainFromAid(firstAid, animeToAdd, true);
+            expandedChains.append(AnimeChain(expandedChain));
+        } else {
+            // No expansion needed, keep original chain
+            expandedChains.append(chain);
+        }
     }
     chains = expandedChains;
     
