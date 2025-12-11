@@ -101,7 +101,7 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     // Add all anime from chains (including expanded ones not in original aids list)
                     if (!finalAnimeIds.contains(aid)) {
                         finalAnimeIds.append(aid);
-                        // Check if this anime lacks cached data and needs preloading
+                        // Check if this anime lacks card creation data cache and needs preloading
                         if (!m_cardCreationDataCache.contains(aid)) {
                             expandedAnimeNeedingData.append(aid);
                         }
@@ -123,13 +123,33 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             .arg(finalAnimeIds.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
     }
     
-    // Preload data for expanded anime that lack cached data
+    // Preload data for expanded anime that lack card creation data cache
     // This must happen BEFORE updating the virtual layout to avoid "No card creation data" errors
     if (!expandedAnimeNeedingData.isEmpty()) {
-        LOG(QString("[MyListCardManager] Preloading card data for %1 expanded anime in chains")
+        LOG(QString("[MyListCardManager] Preloading card creation data for %1 expanded anime in chains")
             .arg(expandedAnimeNeedingData.size()));
         preloadCardCreationData(expandedAnimeNeedingData);
-        LOG("[MyListCardManager] Expanded anime data preload complete");
+        
+        // Verify that preloading succeeded for all anime
+        QList<int> stillMissing;
+        for (int aid : std::as_const(expandedAnimeNeedingData)) {
+            if (!m_cardCreationDataCache.contains(aid)) {
+                stillMissing.append(aid);
+            }
+        }
+        
+        if (!stillMissing.isEmpty()) {
+            QStringList aidStrings;
+            for (int i = 0; i < std::min(10, stillMissing.size()); ++i) {
+                aidStrings.append(QString::number(stillMissing[i]));
+            }
+            QString sampleAids = stillMissing.size() <= 10 ? aidStrings.join(", ") : 
+                                 QString("%1...").arg(aidStrings.join(", "));
+            LOG(QString("[MyListCardManager] WARNING: Failed to preload data for %1 expanded anime (sample: %2)")
+                .arg(stillMissing.size()).arg(sampleAids));
+        } else {
+            LOG("[MyListCardManager] Expanded anime data preload complete");
+        }
     }
     
     // Update virtual layout AFTER releasing the mutex to avoid deadlock
