@@ -144,6 +144,10 @@ public:
     // This ensures chains are built only once with complete data, preventing duplicates
     void buildChainsFromCache();
     
+    // Pre-load relation data for all anime that might be discovered during chain expansion
+    // This prevents race conditions by bulk-loading data before chain building starts
+    void preloadRelationDataForChainExpansion(const QList<int>& baseAids);
+    
     // Create a card for an anime (data must be preloaded first via preloadCardCreationData)
     AnimeCard* createCard(int aid);
     
