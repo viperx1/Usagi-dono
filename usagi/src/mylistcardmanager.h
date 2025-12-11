@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QSet>
 #include <QMutex>
+#include <QWaitCondition>
 #include <QTimer>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
