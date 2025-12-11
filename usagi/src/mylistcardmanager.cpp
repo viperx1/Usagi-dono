@@ -1999,56 +1999,72 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
 
 void MyListCardManager::buildChainsFromCache()
 {
-    QMutexLocker locker(&m_mutex);
+    {
+        QMutexLocker locker(&m_mutex);
+        
+        // Check if chains are already built
+        if (m_chainsBuilt && !m_chainList.isEmpty()) {
+            LOG("[MyListCardManager] Chains already built from cache, skipping rebuild");
+            return;
+        }
+        
+        // Check if a build is already in progress (another thread is building)
+        if (m_chainBuildInProgress) {
+            LOG("[MyListCardManager] Chain building already in progress, skipping duplicate build request");
+            return;
+        }
+        
+        // Mark that we're starting the build
+        m_chainBuildInProgress = true;
+    } // Release mutex before the actual building work
     
-    // Check if chains are already built
-    if (m_chainsBuilt && !m_chainList.isEmpty()) {
-        LOG("[MyListCardManager] Chains already built from cache, skipping rebuild");
-        return;
+    // Get all anime IDs from the cache (need to lock again to access cache)
+    QList<int> allCachedAids;
+    {
+        QMutexLocker locker(&m_mutex);
+        allCachedAids = m_cardCreationDataCache.keys();
     }
-    
-    // Check if a build is already in progress (another thread is building)
-    if (m_chainBuildInProgress) {
-        LOG("[MyListCardManager] Chain building already in progress, skipping duplicate build request");
-        return;
-    }
-    
-    // Mark that we're starting the build
-    m_chainBuildInProgress = true;
-    
-    // Get all anime IDs from the cache
-    QList<int> allCachedAids = m_cardCreationDataCache.keys();
     
     if (allCachedAids.isEmpty()) {
+        QMutexLocker locker(&m_mutex);
         LOG("[MyListCardManager] buildChainsFromCache: No anime in cache, skipping chain building");
         m_chainsBuilt = false;
         m_chainBuildInProgress = false;
+        m_chainBuildComplete.wakeAll();
         return;
     }
     
     LOG(QString("[MyListCardManager] Building chains from %1 cached anime (complete dataset)")
         .arg(allCachedAids.size()));
     
-    // Build chains from ALL cached anime
-    m_chainList = buildChainsFromAnimeIds(allCachedAids);
+    // Build chains from ALL cached anime (this is the expensive operation, done without holding mutex)
+    QList<AnimeChain> newChains = buildChainsFromAnimeIds(allCachedAids);
     
-    // Build aid -> chain index map for quick lookups
-    m_aidToChainIndex.clear();
-    for (int i = 0; i < m_chainList.size(); ++i) {
-        for (int aid : m_chainList[i].getAnimeIds()) {
-            m_aidToChainIndex[aid] = i;
+    // Now lock and update the member variables
+    {
+        QMutexLocker locker(&m_mutex);
+        
+        m_chainList = newChains;
+        
+        // Build aid -> chain index map for quick lookups
+        m_aidToChainIndex.clear();
+        for (int i = 0; i < m_chainList.size(); ++i) {
+            for (int aid : m_chainList[i].getAnimeIds()) {
+                m_aidToChainIndex[aid] = i;
+            }
         }
-    }
-    
-    m_chainsBuilt = true;
-    m_chainBuildInProgress = false;
+        
+        m_chainsBuilt = true;
+        m_chainBuildInProgress = false;
+        
+        LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
+            .arg(m_chainList.size())
+            .arg(m_aidToChainIndex.size()));
+    } // Release mutex before waking threads
     
     // Wake up any threads waiting for chain build to complete
+    // Do this AFTER releasing the mutex so waiting threads don't immediately block again
     m_chainBuildComplete.wakeAll();
-    
-    LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
-        .arg(m_chainList.size())
-        .arg(m_aidToChainIndex.size()));
 }
 
 void MyListCardManager::onHideCardRequested(int aid)
