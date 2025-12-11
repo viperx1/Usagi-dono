@@ -1326,8 +1326,22 @@ AnimeCard* MyListCardManager::createCard(int aid)
     card->setStatistics(data.stats.normalEpisodes(), totalNormalEpisodes, 
                        data.stats.normalViewed(), data.stats.otherEpisodes(), data.stats.otherViewed());
     
-    // Add to cache first (before layout to avoid triggering layout updates prematurely)
+    // Set series chain info if chain mode is enabled
     QMutexLocker locker(&m_mutex);
+    if (m_chainModeEnabled && !m_chainList.isEmpty()) {
+        int chainIndex = m_aidToChainIndex.value(aid, -1);
+        if (chainIndex >= 0 && chainIndex < m_chainList.size()) {
+            const QList<int> chainAnimeIds = m_chainList[chainIndex].getAnimeIds();
+            int aidIndex = chainAnimeIds.indexOf(aid);
+            if (aidIndex >= 0) {
+                int prequelAid = (aidIndex > 0) ? chainAnimeIds[aidIndex - 1] : 0;
+                int sequelAid = (aidIndex < chainAnimeIds.size() - 1) ? chainAnimeIds[aidIndex + 1] : 0;
+                card->setSeriesChainInfo(prequelAid, sequelAid);
+            }
+        }
+    }
+    
+    // Add to cache (mutex already locked above)
     m_cards[aid] = card;
     
     // Add to layout only if not using virtual scrolling
