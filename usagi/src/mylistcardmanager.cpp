@@ -496,6 +496,163 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     
     LOG(QString("[MyListCardManager] After expansion: %1 chains").arg(chains.size()));
     
+    // Merge chains that share anime after expansion
+    // This handles cases where two chains both expanded to include the same anime
+    bool hasDuplicates = true;
+    while (hasDuplicates) {
+        hasDuplicates = false;
+        
+        // Build anime-to-chain-index map to detect duplicates
+        QMap<int, QList<int>> animeToChainIndices;
+        for (int i = 0; i < chains.size(); ++i) {
+            for (int aid : chains[i].getAnimeIds()) {
+                animeToChainIndices[aid].append(i);
+            }
+        }
+        
+        // Find chains that share anime
+        QSet<int> chainsToMerge;
+        QMap<int, QSet<int>> chainMergeGroups;
+        
+        for (auto it = animeToChainIndices.constBegin(); it != animeToChainIndices.constEnd(); ++it) {
+            const QList<int>& chainIndices = it.value();
+            if (chainIndices.size() > 1) {
+                // This anime appears in multiple chains - they need to be merged
+                hasDuplicates = true;
+                int firstChain = chainIndices.first();
+                for (int chainIdx : chainIndices) {
+                    chainsToMerge.insert(chainIdx);
+                    if (!chainMergeGroups.contains(firstChain)) {
+                        chainMergeGroups[firstChain] = QSet<int>();
+                    }
+                    chainMergeGroups[firstChain].insert(chainIdx);
+                }
+            }
+        }
+        
+        if (!hasDuplicates) {
+            break;
+        }
+        
+        LOG(QString("[MyListCardManager] Post-expansion merge: found %1 chains with overlapping anime").arg(chainsToMerge.size()));
+        
+        // Build connected components
+        QMap<int, QSet<int>> mergeComponents;
+        for (int chainIdx : chainsToMerge) {
+            mergeComponents[chainIdx].insert(chainIdx);
+            if (chainMergeGroups.contains(chainIdx)) {
+                mergeComponents[chainIdx].unite(chainMergeGroups[chainIdx]);
+            }
+        }
+        
+        // Expand components transitively
+        bool expanded = true;
+        while (expanded) {
+            expanded = false;
+            for (auto it = mergeComponents.begin(); it != mergeComponents.end(); ++it) {
+                QSet<int> current = it.value();
+                QSet<int> newSet = current;
+                
+                for (int idx : current) {
+                    if (mergeComponents.contains(idx)) {
+                        newSet.unite(mergeComponents[idx]);
+                    }
+                }
+                
+                if (newSet.size() > current.size()) {
+                    it.value() = newSet;
+                    expanded = true;
+                }
+            }
+        }
+        
+        // Find unique merge groups
+        QSet<QSet<int>> uniqueMergeGroups;
+        for (const QSet<int>& component : mergeComponents.values()) {
+            uniqueMergeGroups.insert(component);
+        }
+        
+        // Create new merged chains
+        QList<AnimeChain> newChains;
+        QSet<int> processedChainIndices;
+        
+        for (const QSet<int>& group : uniqueMergeGroups) {
+            // Collect all anime from chains in this group
+            QSet<int> allAnime;
+            for (int chainIdx : group) {
+                processedChainIndices.insert(chainIdx);
+                for (int aid : chains[chainIdx].getAnimeIds()) {
+                    allAnime.insert(aid);
+                }
+            }
+            
+            // Order merged chain using topological sort
+            if (!allAnime.isEmpty()) {
+                // Build adjacency graph
+                QMap<int, QList<int>> graph;
+                QMap<int, int> inDegree;
+                
+                for (int aid : allAnime) {
+                    graph[aid] = QList<int>();
+                    inDegree[aid] = 0;
+                    loadRelationDataForAnime(aid);
+                }
+                
+                // Build graph edges based on sequel relationships
+                for (int aid : allAnime) {
+                    int sequelAid = findSequelAid(aid);
+                    if (sequelAid > 0 && allAnime.contains(sequelAid)) {
+                        graph[aid].append(sequelAid);
+                        inDegree[sequelAid]++;
+                    }
+                }
+                
+                // Topological sort
+                QList<int> orderedChain;
+                QList<int> queue;
+                
+                for (int aid : allAnime) {
+                    if (inDegree[aid] == 0) {
+                        queue.append(aid);
+                    }
+                }
+                
+                while (!queue.isEmpty()) {
+                    int current = queue.takeFirst();
+                    orderedChain.append(current);
+                    
+                    for (int sequel : graph[current]) {
+                        inDegree[sequel]--;
+                        if (inDegree[sequel] == 0) {
+                            queue.append(sequel);
+                        }
+                    }
+                }
+                
+                // Add any remaining (disconnected or cyclic)
+                if (orderedChain.size() < allAnime.size()) {
+                    for (int aid : allAnime) {
+                        if (!orderedChain.contains(aid)) {
+                            orderedChain.append(aid);
+                        }
+                    }
+                }
+                
+                newChains.append(AnimeChain(orderedChain));
+            }
+        }
+        
+        // Add unmerged chains
+        for (int i = 0; i < chains.size(); ++i) {
+            if (!processedChainIndices.contains(i)) {
+                newChains.append(chains[i]);
+            }
+        }
+        
+        chains = newChains;
+        LOG(QString("[MyListCardManager] After post-expansion merge: %1 chains").arg(chains.size()));
+    }
+    
     // Verify total anime count and find duplicates
     int totalAnimeInChains = 0;
     QSet<int> allAnimeInChains;
