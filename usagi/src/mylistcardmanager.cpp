@@ -291,11 +291,26 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
             }
             
             // Rebuild merged chain using relation data for proper ordering
+            // Try building from multiple starting points and use the longest chain to avoid missing anime
             QList<int> mergedList = allAnime.values();
             if (!mergedList.isEmpty()) {
                 LOG(QString("[MyListCardManager] Merging group of %1 chains with %2 total anime")
                     .arg(group.size()).arg(allAnime.size()));
-                newChains.append(AnimeChain(buildChainFromAid(mergedList.first(), allAnime, true)));
+                
+                // Try building chain from each anime in the group and use the longest result
+                QList<int> bestChain;
+                for (int startAid : allAnime) {
+                    QList<int> candidateChain = buildChainFromAid(startAid, allAnime, true);
+                    if (candidateChain.size() > bestChain.size()) {
+                        bestChain = candidateChain;
+                    }
+                    // If we found all anime, no need to try more
+                    if (bestChain.size() == allAnime.size()) {
+                        break;
+                    }
+                }
+                
+                newChains.append(AnimeChain(bestChain));
             }
         }
         
