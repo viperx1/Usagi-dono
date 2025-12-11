@@ -23,9 +23,9 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_virtualLayout(nullptr)
     , m_watchSessionManager(nullptr)
     , m_chainModeEnabled(false)  // Initialize chain mode as disabled
+    , m_chainsBuilt(false)  // Chains not built yet
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
-    , m_chainsBuilt(false)  // Chains not built yet
 {
     // Initialize network manager for poster downloads
     m_networkManager = new QNetworkAccessManager(this);
