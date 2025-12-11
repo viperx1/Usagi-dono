@@ -72,6 +72,15 @@ QList<int> MyListCardManager::getAnimeIdList() const
     return m_orderedAnimeIds;
 }
 
+QList<int> MyListCardManager::getCachedAidList() const
+{
+    QMutexLocker locker(&m_mutex);
+    if (!m_cachedAidList.isEmpty()) {
+        return m_cachedAidList;
+    }
+    return m_orderedAnimeIds;
+}
+
 void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 {
     setAnimeIdList(aids, false);  // Default: chain mode disabled
@@ -520,6 +529,10 @@ void MyListCardManager::loadRelationDataForAnime(int aid) const
         
         // Store in cache (cast away const)
         mutableThis->m_cardCreationDataCache[aid] = data;
+        if (!mutableThis->m_cachedAidSet.contains(aid)) {
+            mutableThis->m_cachedAidList.append(aid);
+            mutableThis->m_cachedAidSet.insert(aid);
+        }
         
         LOG(QString("[MyListCardManager] Loaded relation data for aid=%1 (has relations=%2)")
             .arg(aid).arg(data.getAllRelations().isEmpty() ? "false" : "true"));
@@ -665,6 +678,8 @@ void MyListCardManager::clearAllCards()
     m_cards.clear();
     m_orderedAnimeIds.clear();
     m_cardCreationDataCache.clear();  // Clear the comprehensive card creation data cache
+    m_cachedAidList.clear();
+    m_cachedAidSet.clear();
     m_episodesNeedingData.clear();
     m_animeNeedingMetadata.clear();
     m_animeNeedingPoster.clear();
@@ -1701,6 +1716,15 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
 {
     if (aids.isEmpty()) {
         return;
+    }
+    
+    m_cachedAidList.clear();
+    m_cachedAidSet.clear();
+    for (int aid : aids) {
+        if (!m_cachedAidSet.contains(aid)) {
+            m_cachedAidList.append(aid);
+            m_cachedAidSet.insert(aid);
+        }
     }
     
     QElapsedTimer timer;

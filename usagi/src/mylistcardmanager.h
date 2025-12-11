@@ -58,6 +58,9 @@ public:
     // Get the list of anime IDs in the current order (for virtual scrolling)
     QList<int> getAnimeIdList() const;
     
+    // Get all anime IDs that have cached creation data
+    QList<int> getCachedAidList() const;
+    
     // Set the ordered list of anime IDs (for virtual scrolling after sorting/filtering)
     void setAnimeIdList(const QList<int>& aids);
     
@@ -366,6 +369,8 @@ private:
     // Comprehensive card creation data cache - contains ALL data needed for card creation
     // This is populated once before any cards are created
     QMap<int, CardCreationData> m_cardCreationDataCache;
+    QList<int> m_cachedAidList;              // Cached list of aids corresponding to the data cache
+    QSet<int> m_cachedAidSet;                // Set for fast membership checks on cached aids
     
     // Layout where cards are displayed
     FlowLayout *m_layout;

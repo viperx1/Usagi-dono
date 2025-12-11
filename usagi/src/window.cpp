@@ -1424,9 +1424,6 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
         mylistAnimeIdSet.insert(aid);
     }
     
-    // Store the full unfiltered list of anime IDs (for filter reset)
-    allAnimeIdsList = aids;
-    
     // Clear existing cards
     cardManager->clearAllCards();
     
@@ -3522,9 +3519,6 @@ void Window::loadMylistAsCards()
 		mylistAnimeIdSet.insert(aid);
 	}
 	
-	// Store the full unfiltered list of anime IDs (for filter reset)
-	allAnimeIdsList = aids;
-	
 	// Preload data for ALL anime in database (not just mylist)
 	// This enables proper chain building even when some anime in a chain are not in mylist
 	QList<int> allAnimeIds;
@@ -3884,25 +3878,22 @@ void Window::checkAndRequestChainRelations(int aid)
 // Apply filters to mylist cards
 void Window::applyMylistFilters()
 {
-	// Prevent concurrent filter operations to avoid race conditions
-	QMutexLocker locker(&filterOperationsMutex);
-	
-	// Use the stored full unfiltered list of anime IDs (not the current filtered list)
-	// This ensures that when filters are removed, previously hidden cards reappear
-	QList<int> allAnimeIds = allAnimeIdsList;
-	
-	// Fallback for backward compatibility: if the full list wasn't initialized 
-	// (shouldn't happen in normal operation since onMylistLoadingFinished or 
-	// loadMylistAsCards sets it), try to build it from existing cards.
-	// Note: This fallback may not work correctly if animeCards contains only
-	// a subset of cards, but this is an edge case for legacy code paths.
-	if (allAnimeIds.isEmpty() && !animeCards.isEmpty()) {
-		for (AnimeCard* card : std::as_const(animeCards)) {
-			allAnimeIds.append(card->getAnimeId());
-		}
-		// Store for future use
-		allAnimeIdsList = allAnimeIds;
-	}
+    // Prevent concurrent filter operations to avoid race conditions
+    QMutexLocker locker(&filterOperationsMutex);
+    
+    // Build the full unfiltered list from the card manager's cached data
+    QList<int> cachedAnimeIds = cardManager->getCachedAidList();
+    
+    // Fallback for backward compatibility: if the cached data isn't available yet,
+    // try to build it from existing legacy card list.
+    QList<int> allAnimeIds;
+    if (!cachedAnimeIds.isEmpty()) {
+        allAnimeIds = cachedAnimeIds;
+    } else if (!animeCards.isEmpty()) {
+        for (AnimeCard* card : std::as_const(animeCards)) {
+            allAnimeIds.append(card->getAnimeId());
+        }
+    }
 	
 	if (allAnimeIds.isEmpty()) {
 		mylistStatusLabel->setText("MyList Status: No anime");
@@ -3963,9 +3954,6 @@ void Window::applyMylistFilters()
 			
 			// Mark all anime titles as loaded
 			allAnimeTitlesLoaded = true;
-			
-			// Store the full unfiltered list of all anime IDs
-			allAnimeIdsList = aids;
 			
 			// Set up virtual scrolling with the full list of anime IDs
 			cardManager->setVirtualLayout(mylistVirtualLayout);
