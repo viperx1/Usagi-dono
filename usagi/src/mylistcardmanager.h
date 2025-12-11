@@ -347,6 +347,7 @@ private:
     QList<int> buildChainFromAid(int startAid, const QSet<int>& availableAids, bool expandChain = false) const;
     int findPrequelAid(int aid) const;
     int findSequelAid(int aid) const;
+    int findAnimeWithSequel(int sequelAid) const;  // Find anime that has sequelAid as its sequel (reverse lookup)
     
     // Load relation data for anime not in cache (for chain expansion)
     void loadRelationDataForAnime(int aid) const;

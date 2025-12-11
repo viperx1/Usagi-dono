@@ -370,8 +370,7 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     
     // Expand chains to include related anime (prequels/sequels) not in the initial input
     // This allows showing complete series even when some anime aren't in mylist
-    // NOTE: We expand by adding missing prequels/sequels, not by rebuilding the chain
-    // This preserves the merged chain structure even when sequel relationships are broken
+    // NOTE: Database relationships may be unidirectional, so we need to query both directions
     QList<AnimeChain> expandedChains;
     for (const AnimeChain& chain : chains) {
         QList<int> chainAnime = chain.getAnimeIds();
@@ -396,7 +395,14 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 animeToAdd.insert(prequelAid);
                 currentAid = prequelAid;
             } else {
-                break;
+                // Also check database for anime that have currentAid as their sequel (reverse lookup)
+                int reversePrequelAid = findAnimeWithSequel(currentAid);
+                if (reversePrequelAid > 0 && !animeToAdd.contains(reversePrequelAid)) {
+                    animeToAdd.insert(reversePrequelAid);
+                    currentAid = reversePrequelAid;
+                } else {
+                    break;
+                }
             }
         }
         
@@ -746,6 +752,37 @@ int MyListCardManager::findSequelAid(int aid) const
     
     const CardCreationData& data = m_cardCreationDataCache[aid];
     return data.getSequel();
+}
+
+int MyListCardManager::findAnimeWithSequel(int sequelAid) const
+{
+    // Query database for anime that has sequelAid as its sequel
+    // This is a reverse lookup to handle unidirectional database relationships
+    QSqlQuery query(QSqlDatabase::database());
+    query.prepare("SELECT aid, relaidlist, relaidtype FROM anime WHERE relaidlist LIKE ?");
+    query.addBindValue(QString("%,%1,%").arg(sequelAid));
+    
+    if (!query.exec()) {
+        LOG(QString("[MyListCardManager] Failed to query anime with sequel=%1: %2").arg(sequelAid).arg(query.lastError().text()));
+        return 0;
+    }
+    
+    while (query.next()) {
+        int aid = query.value(0).toInt();
+        QString relaidlist = query.value(1).toString();
+        QString relaidtype = query.value(2).toString();
+        
+        // Parse relations to verify this anime has sequelAid as sequel
+        CardCreationData tempData;
+        tempData.setRelations(relaidlist, relaidtype);
+        if (tempData.getSequel() == sequelAid) {
+            // Load full data for this anime into cache
+            loadRelationDataForAnime(aid);
+            return aid;
+        }
+    }
+    
+    return 0;
 }
 
 void MyListCardManager::loadRelationDataForAnime(int aid) const
