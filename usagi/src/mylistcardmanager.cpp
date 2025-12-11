@@ -24,6 +24,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_watchSessionManager(nullptr)
     , m_chainModeEnabled(false)  // Initialize chain mode as disabled
     , m_chainsBuilt(false)  // Chains not built yet
+    , m_chainBuildInProgress(false)  // No build in progress initially
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
@@ -1990,11 +1991,20 @@ void MyListCardManager::buildChainsFromCache()
 {
     QMutexLocker locker(&m_mutex);
     
-    // Prevent rebuilding if chains are already built
+    // Check if chains are already built
     if (m_chainsBuilt && !m_chainList.isEmpty()) {
         LOG("[MyListCardManager] Chains already built from cache, skipping rebuild");
         return;
     }
+    
+    // Check if a build is already in progress (another thread is building)
+    if (m_chainBuildInProgress) {
+        LOG("[MyListCardManager] Chain building already in progress, skipping duplicate build request");
+        return;
+    }
+    
+    // Mark that we're starting the build
+    m_chainBuildInProgress = true;
     
     // Get all anime IDs from the cache
     QList<int> allCachedAids = m_cardCreationDataCache.keys();
@@ -2002,6 +2012,7 @@ void MyListCardManager::buildChainsFromCache()
     if (allCachedAids.isEmpty()) {
         LOG("[MyListCardManager] buildChainsFromCache: No anime in cache, skipping chain building");
         m_chainsBuilt = false;
+        m_chainBuildInProgress = false;
         return;
     }
     
@@ -2020,6 +2031,7 @@ void MyListCardManager::buildChainsFromCache()
     }
     
     m_chainsBuilt = true;
+    m_chainBuildInProgress = false;
     
     LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
         .arg(m_chainList.size())

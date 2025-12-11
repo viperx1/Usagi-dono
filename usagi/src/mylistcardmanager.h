@@ -391,6 +391,7 @@ private:
     bool m_chainModeEnabled;                // Is chain mode active
     QSet<int> m_expandedChainAnimeIds;      // Anime IDs added by chain expansion (not in original mylist)
     bool m_chainsBuilt;                     // Flag to track if chains have been built from cache
+    bool m_chainBuildInProgress;            // Flag to track if chain building is currently in progress
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;
