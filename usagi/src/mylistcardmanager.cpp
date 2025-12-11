@@ -80,7 +80,7 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
 {
     QList<int> finalAnimeIds;
-    QList<int> expandedAnimeNeedingData;
+    bool needsPreload = false;
     
     {
         QMutexLocker locker(&m_mutex);
@@ -101,9 +101,9 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     // Add all anime from chains (including expanded ones not in original aids list)
                     if (!finalAnimeIds.contains(aid)) {
                         finalAnimeIds.append(aid);
-                        // Check if this anime lacks card creation data cache and needs preloading
+                        // Check if ANY anime lacks card creation data cache - if so, we need to preload ALL
                         if (!m_cardCreationDataCache.contains(aid)) {
-                            expandedAnimeNeedingData.append(aid);
+                            needsPreload = true;
                         }
                     }
                 }
@@ -123,16 +123,17 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             .arg(finalAnimeIds.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
     }
     
-    // Preload data for expanded anime that lack card creation data cache
-    // This must happen BEFORE updating the virtual layout to avoid "No card creation data" errors
-    if (!expandedAnimeNeedingData.isEmpty()) {
-        LOG(QString("[MyListCardManager] Preloading card creation data for %1 expanded anime in chains")
-            .arg(expandedAnimeNeedingData.size()));
-        preloadCardCreationData(expandedAnimeNeedingData);
+    // Preload data for ALL anime if any are missing from cache
+    // This is necessary because preloadCardCreationData clears the cache before repopulating
+    // So we must pass the COMPLETE list to avoid losing already-loaded data
+    if (needsPreload) {
+        LOG(QString("[MyListCardManager] Preloading card creation data for all %1 anime (some expanded anime lack cache)")
+            .arg(finalAnimeIds.size()));
+        preloadCardCreationData(finalAnimeIds);
         
         // Verify that preloading succeeded for all anime
         QList<int> stillMissing;
-        for (int aid : std::as_const(expandedAnimeNeedingData)) {
+        for (int aid : std::as_const(finalAnimeIds)) {
             if (!m_cardCreationDataCache.contains(aid)) {
                 stillMissing.append(aid);
             }
@@ -145,10 +146,10 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             }
             QString sampleAids = stillMissing.size() <= 10 ? aidStrings.join(", ") : 
                                  QString("%1...").arg(aidStrings.join(", "));
-            LOG(QString("[MyListCardManager] WARNING: Failed to preload data for %1 expanded anime (sample: %2)")
+            LOG(QString("[MyListCardManager] WARNING: Failed to preload data for %1 anime (sample: %2)")
                 .arg(stillMissing.size()).arg(sampleAids));
         } else {
-            LOG("[MyListCardManager] Expanded anime data preload complete");
+            LOG("[MyListCardManager] Card creation data preload complete");
         }
     }
     
