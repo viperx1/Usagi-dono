@@ -136,7 +136,12 @@ public:
     
     // Comprehensive preload function that loads ALL data needed for card creation
     // This should be called BEFORE any cards are created to eliminate all SQL queries from createCard()
+    // After preloading, automatically builds chains from the complete cached dataset
     void preloadCardCreationData(const QList<int>& aids);
+    
+    // Build chains once from all cached anime data (called automatically after preloadCardCreationData)
+    // This ensures chains are built only once with complete data, preventing duplicates
+    void buildChainsFromCache();
     
     // Create a card for an anime (data must be preloaded first via preloadCardCreationData)
     AnimeCard* createCard(int aid);
@@ -381,10 +386,11 @@ private:
     QList<int> m_orderedAnimeIds;
     
     // Chain support
-    QList<AnimeChain> m_chainList;          // List of chains
+    QList<AnimeChain> m_chainList;          // List of chains (built once from complete cache)
     QMap<int, int> m_aidToChainIndex;       // Anime ID -> chain index mapping
     bool m_chainModeEnabled;                // Is chain mode active
     QSet<int> m_expandedChainAnimeIds;      // Anime IDs added by chain expansion (not in original mylist)
+    bool m_chainsBuilt;                     // Flag to track if chains have been built from cache
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;

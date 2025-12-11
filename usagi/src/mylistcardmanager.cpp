@@ -25,6 +25,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_chainModeEnabled(false)  // Initialize chain mode as disabled
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
+    , m_chainsBuilt(false)  // Chains not built yet
 {
     // Initialize network manager for poster downloads
     m_networkManager = new QNetworkAccessManager(this);
@@ -80,7 +81,6 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
 {
     QList<int> finalAnimeIds;
-    QList<int> missingDataAnime;
     
     {
         QMutexLocker locker(&m_mutex);
@@ -88,11 +88,39 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         m_expandedChainAnimeIds.clear();
         
         if (chainModeEnabled) {
-            // Build chains BEFORE sorting - always expand to include related anime
-            LOG(QString("[MyListCardManager] Building chains from %1 anime IDs WITH expansion").arg(aids.size()));
-            m_chainList = buildChainsFromAnimeIds(aids);  // Always expand chains
+            // Use pre-built chains from cache instead of rebuilding
+            // Chains were already built once after preloadCardCreationData completed
+            if (!m_chainsBuilt || m_chainList.isEmpty()) {
+                LOG("[MyListCardManager] WARNING: Chain mode enabled but chains not built yet. Building now from cache...");
+                buildChainsFromCache();
+            }
             
-            // Build aid -> chain index map and collect all anime IDs from expanded chains
+            LOG(QString("[MyListCardManager] Using pre-built chains: %1 chains available")
+                .arg(m_chainList.size()));
+            
+            // Filter chains to only include those with at least one anime from the input list
+            QSet<int> inputAidSet(aids.begin(), aids.end());
+            QList<AnimeChain> filteredChains;
+            
+            for (const AnimeChain& chain : std::as_const(m_chainList)) {
+                // Check if this chain contains any anime from the input list
+                bool hasInputAnime = false;
+                for (int aid : chain.getAnimeIds()) {
+                    if (inputAidSet.contains(aid)) {
+                        hasInputAnime = true;
+                        break;
+                    }
+                }
+                
+                if (hasInputAnime) {
+                    filteredChains.append(chain);
+                }
+            }
+            
+            // Update to use filtered chains
+            m_chainList = filteredChains;
+            
+            // Build aid -> chain index map and collect all anime IDs from filtered chains
             m_aidToChainIndex.clear();
             finalAnimeIds.clear();
             for (int i = 0; i < m_chainList.size(); ++i) {
@@ -101,15 +129,11 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     // Add all anime from chains (including expanded ones not in original aids list)
                     if (!finalAnimeIds.contains(aid)) {
                         finalAnimeIds.append(aid);
-                        // Collect anime that lack card creation data cache for incremental preloading
-                        if (!m_cardCreationDataCache.contains(aid)) {
-                            missingDataAnime.append(aid);
-                        }
                     }
                 }
             }
             
-            LOG(QString("[MyListCardManager] Built %1 chains from %2 anime (with expansion)")
+            LOG(QString("[MyListCardManager] Filtered to %1 chains containing %2 anime from input list")
                 .arg(m_chainList.size()).arg(finalAnimeIds.size()));
         } else {
             // Normal mode: clear chain data
@@ -121,36 +145,6 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         m_orderedAnimeIds = finalAnimeIds;
         LOG(QString("[MyListCardManager] setAnimeIdList: set %1 anime IDs, chain mode %2")
             .arg(finalAnimeIds.size()).arg(chainModeEnabled ? "enabled" : "disabled"));
-    }
-    
-    // Preload data for anime missing from cache (incremental preloading)
-    // Now safe because preloadCardCreationData no longer clears the entire cache
-    if (!missingDataAnime.isEmpty()) {
-        LOG(QString("[MyListCardManager] Preloading card creation data for %1 anime missing from cache")
-            .arg(missingDataAnime.size()));
-        preloadCardCreationData(missingDataAnime);
-        
-        // Verify that preloading succeeded
-        QList<int> stillMissing;
-        for (int aid : std::as_const(missingDataAnime)) {
-            if (!m_cardCreationDataCache.contains(aid)) {
-                stillMissing.append(aid);
-            }
-        }
-        
-        if (!stillMissing.isEmpty()) {
-            QStringList aidStrings;
-            int sampleCount = std::min(10, static_cast<int>(stillMissing.size()));
-            for (int i = 0; i < sampleCount; ++i) {
-                aidStrings.append(QString::number(stillMissing[i]));
-            }
-            QString sampleAids = stillMissing.size() <= 10 ? aidStrings.join(", ") : 
-                                 QString("%1...").arg(aidStrings.join(", "));
-            LOG(QString("[MyListCardManager] WARNING: Failed to preload data for %1 anime (sample: %2)")
-                .arg(stillMissing.size()).arg(sampleAids));
-        } else {
-            LOG("[MyListCardManager] Card creation data preload complete");
-        }
     }
     
     // Update virtual layout AFTER releasing the mutex to avoid deadlock
@@ -1986,6 +1980,44 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     qint64 totalElapsed = timer.elapsed();
     LOG(QString("[MyListCardManager] Comprehensive preload complete: %1 anime with full data in %2 ms")
         .arg(m_cardCreationDataCache.size()).arg(totalElapsed));
+    
+    // Build chains once from the complete cached dataset
+    // This ensures all anime have their data loaded and chains are built with complete information
+    buildChainsFromCache();
+}
+
+void MyListCardManager::buildChainsFromCache()
+{
+    QMutexLocker locker(&m_mutex);
+    
+    // Get all anime IDs from the cache
+    QList<int> allCachedAids = m_cardCreationDataCache.keys();
+    
+    if (allCachedAids.isEmpty()) {
+        LOG("[MyListCardManager] buildChainsFromCache: No anime in cache, skipping chain building");
+        m_chainsBuilt = false;
+        return;
+    }
+    
+    LOG(QString("[MyListCardManager] Building chains from %1 cached anime (complete dataset)")
+        .arg(allCachedAids.size()));
+    
+    // Build chains from ALL cached anime
+    m_chainList = buildChainsFromAnimeIds(allCachedAids);
+    
+    // Build aid -> chain index map for quick lookups
+    m_aidToChainIndex.clear();
+    for (int i = 0; i < m_chainList.size(); ++i) {
+        for (int aid : m_chainList[i].getAnimeIds()) {
+            m_aidToChainIndex[aid] = i;
+        }
+    }
+    
+    m_chainsBuilt = true;
+    
+    LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
+        .arg(m_chainList.size())
+        .arg(m_aidToChainIndex.size()));
 }
 
 void MyListCardManager::onHideCardRequested(int aid)
