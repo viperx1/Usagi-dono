@@ -544,17 +544,57 @@ QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& a
         }
     }
     
-    // CRITICAL FIX: Ensure startAid is in the chain
-    // If we started from a prequel but couldn't reach startAid via sequel relationships,
-    // append startAid to the chain to keep it with its prequel.
-    // This handles database inconsistencies where prequel->sequel relationships are not bidirectional.
-    if (!startAidAdded && (expandChain || availableAids.contains(startAid))) {
-        LOG(QString("[MyListCardManager] WARNING: startAid=%1 not reachable from chainStart=%2 via sequel relationships, appending to chain")
-            .arg(startAid).arg(chainStart));
+    // CRITICAL FIX: Ensure all anime from availableAids are in the chain
+    // If we couldn't reach some anime via sequel relationships due to database inconsistencies,
+    // append them in the correct order based on their prequel relationships
+    if (expandChain || !availableAids.isEmpty()) {
+        QSet<int> chainSet;
+        for (int aid : chain) {
+            chainSet.insert(aid);
+        }
         
-        // Append the starting anime to the chain it belongs to (based on its prequel relationship)
-        // This keeps related anime together even when sequel relationships are broken
-        chain.append(startAid);
+        // Find anime in availableAids that are not in the chain
+        QList<int> missingAnime;
+        for (int aid : availableAids) {
+            if (!chainSet.contains(aid)) {
+                missingAnime.append(aid);
+            }
+        }
+        
+        // If there are missing anime, try to add them in the correct order
+        if (!missingAnime.isEmpty()) {
+            LOG(QString("[MyListCardManager] WARNING: %1 anime from availableAids not reachable from chainStart=%2 via sequel relationships")
+                .arg(missingAnime.size()).arg(chainStart));
+            
+            // Sort missing anime by their position in the chain (using prequel relationships)
+            // For each missing anime, traverse backward to find where it should be inserted
+            for (int missingAid : missingAnime) {
+                loadRelationDataForAnime(missingAid);
+                
+                // Find the position to insert this anime
+                // Check if any anime in the chain is its prequel
+                int insertAfterIndex = -1;
+                for (int i = 0; i < chain.size(); ++i) {
+                    if (findSequelAid(chain[i]) == missingAid) {
+                        // Found the prequel, insert after this position
+                        insertAfterIndex = i;
+                        break;
+                    }
+                }
+                
+                if (insertAfterIndex >= 0) {
+                    // Insert after the prequel
+                    chain.insert(insertAfterIndex + 1, missingAid);
+                    LOG(QString("[MyListCardManager] Inserted aid=%1 after aid=%2 based on prequel relationship")
+                        .arg(missingAid).arg(chain[insertAfterIndex]));
+                } else {
+                    // Couldn't find a good position, append at the end
+                    chain.append(missingAid);
+                    LOG(QString("[MyListCardManager] Appended aid=%1 at end (no prequel relationship found)")
+                        .arg(missingAid));
+                }
+            }
+        }
     }
     
     return chain;
