@@ -162,215 +162,20 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
 
 QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& aids) const
 {
-    QList<AnimeChain> chains;
     QSet<int> availableAids = QSet<int>(aids.begin(), aids.end());
-    QSet<int> processedAids;
     
     LOG(QString("[MyListCardManager] buildChainsFromAnimeIds: input has %1 anime, %2 unique, expansion=ALWAYS ON")
         .arg(aids.size()).arg(availableAids.size()));
     
-    // Create single-anime chains initially - merging will handle connections
-    // Use availableAids (unique set) instead of aids to avoid duplicate chains
+    // Build anime-to-chain map: each anime ID maps to its chain
+    QMap<int, QSet<int>> animeToChain;
+    
+    // Initialize: each unique anime starts in its own chain
     for (int aid : availableAids) {
-        // Create a single-anime chain for each unique input anime
-        QList<int> singleAnimeChain;
-        singleAnimeChain.append(aid);
-        chains.append(AnimeChain(singleAnimeChain));
+        animeToChain[aid].insert(aid);
     }
     
-    LOG(QString("[MyListCardManager] Created %1 initial single-anime chains").arg(chains.size()));
-    
-    // OPTIMIZED: Build anime-to-chain-index map for O(1) lookups
-    QMap<int, int> animeToChainIndex;
-    for (int i = 0; i < chains.size(); ++i) {
-        for (int aid : chains[i].getAnimeIds()) {
-            animeToChainIndex[aid] = i;
-        }
-    }
-    
-    // Merge chains by checking each anime's prequel/sequel relations
-    // Instead of O(n²) chain pair checking, this is O(n×relations) which is much faster
-    QSet<int> chainsToMerge;  // Track which chains need merging
-    QMap<int, QSet<int>> chainMergeGroups;  // Group chains that should be merged together
-    
-    for (int chainIdx = 0; chainIdx < chains.size(); ++chainIdx) {
-        QList<int> chainAnime = chains[chainIdx].getAnimeIds();
-        
-        for (int aid : chainAnime) {
-            // Load relation data for this anime
-            loadRelationDataForAnime(aid);
-            CardCreationData data = m_cardCreationDataCache.value(aid);
-            
-            // Use the new API to get all relations
-            QMap<int, RelationData::RelationType> relations = data.getAllRelations();
-            
-            // Check both prequel and sequel relations
-            for (auto it = relations.constBegin(); it != relations.constEnd(); ++it) {
-                int relAid = it.key();
-                RelationData::RelationType relType = it.value();
-                
-                // Only interested in Sequel (1) and Prequel (2) relationships
-                if (relType != RelationData::RelationType::Sequel && 
-                    relType != RelationData::RelationType::Prequel) {
-                    continue;
-                }
-                
-                // Check if this related anime is in another chain
-                if (animeToChainIndex.contains(relAid)) {
-                    int otherChainIdx = animeToChainIndex[relAid];
-                    
-                    // If in different chain, mark both chains for merging
-                    if (otherChainIdx != chainIdx) {
-                        if (!chainMergeGroups.contains(chainIdx)) {
-                            chainMergeGroups[chainIdx] = QSet<int>();
-                        }
-                        chainMergeGroups[chainIdx].insert(otherChainIdx);
-                        chainsToMerge.insert(chainIdx);
-                        chainsToMerge.insert(otherChainIdx);
-                        
-                        LOG(QString("[MyListCardManager] Chain %1 (aid=%2) connects to chain %3 (aid=%4) via %5")
-                            .arg(chainIdx).arg(aid).arg(otherChainIdx).arg(relAid)
-                            .arg(relType == RelationData::RelationType::Sequel ? "sequel" : "prequel"));
-                    }
-                }
-            }
-        }
-    }
-    
-    // Perform merging if needed
-    if (!chainsToMerge.isEmpty()) {
-        LOG(QString("[MyListCardManager] Merging %1 chains that have connections").arg(chainsToMerge.size()));
-        
-        // Build connected components - chains that should be merged together
-        QMap<int, QSet<int>> mergeComponents;
-        for (int chainIdx : chainsToMerge) {
-            mergeComponents[chainIdx].insert(chainIdx);
-            if (chainMergeGroups.contains(chainIdx)) {
-                mergeComponents[chainIdx].unite(chainMergeGroups[chainIdx]);
-            }
-        }
-        
-        // Expand components transitively
-        bool expanded = true;
-        while (expanded) {
-            expanded = false;
-            for (auto it = mergeComponents.begin(); it != mergeComponents.end(); ++it) {
-                QSet<int> current = it.value();
-                QSet<int> newSet = current;
-                
-                for (int idx : current) {
-                    if (mergeComponents.contains(idx)) {
-                        newSet.unite(mergeComponents[idx]);
-                    }
-                }
-                
-                if (newSet.size() > current.size()) {
-                    it.value() = newSet;
-                    expanded = true;
-                }
-            }
-        }
-        
-        // Find unique merge groups
-        QSet<QSet<int>> uniqueMergeGroups;
-        for (const QSet<int>& component : mergeComponents.values()) {
-            uniqueMergeGroups.insert(component);
-        }
-        
-        // Create new merged chains
-        QList<AnimeChain> newChains;
-        QSet<int> processedChainIndices;
-        
-        for (const QSet<int>& group : uniqueMergeGroups) {
-            // Collect all anime from chains in this group
-            QSet<int> allAnime;
-            for (int chainIdx : group) {
-                processedChainIndices.insert(chainIdx);
-                for (int aid : chains[chainIdx].getAnimeIds()) {
-                    allAnime.insert(aid);
-                }
-            }
-            
-            // Order merged chain using topological sort based on prequel/sequel relationships
-            if (!allAnime.isEmpty()) {
-                LOG(QString("[MyListCardManager] Merging group of %1 chains with %2 total anime")
-                    .arg(group.size()).arg(allAnime.size()));
-                
-                // Build adjacency graph: aid -> list of sequels
-                QMap<int, QList<int>> graph;
-                QMap<int, int> inDegree;  // Count of prequels for each anime
-                
-                // Initialize
-                for (int aid : allAnime) {
-                    graph[aid] = QList<int>();
-                    inDegree[aid] = 0;
-                    loadRelationDataForAnime(aid);
-                }
-                
-                // Build graph edges based on sequel relationships
-                for (int aid : allAnime) {
-                    int sequelAid = findSequelAid(aid);
-                    if (sequelAid > 0 && allAnime.contains(sequelAid)) {
-                        graph[aid].append(sequelAid);
-                        inDegree[sequelAid]++;
-                    }
-                }
-                
-                // Topological sort using Kahn's algorithm
-                QList<int> orderedChain;
-                QList<int> queue;
-                
-                // Start with anime that have no prequels (in-degree = 0)
-                for (int aid : allAnime) {
-                    if (inDegree[aid] == 0) {
-                        queue.append(aid);
-                    }
-                }
-                
-                while (!queue.isEmpty()) {
-                    // Process anime with no remaining prequels
-                    int current = queue.takeFirst();
-                    orderedChain.append(current);
-                    
-                    // Reduce in-degree for all sequels
-                    for (int sequel : graph[current]) {
-                        inDegree[sequel]--;
-                        if (inDegree[sequel] == 0) {
-                            queue.append(sequel);
-                        }
-                    }
-                }
-                
-                // If not all anime were added (cycle or disconnected components), add remaining
-                if (orderedChain.size() < allAnime.size()) {
-                    for (int aid : allAnime) {
-                        if (!orderedChain.contains(aid)) {
-                            orderedChain.append(aid);
-                        }
-                    }
-                    LOG(QString("[MyListCardManager] WARNING: Topological sort incomplete, added %1 disconnected anime (total: %2)")
-                        .arg(allAnime.size() - orderedChain.size() + (allAnime.size() - orderedChain.size()))
-                        .arg(allAnime.size()));
-                }
-                
-                newChains.append(AnimeChain(orderedChain));
-            }
-        }
-        
-        // Add unmerged chains
-        for (int i = 0; i < chains.size(); ++i) {
-            if (!processedChainIndices.contains(i)) {
-                newChains.append(chains[i]);
-            }
-        }
-        
-        chains = newChains;
-    }
-    
-    LOG(QString("[MyListCardManager] After merging: %1 chains").arg(chains.size()));
-    
-    // Build reverse lookup map ONCE: sequel_id → prequel_id
-    // This provides O(1) lookups instead of O(n) iteration through all cache (performance optimization)
+    // Build reverse lookup map for expansion: sequel_id → prequel_id
     QMap<int, int> sequelToPrequelMap;
     for (int aid : m_cardCreationDataCache.keys()) {
         loadRelationDataForAnime(aid);
@@ -380,278 +185,173 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         }
     }
     
-    // Expand chains to include related anime (prequels/sequels) not in the initial input
-    // This allows showing complete series even when some anime aren't in mylist
-    // NOTE: Database relationships may be unidirectional, so we use both direct and reverse lookups
-    QList<AnimeChain> expandedChains;
-    for (const AnimeChain& chain : chains) {
-        QList<int> chainAnime = chain.getAnimeIds();
-        if (chainAnime.isEmpty()) {
+    // Process each anime: merge chains and expand to include related anime
+    QSet<int> allProcessedAnime = availableAids;
+    bool changed = true;
+    int iterations = 0;
+    const int MAX_ITERATIONS = 100;  // Safety limit
+    
+    while (changed && iterations < MAX_ITERATIONS) {
+        changed = false;
+        iterations++;
+        
+        // For each anime, check if we need to merge with related anime or expand
+        QList<int> animeToProcess = animeToChain.keys();
+        for (int aid : animeToProcess) {
+            if (!animeToChain.contains(aid)) {
+                continue;  // Already merged into another chain
+            }
+            
+            QSet<int> currentChain = animeToChain[aid];
+            QSet<int> chainsToMerge;
+            
+            // Load relation data
+            loadRelationDataForAnime(aid);
+            
+            // Check prequel
+            int prequelAid = findPrequelAid(aid);
+            if (prequelAid > 0) {
+                if (animeToChain.contains(prequelAid)) {
+                    // Prequel exists in another chain - need to merge
+                    if (animeToChain[prequelAid] != currentChain) {
+                        chainsToMerge.unite(animeToChain[prequelAid]);
+                        changed = true;
+                    }
+                } else if (!allProcessedAnime.contains(prequelAid)) {
+                    // Expand: add prequel to chain
+                    currentChain.insert(prequelAid);
+                    allProcessedAnime.insert(prequelAid);
+                    changed = true;
+                }
+            } else {
+                // Try reverse lookup for prequel
+                int reversePrequelAid = sequelToPrequelMap.value(aid, 0);
+                if (reversePrequelAid > 0) {
+                    if (animeToChain.contains(reversePrequelAid)) {
+                        if (animeToChain[reversePrequelAid] != currentChain) {
+                            chainsToMerge.unite(animeToChain[reversePrequelAid]);
+                            changed = true;
+                        }
+                    } else if (!allProcessedAnime.contains(reversePrequelAid)) {
+                        currentChain.insert(reversePrequelAid);
+                        allProcessedAnime.insert(reversePrequelAid);
+                        changed = true;
+                    }
+                }
+            }
+            
+            // Check sequel
+            int sequelAid = findSequelAid(aid);
+            if (sequelAid > 0) {
+                if (animeToChain.contains(sequelAid)) {
+                    // Sequel exists in another chain - need to merge
+                    if (animeToChain[sequelAid] != currentChain) {
+                        chainsToMerge.unite(animeToChain[sequelAid]);
+                        changed = true;
+                    }
+                } else if (!allProcessedAnime.contains(sequelAid)) {
+                    // Expand: add sequel to chain
+                    currentChain.insert(sequelAid);
+                    allProcessedAnime.insert(sequelAid);
+                    changed = true;
+                }
+            }
+            
+            // Perform merge if needed
+            if (!chainsToMerge.isEmpty()) {
+                currentChain.unite(chainsToMerge);
+                
+                // Update all anime in merged chain to point to the new chain
+                for (int chainAid : currentChain) {
+                    animeToChain[chainAid] = currentChain;
+                }
+            } else if (animeToChain[aid] != currentChain) {
+                // Chain was expanded - update all anime in chain
+                for (int chainAid : currentChain) {
+                    animeToChain[chainAid] = currentChain;
+                }
+            }
+        }
+    }
+    
+    if (iterations >= MAX_ITERATIONS) {
+        LOG(QString("[MyListCardManager] WARNING: Chain building hit iteration limit"));
+    }
+    
+    LOG(QString("[MyListCardManager] Chain building completed in %1 iterations").arg(iterations));
+    
+    // Convert chain sets to unique chains
+    QSet<QSet<int>> uniqueChainSets;
+    for (const QSet<int>& chainSet : animeToChain.values()) {
+        uniqueChainSets.insert(chainSet);
+    }
+    
+    LOG(QString("[MyListCardManager] Found %1 unique chains").arg(uniqueChainSets.size()));
+    
+    // Convert each chain set to an ordered AnimeChain using topological sort
+    QList<AnimeChain> chains;
+    
+    for (const QSet<int>& chainSet : uniqueChainSets) {
+        if (chainSet.isEmpty()) {
             continue;
         }
         
-        // Find prequels and sequels to add
-        QSet<int> animeToAdd;
-        for (int aid : chainAnime) {
-            animeToAdd.insert(aid);
+        // Build adjacency graph for ordering (prequel -> sequel)
+        QMap<int, QList<int>> graph;
+        QMap<int, int> inDegree;
+        
+        // Initialize
+        for (int aid : chainSet) {
+            graph[aid] = QList<int>();
+            inDegree[aid] = 0;
+            loadRelationDataForAnime(aid);
         }
         
-        // Traverse backward from the first anime to find prequels
-        int currentAid = chainAnime.first();
-        QSet<int> visited;
-        while (currentAid > 0 && !visited.contains(currentAid)) {
-            visited.insert(currentAid);
-            loadRelationDataForAnime(currentAid);
-            int prequelAid = findPrequelAid(currentAid);
-            if (prequelAid > 0 && !animeToAdd.contains(prequelAid)) {
-                animeToAdd.insert(prequelAid);
-                currentAid = prequelAid;
-            } else {
-                // Use reverse lookup map for O(1) lookup (instead of O(n) iteration through all cache)
-                int reversePrequelAid = sequelToPrequelMap.value(currentAid, 0);
-                if (reversePrequelAid > 0 && !animeToAdd.contains(reversePrequelAid)) {
-                    animeToAdd.insert(reversePrequelAid);
-                    currentAid = reversePrequelAid;
-                } else {
-                    break;
-                }
+        // Build graph edges based on sequel relationships
+        for (int aid : chainSet) {
+            int sequelAid = findSequelAid(aid);
+            if (sequelAid > 0 && chainSet.contains(sequelAid)) {
+                graph[aid].append(sequelAid);
+                inDegree[sequelAid]++;
             }
         }
         
-        // Traverse forward from the last anime to find sequels
-        currentAid = chainAnime.last();
-        visited.clear();
-        while (currentAid > 0 && !visited.contains(currentAid)) {
-            visited.insert(currentAid);
-            loadRelationDataForAnime(currentAid);
-            int sequelAid = findSequelAid(currentAid);
-            if (sequelAid > 0 && !animeToAdd.contains(sequelAid)) {
-                animeToAdd.insert(sequelAid);
-                currentAid = sequelAid;
-            } else {
-                break;
+        // Topological sort using Kahn's algorithm
+        QList<int> orderedChain;
+        QList<int> queue;
+        
+        // Start with anime that have no prequels (in-degree = 0)
+        for (int aid : chainSet) {
+            if (inDegree[aid] == 0) {
+                queue.append(aid);
             }
         }
         
-        // If we found additional anime, use topological sort to order them
-        if (animeToAdd.size() > chainAnime.size()) {
-            // Build adjacency graph for ordering
-            QMap<int, QList<int>> graph;
-            QMap<int, int> inDegree;
+        while (!queue.isEmpty()) {
+            int current = queue.takeFirst();
+            orderedChain.append(current);
             
-            // Initialize
-            for (int aid : animeToAdd) {
-                graph[aid] = QList<int>();
-                inDegree[aid] = 0;
-                loadRelationDataForAnime(aid);
-            }
-            
-            // Build graph edges
-            for (int aid : animeToAdd) {
-                int sequelAid = findSequelAid(aid);
-                if (sequelAid > 0 && animeToAdd.contains(sequelAid)) {
-                    graph[aid].append(sequelAid);
-                    inDegree[sequelAid]++;
+            for (int sequel : graph[current]) {
+                inDegree[sequel]--;
+                if (inDegree[sequel] == 0) {
+                    queue.append(sequel);
                 }
             }
-            
-            // Topological sort
-            QList<int> expandedChain;
-            QList<int> queue;
-            
-            for (int aid : animeToAdd) {
-                if (inDegree[aid] == 0) {
-                    queue.append(aid);
-                }
-            }
-            
-            while (!queue.isEmpty()) {
-                int current = queue.takeFirst();
-                expandedChain.append(current);
-                
-                for (int sequel : graph[current]) {
-                    inDegree[sequel]--;
-                    if (inDegree[sequel] == 0) {
-                        queue.append(sequel);
-                    }
-                }
-            }
-            
-            // Add any remaining (disconnected or cyclic)
-            if (expandedChain.size() < animeToAdd.size()) {
-                for (int aid : animeToAdd) {
-                    if (!expandedChain.contains(aid)) {
-                        expandedChain.append(aid);
-                    }
-                }
-            }
-            
-            expandedChains.append(AnimeChain(expandedChain));
-        } else {
-            // No expansion needed, keep original chain
-            expandedChains.append(chain);
         }
+        
+        // Add any remaining anime (cycles or disconnected)
+        if (orderedChain.size() < chainSet.size()) {
+            for (int aid : chainSet) {
+                if (!orderedChain.contains(aid)) {
+                    orderedChain.append(aid);
+                }
+            }
+        }
+        
+        chains.append(AnimeChain(orderedChain));
     }
-    chains = expandedChains;
     
-    LOG(QString("[MyListCardManager] After expansion: %1 chains").arg(chains.size()));
-    
-    // Merge chains that share anime after expansion
-    // This handles cases where two chains both expanded to include the same anime
-    bool hasDuplicates = true;
-    while (hasDuplicates) {
-        hasDuplicates = false;
-        
-        // Build anime-to-chain-index map to detect duplicates
-        QMap<int, QList<int>> animeToChainIndices;
-        for (int i = 0; i < chains.size(); ++i) {
-            for (int aid : chains[i].getAnimeIds()) {
-                animeToChainIndices[aid].append(i);
-            }
-        }
-        
-        // Find chains that share anime
-        QSet<int> chainsToMerge;
-        QMap<int, QSet<int>> chainMergeGroups;
-        
-        for (auto it = animeToChainIndices.constBegin(); it != animeToChainIndices.constEnd(); ++it) {
-            const QList<int>& chainIndices = it.value();
-            if (chainIndices.size() > 1) {
-                // This anime appears in multiple chains - they need to be merged
-                hasDuplicates = true;
-                int firstChain = chainIndices.first();
-                for (int chainIdx : chainIndices) {
-                    chainsToMerge.insert(chainIdx);
-                    if (!chainMergeGroups.contains(firstChain)) {
-                        chainMergeGroups[firstChain] = QSet<int>();
-                    }
-                    chainMergeGroups[firstChain].insert(chainIdx);
-                }
-            }
-        }
-        
-        if (!hasDuplicates) {
-            break;
-        }
-        
-        LOG(QString("[MyListCardManager] Post-expansion merge: found %1 chains with overlapping anime").arg(chainsToMerge.size()));
-        
-        // Build connected components
-        QMap<int, QSet<int>> mergeComponents;
-        for (int chainIdx : chainsToMerge) {
-            mergeComponents[chainIdx].insert(chainIdx);
-            if (chainMergeGroups.contains(chainIdx)) {
-                mergeComponents[chainIdx].unite(chainMergeGroups[chainIdx]);
-            }
-        }
-        
-        // Expand components transitively
-        bool expanded = true;
-        while (expanded) {
-            expanded = false;
-            for (auto it = mergeComponents.begin(); it != mergeComponents.end(); ++it) {
-                QSet<int> current = it.value();
-                QSet<int> newSet = current;
-                
-                for (int idx : current) {
-                    if (mergeComponents.contains(idx)) {
-                        newSet.unite(mergeComponents[idx]);
-                    }
-                }
-                
-                if (newSet.size() > current.size()) {
-                    it.value() = newSet;
-                    expanded = true;
-                }
-            }
-        }
-        
-        // Find unique merge groups
-        QSet<QSet<int>> uniqueMergeGroups;
-        for (const QSet<int>& component : mergeComponents.values()) {
-            uniqueMergeGroups.insert(component);
-        }
-        
-        // Create new merged chains
-        QList<AnimeChain> newChains;
-        QSet<int> processedChainIndices;
-        
-        for (const QSet<int>& group : uniqueMergeGroups) {
-            // Collect all anime from chains in this group
-            QSet<int> allAnime;
-            for (int chainIdx : group) {
-                processedChainIndices.insert(chainIdx);
-                for (int aid : chains[chainIdx].getAnimeIds()) {
-                    allAnime.insert(aid);
-                }
-            }
-            
-            // Order merged chain using topological sort
-            if (!allAnime.isEmpty()) {
-                // Build adjacency graph
-                QMap<int, QList<int>> graph;
-                QMap<int, int> inDegree;
-                
-                for (int aid : allAnime) {
-                    graph[aid] = QList<int>();
-                    inDegree[aid] = 0;
-                    loadRelationDataForAnime(aid);
-                }
-                
-                // Build graph edges based on sequel relationships
-                for (int aid : allAnime) {
-                    int sequelAid = findSequelAid(aid);
-                    if (sequelAid > 0 && allAnime.contains(sequelAid)) {
-                        graph[aid].append(sequelAid);
-                        inDegree[sequelAid]++;
-                    }
-                }
-                
-                // Topological sort
-                QList<int> orderedChain;
-                QList<int> queue;
-                
-                for (int aid : allAnime) {
-                    if (inDegree[aid] == 0) {
-                        queue.append(aid);
-                    }
-                }
-                
-                while (!queue.isEmpty()) {
-                    int current = queue.takeFirst();
-                    orderedChain.append(current);
-                    
-                    for (int sequel : graph[current]) {
-                        inDegree[sequel]--;
-                        if (inDegree[sequel] == 0) {
-                            queue.append(sequel);
-                        }
-                    }
-                }
-                
-                // Add any remaining (disconnected or cyclic)
-                if (orderedChain.size() < allAnime.size()) {
-                    for (int aid : allAnime) {
-                        if (!orderedChain.contains(aid)) {
-                            orderedChain.append(aid);
-                        }
-                    }
-                }
-                
-                newChains.append(AnimeChain(orderedChain));
-            }
-        }
-        
-        // Add unmerged chains
-        for (int i = 0; i < chains.size(); ++i) {
-            if (!processedChainIndices.contains(i)) {
-                newChains.append(chains[i]);
-            }
-        }
-        
-        chains = newChains;
-        LOG(QString("[MyListCardManager] After post-expansion merge: %1 chains").arg(chains.size()));
-    }
+    LOG(QString("[MyListCardManager] Created %1 ordered chains").arg(chains.size()));
     
     // Verify total anime count and find duplicates
     int totalAnimeInChains = 0;
