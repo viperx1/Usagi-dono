@@ -417,8 +417,6 @@ private:
     void updateAnimeAlternativeTitlesInCache(int aid);  // Update single anime in cache
     void addAnimeTitlesToList(QStringList& titles, const QString& romaji, const QString& english,
                               const QString& other, const QString& shortNames, const QString& synonyms);  // Helper for title parsing
-    bool matchesSearchFilter(AnimeCard *card, const QString &searchText);
-    bool matchesSearchFilter(int aid, const QString &animeName, const QString &searchText);
     
     bool validateDatabaseConnection(const QSqlDatabase& db, const QString& methodName);
     void debugPrintDatabaseInfoForLid(int lid);

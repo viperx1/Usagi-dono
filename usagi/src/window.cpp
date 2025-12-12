@@ -3802,30 +3802,6 @@ void Window::updateAnimeAlternativeTitlesInCache(int aid)
 		}
 	}
 }
-
-// Check if a card matches the search filter
-bool Window::matchesSearchFilter(AnimeCard *card, const QString &searchText)
-{
-	return matchesSearchFilter(card->getAnimeId(), card->getAnimeTitle(), searchText);
-}
-
-// Check if an anime matches the search filter (using aid and title)
-bool Window::matchesSearchFilter(int aid, const QString &animeName, const QString &searchText)
-{
-	if (searchText.isEmpty()) {
-		return true;
-	}
-	
-	// Check main title first
-	if (animeName.contains(searchText, Qt::CaseInsensitive)) {
-		return true;
-	}
-	
-	// Check alternative titles from cache
-	// Use cache for better performance
-	return animeAlternativeTitlesCache.matchesAnyTitle(aid, searchText);
-}
-
 // Check and request missing relation data for a specific anime's chain
 // This is called when anime data is updated to continue building the chain
 void Window::checkAndRequestChainRelations(int aid)
