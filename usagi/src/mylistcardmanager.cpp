@@ -121,20 +121,32 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 // Filter chains to only include those with at least one anime from the input list
                 // IMPORTANT: Never modify m_chainList - it's the master list from cache
                 QSet<int> inputAidSet(aids.begin(), aids.end());
-                QList<AnimeChain> filteredChains;
                 
-                for (const AnimeChain& chain : std::as_const(m_chainList)) {
-                    // Check if this chain contains any anime from the input list
-                    bool hasInputAnime = false;
-                    for (int aid : chain.getAnimeIds()) {
-                        if (inputAidSet.contains(aid)) {
-                            hasInputAnime = true;
+                // Build a map of which chain each input anime belongs to
+                // This preserves the order of input anime
+                QMap<int, int> inputAidToChainIdx;
+                for (int aid : aids) {
+                    // Find which chain in m_chainList contains this anime
+                    for (int chainIdx = 0; chainIdx < m_chainList.size(); ++chainIdx) {
+                        if (m_chainList[chainIdx].contains(aid)) {
+                            inputAidToChainIdx[aid] = chainIdx;
                             break;
                         }
                     }
-                    
-                    if (hasInputAnime) {
-                        filteredChains.append(chain);
+                }
+                
+                // Collect chains in the order they appear in the input list
+                // Use a set to avoid duplicate chains
+                QSet<int> includedChainIndices;
+                QList<AnimeChain> filteredChains;
+                
+                for (int aid : aids) {
+                    if (inputAidToChainIdx.contains(aid)) {
+                        int chainIdx = inputAidToChainIdx[aid];
+                        if (!includedChainIndices.contains(chainIdx)) {
+                            includedChainIndices.insert(chainIdx);
+                            filteredChains.append(m_chainList[chainIdx]);
+                        }
                     }
                 }
                 
