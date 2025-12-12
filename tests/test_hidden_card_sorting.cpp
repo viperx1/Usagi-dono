@@ -28,6 +28,14 @@ private slots:
     void testAllVisibleChains();
     void testMissingDataTreatedAsVisible();
     void testHiddenCardsWithinChainKeepRelationOrder();
+
+private:
+    // Helper: Create a simple lookup function with no relations
+    static AnimeChain::RelationLookupFunc noRelationsLookup() {
+        return [](int) -> QPair<int,int> {
+            return QPair<int,int>(0, 0);  // No relations
+        };
+    }
 };
 
 // Mock CardCreationData structure matching the actual one used in sorting
@@ -44,12 +52,8 @@ struct MockCardData {
 
 void TestHiddenCardSorting::testHiddenChainByTitle()
 {
-    // Create relation lookup (chains with single anime for simplicity)
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);  // No relations
-    };
-    
     // Create three chains
+    auto lookup = noRelationsLookup();
     AnimeChain chain1(100, lookup);  // Visible
     AnimeChain chain2(200, lookup);  // Visible
     AnimeChain chain3(300, lookup);  // Hidden
@@ -88,10 +92,7 @@ void TestHiddenCardSorting::testHiddenChainByTitle()
 
 void TestHiddenCardSorting::testHiddenChainByType()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);
-    };
-    
+    auto lookup = noRelationsLookup();
     AnimeChain chain1(100, lookup);
     AnimeChain chain2(200, lookup);
     AnimeChain chain3(300, lookup);
@@ -117,10 +118,7 @@ void TestHiddenCardSorting::testHiddenChainByType()
 
 void TestHiddenCardSorting::testHiddenChainByDate()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);
-    };
-    
+    auto lookup = noRelationsLookup();
     AnimeChain chain1(100, lookup);
     AnimeChain chain2(200, lookup);
     AnimeChain chain3(300, lookup);
@@ -146,10 +144,7 @@ void TestHiddenCardSorting::testHiddenChainByDate()
 
 void TestHiddenCardSorting::testHiddenChainByEpisodeCount()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);
-    };
-    
+    auto lookup = noRelationsLookup();
     AnimeChain chain1(100, lookup);
     AnimeChain chain2(200, lookup);
     
@@ -173,10 +168,7 @@ void TestHiddenCardSorting::testHiddenChainByEpisodeCount()
 
 void TestHiddenCardSorting::testHiddenChainByCompletion()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);
-    };
-    
+    auto lookup = noRelationsLookup();
     AnimeChain chain1(100, lookup);
     AnimeChain chain2(200, lookup);
     
@@ -206,10 +198,7 @@ void TestHiddenCardSorting::testHiddenChainByCompletion()
 
 void TestHiddenCardSorting::testHiddenChainByLastPlayed()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);
-    };
-    
+    auto lookup = noRelationsLookup();
     AnimeChain chain1(100, lookup);
     AnimeChain chain2(200, lookup);
     
@@ -246,7 +235,7 @@ void TestHiddenCardSorting::testMixedHiddenChain()
     mixedChain.expand(lookup);
     
     // Create a fully hidden chain for comparison
-    AnimeChain hiddenChain(200, [](int) { return QPair<int,int>(0, 0); });
+    AnimeChain hiddenChain(200, noRelationsLookup());
     
     QMap<int, MockCardData> dataCache;
     dataCache[100].animeTitle = "Series Part 1";
@@ -285,7 +274,7 @@ void TestHiddenCardSorting::testAllHiddenChain()
     allHiddenChain.expand(lookup);
     
     // Create a visible chain for comparison
-    AnimeChain visibleChain(200, [](int) { return QPair<int,int>(0, 0); });
+    AnimeChain visibleChain(200, noRelationsLookup());
     
     QMap<int, MockCardData> dataCache;
     dataCache[100].animeTitle = "Hidden Part 1";
@@ -310,10 +299,7 @@ void TestHiddenCardSorting::testAllVisibleChains()
 {
     // Test that when all chains are visible, normal sorting applies
     
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);
-    };
-    
+    auto lookup = noRelationsLookup();
     AnimeChain chain1(100, lookup);
     AnimeChain chain2(200, lookup);
     
@@ -337,10 +323,7 @@ void TestHiddenCardSorting::testMissingDataTreatedAsVisible()
 {
     // Test that anime with missing data is treated as visible (safe default)
     
-    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
-        return QPair<int,int>(0, 0);
-    };
-    
+    auto lookup = noRelationsLookup();
     AnimeChain chainWithMissingData(100, lookup);
     AnimeChain hiddenChain(200, lookup);
     
@@ -393,7 +376,7 @@ void TestHiddenCardSorting::testHiddenCardsWithinChainKeepRelationOrder()
     
     // This chain has visible anime (100 and 103), so it should be sorted normally (not moved to end)
     // when compared with a fully hidden chain
-    AnimeChain fullyHiddenChain(200, [](int) { return QPair<int,int>(0, 0); });
+    AnimeChain fullyHiddenChain(200, noRelationsLookup());
     dataCache[200].animeTitle = "Fully Hidden";
     dataCache[200].isHidden = true;
     
