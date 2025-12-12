@@ -2062,8 +2062,17 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     }
     qint64 step4Elapsed = timer.elapsed() - step4Start;
     int totalEpisodes = 0;
-    for (const CardCreationData& data : std::as_const(m_cardCreationDataCache)) {
+    for (CardCreationData& data : m_cardCreationDataCache) {
         totalEpisodes += data.episodes.size();
+        
+        // Calculate lastPlayed as the maximum timestamp from all episodes
+        qint64 maxLastPlayed = 0;
+        for (const EpisodeCacheEntry& episode : data.episodes) {
+            if (episode.lastPlayed > maxLastPlayed) {
+                maxLastPlayed = episode.lastPlayed;
+            }
+        }
+        data.lastPlayed = maxLastPlayed;
     }
     LOG(QString("[MyListCardManager] Step 4: Loaded %1 episodes in %2 ms").arg(totalEpisodes).arg(step4Elapsed));
     emit progressUpdate(QString("Loaded episodes (%1 of 3)...").arg(3));

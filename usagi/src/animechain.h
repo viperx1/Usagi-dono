@@ -31,7 +31,10 @@ public:
         ByRepresentativeDate,
         ByRepresentativeType,
         ByChainLength,
-        ByRepresentativeId
+        ByRepresentativeId,
+        ByRepresentativeEpisodeCount,
+        ByRepresentativeCompletion,
+        ByRepresentativeLastPlayed
     };
     
     // Forward declaration of CardCreationData from MyListCardManager
@@ -148,6 +151,46 @@ int AnimeChain::compareWith(
             case SortCriteria::ByChainLength:
                 result = size() - other.size();
                 break;
+            case SortCriteria::ByRepresentativeEpisodeCount: {
+                int myEpisodes = myData.stats.normalEpisodes() + myData.stats.otherEpisodes();
+                int otherEpisodes = otherData.stats.normalEpisodes() + otherData.stats.otherEpisodes();
+                result = myEpisodes - otherEpisodes;
+                break;
+            }
+            case SortCriteria::ByRepresentativeCompletion: {
+                int myTotal = myData.stats.normalEpisodes() + myData.stats.otherEpisodes();
+                int myViewed = myData.stats.normalViewed() + myData.stats.otherViewed();
+                double myCompletion = (myTotal > 0) ? static_cast<double>(myViewed) / myTotal : 0.0;
+                
+                int otherTotal = otherData.stats.normalEpisodes() + otherData.stats.otherEpisodes();
+                int otherViewed = otherData.stats.normalViewed() + otherData.stats.otherViewed();
+                double otherCompletion = (otherTotal > 0) ? static_cast<double>(otherViewed) / otherTotal : 0.0;
+                
+                if (myCompletion < otherCompletion) result = -1;
+                else if (myCompletion > otherCompletion) result = 1;
+                else result = 0;
+                break;
+            }
+            case SortCriteria::ByRepresentativeLastPlayed: {
+                qint64 myLastPlayed = myData.lastPlayed;
+                qint64 otherLastPlayed = otherData.lastPlayed;
+                
+                // Never played items (0) go to the end regardless of sort order
+                if (myLastPlayed == 0 && otherLastPlayed == 0) {
+                    result = 0;
+                } else if (myLastPlayed == 0) {
+                    // Unplayed always at end: in the pre-negation result, return positive to put at end
+                    result = 1;
+                } else if (otherLastPlayed == 0) {
+                    // Unplayed always at end: in the pre-negation result, return negative to put other at end
+                    result = -1;
+                } else {
+                    if (myLastPlayed < otherLastPlayed) result = -1;
+                    else if (myLastPlayed > otherLastPlayed) result = 1;
+                    else result = 0;
+                }
+                break;
+            }
             case SortCriteria::ByRepresentativeId:
             default:
                 result = myAid - otherAid;
