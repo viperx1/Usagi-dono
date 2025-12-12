@@ -2102,3 +2102,30 @@ if(WIN32)
 endif()
 
 add_test(NAME test_cardcreationdata_api COMMAND test_cardcreationdata_api -v2)
+
+# ==========================================================
+# test_animechain - AnimeChain class tests
+# ==========================================================
+add_executable(test_animechain
+    test_animechain.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animechain.cpp
+)
+
+target_link_libraries(test_animechain PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_animechain PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_animechain PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_animechain COMMAND test_animechain -v2)
+
