@@ -2183,12 +2183,25 @@ void MyListCardManager::buildChainsFromCache()
         // Check if chains are already built
         if (m_chainsBuilt && !m_chainList.isEmpty()) {
             LOG("[MyListCardManager] Chains already built from cache, skipping rebuild");
+            // Ensure data is marked ready even when skipping rebuild
+            // (this handles case where preloadCardCreationData was called again after chains were built)
+            if (!m_dataReady) {
+                LOG("[MyListCardManager] [DEBUG] Chains already built but data not ready, marking ready now");
+                m_dataReady = true;
+                locker.unlock();  // Release mutex before waking threads
+                m_dataReadyCondition.wakeAll();
+            }
             return;
         }
         
         // Check if a build is already in progress (another thread is building)
         if (m_chainBuildInProgress) {
-            LOG("[MyListCardManager] Chain building already in progress, skipping duplicate build request");
+            LOG("[MyListCardManager] Chain building already in progress, waiting for completion");
+            // Wait for the other thread to complete the build
+            while (m_chainBuildInProgress && !m_dataReady) {
+                m_dataReadyCondition.wait(&m_mutex);
+            }
+            LOG("[MyListCardManager] Chain building complete by another thread");
             return;
         }
         
