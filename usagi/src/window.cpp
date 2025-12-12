@@ -4046,11 +4046,38 @@ void Window::applyMylistFilters()
 	
 	QList<int> filteredAnimeIds;
 	int totalCount = allAnimeIds.size();
+	
+	// Build composite filter using new filter classes
+	CompositeFilter composite;
+	
+	// Add search filter if text is provided
+	if (!searchText.isEmpty()) {
+		composite.addFilter(new SearchFilter(searchText, &animeAlternativeTitlesCache));
+	}
+	
+	// Add type filter if specified
+	if (!typeFilter.isEmpty()) {
+		composite.addFilter(new TypeFilter(typeFilter));
+	}
+	
+	// Add completion filter if specified
+	if (!completionFilter.isEmpty()) {
+		composite.addFilter(new CompletionFilter(completionFilter));
+	}
+	
+	// Add unwatched filter if enabled
+	if (showOnlyUnwatched) {
+		composite.addFilter(new UnwatchedFilter(true));
+	}
+	
+	// Add adult content filter
+	composite.addFilter(new AdultContentFilter(adultContentFilter));
+	
+	LOG(QString("[Window] Applying filters: %1").arg(composite.description()));
+	
 	// Apply filters to determine which anime to show
 	// Use cached data when card widgets don't exist (virtual scrolling)
 	for (int aid : allAnimeIds) {
-		bool visible = true;
-		
 		// Apply "In My List" filter first - this is a quick check using the set
 		if (inMyListOnly && !mylistAnimeIdSet.contains(aid)) {
 			// This anime is not in mylist, skip it
@@ -4070,93 +4097,11 @@ void Window::applyMylistFilters()
 			}
 		}
 		
-		// Get anime name for search filter
-		QString animeName = card ? card->getAnimeTitle() : cachedData.animeName();
+		// Create data accessor for unified access to card/cached data
+		AnimeDataAccessor accessor(aid, card, cachedData);
 		
-		// Apply search filter
-		if (!searchText.isEmpty()) {
-			visible = visible && matchesSearchFilter(aid, animeName, searchText);
-		}
-		
-		// Apply type filter
-		if (!typeFilter.isEmpty()) {
-			QString animeType = card ? card->getAnimeType() : cachedData.typeName();
-			visible = visible && (animeType == typeFilter);
-		}
-		
-		// Apply completion filter
-		if (!completionFilter.isEmpty()) {
-			int normalEpisodes, normalViewed, totalEpisodes;
-			
-			if (card) {
-				normalEpisodes = card->getNormalEpisodes();
-				normalViewed = card->getNormalViewed();
-				totalEpisodes = card->getTotalNormalEpisodes();
-			} else {
-				normalEpisodes = cachedData.stats().normalEpisodes();
-				normalViewed = cachedData.stats().normalViewed();
-				totalEpisodes = cachedData.eptotal() > 0 ? cachedData.eptotal() : cachedData.stats().totalNormalEpisodes();
-			}
-			
-			if (completionFilter == "completed") {
-				// Completed: all normal episodes viewed
-				// For anime with known total episodes, check if all are viewed
-				// For anime with unknown total (totalEpisodes == 0), check if all episodes in mylist are viewed
-				if (totalEpisodes > 0) {
-					visible = visible && (normalViewed >= totalEpisodes);
-				} else {
-					// Unknown total episodes: consider completed if user has episodes and all are viewed
-					visible = visible && (normalEpisodes > 0 && normalViewed >= normalEpisodes);
-				}
-			} else if (completionFilter == "watching") {
-				// Watching: some episodes viewed but not all
-				// Must have at least one viewed episode
-				// And either: total is unknown (totalEpisodes == 0) with more episodes available,
-				//         or: total is known and not all are viewed
-				if (totalEpisodes > 0) {
-					visible = visible && (normalViewed > 0 && normalViewed < totalEpisodes);
-				} else {
-					// Unknown total episodes: watching if some viewed and not all in mylist are viewed
-					visible = visible && (normalViewed > 0 && normalViewed < normalEpisodes);
-				}
-			} else if (completionFilter == "notstarted") {
-				// Not started: no episodes viewed
-				visible = visible && (normalViewed == 0);
-			}
-		}
-		
-		// Apply unwatched filter
-		if (showOnlyUnwatched) {
-			int normalEpisodes, normalViewed, otherEpisodes, otherViewed;
-			
-			if (card) {
-				normalEpisodes = card->getNormalEpisodes();
-				normalViewed = card->getNormalViewed();
-				otherEpisodes = card->getOtherEpisodes();
-				otherViewed = card->getOtherViewed();
-			} else {
-				normalEpisodes = cachedData.stats().normalEpisodes();
-				normalViewed = cachedData.stats().normalViewed();
-				otherEpisodes = cachedData.stats().otherEpisodes();
-				otherViewed = cachedData.stats().otherViewed();
-			}
-			
-			// Show only if there are unwatched episodes
-			visible = visible && ((normalEpisodes > normalViewed) || (otherEpisodes > otherViewed));
-		}
-		// Apply adult content filter
-		if (adultContentFilter == "hide") {
-			bool is18Restricted = card ? card->is18Restricted() : cachedData.is18Restricted();
-			// Hide 18+ content (default)
-			visible = visible && !is18Restricted;
-		} else if (adultContentFilter == "showonly") {
-			bool is18Restricted = card ? card->is18Restricted() : cachedData.is18Restricted();
-			// Show only 18+ content
-			visible = visible && is18Restricted;
-		}
-		// "ignore" means no filtering based on 18+ status
-		
-		if (visible) {
+		// Apply all filters at once using composite filter
+		if (composite.matches(accessor)) {
 			filteredAnimeIds.append(aid);
 		}
 	}

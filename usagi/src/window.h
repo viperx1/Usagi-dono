@@ -55,6 +55,7 @@
 #include "progresstracker.h"
 #include "hashingtask.h"
 #include "animemetadatacache.h"
+#include "animefilter.h"
 #include "backgrounddatabaseworker.h"
 #include "hashercoordinator.h"
 #include "trayiconmanager.h"
