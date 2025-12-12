@@ -79,40 +79,123 @@ void TestAnimeChain::testMergePreservesOrder()
 
 void TestAnimeChain::testInuyashaChainOrdering()
 {
-    // Reproduce the exact Inuyasha chain issue
-    // 144 (Inuyasha) -> 6716 (Kanketsuhen) -> 15546 (Yashahime) -> 16141 (Yashahime S2)
+    // Reproduce the exact Inuyasha chain issue with realistic scenario:
+    // - 144, 15546, 16141 are in mylist (have relation data loaded)
+    // - 6716 is NOT in mylist (no relation data initially)
+    // Expected final order: 144 -> 6716 -> 15546 -> 16141
     
     AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
         if (aid == 144) return QPair<int,int>(0, 6716);         // Inuyasha: sequel=6716
-        if (aid == 6716) return QPair<int,int>(144, 15546);     // Kanketsuhen: prequel=144, sequel=15546
+        if (aid == 6716) return QPair<int,int>(0, 0);           // Kanketsuhen: NO RELATION DATA (not in mylist)
         if (aid == 15546) return QPair<int,int>(6716, 16141);   // Yashahime: prequel=6716, sequel=16141
         if (aid == 16141) return QPair<int,int>(15546, 0);      // Yashahime S2: prequel=15546
         return QPair<int,int>(0, 0);
     };
     
-    // Simulate the chain building process from the issue:
-    // 1. Chain 13 starts with 15546, finds prequel 6716
-    AnimeChain chain13(15546, lookup);
-    AnimeChain chain6716(6716, lookup);
-    chain13.mergeWith(chain6716, lookup);
+    // Simulate buildChainsFromAnimeIds with only mylist anime (144, 15546, 16141)
+    // This matches the actual scenario from the logs
+    QList<int> mylistAnime = {144, 15546, 16141};
     
-    // 2. Chain 528 starts with 144, finds sequel 6716
-    AnimeChain chain528(144, lookup);
+    // Create initial chains - one per anime in mylist
+    QMap<int, int> animeToChainIdx;
+    QList<AnimeChain> chains;
+    QSet<int> deletedChains;
     
-    // 3. Later, chain 528 finds that 6716 is already in chain 13, so merge
-    chain528.mergeWith(chain13, lookup);
+    int idx = 0;
+    for (int aid : mylistAnime) {
+        AnimeChain chain(aid, lookup);
+        chains.append(chain);
+        animeToChainIdx[aid] = idx;
+        idx++;
+    }
     
-    // 4. Chain 528 also has 16141 somehow
-    AnimeChain chain16141(16141, lookup);
-    chain528.mergeWith(chain16141, lookup);
+    // Expand and merge chains (simulating MyListCardManager::buildChainsFromAnimeIds)
+    for (int i = 0; i < chains.size(); i++) {
+        if (deletedChains.contains(i)) {
+            continue;
+        }
+        
+        QSet<int> processed;
+        bool changed = true;
+        int iterations = 0;
+        const int MAX_ITERATIONS = 100;
+        
+        while (changed && iterations < MAX_ITERATIONS) {
+            changed = false;
+            iterations++;
+            
+            QList<int> currentAnime = chains[i].getAnimeIds();
+            for (int aid : currentAnime) {
+                if (processed.contains(aid)) {
+                    continue;
+                }
+                processed.insert(aid);
+                
+                auto unbound = chains[i].getUnboundRelations(aid);
+                
+                // Process prequel
+                if (unbound.first > 0) {
+                    if (animeToChainIdx.contains(unbound.first)) {
+                        // Prequel is in another chain - merge
+                        int otherIdx = animeToChainIdx[unbound.first];
+                        if (otherIdx != i && !deletedChains.contains(otherIdx)) {
+                            chains[i].mergeWith(chains[otherIdx], lookup);
+                            deletedChains.insert(otherIdx);
+                            for (int aid2 : chains[i].getAnimeIds()) {
+                                animeToChainIdx[aid2] = i;
+                            }
+                            changed = true;
+                        }
+                    } else {
+                        // Prequel not in any chain yet - add it
+                        AnimeChain prequelChain(unbound.first, lookup);
+                        chains[i].mergeWith(prequelChain, lookup);
+                        animeToChainIdx[unbound.first] = i;
+                        changed = true;
+                    }
+                }
+                
+                // Process sequel
+                if (unbound.second > 0) {
+                    if (animeToChainIdx.contains(unbound.second)) {
+                        // Sequel is in another chain - merge
+                        int otherIdx = animeToChainIdx[unbound.second];
+                        if (otherIdx != i && !deletedChains.contains(otherIdx)) {
+                            chains[i].mergeWith(chains[otherIdx], lookup);
+                            deletedChains.insert(otherIdx);
+                            for (int aid2 : chains[i].getAnimeIds()) {
+                                animeToChainIdx[aid2] = i;
+                            }
+                            changed = true;
+                        }
+                    } else {
+                        // Sequel not in any chain yet - add it
+                        AnimeChain sequelChain(unbound.second, lookup);
+                        chains[i].mergeWith(sequelChain, lookup);
+                        animeToChainIdx[unbound.second] = i;
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
     
-    // Final order should be: 144 -> 6716 -> 15546 -> 16141
-    QList<int> ids = chain528.getAnimeIds();
+    // Find the final merged chain (should contain all 4 anime)
+    AnimeChain finalChain;
+    for (int i = 0; i < chains.size(); i++) {
+        if (!deletedChains.contains(i)) {
+            if (chains[i].getAnimeIds().size() > finalChain.getAnimeIds().size()) {
+                finalChain = chains[i];
+            }
+        }
+    }
+    
+    QList<int> ids = finalChain.getAnimeIds();
     QCOMPARE(ids.size(), 4);
     
-    // Verify correct order
+    // Verify correct order: 144 -> 6716 -> 15546 -> 16141
     QCOMPARE(ids[0], 144);    // Inuyasha first
-    QCOMPARE(ids[1], 6716);   // Kanketsuhen second
+    QCOMPARE(ids[1], 6716);   // Kanketsuhen second (even with no relation data)
     QCOMPARE(ids[2], 15546);  // Yashahime third
     QCOMPARE(ids[3], 16141);  // Yashahime S2 fourth
 }
