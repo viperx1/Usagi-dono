@@ -166,8 +166,11 @@ int AnimeChain::compareWith(
                 int otherViewed = otherData.stats.normalViewed() + otherData.stats.otherViewed();
                 double otherCompletion = (otherTotal > 0) ? static_cast<double>(otherViewed) / otherTotal : 0.0;
                 
-                if (myCompletion < otherCompletion) result = -1;
-                else if (myCompletion > otherCompletion) result = 1;
+                // Use epsilon for floating-point comparison
+                const double epsilon = 1e-9;
+                double diff = myCompletion - otherCompletion;
+                if (diff < -epsilon) result = -1;
+                else if (diff > epsilon) result = 1;
                 else result = 0;
                 break;
             }
@@ -175,22 +178,22 @@ int AnimeChain::compareWith(
                 qint64 myLastPlayed = myData.lastPlayed;
                 qint64 otherLastPlayed = otherData.lastPlayed;
                 
-                // Never played items (0) go to the end regardless of sort order
-                // We need to handle this specially since it shouldn't be affected by ascending/descending
+                // Never played items (0) must always appear at the end in sorted order,
+                // regardless of ascending/descending. To achieve this when the result
+                // is conditionally negated based on 'ascending' at the end of this function,
+                // we pre-adjust the result value here.
                 if (myLastPlayed == 0 && otherLastPlayed == 0) {
                     result = 0;
                 } else if (myLastPlayed == 0) {
-                    // Unplayed always at end: return result that puts this after other
-                    // Since the template will negate based on ascending, we need to return a value
-                    // that after potential negation still puts unplayed at end
-                    // In ascending order: want this > other, so result should be > 0
-                    // In descending order: want this > other, but result will be negated, so need < 0
+                    // This anime is unplayed: should appear after the other (which is played).
+                    // Pre-adjust so that after potential negation, unplayed is still > played.
                     result = ascending ? 1 : -1;
                 } else if (otherLastPlayed == 0) {
-                    // Unplayed always at end: return result that puts other after this
+                    // Other anime is unplayed: should appear after this (which is played).
+                    // Pre-adjust so that after potential negation, this is still < unplayed.
                     result = ascending ? -1 : 1;
                 } else {
-                    // Normal comparison
+                    // Normal comparison: both have been played
                     if (myLastPlayed < otherLastPlayed) result = -1;
                     else if (myLastPlayed > otherLastPlayed) result = 1;
                     else result = 0;

@@ -21,6 +21,7 @@ private slots:
 };
 
 // Mock CardCreationData structure for testing
+// Matches the actual CardCreationData structure fields used in sorting
 struct MockCardData {
     QString animeTitle;
     QString typeName;

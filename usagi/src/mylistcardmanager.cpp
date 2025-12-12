@@ -2067,10 +2067,12 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         
         // Calculate lastPlayed as the maximum timestamp from all episodes
         qint64 maxLastPlayed = 0;
-        for (const EpisodeCacheEntry& episode : data.episodes) {
-            if (episode.lastPlayed > maxLastPlayed) {
-                maxLastPlayed = episode.lastPlayed;
-            }
+        if (!data.episodes.isEmpty()) {
+            auto maxIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+                [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
+                    return a.lastPlayed < b.lastPlayed;
+                });
+            maxLastPlayed = maxIt->lastPlayed;
         }
         data.lastPlayed = maxLastPlayed;
     }
