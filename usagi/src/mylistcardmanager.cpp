@@ -2164,6 +2164,9 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     QSqlQuery q(db);
     
     LOG(QString("[MyListCardManager] [DEBUG] Executing bulk query for %1 AIDs").arg(aidsToLoad.size()));
+    
+    QSet<int> foundAids;  // Track which AIDs were found in database
+    
     if (q.exec(query)) {
         QMutexLocker locker(&m_mutex);
         int loaded = 0;
@@ -2173,11 +2176,24 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
             data.setRelations(q.value(1).toString(), q.value(2).toString());
             data.hasData = false;  // Mark as partial data (only relations loaded)
             m_cardCreationDataCache[aid] = data;
+            foundAids.insert(aid);
             loaded++;
         }
         LOG(QString("[MyListCardManager] [DEBUG] Preloaded relation data for %1 AIDs").arg(loaded));
     } else {
         LOG(QString("[MyListCardManager] [DEBUG] Failed to execute bulk query: %1").arg(q.lastError().text()));
+    }
+    
+    // Request missing anime data from API for AIDs not found in database
+    QSet<int> missingAids = aidsToLoad - foundAids;
+    if (!missingAids.isEmpty() && adbapi != nullptr) {
+        LOG(QString("[MyListCardManager] [DEBUG] Requesting %1 missing anime from API").arg(missingAids.size()));
+        for (int aid : missingAids) {
+            LOG(QString("[MyListCardManager] [DEBUG] Requesting anime data from API for AID=%1").arg(aid));
+            // Request anime data from AniDB API
+            // This will queue the request and populate the database when response arrives
+            adbapi->Anime(aid);
+        }
     }
 }
 
