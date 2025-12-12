@@ -176,15 +176,21 @@ int AnimeChain::compareWith(
                 qint64 otherLastPlayed = otherData.lastPlayed;
                 
                 // Never played items (0) go to the end regardless of sort order
+                // We need to handle this specially since it shouldn't be affected by ascending/descending
                 if (myLastPlayed == 0 && otherLastPlayed == 0) {
                     result = 0;
                 } else if (myLastPlayed == 0) {
-                    // Unplayed always at end: in the pre-negation result, return positive to put at end
-                    result = 1;
+                    // Unplayed always at end: return result that puts this after other
+                    // Since the template will negate based on ascending, we need to return a value
+                    // that after potential negation still puts unplayed at end
+                    // In ascending order: want this > other, so result should be > 0
+                    // In descending order: want this > other, but result will be negated, so need < 0
+                    result = ascending ? 1 : -1;
                 } else if (otherLastPlayed == 0) {
-                    // Unplayed always at end: in the pre-negation result, return negative to put other at end
-                    result = -1;
+                    // Unplayed always at end: return result that puts other after this
+                    result = ascending ? -1 : 1;
                 } else {
+                    // Normal comparison
                     if (myLastPlayed < otherLastPlayed) result = -1;
                     else if (myLastPlayed > otherLastPlayed) result = 1;
                     else result = 0;
