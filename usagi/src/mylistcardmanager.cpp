@@ -2102,99 +2102,130 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
 {
     LOG(QString("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion called with %1 base AIDs").arg(baseAids.size()));
     
-    // Collect all related anime IDs (prequels/sequels) that might be discovered during chain building
-    QSet<int> relatedAids;
+    // Iteratively collect all related anime IDs to handle chains of prequels/sequels
+    // E.g., if A->B->C where B is discovered from A, we also want to discover C from B
+    QSet<int> allProcessedAids(baseAids.begin(), baseAids.end());
+    QSet<int> aidsToProcess(baseAids.begin(), baseAids.end());
+    QSet<int> allRequestedApiAids;  // Track AIDs we've requested from API to avoid duplicates
     
-    {
-        QMutexLocker locker(&m_mutex);
-        LOG("[MyListCardManager] [DEBUG] Collecting related AIDs from cache");
+    const int MAX_ITERATIONS = 10;  // Safety limit to prevent infinite loops
+    int iteration = 0;
+    
+    while (!aidsToProcess.isEmpty() && iteration < MAX_ITERATIONS) {
+        iteration++;
+        LOG(QString("[MyListCardManager] [DEBUG] Preload iteration %1, processing %2 AIDs").arg(iteration).arg(aidsToProcess.size()));
         
-        for (int aid : baseAids) {
-            if (m_cardCreationDataCache.contains(aid)) {
-                const CardCreationData& data = m_cardCreationDataCache[aid];
-                
-                // Get prequel and sequel AIDs
-                int prequelAid = data.getPrequel();
-                int sequelAid = data.getSequel();
-                
-                if (prequelAid > 0) {
-                    relatedAids.insert(prequelAid);
-                }
-                if (sequelAid > 0) {
-                    relatedAids.insert(sequelAid);
+        QSet<int> relatedAids;
+        
+        {
+            QMutexLocker locker(&m_mutex);
+            LOG(QString("[MyListCardManager] [DEBUG] Collecting related AIDs from %1 anime in cache").arg(aidsToProcess.size()));
+            
+            for (int aid : aidsToProcess) {
+                if (m_cardCreationDataCache.contains(aid)) {
+                    const CardCreationData& data = m_cardCreationDataCache[aid];
+                    
+                    // Get prequel and sequel AIDs
+                    int prequelAid = data.getPrequel();
+                    int sequelAid = data.getSequel();
+                    
+                    if (prequelAid > 0 && !allProcessedAids.contains(prequelAid)) {
+                        relatedAids.insert(prequelAid);
+                    }
+                    if (sequelAid > 0 && !allProcessedAids.contains(sequelAid)) {
+                        relatedAids.insert(sequelAid);
+                    }
                 }
             }
         }
-    }
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Found %1 related AIDs to preload").arg(relatedAids.size()));
-    
-    // Filter out AIDs that are already in cache
-    QSet<int> aidsToLoad;
-    {
-        QMutexLocker locker(&m_mutex);
-        for (int aid : relatedAids) {
-            if (!m_cardCreationDataCache.contains(aid)) {
-                aidsToLoad.insert(aid);
+        
+        if (relatedAids.isEmpty()) {
+            LOG(QString("[MyListCardManager] [DEBUG] No new related AIDs found in iteration %1, stopping").arg(iteration));
+            break;
+        }
+        
+        LOG(QString("[MyListCardManager] [DEBUG] Found %1 new related AIDs in iteration %2").arg(relatedAids.size()).arg(iteration));
+        
+        // Filter out AIDs that are already in cache
+        QSet<int> aidsToLoad;
+        {
+            QMutexLocker locker(&m_mutex);
+            for (int aid : relatedAids) {
+                if (!m_cardCreationDataCache.contains(aid)) {
+                    aidsToLoad.insert(aid);
+                }
             }
         }
-    }
-    
-    if (aidsToLoad.isEmpty()) {
-        LOG("[MyListCardManager] [DEBUG] All related AIDs already in cache, nothing to preload");
-        return;
-    }
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Loading %1 missing related AIDs").arg(aidsToLoad.size()));
-    
-    // Bulk-load relation data for missing AIDs
-    QStringList aidStrings;
-    for (int aid : aidsToLoad) {
-        aidStrings.append(QString::number(aid));
-    }
-    QString aidsList = aidStrings.join(",");
-    
-    QSqlDatabase db = QSqlDatabase::database();
-    if (!db.isOpen()) {
-        LOG("[MyListCardManager] [DEBUG] Database not open, cannot preload relations");
-        return;
-    }
-    
-    QString query = QString("SELECT aid, relaidlist, relaidtype FROM anime WHERE aid IN (%1)").arg(aidsList);
-    QSqlQuery q(db);
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Executing bulk query for %1 AIDs").arg(aidsToLoad.size()));
-    
-    QSet<int> foundAids;  // Track which AIDs were found in database
-    
-    if (q.exec(query)) {
-        QMutexLocker locker(&m_mutex);
-        int loaded = 0;
-        while (q.next()) {
-            int aid = q.value(0).toInt();
-            CardCreationData data;
-            data.setRelations(q.value(1).toString(), q.value(2).toString());
-            data.hasData = false;  // Mark as partial data (only relations loaded)
-            m_cardCreationDataCache[aid] = data;
-            foundAids.insert(aid);
-            loaded++;
+        
+        if (!aidsToLoad.isEmpty()) {
+            LOG(QString("[MyListCardManager] [DEBUG] Loading %1 missing related AIDs from database").arg(aidsToLoad.size()));
+            
+            // Bulk-load relation data for missing AIDs
+            QStringList aidStrings;
+            for (int aid : aidsToLoad) {
+                aidStrings.append(QString::number(aid));
+            }
+            QString aidsList = aidStrings.join(",");
+            
+            QSqlDatabase db = QSqlDatabase::database();
+            if (!db.isOpen()) {
+                LOG("[MyListCardManager] [DEBUG] Database not open, cannot preload relations");
+                break;
+            }
+            
+            QString query = QString("SELECT aid, relaidlist, relaidtype FROM anime WHERE aid IN (%1)").arg(aidsList);
+            QSqlQuery q(db);
+            
+            LOG(QString("[MyListCardManager] [DEBUG] Executing bulk query for %1 AIDs").arg(aidsToLoad.size()));
+            
+            QSet<int> foundAids;  // Track which AIDs were found in database
+            
+            if (q.exec(query)) {
+                QMutexLocker locker(&m_mutex);
+                int loaded = 0;
+                while (q.next()) {
+                    int aid = q.value(0).toInt();
+                    CardCreationData data;
+                    data.setRelations(q.value(1).toString(), q.value(2).toString());
+                    data.hasData = false;  // Mark as partial data (only relations loaded)
+                    m_cardCreationDataCache[aid] = data;
+                    foundAids.insert(aid);
+                    loaded++;
+                }
+                LOG(QString("[MyListCardManager] [DEBUG] Preloaded relation data for %1 AIDs").arg(loaded));
+            } else {
+                LOG(QString("[MyListCardManager] [DEBUG] Failed to execute bulk query: %1").arg(q.lastError().text()));
+            }
+            
+            // Request missing anime data from API for AIDs not found in database
+            QSet<int> missingAids = aidsToLoad - foundAids;
+            if (!missingAids.isEmpty() && adbapi != nullptr) {
+                // Filter out AIDs we've already requested to avoid duplicate API calls
+                QSet<int> newMissingAids = missingAids - allRequestedApiAids;
+                if (!newMissingAids.isEmpty()) {
+                    LOG(QString("[MyListCardManager] [DEBUG] Requesting %1 missing anime from API").arg(newMissingAids.size()));
+                    for (int aid : newMissingAids) {
+                        LOG(QString("[MyListCardManager] [DEBUG] Requesting anime data from API for AID=%1").arg(aid));
+                        // Request anime data from AniDB API
+                        // This will queue the request and populate the database when response arrives
+                        adbapi->Anime(aid);
+                        allRequestedApiAids.insert(aid);
+                    }
+                }
+            }
         }
-        LOG(QString("[MyListCardManager] [DEBUG] Preloaded relation data for %1 AIDs").arg(loaded));
-    } else {
-        LOG(QString("[MyListCardManager] [DEBUG] Failed to execute bulk query: %1").arg(q.lastError().text()));
+        
+        // Mark all related AIDs as processed and prepare for next iteration
+        allProcessedAids.unite(relatedAids);
+        aidsToProcess = relatedAids;  // In next iteration, process the newly discovered anime
     }
     
-    // Request missing anime data from API for AIDs not found in database
-    QSet<int> missingAids = aidsToLoad - foundAids;
-    if (!missingAids.isEmpty() && adbapi != nullptr) {
-        LOG(QString("[MyListCardManager] [DEBUG] Requesting %1 missing anime from API").arg(missingAids.size()));
-        for (int aid : missingAids) {
-            LOG(QString("[MyListCardManager] [DEBUG] Requesting anime data from API for AID=%1").arg(aid));
-            // Request anime data from AniDB API
-            // This will queue the request and populate the database when response arrives
-            adbapi->Anime(aid);
-        }
+    if (iteration >= MAX_ITERATIONS) {
+        LOG(QString("[MyListCardManager] [DEBUG] WARNING: Reached max iterations (%1) in preloadRelationDataForChainExpansion").arg(MAX_ITERATIONS));
     }
+    
+    LOG(QString("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion completed after %1 iterations, processed %2 total AIDs")
+        .arg(iteration).arg(allProcessedAids.size()));
 }
 
 void MyListCardManager::buildChainsFromCache()
