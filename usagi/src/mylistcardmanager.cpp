@@ -592,63 +592,21 @@ void MyListCardManager::loadRelationDataForAnime(int aid) const
 {
     LOG(QString("[MyListCardManager] [DEBUG] loadRelationDataForAnime called for aid=%1").arg(aid));
     
-    // CRITICAL: Must protect cache access with mutex to prevent race conditions
-    LOG(QString("[MyListCardManager] [DEBUG] Acquiring mutex for aid=%1").arg(aid));
+    // This function now ONLY reads from the preloaded cache
+    // All relation data must be preloaded via preloadRelationDataForChainExpansion() before chain building
+    // Database calls are NOT permitted here to avoid performance issues during chain expansion
+    
     QMutexLocker locker(&m_mutex);
-    LOG(QString("[MyListCardManager] [DEBUG] Mutex acquired for aid=%1").arg(aid));
     
     // If already in cache, nothing to do
     if (m_cardCreationDataCache.contains(aid)) {
-        LOG(QString("[MyListCardManager] [DEBUG] aid=%1 already in cache, returning").arg(aid));
+        LOG(QString("[MyListCardManager] [DEBUG] aid=%1 found in cache").arg(aid));
         return;
     }
     
-    // Release mutex before database query to avoid holding it during I/O
-    LOG(QString("[MyListCardManager] [DEBUG] Releasing mutex before DB query for aid=%1").arg(aid));
-    locker.unlock();
-    LOG(QString("[MyListCardManager] [DEBUG] Mutex released for aid=%1").arg(aid));
-    
-    // Query database for relation data
-    // Note: This is a const method but modifies mutable cache - we need to cast away const
-    MyListCardManager* mutableThis = const_cast<MyListCardManager*>(this);
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Preparing DB query for aid=%1").arg(aid));
-    QSqlQuery query(QSqlDatabase::database());
-    query.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
-    query.addBindValue(aid);
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Executing DB query for aid=%1").arg(aid));
-    if (!query.exec()) {
-        LOG(QString("[MyListCardManager] Failed to load relation data for aid=%1: %2").arg(aid).arg(query.lastError().text()));
-        return;
-    }
-    LOG(QString("[MyListCardManager] [DEBUG] DB query executed for aid=%1").arg(aid));
-    
-    if (query.next()) {
-        LOG(QString("[MyListCardManager] [DEBUG] DB query returned data for aid=%1").arg(aid));
-        CardCreationData data;
-        data.setRelations(query.value(0).toString(), query.value(1).toString());
-        
-        // Re-acquire mutex before modifying cache
-        LOG(QString("[MyListCardManager] [DEBUG] Re-acquiring mutex for aid=%1").arg(aid));
-        locker.relock();
-        LOG(QString("[MyListCardManager] [DEBUG] Mutex re-acquired for aid=%1").arg(aid));
-        
-        // Check again if another thread added it while we were unlocked
-        if (!m_cardCreationDataCache.contains(aid)) {
-            // Store in cache (cast away const)
-            LOG(QString("[MyListCardManager] [DEBUG] Storing aid=%1 in cache").arg(aid));
-            mutableThis->m_cardCreationDataCache[aid] = data;
-            
-            LOG(QString("[MyListCardManager] Loaded relation data for aid=%1 (has relations=%2)")
-                .arg(aid).arg(data.getAllRelations().isEmpty() ? "false" : "true"));
-        } else {
-            LOG(QString("[MyListCardManager] [DEBUG] aid=%1 was added by another thread, skipping").arg(aid));
-        }
-    } else {
-        LOG(QString("[MyListCardManager] No anime found in database for aid=%1").arg(aid));
-    }
-    LOG(QString("[MyListCardManager] [DEBUG] loadRelationDataForAnime completed for aid=%1").arg(aid));
+    // If not in cache, it means preloading didn't include this anime
+    // This is expected for anime that are not in the database or were filtered out
+    LOG(QString("[MyListCardManager] [DEBUG] aid=%1 not in cache - relation data should have been preloaded").arg(aid));
 }
 
 void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascending)
