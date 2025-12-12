@@ -1,6 +1,7 @@
 #include "animefilter.h"
 #include "animecard.h"
 #include "mylistcardmanager.h"
+#include "cachedanimedata.h"
 
 // ============================================================================
 // AnimeDataAccessor Implementation

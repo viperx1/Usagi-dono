@@ -97,12 +97,13 @@ MyListCardManager::CachedAnimeData TestFilterClasses::createCachedData(
     return MyListCardManager::CachedAnimeData(
         title,      // animeName
         type,       // typeName
-        eptotal,    // eptotal
+        "",         // startDate
+        "",         // endDate
+        false,      // isHidden
         is18,       // is18Restricted
-        0,          // dateStarted
-        0,          // dateFinished
-        0,          // lastPlayed
-        stats       // stats
+        eptotal,    // eptotal
+        stats,      // stats
+        0           // lastPlayed
     );
 }
 
