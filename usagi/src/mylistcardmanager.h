@@ -240,7 +240,7 @@ private:
     class CardCreationData {
     public:
         CardCreationData() 
-            : isHidden(false), is18Restricted(false), eptotal(0), hasData(false) {}
+            : isHidden(false), is18Restricted(false), eptotal(0), lastPlayed(0), hasData(false) {}
         
         // Anime basic info - public members for direct access (struct-like interface)
         QString nameRomaji;
@@ -259,6 +259,7 @@ private:
         bool isHidden;
         bool is18Restricted;
         int eptotal;
+        qint64 lastPlayed;
         
         // Statistics
         AnimeStats stats;

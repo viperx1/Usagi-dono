@@ -2130,3 +2130,30 @@ endif()
 
 add_test(NAME test_animechain COMMAND test_animechain -v2)
 
+# ==========================================================
+# test_chain_sorting - AnimeChain sorting criteria tests
+# ==========================================================
+add_executable(test_chain_sorting
+    test_chain_sorting.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animechain.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animestats.cpp
+)
+
+target_link_libraries(test_chain_sorting PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_chain_sorting PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_chain_sorting PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_chain_sorting COMMAND test_chain_sorting -v2)
+

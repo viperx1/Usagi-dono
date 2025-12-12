@@ -31,7 +31,10 @@ public:
         ByRepresentativeDate,
         ByRepresentativeType,
         ByChainLength,
-        ByRepresentativeId
+        ByRepresentativeId,
+        ByRepresentativeEpisodeCount,
+        ByRepresentativeCompletion,
+        ByRepresentativeLastPlayed
     };
     
     // Forward declaration of CardCreationData from MyListCardManager
@@ -148,6 +151,55 @@ int AnimeChain::compareWith(
             case SortCriteria::ByChainLength:
                 result = size() - other.size();
                 break;
+            case SortCriteria::ByRepresentativeEpisodeCount: {
+                int myEpisodes = myData.stats.normalEpisodes() + myData.stats.otherEpisodes();
+                int otherEpisodes = otherData.stats.normalEpisodes() + otherData.stats.otherEpisodes();
+                result = myEpisodes - otherEpisodes;
+                break;
+            }
+            case SortCriteria::ByRepresentativeCompletion: {
+                int myTotal = myData.stats.normalEpisodes() + myData.stats.otherEpisodes();
+                int myViewed = myData.stats.normalViewed() + myData.stats.otherViewed();
+                double myCompletion = (myTotal > 0) ? static_cast<double>(myViewed) / myTotal : 0.0;
+                
+                int otherTotal = otherData.stats.normalEpisodes() + otherData.stats.otherEpisodes();
+                int otherViewed = otherData.stats.normalViewed() + otherData.stats.otherViewed();
+                double otherCompletion = (otherTotal > 0) ? static_cast<double>(otherViewed) / otherTotal : 0.0;
+                
+                // Use epsilon for floating-point comparison
+                const double epsilon = 1e-9;
+                double diff = myCompletion - otherCompletion;
+                if (diff < -epsilon) result = -1;
+                else if (diff > epsilon) result = 1;
+                else result = 0;
+                break;
+            }
+            case SortCriteria::ByRepresentativeLastPlayed: {
+                qint64 myLastPlayed = myData.lastPlayed;
+                qint64 otherLastPlayed = otherData.lastPlayed;
+                
+                // Never played items (0) must always appear at the end in sorted order,
+                // regardless of ascending/descending. To achieve this when the result
+                // is conditionally negated based on 'ascending' at the end of this function,
+                // we pre-adjust the result value here.
+                if (myLastPlayed == 0 && otherLastPlayed == 0) {
+                    result = 0;
+                } else if (myLastPlayed == 0) {
+                    // This anime is unplayed: should appear after the other (which is played).
+                    // Pre-adjust so that after potential negation, unplayed is still > played.
+                    result = ascending ? 1 : -1;
+                } else if (otherLastPlayed == 0) {
+                    // Other anime is unplayed: should appear after this (which is played).
+                    // Pre-adjust so that after potential negation, this is still < unplayed.
+                    result = ascending ? -1 : 1;
+                } else {
+                    // Normal comparison: both have been played
+                    if (myLastPlayed < otherLastPlayed) result = -1;
+                    else if (myLastPlayed > otherLastPlayed) result = 1;
+                    else result = 0;
+                }
+                break;
+            }
             case SortCriteria::ByRepresentativeId:
             default:
                 result = myAid - otherAid;

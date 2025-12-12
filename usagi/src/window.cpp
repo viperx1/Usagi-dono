@@ -3161,11 +3161,39 @@ void Window::sortMylistCards(int sortIndex)
 	
 	// Handle nested sorting when series chain is enabled
 	if (seriesChainEnabled) {
-		LOG("[Window] Series chain enabled - delegating to MyListCardManager for chain sorting (airdate descending)");
+		LOG("[Window] Series chain enabled - delegating to MyListCardManager for chain sorting");
 		
-		// Always sort chains by aired date descending (newest first)
-		// This ensures prequels appear before sequels chronologically
-		cardManager->sortChains(AnimeChain::SortCriteria::ByRepresentativeDate, false);  // false = descending
+		// Map UI sortIndex to AnimeChain::SortCriteria
+		AnimeChain::SortCriteria chainCriteria;
+		switch (sortIndex) {
+			case 0:  // Anime Title
+				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeTitle;
+				break;
+			case 1:  // Type
+				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeType;
+				break;
+			case 2:  // Aired Date
+				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeDate;
+				break;
+			case 3:  // Episodes (Count)
+				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeEpisodeCount;
+				break;
+			case 4:  // Completion %
+				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeCompletion;
+				break;
+			case 5:  // Last Played
+				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeLastPlayed;
+				break;
+			default:
+				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeDate;
+				break;
+		}
+		
+		LOG(QString("[Window] Sorting chains by criteria %1 (sortIndex=%2), ascending=%3")
+			.arg(static_cast<int>(chainCriteria)).arg(sortIndex).arg(sortAscending));
+		
+		// Sort chains using the selected criteria and sort order
+		cardManager->sortChains(chainCriteria, sortAscending);
 		
 		// Get the updated anime ID list from card manager (already reordered)
 		animeIds = cardManager->getAnimeIdList();
@@ -3437,7 +3465,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Update the card manager with the new order
-	cardManager->setAnimeIdList(animeIds);
+	cardManager->setAnimeIdList(animeIds, false);  // Chain mode is disabled when in regular sorting mode
 	
 	// If using virtual scrolling, refresh the layout
 	if (mylistVirtualLayout) {
