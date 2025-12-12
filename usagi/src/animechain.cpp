@@ -67,12 +67,15 @@ bool AnimeChain::mergeWith(const AnimeChain& other, RelationLookupFunc /*lookupF
         return false;
     }
     
-    // Use QSet to ensure no duplicates when merging
-    QSet<int> uniqueAnime(m_animeIds.begin(), m_animeIds.end());
+    // Merge anime IDs while avoiding duplicates
+    // Preserve order: first add all from this chain, then add new ones from other chain
+    QSet<int> existingAnime(m_animeIds.begin(), m_animeIds.end());
     for (int aid : other.m_animeIds) {
-        uniqueAnime.insert(aid);
+        if (!existingAnime.contains(aid)) {
+            m_animeIds.append(aid);
+            existingAnime.insert(aid);
+        }
     }
-    m_animeIds = uniqueAnime.values();
     
     // Merge relation data
     for (auto it = other.m_relations.constBegin(); it != other.m_relations.constEnd(); ++it) {
@@ -172,11 +175,15 @@ void AnimeChain::orderChain()
     QList<int> queue;
     
     // Start with anime that have no prequels (in-degree = 0)
+    // Sort roots by anime ID to ensure deterministic ordering for disconnected components
+    QList<int> roots;
     for (int aid : m_animeIds) {
         if (inDegree[aid] == 0) {
-            queue.append(aid);
+            roots.append(aid);
         }
     }
+    std::sort(roots.begin(), roots.end());
+    queue = roots;
     
     while (!queue.isEmpty()) {
         int current = queue.takeFirst();
