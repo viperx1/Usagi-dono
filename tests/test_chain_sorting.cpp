@@ -33,7 +33,7 @@ struct MockCardData {
 void TestChainSorting::testSortByTitle()
 {
     // Create relation lookup (chains with single anime for simplicity)
-    AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
+    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
         return QPair<int,int>(0, 0);  // No relations
     };
     
@@ -57,7 +57,7 @@ void TestChainSorting::testSortByTitle()
 
 void TestChainSorting::testSortByType()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
+    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
         return QPair<int,int>(0, 0);
     };
     
@@ -79,7 +79,7 @@ void TestChainSorting::testSortByType()
 
 void TestChainSorting::testSortByDate()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
+    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
         return QPair<int,int>(0, 0);
     };
     
@@ -101,7 +101,7 @@ void TestChainSorting::testSortByDate()
 
 void TestChainSorting::testSortByEpisodeCount()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
+    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
         return QPair<int,int>(0, 0);
     };
     
@@ -128,7 +128,7 @@ void TestChainSorting::testSortByEpisodeCount()
 
 void TestChainSorting::testSortByCompletion()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
+    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
         return QPair<int,int>(0, 0);
     };
     
@@ -159,7 +159,7 @@ void TestChainSorting::testSortByCompletion()
 
 void TestChainSorting::testSortByLastPlayed()
 {
-    AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
+    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
         return QPair<int,int>(0, 0);
     };
     
