@@ -2102,6 +2102,13 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
 {
     LOG(QString("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion called with %1 base AIDs").arg(baseAids.size()));
     
+    // Early check: if API is not available, we can't request missing data
+    // Continue with database loading but skip API requests
+    bool canRequestFromApi = (adbapi != nullptr);
+    if (!canRequestFromApi) {
+        LOG("[MyListCardManager] [DEBUG] AniDB API not available, will only load from database");
+    }
+    
     // Iteratively collect all related anime IDs to handle chains of prequels/sequels
     // E.g., if A->B->C where B is discovered from A, we also want to discover C from B
     QSet<int> allProcessedAids(baseAids.begin(), baseAids.end());
@@ -2199,7 +2206,7 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
             
             // Request missing anime data from API for AIDs not found in database
             QSet<int> missingAids = aidsToLoad - foundAids;
-            if (!missingAids.isEmpty() && adbapi) {
+            if (!missingAids.isEmpty() && canRequestFromApi) {
                 // Filter out AIDs we've already requested to avoid duplicate API calls
                 QSet<int> newMissingAids = missingAids - allRequestedApiAids;
                 if (!newMissingAids.isEmpty()) {
@@ -2208,6 +2215,11 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
                         LOG(QString("[MyListCardManager] [DEBUG] Requesting anime data from API for AID=%1").arg(aid));
                         // Request anime data from AniDB API
                         // This will queue the request and populate the database when response arrives
+                        // The Anime() function handles all error cases internally:
+                        // - Rate limiting (7-day cache)
+                        // - Authentication
+                        // - Request queueing
+                        // - Database updates
                         adbapi->Anime(aid);
                         allRequestedApiAids.insert(aid);
                     }
@@ -2231,8 +2243,8 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
             .arg(MAX_PRELOAD_ITERATIONS).arg(recentAids.join(", ")));
     }
     
-    LOG(QString("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion completed after %1 iterations, processed %2 total AIDs")
-        .arg(iteration).arg(allProcessedAids.size()));
+    LOG(QString("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion completed after %1 iterations, processed %2 total AIDs, requested %3 from API")
+        .arg(iteration).arg(allProcessedAids.size()).arg(allRequestedApiAids.size()));
 }
 
 void MyListCardManager::buildChainsFromCache()
