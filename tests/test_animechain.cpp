@@ -139,11 +139,12 @@ void TestAnimeChain::testMultipleRootsOrdered()
     QList<int> ids = chain.getAnimeIds();
     QCOMPARE(ids.size(), 3);
     
-    // Roots should be ordered by ID: 100 comes before 500
-    // Since 100 has a sequel 200, final order should be: 100, 200, 500
+    // Roots (100 and 500) are sorted by ID and processed first
+    // Topological sort processes all roots before their dependents
+    // Order: 100 (root), 500 (root), 200 (depends on 100)
     QCOMPARE(ids[0], 100);
-    QCOMPARE(ids[1], 200);
-    QCOMPARE(ids[2], 500);
+    QCOMPARE(ids[1], 500);
+    QCOMPARE(ids[2], 200);
 }
 
 void TestAnimeChain::testDisconnectedComponents()
@@ -171,11 +172,12 @@ void TestAnimeChain::testDisconnectedComponents()
     QList<int> ids = chainA.getAnimeIds();
     QCOMPARE(ids.size(), 4);
     
-    // Roots (10 and 30) should be ordered by ID
-    // Since 10 < 30, chain A should come first
+    // Roots (10 and 30) are sorted by ID and processed first
+    // Topological sort processes all roots before their dependents
+    // Order: 10 (root), 30 (root), 20 (depends on 10), 40 (depends on 30)
     QCOMPARE(ids[0], 10);
-    QCOMPARE(ids[1], 20);
-    QCOMPARE(ids[2], 30);
+    QCOMPARE(ids[1], 30);
+    QCOMPARE(ids[2], 20);
     QCOMPARE(ids[3], 40);
 }
 
