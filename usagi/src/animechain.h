@@ -127,6 +127,37 @@ int AnimeChain::compareWith(
     SortCriteria criteria,
     bool ascending) const
 {
+    // Check if entire chains are hidden (all anime in chain are hidden)
+    // If a chain has at least one non-hidden anime, it's not considered a "hidden chain"
+    bool myChainAllHidden = true;
+    bool otherChainAllHidden = true;
+    
+    // Check all anime in this chain
+    for (int aid : m_animeIds) {
+        if (dataCache.contains(aid) && !dataCache[aid].isHidden) {
+            myChainAllHidden = false;
+            break;
+        }
+    }
+    
+    // Check all anime in other chain
+    for (int aid : other.m_animeIds) {
+        if (dataCache.contains(aid) && !dataCache[aid].isHidden) {
+            otherChainAllHidden = false;
+            break;
+        }
+    }
+    
+    // If only one chain is entirely hidden, hidden chain goes to the end
+    if (myChainAllHidden != otherChainAllHidden) {
+        // Return value independent of ascending flag - hidden chains always go to end
+        // If ascending=true: we want non-hidden < hidden, so return -1 when other is hidden
+        // If ascending=false: we want non-hidden < hidden (same), so return -1 when other is hidden
+        // This means we need to return the value that would put hidden chains at the end
+        // in BOTH ascending and descending order.
+        return otherChainAllHidden ? -1 : 1;
+    }
+    
     int result = 0;
     int myAid = getRepresentativeAnimeId();
     int otherAid = other.getRepresentativeAnimeId();
