@@ -151,6 +151,11 @@ void TestAniDBApiCommands::initTestCase()
     
     // Clear any existing packets
     clearPackets();
+    
+    // Clear episode cache to ensure Episode() tests work correctly
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
+    query.exec("DELETE FROM `episode` WHERE `eid` = 12345");
 }
 
 void TestAniDBApiCommands::cleanupTestCase()
@@ -162,6 +167,11 @@ void TestAniDBApiCommands::cleanup()
 {
     // Clear packets after each test
     clearPackets();
+    
+    // Clear episode cache to ensure Episode() tests don't skip requests
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery query(db);
+    query.exec("DELETE FROM `episode` WHERE `eid` = 12345");
 }
 
 // ===== AUTH Command Tests =====
