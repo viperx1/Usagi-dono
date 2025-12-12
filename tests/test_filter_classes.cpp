@@ -63,7 +63,7 @@ private:
     AnimeMetadataCache* m_cache;
     
     // Helper to create cached data for testing
-    MyListCardManager::CachedAnimeData createCachedData(
+    CachedAnimeData createCachedData(
         const QString& title, const QString& type, int eptotal, bool is18,
         int normalEp, int normalViewed, int otherEp, int otherViewed);
 };
@@ -83,7 +83,7 @@ void TestFilterClasses::cleanup()
     m_cache->clear();
 }
 
-MyListCardManager::CachedAnimeData TestFilterClasses::createCachedData(
+CachedAnimeData TestFilterClasses::createCachedData(
     const QString& title, const QString& type, int eptotal, bool is18,
     int normalEp, int normalViewed, int otherEp, int otherViewed)
 {
@@ -94,7 +94,7 @@ MyListCardManager::CachedAnimeData TestFilterClasses::createCachedData(
     stats.setOtherViewed(otherViewed);
     stats.setTotalNormalEpisodes(eptotal);
     
-    return MyListCardManager::CachedAnimeData(
+    return CachedAnimeData(
         title,      // animeName
         type,       // typeName
         "",         // startDate
@@ -134,7 +134,7 @@ void TestFilterClasses::testDataAccessor_hasData()
     QVERIFY(accessor1.hasData());
     
     // Empty cached data
-    MyListCardManager::CachedAnimeData emptyData;
+    CachedAnimeData emptyData;
     AnimeDataAccessor accessor2(2, nullptr, emptyData);
     QVERIFY(!accessor2.hasData());
 }

@@ -8,7 +8,7 @@
 // ============================================================================
 
 AnimeDataAccessor::AnimeDataAccessor(int aid, AnimeCard* card, 
-                                     const MyListCardManager::CachedAnimeData& cachedData)
+                                     const CachedAnimeData& cachedData)
     : m_aid(aid)
     , m_card(card)
     , m_cachedData(cachedData)

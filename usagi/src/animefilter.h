@@ -5,6 +5,10 @@
 #include <QList>
 #include "animemetadatacache.h"
 
+// Forward declarations
+class AnimeCard;
+class CachedAnimeData;
+
 /**
  * Unified data accessor for anime filtering
  * 
@@ -17,7 +21,7 @@
 class AnimeDataAccessor
 {
 public:
-    AnimeDataAccessor(int aid, class AnimeCard* card, const class MyListCardManager::CachedAnimeData& cachedData);
+    AnimeDataAccessor(int aid, AnimeCard* card, const CachedAnimeData& cachedData);
     
     // Anime identification
     int getAnimeId() const { return m_aid; }
@@ -39,8 +43,8 @@ public:
     
 private:
     int m_aid;
-    class AnimeCard* m_card;
-    const class MyListCardManager::CachedAnimeData& m_cachedData;
+    AnimeCard* m_card;
+    const CachedAnimeData& m_cachedData;
 };
 
 /**
