@@ -67,12 +67,15 @@ bool AnimeChain::mergeWith(const AnimeChain& other, RelationLookupFunc /*lookupF
         return false;
     }
     
-    // Use QSet to ensure no duplicates when merging
-    QSet<int> uniqueAnime(m_animeIds.begin(), m_animeIds.end());
+    // Merge anime IDs while avoiding duplicates
+    // Preserve order: first add all from this chain, then add new ones from other chain
+    QSet<int> existingAnime(m_animeIds.begin(), m_animeIds.end());
     for (int aid : other.m_animeIds) {
-        uniqueAnime.insert(aid);
+        if (!existingAnime.contains(aid)) {
+            m_animeIds.append(aid);
+            existingAnime.insert(aid);
+        }
     }
-    m_animeIds = uniqueAnime.values();
     
     // Merge relation data
     for (auto it = other.m_relations.constBegin(); it != other.m_relations.constEnd(); ++it) {
@@ -164,6 +167,18 @@ void AnimeChain::orderChain()
                 graph[aid].append(sequelAid);
                 inDegree[sequelAid]++;
             }
+            
+            // Also use prequel relationships to infer reverse edges
+            // This handles cases where an anime has no relation data but is referenced by others
+            int prequelAid = m_relations[aid].first;
+            if (prequelAid > 0 && m_animeIds.contains(prequelAid)) {
+                // This anime says prequelAid is its prequel, so add edge prequel→this
+                // Only add if the edge doesn't already exist (to avoid duplicates)
+                if (!graph[prequelAid].contains(aid)) {
+                    graph[prequelAid].append(aid);
+                    inDegree[aid]++;
+                }
+            }
         }
     }
     
@@ -172,11 +187,15 @@ void AnimeChain::orderChain()
     QList<int> queue;
     
     // Start with anime that have no prequels (in-degree = 0)
+    // Sort roots by anime ID to ensure deterministic ordering for disconnected components
+    QList<int> roots;
     for (int aid : m_animeIds) {
         if (inDegree[aid] == 0) {
-            queue.append(aid);
+            roots.append(aid);
         }
     }
+    std::sort(roots.begin(), roots.end());
+    queue = roots;
     
     while (!queue.isEmpty()) {
         int current = queue.takeFirst();
