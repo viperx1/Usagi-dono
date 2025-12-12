@@ -6,10 +6,11 @@
  * Test suite for hidden card sorting behavior
  * 
  * Validates that:
- * - Hidden cards are displayed at the end in non-chain mode
- * - In chain mode, chains with ALL hidden anime are displayed at the end
- * - In chain mode, chains with at least one non-hidden anime are sorted normally
- * - This behavior is consistent across all sort criteria
+ * - In chain mode, chains where ALL anime are hidden are displayed at the end
+ * - In chain mode, chains with at least one non-hidden anime are sorted normally (not moved to end)
+ * - Within each chain, anime maintain their prequel→sequel relation order regardless of hidden status
+ * - This chain-level hidden behavior is consistent across all sort criteria
+ * - In non-chain mode (tested elsewhere), individual hidden cards go to the end
  */
 class TestHiddenCardSorting : public QObject
 {
@@ -25,6 +26,8 @@ private slots:
     void testMixedHiddenChain();
     void testAllHiddenChain();
     void testAllVisibleChains();
+    void testMissingDataTreatedAsVisible();
+    void testHiddenCardsWithinChainKeepRelationOrder();
 };
 
 // Mock CardCreationData structure matching the actual one used in sorting
@@ -328,6 +331,74 @@ void TestHiddenCardSorting::testAllVisibleChains()
     // Test descending - reversed
     result = chain1.compareWith(chain2, dataCache, AnimeChain::SortCriteria::ByRepresentativeTitle, false);
     QVERIFY2(result < 0, "In descending: Zetman < Attack on Titan (both visible, reversed)");
+}
+
+void TestHiddenCardSorting::testMissingDataTreatedAsVisible()
+{
+    // Test that anime with missing data is treated as visible (safe default)
+    
+    AnimeChain::RelationLookupFunc lookup = [](int) -> QPair<int,int> {
+        return QPair<int,int>(0, 0);
+    };
+    
+    AnimeChain chainWithMissingData(100, lookup);
+    AnimeChain hiddenChain(200, lookup);
+    
+    QMap<int, MockCardData> dataCache;
+    // Note: No data for anime 100 (missing from cache)
+    
+    dataCache[200].animeTitle = "Hidden Series";
+    dataCache[200].isHidden = true;
+    
+    // Chain with missing data should be treated as visible and come before hidden chain
+    int result = chainWithMissingData.compareWith(hiddenChain, dataCache, AnimeChain::SortCriteria::ByRepresentativeTitle, true);
+    QVERIFY2(result < 0, "Chain with missing data (treated as visible) < Hidden chain");
+}
+
+void TestHiddenCardSorting::testHiddenCardsWithinChainKeepRelationOrder()
+{
+    // Test that hidden cards WITHIN a non-fully-hidden chain maintain their relation order
+    // This verifies that hidden status doesn't affect INTERNAL chain ordering, only EXTERNAL chain sorting
+    
+    AnimeChain::RelationLookupFunc lookup = [](int aid) -> QPair<int,int> {
+        if (aid == 100) return QPair<int,int>(0, 101);    // 100 -> 101 (sequel)
+        if (aid == 101) return QPair<int,int>(100, 102);  // 100 <- 101 -> 102
+        if (aid == 102) return QPair<int,int>(101, 103);  // 101 <- 102 -> 103
+        if (aid == 103) return QPair<int,int>(102, 0);    // 102 <- 103
+        return QPair<int,int>(0, 0);
+    };
+    
+    // Create a chain: 100 (visible) -> 101 (hidden) -> 102 (hidden) -> 103 (visible)
+    AnimeChain mixedChain(100, lookup);
+    mixedChain.expand(lookup);
+    
+    QMap<int, MockCardData> dataCache;
+    dataCache[100].isHidden = false;  // Visible
+    dataCache[101].isHidden = true;   // Hidden
+    dataCache[102].isHidden = true;   // Hidden
+    dataCache[103].isHidden = false;  // Visible
+    
+    // Verify the chain contains all 4 anime
+    QList<int> chainAnimeIds = mixedChain.getAnimeIds();
+    QCOMPARE(chainAnimeIds.size(), 4);
+    
+    // Verify the chain is ordered by relation (prequel->sequel), NOT by hidden status
+    // Expected order: 100 -> 101 -> 102 -> 103
+    QVERIFY2(chainAnimeIds.indexOf(100) < chainAnimeIds.indexOf(101), 
+             "100 (visible) comes before 101 (hidden) - relation order preserved");
+    QVERIFY2(chainAnimeIds.indexOf(101) < chainAnimeIds.indexOf(102), 
+             "101 (hidden) comes before 102 (hidden) - relation order preserved");
+    QVERIFY2(chainAnimeIds.indexOf(102) < chainAnimeIds.indexOf(103), 
+             "102 (hidden) comes before 103 (visible) - relation order preserved");
+    
+    // This chain has visible anime (100 and 103), so it should be sorted normally (not moved to end)
+    // when compared with a fully hidden chain
+    AnimeChain fullyHiddenChain(200, [](int) { return QPair<int,int>(0, 0); });
+    dataCache[200].animeTitle = "Fully Hidden";
+    dataCache[200].isHidden = true;
+    
+    int result = mixedChain.compareWith(fullyHiddenChain, dataCache, AnimeChain::SortCriteria::ByRepresentativeTitle, true);
+    QVERIFY2(result < 0, "Mixed chain (has visible anime) < Fully hidden chain - chain-level sorting works");
 }
 
 QTEST_MAIN(TestHiddenCardSorting)

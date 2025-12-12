@@ -134,7 +134,13 @@ int AnimeChain::compareWith(
     
     // Check all anime in this chain
     for (int aid : m_animeIds) {
-        if (dataCache.contains(aid) && !dataCache[aid].isHidden) {
+        if (dataCache.contains(aid)) {
+            if (!dataCache[aid].isHidden) {
+                myChainAllHidden = false;
+                break;
+            }
+        } else {
+            // If data is missing, assume anime is not hidden (safe default for visibility)
             myChainAllHidden = false;
             break;
         }
@@ -142,7 +148,13 @@ int AnimeChain::compareWith(
     
     // Check all anime in other chain
     for (int aid : other.m_animeIds) {
-        if (dataCache.contains(aid) && !dataCache[aid].isHidden) {
+        if (dataCache.contains(aid)) {
+            if (!dataCache[aid].isHidden) {
+                otherChainAllHidden = false;
+                break;
+            }
+        } else {
+            // If data is missing, assume anime is not hidden (safe default for visibility)
             otherChainAllHidden = false;
             break;
         }
