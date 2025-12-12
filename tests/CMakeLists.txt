@@ -1661,6 +1661,7 @@ set(MYLISTCARDMANAGER_TEST_SOURCES
     ../usagi/src/cardfileinfo.cpp
     ../usagi/src/cardepisodeinfo.cpp
     ../usagi/src/relationdata.cpp
+    ../usagi/src/animechain.cpp
 )
 
 set(MYLISTCARDMANAGER_TEST_HEADERS
