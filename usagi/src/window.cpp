@@ -4407,12 +4407,20 @@ void Window::onTrayShowHideRequested()
         LOG("Window hidden to tray");
     } else {
         // Restore the previous window state and geometry
-        // Only set geometry if it's valid (non-empty and has positive dimensions)
-        if (windowGeometryBeforeHide.isValid() && !windowGeometryBeforeHide.isEmpty()) {
-            this->setGeometry(windowGeometryBeforeHide);
-        }
-        this->setWindowState(windowStateBeforeHide);
+        // First show the window, then restore state
         this->show();
+        
+        // Restore window state (maximized, minimized, etc.)
+        this->setWindowState(windowStateBeforeHide);
+        
+        // Only set geometry if window is in normal state and geometry is valid
+        // When maximized/fullscreen, Qt manages geometry automatically
+        if ((windowStateBeforeHide & (Qt::WindowMaximized | Qt::WindowFullScreen)) == 0) {
+            if (windowGeometryBeforeHide.isValid() && !windowGeometryBeforeHide.isEmpty()) {
+                this->setGeometry(windowGeometryBeforeHide);
+            }
+        }
+        
         this->activateWindow();
         this->raise();
         LOG("Window shown from tray");
