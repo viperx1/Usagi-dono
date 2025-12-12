@@ -3465,7 +3465,7 @@ void Window::sortMylistCards(int sortIndex)
 	}
 	
 	// Update the card manager with the new order
-	cardManager->setAnimeIdList(animeIds);
+	cardManager->setAnimeIdList(animeIds, false);  // Chain mode is disabled when in regular sorting mode
 	
 	// If using virtual scrolling, refresh the layout
 	if (mylistVirtualLayout) {
