@@ -39,6 +39,7 @@ set(SOURCES
     src/playbuttondelegate.cpp
     src/animecard.cpp
     src/animechain.cpp
+    src/animefilter.cpp
     src/flowlayout.cpp
     src/mylistcardmanager.cpp
     src/mylistfiltersidebar.cpp
@@ -92,6 +93,7 @@ set(HEADERS
     src/playbuttondelegate.h
     src/animecard.h
     src/animechain.h
+    src/animefilter.h
     src/flowlayout.h
     src/mylistcardmanager.h
     src/mylistfiltersidebar.h

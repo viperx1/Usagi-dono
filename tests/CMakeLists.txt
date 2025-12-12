@@ -2157,3 +2157,59 @@ endif()
 
 add_test(NAME test_chain_sorting COMMAND test_chain_sorting -v2)
 
+# ==========================================================
+# test_filter_system - Comprehensive filter system tests
+# ==========================================================
+add_executable(test_filter_system
+    test_filter_system.cpp
+)
+
+target_link_libraries(test_filter_system PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+target_include_directories(test_filter_system PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_filter_system PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_filter_system COMMAND test_filter_system -v2)
+
+# ==========================================================
+# test_filter_classes - Refactored filter classes tests
+# ==========================================================
+add_executable(test_filter_classes
+    test_filter_classes.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animefilter.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animemetadatacache.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animestats.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/cachedanimedata.cpp
+)
+
+target_link_libraries(test_filter_classes PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Widgets
+)
+
+target_include_directories(test_filter_classes PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_filter_classes PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_filter_classes COMMAND test_filter_classes -v2)
+
