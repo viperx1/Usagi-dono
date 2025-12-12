@@ -121,20 +121,32 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 // Filter chains to only include those with at least one anime from the input list
                 // IMPORTANT: Never modify m_chainList - it's the master list from cache
                 QSet<int> inputAidSet(aids.begin(), aids.end());
-                QList<AnimeChain> filteredChains;
                 
-                for (const AnimeChain& chain : std::as_const(m_chainList)) {
-                    // Check if this chain contains any anime from the input list
-                    bool hasInputAnime = false;
-                    for (int aid : chain.getAnimeIds()) {
-                        if (inputAidSet.contains(aid)) {
-                            hasInputAnime = true;
+                // Build a map of which chain each input anime belongs to
+                // This preserves the order of input anime
+                QMap<int, int> inputAidToChainIdx;
+                for (int aid : aids) {
+                    // Find which chain in m_chainList contains this anime
+                    for (int chainIdx = 0; chainIdx < m_chainList.size(); ++chainIdx) {
+                        if (m_chainList[chainIdx].contains(aid)) {
+                            inputAidToChainIdx[aid] = chainIdx;
                             break;
                         }
                     }
-                    
-                    if (hasInputAnime) {
-                        filteredChains.append(chain);
+                }
+                
+                // Collect chains in the order they appear in the input list
+                // Use a set to avoid duplicate chains
+                QSet<int> includedChainIndices;
+                QList<AnimeChain> filteredChains;
+                
+                for (int aid : aids) {
+                    if (inputAidToChainIdx.contains(aid)) {
+                        int chainIdx = inputAidToChainIdx[aid];
+                        if (!includedChainIndices.contains(chainIdx)) {
+                            includedChainIndices.insert(chainIdx);
+                            filteredChains.append(m_chainList[chainIdx]);
+                        }
                     }
                 }
                 
@@ -156,8 +168,8 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     .arg(filteredChains.size()).arg(finalAnimeIds.size()).arg(m_chainList.size()));
             }
         } else {
-            // Normal mode: clear chain data
-            m_chainList.clear();
+            // Normal mode: just use the input list as-is
+            // IMPORTANT: Do NOT clear m_chainList - it's the master list from cache and is reused
             m_aidToChainIndex.clear();
             finalAnimeIds = aids;
         }
@@ -324,8 +336,8 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     QSet<int> allAnimeInChains;
     QMap<int, int> animeOccurrences;  // Track how many times each anime appears
     
-    for (int chainIdx = 0; chainIdx < chains.size(); ++chainIdx) {
-        const AnimeChain& chain = chains[chainIdx];
+    for (int chainIdx = 0; chainIdx < finalChains.size(); ++chainIdx) {
+        const AnimeChain& chain = finalChains[chainIdx];
         for (int aid : chain.getAnimeIds()) {
             totalAnimeInChains++;
             allAnimeInChains.insert(aid);
@@ -339,43 +351,40 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         }
     }
     
-    if (totalAnimeInChains != availableAids.size()) {
-        LOG(QString("[MyListCardManager] WARNING: Chain building mismatch! Input: %1 unique anime, Chains contain: %2 anime (%3 unique)")
-            .arg(availableAids.size()).arg(totalAnimeInChains).arg(allAnimeInChains.size()));
-            
-        // Log which anime are extra
-        QSet<int> extraAnime = allAnimeInChains - availableAids;
-        if (!extraAnime.isEmpty()) {
-            QStringList extraList;
-            for (int aid : extraAnime) {
-                extraList.append(QString::number(aid));
-            }
-            LOG(QString("[MyListCardManager] Extra anime in chains (NOT in input): %1").arg(extraList.join(", ")));
-        }
-        
-        // Log which anime are missing
-        QSet<int> missingAnime = availableAids - allAnimeInChains;
-        if (!missingAnime.isEmpty()) {
-            QStringList missingList;
-            for (int aid : missingAnime) {
-                missingList.append(QString::number(aid));
-            }
-            LOG(QString("[MyListCardManager] Missing anime from chains: %1").arg(missingList.join(", ")));
-        }
-        
-        // Log duplicates
-        QStringList duplicates;
-        for (QMap<int, int>::const_iterator it = animeOccurrences.constBegin(); it != animeOccurrences.constEnd(); ++it) {
-            if (it.value() > 1) {
-                duplicates.append(QString("%1(x%2)").arg(it.key()).arg(it.value()));
-            }
-        }
-        if (!duplicates.isEmpty()) {
-            LOG(QString("[MyListCardManager] Duplicate anime in chains: %1").arg(duplicates.join(", ")));
-        }
+    if (totalAnimeInChains != allAnimeInChains.size()) {
+        LOG(QString("[MyListCardManager] ERROR: Duplicate anime detected! Total slots: %1, Unique anime: %2")
+            .arg(totalAnimeInChains).arg(allAnimeInChains.size()));
     }
     
-    return chains;
+    // Log expansion results
+    QSet<int> expandedAnime = allAnimeInChains - availableAids;
+    if (!expandedAnime.isEmpty()) {
+        LOG(QString("[MyListCardManager] Chain expansion added %1 anime not in original input")
+            .arg(expandedAnime.size()));
+    }
+    
+    // Verify no anime from input was lost
+    QSet<int> missingAnime = availableAids - allAnimeInChains;
+    if (!missingAnime.isEmpty()) {
+        QStringList missingList;
+        for (int aid : missingAnime) {
+            missingList.append(QString::number(aid));
+        }
+        LOG(QString("[MyListCardManager] ERROR: Missing anime from chains: %1").arg(missingList.join(", ")));
+    }
+    
+    // Log duplicates
+    QStringList duplicates;
+    for (QMap<int, int>::const_iterator it = animeOccurrences.constBegin(); it != animeOccurrences.constEnd(); ++it) {
+        if (it.value() > 1) {
+            duplicates.append(QString("%1(x%2)").arg(it.key()).arg(it.value()));
+        }
+    }
+    if (!duplicates.isEmpty()) {
+        LOG(QString("[MyListCardManager] ERROR: Duplicate anime in chains: %1").arg(duplicates.join(", ")));
+    }
+    
+    return finalChains;
 }
 
 QList<int> MyListCardManager::buildChainFromAid(int startAid, const QSet<int>& availableAids, bool expandChain) const
@@ -595,63 +604,21 @@ void MyListCardManager::loadRelationDataForAnime(int aid) const
 {
     LOG(QString("[MyListCardManager] [DEBUG] loadRelationDataForAnime called for aid=%1").arg(aid));
     
-    // CRITICAL: Must protect cache access with mutex to prevent race conditions
-    LOG(QString("[MyListCardManager] [DEBUG] Acquiring mutex for aid=%1").arg(aid));
+    // This function now ONLY reads from the preloaded cache
+    // All relation data must be preloaded via preloadRelationDataForChainExpansion() before chain building
+    // Database calls are NOT permitted here to avoid performance issues during chain expansion
+    
     QMutexLocker locker(&m_mutex);
-    LOG(QString("[MyListCardManager] [DEBUG] Mutex acquired for aid=%1").arg(aid));
     
     // If already in cache, nothing to do
     if (m_cardCreationDataCache.contains(aid)) {
-        LOG(QString("[MyListCardManager] [DEBUG] aid=%1 already in cache, returning").arg(aid));
+        LOG(QString("[MyListCardManager] [DEBUG] aid=%1 found in cache").arg(aid));
         return;
     }
     
-    // Release mutex before database query to avoid holding it during I/O
-    LOG(QString("[MyListCardManager] [DEBUG] Releasing mutex before DB query for aid=%1").arg(aid));
-    locker.unlock();
-    LOG(QString("[MyListCardManager] [DEBUG] Mutex released for aid=%1").arg(aid));
-    
-    // Query database for relation data
-    // Note: This is a const method but modifies mutable cache - we need to cast away const
-    MyListCardManager* mutableThis = const_cast<MyListCardManager*>(this);
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Preparing DB query for aid=%1").arg(aid));
-    QSqlQuery query(QSqlDatabase::database());
-    query.prepare("SELECT relaidlist, relaidtype FROM anime WHERE aid = ?");
-    query.addBindValue(aid);
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Executing DB query for aid=%1").arg(aid));
-    if (!query.exec()) {
-        LOG(QString("[MyListCardManager] Failed to load relation data for aid=%1: %2").arg(aid).arg(query.lastError().text()));
-        return;
-    }
-    LOG(QString("[MyListCardManager] [DEBUG] DB query executed for aid=%1").arg(aid));
-    
-    if (query.next()) {
-        LOG(QString("[MyListCardManager] [DEBUG] DB query returned data for aid=%1").arg(aid));
-        CardCreationData data;
-        data.setRelations(query.value(0).toString(), query.value(1).toString());
-        
-        // Re-acquire mutex before modifying cache
-        LOG(QString("[MyListCardManager] [DEBUG] Re-acquiring mutex for aid=%1").arg(aid));
-        locker.relock();
-        LOG(QString("[MyListCardManager] [DEBUG] Mutex re-acquired for aid=%1").arg(aid));
-        
-        // Check again if another thread added it while we were unlocked
-        if (!m_cardCreationDataCache.contains(aid)) {
-            // Store in cache (cast away const)
-            LOG(QString("[MyListCardManager] [DEBUG] Storing aid=%1 in cache").arg(aid));
-            mutableThis->m_cardCreationDataCache[aid] = data;
-            
-            LOG(QString("[MyListCardManager] Loaded relation data for aid=%1 (has relations=%2)")
-                .arg(aid).arg(data.getAllRelations().isEmpty() ? "false" : "true"));
-        } else {
-            LOG(QString("[MyListCardManager] [DEBUG] aid=%1 was added by another thread, skipping").arg(aid));
-        }
-    } else {
-        LOG(QString("[MyListCardManager] No anime found in database for aid=%1").arg(aid));
-    }
-    LOG(QString("[MyListCardManager] [DEBUG] loadRelationDataForAnime completed for aid=%1").arg(aid));
+    // If not in cache, it means preloading didn't include this anime
+    // This is expected for anime that are not in the database or were filtered out
+    LOG(QString("[MyListCardManager] [DEBUG] aid=%1 not in cache - relation data should have been preloaded").arg(aid));
 }
 
 void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascending)
@@ -665,21 +632,40 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     
     int inputAnimeCount = m_orderedAnimeIds.size();
     
-    LOG(QString("[MyListCardManager] Sorting %1 chains by criteria %2, ascending=%3 (current ordered list has %4 anime)")
-        .arg(m_chainList.size()).arg(static_cast<int>(criteria)).arg(ascending).arg(inputAnimeCount));
+    LOG(QString("[MyListCardManager] Sorting chains by criteria %2, ascending=%3 (current ordered list has %4 anime)")
+        .arg(static_cast<int>(criteria)).arg(ascending).arg(inputAnimeCount));
     
-    // Sort chains using comparison function
-    std::sort(m_chainList.begin(), m_chainList.end(),
+    // Build a list of currently displayed chains (those with anime in m_orderedAnimeIds)
+    QSet<int> displayedAnimeSet(m_orderedAnimeIds.begin(), m_orderedAnimeIds.end());
+    QList<AnimeChain> displayedChains;
+    QSet<int> includedChainIndices;
+    
+    // Collect chains that contain displayed anime, preserving uniqueness
+    for (int i = 0; i < m_chainList.size(); ++i) {
+        const AnimeChain& chain = m_chainList[i];
+        for (int aid : chain.getAnimeIds()) {
+            if (displayedAnimeSet.contains(aid)) {
+                if (!includedChainIndices.contains(i)) {
+                    includedChainIndices.insert(i);
+                    displayedChains.append(chain);
+                }
+                break;
+            }
+        }
+    }
+    
+    // Sort ONLY the displayed chains (not the master list!)
+    std::sort(displayedChains.begin(), displayedChains.end(),
               [this, criteria, ascending](const AnimeChain& a, const AnimeChain& b) {
                   return a.compareWith(b, m_cardCreationDataCache, criteria, ascending) < 0;
               });
     
-    // Rebuild flattened anime ID list preserving internal chain order
+    // Rebuild flattened anime ID list from sorted displayed chains
     m_orderedAnimeIds.clear();
     m_aidToChainIndex.clear();
     
-    for (int i = 0; i < m_chainList.size(); ++i) {
-        for (int aid : m_chainList[i].getAnimeIds()) {
+    for (int i = 0; i < displayedChains.size(); ++i) {
+        for (int aid : displayedChains[i].getAnimeIds()) {
             m_orderedAnimeIds.append(aid);
             m_aidToChainIndex[aid] = i;
         }
@@ -690,8 +676,8 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
             .arg(inputAnimeCount).arg(m_orderedAnimeIds.size()));
     }
     
-    LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains")
-        .arg(m_orderedAnimeIds.size()).arg(m_chainList.size()));
+    LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains (master list unchanged with %3 chains)")
+        .arg(m_orderedAnimeIds.size()).arg(displayedChains.size()).arg(m_chainList.size()));
     
     // Note: We don't call refresh() here because it causes re-entrancy issues
     // when called synchronously during sorting. The caller (window.cpp) will
@@ -2186,12 +2172,25 @@ void MyListCardManager::buildChainsFromCache()
         // Check if chains are already built
         if (m_chainsBuilt && !m_chainList.isEmpty()) {
             LOG("[MyListCardManager] Chains already built from cache, skipping rebuild");
+            // Ensure data is marked ready even when skipping rebuild
+            // (this handles case where preloadCardCreationData was called again after chains were built)
+            if (!m_dataReady) {
+                LOG("[MyListCardManager] [DEBUG] Chains already built but data not ready, marking ready now");
+                m_dataReady = true;
+                locker.unlock();  // Release mutex before waking threads
+                m_dataReadyCondition.wakeAll();
+            }
             return;
         }
         
         // Check if a build is already in progress (another thread is building)
         if (m_chainBuildInProgress) {
-            LOG("[MyListCardManager] Chain building already in progress, skipping duplicate build request");
+            LOG("[MyListCardManager] Chain building already in progress, waiting for completion");
+            // Wait for the other thread to complete the build
+            while (m_chainBuildInProgress && !m_dataReady) {
+                m_dataReadyCondition.wait(&m_mutex);
+            }
+            LOG("[MyListCardManager] Chain building complete by another thread");
             return;
         }
         
