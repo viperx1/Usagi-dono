@@ -167,6 +167,18 @@ void AnimeChain::orderChain()
                 graph[aid].append(sequelAid);
                 inDegree[sequelAid]++;
             }
+            
+            // Also use prequel relationships to infer reverse edges
+            // This handles cases where an anime has no relation data but is referenced by others
+            int prequelAid = m_relations[aid].first;
+            if (prequelAid > 0 && m_animeIds.contains(prequelAid)) {
+                // This anime says prequelAid is its prequel, so add edge prequel→this
+                // Only add if the edge doesn't already exist (to avoid duplicates)
+                if (!graph[prequelAid].contains(aid)) {
+                    graph[prequelAid].append(aid);
+                    inDegree[aid]++;
+                }
+            }
         }
     }
     
