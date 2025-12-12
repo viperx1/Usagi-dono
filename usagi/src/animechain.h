@@ -117,6 +117,24 @@ public:
 private:
     QList<int> m_animeIds;  // Ordered list of anime IDs (prequel to sequel)
     QMap<int, QPair<int,int>> m_relations;  // aid -> (prequel_aid, sequel_aid)
+    
+    // Helper to check if all anime in a list are hidden
+    template<typename CardCreationData>
+    static bool isChainFullyHidden(const QList<int>& animeIds, 
+                                   const QMap<int, CardCreationData>& dataCache)
+    {
+        for (int aid : animeIds) {
+            if (dataCache.contains(aid)) {
+                if (!dataCache[aid].isHidden) {
+                    return false;  // Found a non-hidden anime
+                }
+            } else {
+                // Missing data treated as visible (safe default for visibility)
+                return false;
+            }
+        }
+        return true;  // All anime in chain are hidden
+    }
 };
 
 // Template implementation must be in header
@@ -129,44 +147,12 @@ int AnimeChain::compareWith(
 {
     // Check if entire chains are hidden (all anime in chain are hidden)
     // If a chain has at least one non-hidden anime, it's not considered a "hidden chain"
-    bool myChainAllHidden = true;
-    bool otherChainAllHidden = true;
-    
-    // Check all anime in this chain
-    for (int aid : m_animeIds) {
-        if (dataCache.contains(aid)) {
-            if (!dataCache[aid].isHidden) {
-                myChainAllHidden = false;
-                break;
-            }
-        } else {
-            // If data is missing, assume anime is not hidden (safe default for visibility)
-            myChainAllHidden = false;
-            break;
-        }
-    }
-    
-    // Check all anime in other chain
-    for (int aid : other.m_animeIds) {
-        if (dataCache.contains(aid)) {
-            if (!dataCache[aid].isHidden) {
-                otherChainAllHidden = false;
-                break;
-            }
-        } else {
-            // If data is missing, assume anime is not hidden (safe default for visibility)
-            otherChainAllHidden = false;
-            break;
-        }
-    }
+    bool myChainAllHidden = isChainFullyHidden(m_animeIds, dataCache);
+    bool otherChainAllHidden = isChainFullyHidden(other.m_animeIds, dataCache);
     
     // If only one chain is entirely hidden, hidden chain goes to the end
     if (myChainAllHidden != otherChainAllHidden) {
-        // Return value independent of ascending flag - hidden chains always go to end
-        // If ascending=true: we want non-hidden < hidden, so return -1 when other is hidden
-        // If ascending=false: we want non-hidden < hidden (same), so return -1 when other is hidden
-        // This means we need to return the value that would put hidden chains at the end
-        // in BOTH ascending and descending order.
+        // Hidden chains always sort to the end regardless of sort order direction
         return otherChainAllHidden ? -1 : 1;
     }
     
