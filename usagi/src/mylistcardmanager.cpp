@@ -2108,10 +2108,10 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     QSet<int> aidsToProcess(baseAids.begin(), baseAids.end());
     QSet<int> allRequestedApiAids;  // Track AIDs we've requested from API to avoid duplicates
     
-    const int MAX_ITERATIONS = 10;  // Safety limit to prevent infinite loops
+    const int MAX_PRELOAD_ITERATIONS = 10;  // Safety limit to prevent infinite loops
     int iteration = 0;
     
-    while (!aidsToProcess.isEmpty() && iteration < MAX_ITERATIONS) {
+    while (!aidsToProcess.isEmpty() && iteration < MAX_PRELOAD_ITERATIONS) {
         iteration++;
         LOG(QString("[MyListCardManager] [DEBUG] Preload iteration %1, processing %2 AIDs").arg(iteration).arg(aidsToProcess.size()));
         
@@ -2199,7 +2199,7 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
             
             // Request missing anime data from API for AIDs not found in database
             QSet<int> missingAids = aidsToLoad - foundAids;
-            if (!missingAids.isEmpty() && adbapi != nullptr) {
+            if (!missingAids.isEmpty() && adbapi) {
                 // Filter out AIDs we've already requested to avoid duplicate API calls
                 QSet<int> newMissingAids = missingAids - allRequestedApiAids;
                 if (!newMissingAids.isEmpty()) {
@@ -2220,8 +2220,15 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
         aidsToProcess = relatedAids;  // In next iteration, process the newly discovered anime
     }
     
-    if (iteration >= MAX_ITERATIONS) {
-        LOG(QString("[MyListCardManager] [DEBUG] WARNING: Reached max iterations (%1) in preloadRelationDataForChainExpansion").arg(MAX_ITERATIONS));
+    if (iteration >= MAX_PRELOAD_ITERATIONS) {
+        // Log as error since this could indicate circular references or other issues
+        QStringList recentAids;
+        for (int aid : aidsToProcess) {
+            recentAids.append(QString::number(aid));
+        }
+        LOG(QString("[MyListCardManager] ERROR: Reached max iterations (%1) in preloadRelationDataForChainExpansion. "
+                    "This may indicate circular references or a very long chain. Last processed AIDs: %2")
+            .arg(MAX_PRELOAD_ITERATIONS).arg(recentAids.join(", ")));
     }
     
     LOG(QString("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion completed after %1 iterations, processed %2 total AIDs")
