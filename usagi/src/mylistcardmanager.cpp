@@ -156,8 +156,8 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                     .arg(filteredChains.size()).arg(finalAnimeIds.size()).arg(m_chainList.size()));
             }
         } else {
-            // Normal mode: clear chain data
-            m_chainList.clear();
+            // Normal mode: just use the input list as-is
+            // IMPORTANT: Do NOT clear m_chainList - it's the master list from cache and is reused
             m_aidToChainIndex.clear();
             finalAnimeIds = aids;
         }
