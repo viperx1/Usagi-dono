@@ -632,21 +632,40 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     
     int inputAnimeCount = m_orderedAnimeIds.size();
     
-    LOG(QString("[MyListCardManager] Sorting %1 chains by criteria %2, ascending=%3 (current ordered list has %4 anime)")
-        .arg(m_chainList.size()).arg(static_cast<int>(criteria)).arg(ascending).arg(inputAnimeCount));
+    LOG(QString("[MyListCardManager] Sorting chains by criteria %2, ascending=%3 (current ordered list has %4 anime)")
+        .arg(static_cast<int>(criteria)).arg(ascending).arg(inputAnimeCount));
     
-    // Sort chains using comparison function
-    std::sort(m_chainList.begin(), m_chainList.end(),
+    // Build a list of currently displayed chains (those with anime in m_orderedAnimeIds)
+    QSet<int> displayedAnimeSet(m_orderedAnimeIds.begin(), m_orderedAnimeIds.end());
+    QList<AnimeChain> displayedChains;
+    QSet<int> includedChainIndices;
+    
+    // Collect chains that contain displayed anime, preserving uniqueness
+    for (int i = 0; i < m_chainList.size(); ++i) {
+        const AnimeChain& chain = m_chainList[i];
+        for (int aid : chain.getAnimeIds()) {
+            if (displayedAnimeSet.contains(aid)) {
+                if (!includedChainIndices.contains(i)) {
+                    includedChainIndices.insert(i);
+                    displayedChains.append(chain);
+                }
+                break;
+            }
+        }
+    }
+    
+    // Sort ONLY the displayed chains (not the master list!)
+    std::sort(displayedChains.begin(), displayedChains.end(),
               [this, criteria, ascending](const AnimeChain& a, const AnimeChain& b) {
                   return a.compareWith(b, m_cardCreationDataCache, criteria, ascending) < 0;
               });
     
-    // Rebuild flattened anime ID list preserving internal chain order
+    // Rebuild flattened anime ID list from sorted displayed chains
     m_orderedAnimeIds.clear();
     m_aidToChainIndex.clear();
     
-    for (int i = 0; i < m_chainList.size(); ++i) {
-        for (int aid : m_chainList[i].getAnimeIds()) {
+    for (int i = 0; i < displayedChains.size(); ++i) {
+        for (int aid : displayedChains[i].getAnimeIds()) {
             m_orderedAnimeIds.append(aid);
             m_aidToChainIndex[aid] = i;
         }
@@ -657,8 +676,8 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
             .arg(inputAnimeCount).arg(m_orderedAnimeIds.size()));
     }
     
-    LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains")
-        .arg(m_orderedAnimeIds.size()).arg(m_chainList.size()));
+    LOG(QString("[MyListCardManager] Rebuilt ordered list: %1 anime in %2 chains (master list unchanged with %3 chains)")
+        .arg(m_orderedAnimeIds.size()).arg(displayedChains.size()).arg(m_chainList.size()));
     
     // Note: We don't call refresh() here because it causes re-entrancy issues
     // when called synchronously during sorting. The caller (window.cpp) will
