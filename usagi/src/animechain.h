@@ -127,6 +127,34 @@ int AnimeChain::compareWith(
     SortCriteria criteria,
     bool ascending) const
 {
+    // Helper lambda to check if all anime in a list are hidden
+    // Returns false if any anime is missing from cache (treated as visible)
+    auto isChainFullyHidden = [&dataCache](const QList<int>& animeIds) -> bool {
+        for (int aid : animeIds) {
+            if (dataCache.contains(aid)) {
+                if (!dataCache[aid].isHidden) {
+                    return false;  // Found a non-hidden anime
+                }
+            } else {
+                // Missing data treated as visible (safe default for visibility)
+                return false;
+            }
+        }
+        return true;  // All anime in chain are hidden
+    };
+    
+    // Check if entire chains are hidden (all anime in chain are hidden)
+    // If a chain has at least one non-hidden anime, it's not considered a "hidden chain"
+    bool myChainAllHidden = isChainFullyHidden(m_animeIds);
+    bool otherChainAllHidden = isChainFullyHidden(other.m_animeIds);
+    
+    // If only one chain is entirely hidden, hidden chain goes to the end
+    if (myChainAllHidden != otherChainAllHidden) {
+        // Hidden chains always sort to the end regardless of sort order direction
+        // Return negative if this chain should come first, positive if other should come first
+        return otherChainAllHidden ? -1 : 1;
+    }
+    
     int result = 0;
     int myAid = getRepresentativeAnimeId();
     int otherAid = other.getRepresentativeAnimeId();

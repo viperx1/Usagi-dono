@@ -2158,6 +2158,33 @@ endif()
 add_test(NAME test_chain_sorting COMMAND test_chain_sorting -v2)
 
 # ==========================================================
+# test_hidden_card_sorting - Hidden card sorting with chains
+# ==========================================================
+add_executable(test_hidden_card_sorting
+    test_hidden_card_sorting.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animechain.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animestats.cpp
+)
+
+target_link_libraries(test_hidden_card_sorting PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_hidden_card_sorting PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_hidden_card_sorting PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_hidden_card_sorting COMMAND test_hidden_card_sorting -v2)
+
+# ==========================================================
 # test_filter_system - Comprehensive filter system tests
 # ==========================================================
 add_executable(test_filter_system
