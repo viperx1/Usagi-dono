@@ -137,11 +137,12 @@ public:
     
     // Comprehensive preload function that loads ALL data needed for card creation
     // This should be called BEFORE any cards are created to eliminate all SQL queries from createCard()
-    // After preloading, automatically builds chains from the complete cached dataset
+    // NOTE: Does NOT build chains - caller must explicitly call buildChainsFromCache() after all data loading is complete
     void preloadCardCreationData(const QList<int>& aids);
     
-    // Build chains once from all cached anime data (called automatically after preloadCardCreationData)
-    // This ensures chains are built only once with complete data, preventing duplicates
+    // Build chains once from all cached anime data (must be called explicitly after all data loading is complete)
+    // This ensures chains are built from the complete dataset BEFORE any filtering occurs
+    // Chains should be built independently of filter state to provide complete relationship information
     void buildChainsFromCache();
     
     // Pre-load relation data for all anime that might be discovered during chain expansion

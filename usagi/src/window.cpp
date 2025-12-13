@@ -1446,6 +1446,12 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
         LOG("[Virtual Scrolling] Comprehensive card data preload complete");
     }
     
+    // Build chains from all cached data BEFORE applying any filters
+    // This ensures chains are built from complete data, independent of filter state
+    LOG("[Window] Building chains from cached data before applying filters...");
+    cardManager->buildChainsFromCache();
+    LOG("[Window] Chain building complete");
+    
     // Get all cards for backward compatibility (will be empty initially with virtual scrolling)
     animeCards = cardManager->getAllCards();
     
@@ -3570,6 +3576,12 @@ void Window::loadMylistAsCards()
 		}
 	}
 	
+	// Build chains from all cached data BEFORE applying any filters
+	// This ensures chains are built from complete data, independent of filter state
+	LOG("[Window] Building chains from cached data before applying filters...");
+	cardManager->buildChainsFromCache();
+	LOG("[Window] Chain building complete");
+	
 	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
 	animeCards = cardManager->getAllCards();
 	
@@ -3950,6 +3962,12 @@ void Window::applyMylistFilters()
 				cardManager->preloadCardCreationData(aids);
 				LOG("[Window] Card data preload complete");
 			}
+			
+			// Build chains from all cached data BEFORE applying any filters
+			// This ensures chains are built from complete data, independent of filter state
+			LOG("[Window] Building chains from cached data before applying filters...");
+			cardManager->buildChainsFromCache();
+			LOG("[Window] Chain building complete");
 			
 			// Mark all anime titles as loaded
 			allAnimeTitlesLoaded = true;

@@ -2094,9 +2094,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     LOG(QString("[MyListCardManager] Comprehensive preload complete: %1 anime with full data in %2 ms")
         .arg(m_cardCreationDataCache.size()).arg(totalElapsed));
     
-    // Build chains once from the complete cached dataset
-    // This ensures all anime have their data loaded and chains are built with complete information
-    buildChainsFromCache();
+    // NOTE: Chain building is now done explicitly by the caller after all data loading is complete
+    // This ensures chains are built from the complete dataset, not incrementally during loading
 }
 
 void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& baseAids)
