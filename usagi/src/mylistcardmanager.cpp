@@ -172,6 +172,8 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 
                 // Build aid -> chain index map and collect all anime IDs from filtered chains
                 // Use filteredChains (local variable) - never modify m_chainList
+                // Store filtered chains (including standalone ones) for use by sortChains
+                m_displayedChains = filteredChains;
                 m_aidToChainIndex.clear();
                 finalAnimeIds.clear();
                 for (int i = 0; i < filteredChains.size(); ++i) {
@@ -191,6 +193,7 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
             // Normal mode: just use the input list as-is
             // IMPORTANT: Do NOT clear m_chainList - it's the master list from cache and is reused
             m_aidToChainIndex.clear();
+            m_displayedChains.clear();  // Clear displayed chains when not in chain mode
             finalAnimeIds = aids;
         }
         
@@ -645,8 +648,8 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
 {
     QMutexLocker locker(&m_mutex);
     
-    if (!m_chainModeEnabled || m_chainList.isEmpty()) {
-        LOG("[MyListCardManager] sortChains: chain mode not enabled or no chains");
+    if (!m_chainModeEnabled || m_displayedChains.isEmpty()) {
+        LOG("[MyListCardManager] sortChains: chain mode not enabled or no displayed chains");
         return;
     }
     
@@ -655,26 +658,10 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
     LOG(QString("[MyListCardManager] Sorting chains by criteria %2, ascending=%3 (current ordered list has %4 anime)")
         .arg(static_cast<int>(criteria)).arg(ascending).arg(inputAnimeCount));
     
-    // Build a list of currently displayed chains (those with anime in m_orderedAnimeIds)
-    QSet<int> displayedAnimeSet(m_orderedAnimeIds.begin(), m_orderedAnimeIds.end());
-    QList<AnimeChain> displayedChains;
-    QSet<int> includedChainIndices;
+    // Sort the displayed chains (includes both pre-built and standalone chains)
+    QList<AnimeChain> displayedChains = m_displayedChains;  // Work with a copy
     
-    // Collect chains that contain displayed anime, preserving uniqueness
-    for (int i = 0; i < m_chainList.size(); ++i) {
-        const AnimeChain& chain = m_chainList[i];
-        for (int aid : chain.getAnimeIds()) {
-            if (displayedAnimeSet.contains(aid)) {
-                if (!includedChainIndices.contains(i)) {
-                    includedChainIndices.insert(i);
-                    displayedChains.append(chain);
-                }
-                break;
-            }
-        }
-    }
-    
-    // Sort ONLY the displayed chains (not the master list!)
+    // Sort the displayed chains
     std::sort(displayedChains.begin(), displayedChains.end(),
               [this, criteria, ascending](const AnimeChain& a, const AnimeChain& b) {
                   return a.compareWith(b, m_cardCreationDataCache, criteria, ascending) < 0;
@@ -690,6 +677,9 @@ void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascen
             m_aidToChainIndex[aid] = i;
         }
     }
+    
+    // Update m_displayedChains with the sorted version
+    m_displayedChains = displayedChains;
     
     if (m_orderedAnimeIds.size() != inputAnimeCount) {
         LOG(QString("[MyListCardManager] WARNING: Anime count changed during sort! Before: %1, After: %2")

@@ -396,6 +396,7 @@ private:
     
     // Chain support
     QList<AnimeChain> m_chainList;          // List of chains (built once from complete cache)
+    QList<AnimeChain> m_displayedChains;    // Currently displayed chains (includes standalone chains from filtering)
     QMap<int, int> m_aidToChainIndex;       // Anime ID -> chain index mapping
     bool m_chainModeEnabled;                // Is chain mode active
     QSet<int> m_expandedChainAnimeIds;      // Anime IDs added by chain expansion (not in original mylist)
