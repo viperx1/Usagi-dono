@@ -145,10 +145,10 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 // (it would try to acquire the mutex again, causing a deadlock)
                 // Instead, directly access the cache which is already populated
                 auto relationLookup = [this](int aid) -> QPair<int,int> {
-                    // Direct cache access - mutex already held by caller
-                    if (m_cardCreationDataCache.contains(aid)) {
-                        const CardCreationData& data = m_cardCreationDataCache[aid];
-                        return QPair<int,int>(data.getPrequel(), data.getSequel());
+                    // Direct cache access - mutex already held by caller (setAnimeIdList)
+                    auto it = m_cardCreationDataCache.find(aid);
+                    if (it != m_cardCreationDataCache.end()) {
+                        return QPair<int,int>(it->getPrequel(), it->getSequel());
                     }
                     return QPair<int,int>(0, 0);
                 };
