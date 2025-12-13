@@ -117,13 +117,19 @@ public:
 private:
     QList<int> m_animeIds;  // Ordered list of anime IDs (prequel to sequel)
     QMap<int, QPair<int,int>> m_relations;  // aid -> (prequel_aid, sequel_aid)
-    
-    // Helper to check if all anime in a list are hidden
+};
+
+// Template implementation must be in header
+template<typename CardCreationData>
+int AnimeChain::compareWith(
+    const AnimeChain& other,
+    const QMap<int, CardCreationData>& dataCache,
+    SortCriteria criteria,
+    bool ascending) const
+{
+    // Helper lambda to check if all anime in a list are hidden
     // Returns false if any anime is missing from cache (treated as visible)
-    template<typename CardCreationData>
-    static bool isChainFullyHidden(const QList<int>& animeIds, 
-                                   const QMap<int, CardCreationData>& dataCache)
-    {
+    auto isChainFullyHidden = [&dataCache](const QList<int>& animeIds) -> bool {
         for (int aid : animeIds) {
             if (dataCache.contains(aid)) {
                 if (!dataCache[aid].isHidden) {
@@ -135,21 +141,12 @@ private:
             }
         }
         return true;  // All anime in chain are hidden
-    }
-};
-
-// Template implementation must be in header
-template<typename CardCreationData>
-int AnimeChain::compareWith(
-    const AnimeChain& other,
-    const QMap<int, CardCreationData>& dataCache,
-    SortCriteria criteria,
-    bool ascending) const
-{
+    };
+    
     // Check if entire chains are hidden (all anime in chain are hidden)
     // If a chain has at least one non-hidden anime, it's not considered a "hidden chain"
-    bool myChainAllHidden = isChainFullyHidden(m_animeIds, dataCache);
-    bool otherChainAllHidden = isChainFullyHidden(other.m_animeIds, dataCache);
+    bool myChainAllHidden = isChainFullyHidden(m_animeIds);
+    bool otherChainAllHidden = isChainFullyHidden(other.m_animeIds);
     
     // If only one chain is entirely hidden, hidden chain goes to the end
     if (myChainAllHidden != otherChainAllHidden) {
