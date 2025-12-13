@@ -1446,16 +1446,6 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
         LOG("[Virtual Scrolling] Comprehensive card data preload complete");
     }
     
-    // Set the ordered anime ID list for virtual scrolling
-    // The VirtualFlowLayout will request cards on-demand as user scrolls
-    cardManager->setAnimeIdList(aids);
-    
-    // Update the virtual layout with the item count
-    if (mylistVirtualLayout) {
-        mylistVirtualLayout->setItemCount(aids.size());
-        mylistVirtualLayout->refresh();
-    }
-    
     // Get all cards for backward compatibility (will be empty initially with virtual scrolling)
     animeCards = cardManager->getAllCards();
     
@@ -3578,15 +3568,6 @@ void Window::loadMylistAsCards()
 			cardManager->preloadCardCreationData(aids);
 			LOG("[Window] Card data preload complete (fallback to mylist only)");
 		}
-	}
-	
-	// Set the ordered anime ID list for virtual scrolling
-	cardManager->setAnimeIdList(aids);
-	
-	// Update the virtual layout with the item count
-	if (mylistVirtualLayout) {
-		mylistVirtualLayout->setItemCount(aids.size());
-		mylistVirtualLayout->refresh();
 	}
 	
 	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
