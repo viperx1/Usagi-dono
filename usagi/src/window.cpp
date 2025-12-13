@@ -388,6 +388,19 @@ Window::Window()
         }
     });
     
+    // Connect missing anime data detected signal to request from API
+    connect(cardManager, &MyListCardManager::missingAnimeDataDetected, this, [this](const QList<int>& aids) {
+        LOG(QString("[Window] Missing anime data detected for %1 anime during chain expansion").arg(aids.size()));
+        if (adbapi) {
+            for (int aid : aids) {
+                LOG(QString("[Window] Requesting missing anime data from AniDB API for aid=%1").arg(aid));
+                adbapi->Anime(aid);
+            }
+        } else {
+            LOG(QString("[Window] ERROR: adbapi is null, cannot request anime data"));
+        }
+    });
+    
     // Connect file API update signal to update watched status on AniDB
     connect(cardManager, &MyListCardManager::fileNeedsApiUpdate, this, [this](int lid, int size, QString ed2khash, int viewed) {
         LOG(QString("[Window] Updating file watched status on AniDB for lid=%1, viewed=%2").arg(lid).arg(viewed));
@@ -2431,6 +2444,10 @@ void Window::getNotifyAnimeUpdated(int aid)
 		if (filterSidebar && filterSidebar->getShowSeriesChain() && watchSessionManager) {
 			LOG(QString("[Window] Series chain display enabled - checking chain for anime %1").arg(aid));
 			checkAndRequestChainRelations(aid);
+			
+			// Refresh the display to incorporate the newly arrived anime into chains
+			LOG(QString("[Window] Refreshing mylist display to update chains after anime %1 data arrived").arg(aid));
+			applyMylistFilters();
 		}
 	}
 	

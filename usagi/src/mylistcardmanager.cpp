@@ -1085,7 +1085,13 @@ void MyListCardManager::onEpisodeUpdated(int eid, int aid)
 
 void MyListCardManager::onAnimeUpdated(int aid)
 {
-    // Schedule card update
+    LOG(QString("[MyListCardManager] Anime updated for aid=%1").arg(aid));
+    
+    // Reload this anime's data into the cache from database
+    QList<int> aidList{aid};
+    preloadCardCreationData(aidList);
+    
+    // Schedule card update if card exists
     updateCardAnimeInfo(aid);
     
     // Remove from tracking
@@ -2163,6 +2169,8 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     QString query = QString("SELECT aid, relaidlist, relaidtype FROM anime WHERE aid IN (%1)").arg(aidsList);
     QSqlQuery q(db);
     
+    QSet<int> loadedAids;  // Track which AIDs were found in the database
+    
     LOG(QString("[MyListCardManager] [DEBUG] Executing bulk query for %1 AIDs").arg(aidsToLoad.size()));
     if (q.exec(query)) {
         QMutexLocker locker(&m_mutex);
@@ -2173,11 +2181,21 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
             data.setRelations(q.value(1).toString(), q.value(2).toString());
             data.hasData = false;  // Mark as partial data (only relations loaded)
             m_cardCreationDataCache[aid] = data;
+            loadedAids.insert(aid);
             loaded++;
         }
         LOG(QString("[MyListCardManager] [DEBUG] Preloaded relation data for %1 AIDs").arg(loaded));
     } else {
         LOG(QString("[MyListCardManager] [DEBUG] Failed to execute bulk query: %1").arg(q.lastError().text()));
+    }
+    
+    // Detect which AIDs were NOT found in the database
+    QSet<int> missingAids = aidsToLoad - loadedAids;
+    
+    if (!missingAids.isEmpty()) {
+        LOG(QString("[MyListCardManager] [DEBUG] Found %1 related anime missing from database, requesting from API").arg(missingAids.size()));
+        QList<int> missingAidList = missingAids.values();
+        emit missingAnimeDataDetected(missingAidList);
     }
 }
 

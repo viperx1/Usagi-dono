@@ -183,6 +183,9 @@ signals:
     // Emitted to update progress status during data loading
     void progressUpdate(const QString& message);
     
+    // Emitted when missing anime data is detected during chain expansion
+    void missingAnimeDataDetected(const QList<int>& aids);
+    
 public slots:
     // Slot to handle episode updates from API
     void onEpisodeUpdated(int eid, int aid);
