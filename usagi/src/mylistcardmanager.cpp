@@ -141,9 +141,16 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 QList<AnimeChain> filteredChains;
                 
                 // Create relation lookup function for standalone chains
+                // NOTE: We're already holding m_mutex here, so we cannot call loadRelationDataForAnime
+                // (it would try to acquire the mutex again, causing a deadlock)
+                // Instead, directly access the cache which is already populated
                 auto relationLookup = [this](int aid) -> QPair<int,int> {
-                    loadRelationDataForAnime(aid);
-                    return QPair<int,int>(findPrequelAid(aid), findSequelAid(aid));
+                    // Direct cache access - mutex already held by caller
+                    if (m_cardCreationDataCache.contains(aid)) {
+                        const CardCreationData& data = m_cardCreationDataCache[aid];
+                        return QPair<int,int>(data.getPrequel(), data.getSequel());
+                    }
+                    return QPair<int,int>(0, 0);
                 };
                 
                 for (int aid : aids) {
@@ -156,9 +163,6 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                         }
                     } else {
                         // Anime is NOT in any chain in m_chainList
-                        // This can happen if:
-                        // 1. The anime was filtered out during initial cache load
-                        // 2. The anime has no relation data and was loaded later
                         // Create a standalone single-anime chain for it
                         LOG(QString("[MyListCardManager] Anime %1 not found in any chain, creating standalone chain").arg(aid));
                         AnimeChain standaloneChain(aid, relationLookup);
