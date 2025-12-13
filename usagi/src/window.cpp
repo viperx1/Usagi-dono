@@ -3976,15 +3976,8 @@ void Window::applyMylistFilters()
 			// Store the full unfiltered list of all anime IDs
 			allAnimeIdsList = aids;
 			
-			// Set up virtual scrolling with the full list of anime IDs
+			// Set up virtual scrolling (layout will be populated after filtering)
 			cardManager->setVirtualLayout(mylistVirtualLayout);
-			cardManager->setAnimeIdList(aids);
-			
-			// Update the virtual layout with the item count
-			if (mylistVirtualLayout) {
-				mylistVirtualLayout->setItemCount(aids.size());
-				mylistVirtualLayout->refresh();
-			}
 			
 			// Get all cards for backward compatibility
 			animeCards = cardManager->getAllCards();
