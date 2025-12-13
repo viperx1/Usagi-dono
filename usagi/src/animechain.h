@@ -119,6 +119,7 @@ private:
     QMap<int, QPair<int,int>> m_relations;  // aid -> (prequel_aid, sequel_aid)
     
     // Helper to check if all anime in a list are hidden
+    // Returns false if any anime is missing from cache (treated as visible)
     template<typename CardCreationData>
     static bool isChainFullyHidden(const QList<int>& animeIds, 
                                    const QMap<int, CardCreationData>& dataCache)
@@ -153,6 +154,7 @@ int AnimeChain::compareWith(
     // If only one chain is entirely hidden, hidden chain goes to the end
     if (myChainAllHidden != otherChainAllHidden) {
         // Hidden chains always sort to the end regardless of sort order direction
+        // Return negative if this chain should come first, positive if other should come first
         return otherChainAllHidden ? -1 : 1;
     }
     
