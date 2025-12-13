@@ -85,6 +85,12 @@ void TestMissingAnimeDataRequest::cleanup()
 {
     delete manager;
     delete container;
+    
+    // Clear test data between tests
+    QSqlQuery q(db);
+    q.exec("DELETE FROM mylist");
+    q.exec("DELETE FROM anime_titles");
+    q.exec("DELETE FROM anime");
 }
 
 void TestMissingAnimeDataRequest::createTestDatabase()
@@ -157,7 +163,7 @@ void TestMissingAnimeDataRequest::insertTestAnime(int aid, const QString &name, 
     q.prepare("INSERT INTO anime (aid, nameromaji, eptotal, typename, startdate, enddate, relaidlist, relaidtype) "
               "VALUES (?, ?, 12, 'TV Series', '2020-01-01', '2020-03-31', ?, ?)");
     q.addBindValue(aid);
-    q.addBindValue(name);
+    q.addBindValue(name);  // Set nameromaji so getCachedAnimeData returns it
     q.addBindValue(relaidListStr);
     q.addBindValue(relaidTypeStr);
     
@@ -195,11 +201,11 @@ void TestMissingAnimeDataRequest::testDetectMissingPrequel()
     aids.append(2);
     manager->preloadCardCreationData(aids);
     
-    // Wait for signal
-    QVERIFY(spy.wait(1000));
+    // Signal should be emitted synchronously during preloadCardCreationData
+    // so we don't need to wait, just check immediately
+    QCOMPARE(spy.count(), 1);
     
     // Verify signal was emitted with the missing anime ID
-    QCOMPARE(spy.count(), 1);
     QList<QVariant> arguments = spy.takeFirst();
     QList<int> missingAids = arguments.at(0).value<QList<int>>();
     QCOMPARE(missingAids.size(), 1);
@@ -217,9 +223,9 @@ void TestMissingAnimeDataRequest::testDetectMissingSequel()
     aids.append(1);
     manager->preloadCardCreationData(aids);
     
-    QVERIFY(spy.wait(1000));
-    
+    // Signal should be emitted synchronously during preloadCardCreationData
     QCOMPARE(spy.count(), 1);
+    
     QList<QVariant> arguments = spy.takeFirst();
     QList<int> missingAids = arguments.at(0).value<QList<int>>();
     QCOMPARE(missingAids.size(), 1);
@@ -237,9 +243,9 @@ void TestMissingAnimeDataRequest::testDetectMultipleMissingAnime()
     aids.append(2);
     manager->preloadCardCreationData(aids);
     
-    QVERIFY(spy.wait(1000));
-    
+    // Signal should be emitted synchronously during preloadCardCreationData
     QCOMPARE(spy.count(), 1);
+    
     QList<QVariant> arguments = spy.takeFirst();
     QList<int> missingAids = arguments.at(0).value<QList<int>>();
     QCOMPARE(missingAids.size(), 2);
@@ -258,9 +264,6 @@ void TestMissingAnimeDataRequest::testNoSignalWhenAllAnimePresent()
     QList<int> aids;
     aids.append(1);
     manager->preloadCardCreationData(aids);
-    
-    // Wait a bit to ensure no signal is emitted
-    QTest::qWait(500);
     
     // No signal should be emitted since all related anime are present
     QCOMPARE(spy.count(), 0);
@@ -290,8 +293,8 @@ void TestMissingAnimeDataRequest::testAnimeDataReloadOnUpdate()
     // Simulate API response by calling onAnimeUpdated
     manager->onAnimeUpdated(1);
     
-    // Wait for preload to complete
-    QTest::qWait(500);
+    // Process events to allow asynchronous operations to complete
+    QCoreApplication::processEvents();
     
     // Verify data was reloaded
     cachedData = manager->getCachedAnimeData(1);
