@@ -26,6 +26,7 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_chainsBuilt(false)  // Chains not built yet
     , m_chainBuildInProgress(false)  // No build in progress initially
     , m_dataReady(false)  // Data not ready initially
+    , m_lastChainBuildAnimeCount(0)  // No chains built yet
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
@@ -2190,18 +2191,35 @@ void MyListCardManager::buildChainsFromCache()
         QMutexLocker locker(&m_mutex);
         LOG("[MyListCardManager] [DEBUG] Mutex acquired in buildChainsFromCache");
         
-        // Check if chains are already built
+        // Get current cache size to check if rebuild is needed
+        int currentCacheSize = m_cardCreationDataCache.size();
+        
+        // Check if chains are already built and cache size hasn't changed significantly
+        // Rebuild if cache grew by more than 10% (indicates new anime were loaded)
         if (m_chainsBuilt && !m_chainList.isEmpty()) {
-            LOG("[MyListCardManager] Chains already built from cache, skipping rebuild");
-            // Ensure data is marked ready even when skipping rebuild
-            // (this handles case where preloadCardCreationData was called again after chains were built)
-            if (!m_dataReady) {
-                LOG("[MyListCardManager] [DEBUG] Chains already built but data not ready, marking ready now");
-                m_dataReady = true;
-                locker.unlock();  // Release mutex before waking threads
-                m_dataReadyCondition.wakeAll();
+            int sizeDiff = abs(currentCacheSize - m_lastChainBuildAnimeCount);
+            double changePercent = m_lastChainBuildAnimeCount > 0 ? 
+                (double)sizeDiff / m_lastChainBuildAnimeCount * 100.0 : 100.0;
+            
+            if (changePercent < 10.0) {
+                LOG(QString("[MyListCardManager] Chains already built from %1 anime, cache has %2 anime (%.1f%% change), skipping rebuild")
+                    .arg(m_lastChainBuildAnimeCount).arg(currentCacheSize).arg(changePercent));
+                // Ensure data is marked ready even when skipping rebuild
+                // (this handles case where preloadCardCreationData was called again after chains were built)
+                if (!m_dataReady) {
+                    LOG("[MyListCardManager] [DEBUG] Chains already built but data not ready, marking ready now");
+                    m_dataReady = true;
+                    locker.unlock();  // Release mutex before waking threads
+                    m_dataReadyCondition.wakeAll();
+                }
+                return;
+            } else {
+                LOG(QString("[MyListCardManager] Cache size changed significantly: %1 -> %2 anime (%.1f%% change), rebuilding chains")
+                    .arg(m_lastChainBuildAnimeCount).arg(currentCacheSize).arg(changePercent));
+                // Reset flags to allow rebuild
+                m_chainsBuilt = false;
+                m_dataReady = false;
             }
-            return;
         }
         
         // Check if a build is already in progress (another thread is building)
@@ -2276,6 +2294,7 @@ void MyListCardManager::buildChainsFromCache()
         m_chainsBuilt = true;
         m_chainBuildInProgress = false;
         m_dataReady = true;  // Mark ALL data as ready (preload + chain build complete)
+        m_lastChainBuildAnimeCount = m_cardCreationDataCache.size();  // Track cache size used for this build
         
         LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
             .arg(m_chainList.size())

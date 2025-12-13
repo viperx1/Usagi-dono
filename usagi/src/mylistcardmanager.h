@@ -403,6 +403,7 @@ private:
     bool m_chainsBuilt;                     // Flag to track if chains have been built from cache
     bool m_chainBuildInProgress;            // Flag to track if chain building is currently in progress
     bool m_dataReady;                       // Flag to track if ALL data is loaded and processed (preload + chains)
+    int m_lastChainBuildAnimeCount;         // Number of anime used in last chain build (to detect when rebuild is needed)
     
     // Network manager for poster downloads
     QNetworkAccessManager *m_networkManager;
