@@ -1446,15 +1446,8 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
         LOG("[Virtual Scrolling] Comprehensive card data preload complete");
     }
     
-    // Set the ordered anime ID list for virtual scrolling
-    // The VirtualFlowLayout will request cards on-demand as user scrolls
-    cardManager->setAnimeIdList(aids);
-    
-    // Update the virtual layout with the item count
-    if (mylistVirtualLayout) {
-        mylistVirtualLayout->setItemCount(aids.size());
-        mylistVirtualLayout->refresh();
-    }
+    // Build chains from all cached data BEFORE applying any filters
+    buildChainsWithLogging();
     
     // Get all cards for backward compatibility (will be empty initially with virtual scrolling)
     animeCards = cardManager->getAllCards();
@@ -3580,14 +3573,8 @@ void Window::loadMylistAsCards()
 		}
 	}
 	
-	// Set the ordered anime ID list for virtual scrolling
-	cardManager->setAnimeIdList(aids);
-	
-	// Update the virtual layout with the item count
-	if (mylistVirtualLayout) {
-		mylistVirtualLayout->setItemCount(aids.size());
-		mylistVirtualLayout->refresh();
-	}
+	// Build chains from all cached data BEFORE applying any filters
+	buildChainsWithLogging();
 	
 	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
 	animeCards = cardManager->getAllCards();
@@ -3890,6 +3877,14 @@ void Window::checkAndRequestChainRelations(int aid)
 	}
 }
 
+// Helper method to build chains with consistent logging
+void Window::buildChainsWithLogging()
+{
+	LOG("[Window] Building chains from cached data before applying filters...");
+	cardManager->buildChainsFromCache();
+	LOG("[Window] Chain building complete");
+}
+
 // Apply filters to mylist cards
 void Window::applyMylistFilters()
 {
@@ -3970,21 +3965,17 @@ void Window::applyMylistFilters()
 				LOG("[Window] Card data preload complete");
 			}
 			
+			// Build chains from all cached data BEFORE applying any filters
+			buildChainsWithLogging();
+			
 			// Mark all anime titles as loaded
 			allAnimeTitlesLoaded = true;
 			
 			// Store the full unfiltered list of all anime IDs
 			allAnimeIdsList = aids;
 			
-			// Set up virtual scrolling with the full list of anime IDs
+			// Set up virtual scrolling (layout will be populated after filtering)
 			cardManager->setVirtualLayout(mylistVirtualLayout);
-			cardManager->setAnimeIdList(aids);
-			
-			// Update the virtual layout with the item count
-			if (mylistVirtualLayout) {
-				mylistVirtualLayout->setItemCount(aids.size());
-				mylistVirtualLayout->refresh();
-			}
 			
 			// Get all cards for backward compatibility
 			animeCards = cardManager->getAllCards();

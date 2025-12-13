@@ -360,6 +360,9 @@ public slots:
     void applyMylistFilters();
     void checkAndRequestChainRelations(int aid);  // Check and request missing relation data for anime's chain
     
+    // Helper method to build chains with consistent logging
+    void buildChainsWithLogging();
+    
     // Directory watcher slots
     void onWatcherNewFilesDetected(const QStringList &filePaths);
     
