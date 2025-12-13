@@ -607,8 +607,6 @@ int MyListCardManager::findSequelAid(int aid) const
 
 void MyListCardManager::loadRelationDataForAnime(int aid) const
 {
-    LOG(QString("[MyListCardManager] [DEBUG] loadRelationDataForAnime called for aid=%1").arg(aid));
-    
     // This function now ONLY reads from the preloaded cache
     // All relation data must be preloaded via preloadRelationDataForChainExpansion() before chain building
     // Database calls are NOT permitted here to avoid performance issues during chain expansion
@@ -617,7 +615,6 @@ void MyListCardManager::loadRelationDataForAnime(int aid) const
     
     // If already in cache, nothing to do
     if (m_cardCreationDataCache.contains(aid)) {
-        LOG(QString("[MyListCardManager] [DEBUG] aid=%1 found in cache").arg(aid));
         return;
     }
     
