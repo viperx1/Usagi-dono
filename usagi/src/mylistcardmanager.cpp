@@ -249,10 +249,6 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
             continue;  // This chain was already merged into another
         }
         
-        if (i % 50 == 0) {
-            LOG(QString("[MyListCardManager] [DEBUG] Processing chain %1/%2").arg(i).arg(chains.size()));
-        }
-        
         // Expand this chain to include all related anime
         // The expand method will add related anime not yet in the chain
         QSet<int> processed;
@@ -260,15 +256,9 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         int iterations = 0;
         const int MAX_ITERATIONS = 100;
         
-        LOG(QString("[MyListCardManager] [DEBUG] Expanding chain %1 (initial size: %2)").arg(i).arg(chains[i].getAnimeIds().size()));
-        
         while (changed && iterations < MAX_ITERATIONS) {
             changed = false;
             iterations++;
-            
-            if (iterations > 10 && iterations % 10 == 0) {
-                LOG(QString("[MyListCardManager] [DEBUG] Chain %1 iteration %2/%3").arg(i).arg(iterations).arg(MAX_ITERATIONS));
-            }
             
             QList<int> currentAnime = chains[i].getAnimeIds();
             for (int aid : currentAnime) {
@@ -281,12 +271,10 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 
                 // Process prequel
                 if (unbound.first > 0) {
-                    LOG(QString("[MyListCardManager] [DEBUG] Chain %1: Found prequel %2 for aid=%3").arg(i).arg(unbound.first).arg(aid));
                     if (animeToChainIdx.contains(unbound.first)) {
                         // Prequel is in another chain - merge that chain into this one
                         int otherIdx = animeToChainIdx[unbound.first];
                         if (otherIdx != i && !deletedChains.contains(otherIdx)) {
-                            LOG(QString("[MyListCardManager] [DEBUG] Merging chain %1 into chain %2").arg(otherIdx).arg(i));
                             chains[i].mergeWith(chains[otherIdx], relationLookup);
                             deletedChains.insert(otherIdx);
                             
@@ -298,7 +286,6 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                         }
                     } else {
                         // Prequel not in any chain yet - add it via expanding
-                        LOG(QString("[MyListCardManager] [DEBUG] Creating new chain for prequel %1").arg(unbound.first));
                         AnimeChain prequelChain(unbound.first, relationLookup);
                         chains[i].mergeWith(prequelChain, relationLookup);
                         animeToChainIdx[unbound.first] = i;
@@ -308,12 +295,10 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                 
                 // Process sequel
                 if (unbound.second > 0) {
-                    LOG(QString("[MyListCardManager] [DEBUG] Chain %1: Found sequel %2 for aid=%3").arg(i).arg(unbound.second).arg(aid));
                     if (animeToChainIdx.contains(unbound.second)) {
                         // Sequel is in another chain - merge that chain into this one
                         int otherIdx = animeToChainIdx[unbound.second];
                         if (otherIdx != i && !deletedChains.contains(otherIdx)) {
-                            LOG(QString("[MyListCardManager] [DEBUG] Merging chain %1 into chain %2").arg(otherIdx).arg(i));
                             chains[i].mergeWith(chains[otherIdx], relationLookup);
                             deletedChains.insert(otherIdx);
                             
@@ -325,7 +310,6 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
                         }
                     } else {
                         // Sequel not in any chain yet - add it via expanding
-                        LOG(QString("[MyListCardManager] [DEBUG] Creating new chain for sequel %1").arg(unbound.second));
                         AnimeChain sequelChain(unbound.second, relationLookup);
                         chains[i].mergeWith(sequelChain, relationLookup);
                         animeToChainIdx[unbound.second] = i;
@@ -338,9 +322,6 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
         if (iterations >= MAX_ITERATIONS) {
             LOG(QString("[MyListCardManager] [DEBUG] WARNING: Chain %1 hit MAX_ITERATIONS limit!").arg(i));
         }
-        
-        LOG(QString("[MyListCardManager] [DEBUG] Chain %1 expansion complete after %2 iterations (final size: %3)")
-            .arg(i).arg(iterations).arg(chains[i].getAnimeIds().size()));
     }
     
     LOG("[MyListCardManager] [DEBUG] Chain expansion and merging complete");
@@ -761,8 +742,6 @@ AnimeCard* MyListCardManager::createCardForIndex(int index)
     
     int aid = m_orderedAnimeIds[index];
     locker.unlock();
-    
-    LOG(QString("[MyListCardManager] createCardForIndex: creating card for index=%1, aid=%2").arg(index).arg(aid));
     
     // Create the card using the existing createCard method
     AnimeCard* card = createCard(aid);
@@ -1373,7 +1352,6 @@ AnimeCard* MyListCardManager::createCard(int aid)
     
     // Check if card already exists - prevent duplicates
     if (hasCard(aid)) {
-        LOG(QString("[MyListCardManager] Card already exists for aid=%1, skipping duplicate creation").arg(aid));
         return m_cards[aid];
     }
     
