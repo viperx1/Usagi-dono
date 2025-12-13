@@ -2099,8 +2099,10 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     // (See: onMylistLoadingFinished, loadMylistAsCards, applyMylistFilters in window.cpp)
     // This ensures chains are built from the complete dataset, not incrementally during loading
     
-    // SPECIAL CASE: If chains are already built (e.g., during FINAL PRELOAD for missing anime),
-    // mark data as ready to prevent deadlock in createCardForIndex()
+    // SPECIAL CASE: Handle FINAL PRELOAD scenario to prevent deadlock
+    // When chains are already built (m_chainsBuilt=true) but data not ready (m_dataReady=false),
+    // it means we're in FINAL PRELOAD loading missing anime after chains were already built.
+    // In this case, mark data ready without rebuilding chains to prevent createCardForIndex() deadlock.
     {
         QMutexLocker locker(&m_mutex);
         if (m_chainsBuilt && !m_dataReady) {
