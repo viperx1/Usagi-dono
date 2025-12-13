@@ -1937,6 +1937,55 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         .arg(m_cardCreationDataCache.size()).arg(step1Elapsed));
     emit progressUpdate(QString("Loaded anime data (%1 of 3)...").arg(1));
     
+    // Step 1.5: Check for missing related anime and request from API
+    // This runs regardless of chain mode to ensure related anime data is fetched
+    {
+        QSet<int> relatedAids;
+        QMutexLocker locker(&m_mutex);
+        
+        // Collect all related anime from the loaded anime
+        for (int aid : aids) {
+            if (m_cardCreationDataCache.contains(aid)) {
+                const CardCreationData& data = m_cardCreationDataCache[aid];
+                int prequelAid = data.getPrequel();
+                int sequelAid = data.getSequel();
+                
+                if (prequelAid > 0) {
+                    relatedAids.insert(prequelAid);
+                }
+                if (sequelAid > 0) {
+                    relatedAids.insert(sequelAid);
+                }
+            }
+        }
+        
+        if (!relatedAids.isEmpty()) {
+            LOG(QString("[MyListCardManager] Found %1 related anime to check").arg(relatedAids.size()));
+            
+            // Check which related anime are missing from database
+            QSet<int> missingAids;
+            for (int relAid : relatedAids) {
+                // Check if anime exists in database
+                QSqlQuery checkQ(db);
+                checkQ.prepare("SELECT COUNT(*) FROM anime WHERE aid = ?");
+                checkQ.addBindValue(relAid);
+                if (checkQ.exec() && checkQ.next()) {
+                    int count = checkQ.value(0).toInt();
+                    if (count == 0) {
+                        missingAids.insert(relAid);
+                    }
+                }
+            }
+            
+            if (!missingAids.isEmpty()) {
+                LOG(QString("[MyListCardManager] Found %1 related anime missing from database, requesting from API").arg(missingAids.size()));
+                QList<int> missingAidList(missingAids.begin(), missingAids.end());
+                locker.unlock();  // Release mutex before emitting signal
+                emit missingAnimeDataDetected(missingAidList);
+            }
+        }
+    }
+    
     // Step 2: Load anime titles for anime without anime table data OR with empty animeTitle
     // This fills in titles from anime_titles table when anime table is missing/incomplete
     qint64 step2Start = timer.elapsed();
