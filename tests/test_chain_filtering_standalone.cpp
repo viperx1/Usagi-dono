@@ -93,19 +93,27 @@ void TestChainFilteringStandalone::createTestDatabase()
 {
     QSqlQuery query(db);
     
-    // Create anime table with relation columns
+    // Create anime table (matching production schema)
     QString createAnime = "CREATE TABLE anime ("
         "aid INTEGER PRIMARY KEY, "
-        "romaji_name TEXT, "
-        "kanji_name TEXT, "
-        "english_name TEXT, "
-        "type TEXT, "
-        "year INTEGER, "
+        "nameromaji TEXT, "
+        "nameenglish TEXT, "
+        "eptotal INTEGER, "
+        "eps INTEGER, "
+        "typename TEXT, "
+        "startdate TEXT, "
         "enddate TEXT, "
-        "picture TEXT, "
-        "rating INTEGER, "
-        "temprating INTEGER, "
-        "reviewrating INTEGER"
+        "picname TEXT, "
+        "poster_image BLOB, "
+        "category TEXT, "
+        "rating TEXT, "
+        "tag_name_list TEXT, "
+        "tag_id_list TEXT, "
+        "tag_weight_list TEXT, "
+        "hidden INTEGER DEFAULT 0, "
+        "is_18_restricted INTEGER DEFAULT 0, "
+        "relaidlist TEXT, "
+        "relaidtype TEXT"
     ")";
     
     if (!query.exec(createAnime)) {
@@ -113,17 +121,46 @@ void TestChainFilteringStandalone::createTestDatabase()
         QFAIL("Could not create anime table");
     }
     
-    // Create relation table
-    QString createRelation = "CREATE TABLE relation ("
-        "rid INTEGER PRIMARY KEY AUTOINCREMENT, "
+    // Create anime_titles table
+    QString createTitles = "CREATE TABLE anime_titles ("
         "aid INTEGER, "
-        "related_aid INTEGER, "
-        "relation_type TEXT"
+        "type INTEGER, "
+        "language TEXT, "
+        "title TEXT"
     ")";
     
-    if (!query.exec(createRelation)) {
-        qWarning() << "Failed to create relation table:" << query.lastError().text();
-        QFAIL("Could not create relation table");
+    if (!query.exec(createTitles)) {
+        qWarning() << "Failed to create anime_titles table:" << query.lastError().text();
+        QFAIL("Could not create anime_titles table");
+    }
+    
+    // Create episode table (required by preload)
+    QString createEpisode = "CREATE TABLE episode ("
+        "eid INTEGER PRIMARY KEY, "
+        "aid INTEGER, "
+        "epno TEXT, "
+        "name TEXT"
+    ")";
+    
+    if (!query.exec(createEpisode)) {
+        qWarning() << "Failed to create episode table:" << query.lastError().text();
+        QFAIL("Could not create episode table");
+    }
+    
+    // Create mylist table (required by preload)
+    QString createMylist = "CREATE TABLE mylist ("
+        "lid INTEGER PRIMARY KEY, "
+        "aid INTEGER, "
+        "eid INTEGER, "
+        "fid INTEGER, "
+        "state INTEGER, "
+        "viewed INTEGER, "
+        "storage TEXT"
+    ")";
+    
+    if (!query.exec(createMylist)) {
+        qWarning() << "Failed to create mylist table:" << query.lastError().text();
+        QFAIL("Could not create mylist table");
     }
 }
 
@@ -131,38 +168,43 @@ void TestChainFilteringStandalone::insertTestAnime(int aid, const QString &name,
 {
     QSqlQuery query(db);
     
-    // Insert anime
-    query.prepare("INSERT INTO anime (aid, romaji_name, type, year) VALUES (?, ?, ?, ?)");
+    // Build relation lists
+    QStringList relAidList;
+    QStringList relTypeList;
+    
+    if (prequelAid > 0) {
+        relAidList.append(QString::number(prequelAid));
+        relTypeList.append("1");  // 1 = prequel
+    }
+    
+    if (sequelAid > 0) {
+        relAidList.append(QString::number(sequelAid));
+        relTypeList.append("2");  // 2 = sequel
+    }
+    
+    QString relaidlist = relAidList.join("'");
+    QString relaidtype = relTypeList.join("'");
+    
+    // Insert anime with relation data
+    query.prepare("INSERT INTO anime (aid, nameromaji, eptotal, typename, startdate, enddate, relaidlist, relaidtype) "
+                  "VALUES (?, ?, 12, 'TV Series', '2019-01-01', '2019-03-31', ?, ?)");
     query.addBindValue(aid);
     query.addBindValue(name);
-    query.addBindValue("TV Series");
-    query.addBindValue(2019);
+    query.addBindValue(relaidlist);
+    query.addBindValue(relaidtype);
     
     if (!query.exec()) {
         qWarning() << "Failed to insert anime:" << query.lastError().text();
         QFAIL("Could not insert anime");
     }
     
-    // Insert prequel relation if specified
-    if (prequelAid > 0) {
-        query.prepare("INSERT INTO relation (aid, related_aid, relation_type) VALUES (?, ?, 'prequel')");
-        query.addBindValue(aid);
-        query.addBindValue(prequelAid);
-        
-        if (!query.exec()) {
-            qWarning() << "Failed to insert prequel relation:" << query.lastError().text();
-        }
-    }
+    // Also insert into anime_titles for the title lookup
+    query.prepare("INSERT INTO anime_titles (aid, type, language, title) VALUES (?, 1, 'x-jat', ?)");
+    query.addBindValue(aid);
+    query.addBindValue(name);
     
-    // Insert sequel relation if specified
-    if (sequelAid > 0) {
-        query.prepare("INSERT INTO relation (aid, related_aid, relation_type) VALUES (?, ?, 'sequel')");
-        query.addBindValue(aid);
-        query.addBindValue(sequelAid);
-        
-        if (!query.exec()) {
-            qWarning() << "Failed to insert sequel relation:" << query.lastError().text();
-        }
+    if (!query.exec()) {
+        qWarning() << "Failed to insert anime title:" << query.lastError().text();
     }
 }
 
