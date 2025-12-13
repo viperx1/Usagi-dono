@@ -42,6 +42,7 @@ private:
     
     void createTestDatabase();
     void insertTestAnime(int aid, const QString &name, int prequelAid = 0, int sequelAid = 0);
+    int countChains(const QList<int>& animeIds);
 };
 
 void TestChainFilteringStandalone::initTestCase()
@@ -165,6 +166,19 @@ void TestChainFilteringStandalone::insertTestAnime(int aid, const QString &name,
     }
 }
 
+int TestChainFilteringStandalone::countChains(const QList<int>& animeIds)
+{
+    // Helper function to count unique chains from anime IDs
+    QList<int> chainIndices;
+    for (int aid : animeIds) {
+        int chainIdx = manager->getChainIndexForAnime(aid);
+        if (!chainIndices.contains(chainIdx)) {
+            chainIndices.append(chainIdx);
+        }
+    }
+    return chainIndices.size();
+}
+
 void TestChainFilteringStandalone::testStandaloneAnimeInChainMode()
 {
     // Reproduce the Arifureta scenario:
@@ -200,14 +214,7 @@ void TestChainFilteringStandalone::testStandaloneAnimeInChainMode()
     QVERIFY(displayedAnime.contains(17615));
     
     // Verify we have 2 chains
-    QList<int> chainIndices;
-    for (int aid : displayedAnime) {
-        int chainIdx = manager->getChainIndexForAnime(aid);
-        if (!chainIndices.contains(chainIdx)) {
-            chainIndices.append(chainIdx);
-        }
-    }
-    QCOMPARE(chainIndices.size(), 2);
+    QCOMPARE(countChains(displayedAnime), 2);
 }
 
 void TestChainFilteringStandalone::testMixedChainAndStandalone()
@@ -238,14 +245,7 @@ void TestChainFilteringStandalone::testMixedChainAndStandalone()
     QCOMPARE(displayedAnime.size(), 7);
     
     // Verify we have 4 chains (2 multi-anime chains + 2 standalone)
-    QList<int> chainIndices;
-    for (int aid : displayedAnime) {
-        int chainIdx = manager->getChainIndexForAnime(aid);
-        if (!chainIndices.contains(chainIdx)) {
-            chainIndices.append(chainIdx);
-        }
-    }
-    QCOMPARE(chainIndices.size(), 4);
+    QCOMPARE(countChains(displayedAnime), 4);
 }
 
 void TestChainFilteringStandalone::testMultipleStandaloneAnime()
@@ -267,14 +267,7 @@ void TestChainFilteringStandalone::testMultipleStandaloneAnime()
     QCOMPARE(displayedAnime.size(), 3);
     
     // Verify we have 3 chains (all standalone)
-    QList<int> chainIndices;
-    for (int aid : displayedAnime) {
-        int chainIdx = manager->getChainIndexForAnime(aid);
-        if (!chainIndices.contains(chainIdx)) {
-            chainIndices.append(chainIdx);
-        }
-    }
-    QCOMPARE(chainIndices.size(), 3);
+    QCOMPARE(countChains(displayedAnime), 3);
 }
 
 QTEST_MAIN(TestChainFilteringStandalone)
