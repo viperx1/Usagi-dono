@@ -2098,6 +2098,17 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     // Callers use buildChainsWithLogging() (or call buildChainsFromCache() directly) after preloadCardCreationData()
     // (See: onMylistLoadingFinished, loadMylistAsCards, applyMylistFilters in window.cpp)
     // This ensures chains are built from the complete dataset, not incrementally during loading
+    
+    // SPECIAL CASE: If chains are already built (e.g., during FINAL PRELOAD for missing anime),
+    // mark data as ready to prevent deadlock in createCardForIndex()
+    {
+        QMutexLocker locker(&m_mutex);
+        if (m_chainsBuilt && !m_dataReady) {
+            LOG("[MyListCardManager] Chains already built, marking data ready after preload");
+            m_dataReady = true;
+            m_dataReadyCondition.wakeAll();
+        }
+    }
 }
 
 void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& baseAids)
