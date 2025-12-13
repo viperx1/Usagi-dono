@@ -151,8 +151,8 @@ void TestMissingAnimeDataRequest::insertTestAnime(int aid, const QString &name, 
         relaidType.append("1");  // 1 = sequel
     }
     
-    QString relaidListStr = relaidList.isEmpty() ? "" : "'" + relaidList.join("'") + "'";
-    QString relaidTypeStr = relaidType.isEmpty() ? "" : "'" + relaidType.join("'") + "'";
+    QString relaidListStr = relaidList.isEmpty() ? "" : "'" + relaidList.join("','") + "'";
+    QString relaidTypeStr = relaidType.isEmpty() ? "" : "'" + relaidType.join("','") + "'";
     
     q.prepare("INSERT INTO anime (aid, nameromaji, eptotal, typename, startdate, enddate, relaidlist, relaidtype) "
               "VALUES (?, ?, 12, 'TV Series', '2020-01-01', '2020-03-31', ?, ?)");

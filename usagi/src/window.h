@@ -411,6 +411,9 @@ private:
     bool animeTitlesCacheLoaded;
     void loadAnimeTitlesCache();
     
+    // Timestamp for last chain refresh (to prevent excessive refreshes during batch anime updates)
+    qint64 lastChainRefreshTime;
+    
     // Helper cache for mylist filtering - now using proper class
     AnimeMetadataCache animeAlternativeTitlesCache;  // aid -> alternative titles
     void loadAnimeAlternativeTitlesForFiltering();

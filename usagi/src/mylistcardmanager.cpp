@@ -2194,7 +2194,7 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     
     if (!missingAids.isEmpty()) {
         LOG(QString("[MyListCardManager] [DEBUG] Found %1 related anime missing from database, requesting from API").arg(missingAids.size()));
-        QList<int> missingAidList = missingAids.values();
+        QList<int> missingAidList(missingAids.begin(), missingAids.end());
         emit missingAnimeDataDetected(missingAidList);
     }
 }

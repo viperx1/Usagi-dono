@@ -167,6 +167,9 @@ Window::Window()
 	// Initialize anime titles cache flag
 	animeTitlesCacheLoaded = false;
 	
+	// Initialize chain refresh timestamp (to throttle refreshes during batch updates)
+	lastChainRefreshTime = 0;
+	
     // Initialize window state for tray restore
     windowStateBeforeHide = Qt::WindowNoState;
     exitingFromTray = false;
@@ -2446,8 +2449,17 @@ void Window::getNotifyAnimeUpdated(int aid)
 			checkAndRequestChainRelations(aid);
 			
 			// Refresh the display to incorporate the newly arrived anime into chains
-			LOG(QString("[Window] Refreshing mylist display to update chains after anime %1 data arrived").arg(aid));
-			applyMylistFilters();
+			// Throttle refreshes to at most once per second to avoid excessive operations during batch updates
+			qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+			const qint64 REFRESH_THROTTLE_MS = 1000;  // Minimum time between refreshes
+			
+			if (currentTime - lastChainRefreshTime >= REFRESH_THROTTLE_MS) {
+				LOG(QString("[Window] Refreshing mylist display to update chains after anime %1 data arrived").arg(aid));
+				lastChainRefreshTime = currentTime;
+				applyMylistFilters();
+			} else {
+				LOG(QString("[Window] Skipping chain refresh (throttled, last refresh was %1 ms ago)").arg(currentTime - lastChainRefreshTime));
+			}
 		}
 	}
 	
