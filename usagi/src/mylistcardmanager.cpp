@@ -142,7 +142,7 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 
                 // Create relation lookup function for standalone chains
                 auto relationLookup = [this](int aid) -> QPair<int,int> {
-                    const_cast<MyListCardManager*>(this)->loadRelationDataForAnime(aid);
+                    loadRelationDataForAnime(aid);
                     return QPair<int,int>(findPrequelAid(aid), findSequelAid(aid));
                 };
                 
