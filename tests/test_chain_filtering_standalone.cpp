@@ -169,12 +169,10 @@ void TestChainFilteringStandalone::insertTestAnime(int aid, const QString &name,
 int TestChainFilteringStandalone::countChains(const QList<int>& animeIds)
 {
     // Helper function to count unique chains from anime IDs
-    QList<int> chainIndices;
+    QSet<int> chainIndices;
     for (int aid : animeIds) {
         int chainIdx = manager->getChainIndexForAnime(aid);
-        if (!chainIndices.contains(chainIdx)) {
-            chainIndices.append(chainIdx);
-        }
+        chainIndices.insert(chainIdx);
     }
     return chainIndices.size();
 }
@@ -183,8 +181,9 @@ void TestChainFilteringStandalone::testStandaloneAnimeInChainMode()
 {
     // Reproduce the Arifureta scenario:
     // - aid 13624: standalone (no relation data)
-    // - aid 15135: has sequel relation to 17615
-    // - aid 17615: has prequel relation to 15135
+    // - aid 15135: Season 2, has sequel → 17615 (Season 3)
+    // - aid 17615: Season 3, has prequel ← 15135 (Season 2)
+    // Chain: 15135 → 17615
     
     insertTestAnime(13624, "Arifureta Shokugyou de Sekai Saikyou", 0, 0);  // No relations
     insertTestAnime(15135, "Arifureta Shokugyou de Sekai Saikyou 2nd Season", 0, 17615);  // sequel=17615
