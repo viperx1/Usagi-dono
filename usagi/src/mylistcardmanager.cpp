@@ -140,13 +140,29 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 QSet<int> includedChainIndices;
                 QList<AnimeChain> filteredChains;
                 
+                // Create relation lookup function for standalone chains
+                auto relationLookup = [this](int aid) -> QPair<int,int> {
+                    const_cast<MyListCardManager*>(this)->loadRelationDataForAnime(aid);
+                    return QPair<int,int>(findPrequelAid(aid), findSequelAid(aid));
+                };
+                
                 for (int aid : aids) {
                     if (inputAidToChainIdx.contains(aid)) {
+                        // Anime is in an existing chain - add that chain
                         int chainIdx = inputAidToChainIdx[aid];
                         if (!includedChainIndices.contains(chainIdx)) {
                             includedChainIndices.insert(chainIdx);
                             filteredChains.append(m_chainList[chainIdx]);
                         }
+                    } else {
+                        // Anime is NOT in any chain in m_chainList
+                        // This can happen if:
+                        // 1. The anime was filtered out during initial cache load
+                        // 2. The anime has no relation data and was loaded later
+                        // Create a standalone single-anime chain for it
+                        LOG(QString("[MyListCardManager] Anime %1 not found in any chain, creating standalone chain").arg(aid));
+                        AnimeChain standaloneChain(aid, relationLookup);
+                        filteredChains.append(standaloneChain);
                     }
                 }
                 

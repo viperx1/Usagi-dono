@@ -2185,6 +2185,115 @@ endif()
 add_test(NAME test_hidden_card_sorting COMMAND test_hidden_card_sorting -v2)
 
 # ==========================================================
+# test_chain_filtering_standalone - Chain filtering with standalone anime
+# ==========================================================
+set(CHAIN_FILTERING_STANDALONE_TEST_SOURCES
+    test_chain_filtering_standalone.cpp
+    ../usagi/src/mylistcardmanager.cpp
+    ../usagi/src/animecard.cpp
+    ../usagi/src/flowlayout.cpp
+    ../usagi/src/virtualflowlayout.cpp
+    ../usagi/src/playbuttondelegate.cpp
+    ../usagi/src/epno.cpp
+    ../usagi/src/aired.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/myanidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+    ../usagi/src/watchsessionmanager.cpp
+    ../usagi/src/watchchunkmanager.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
+    ../usagi/src/sessioninfo.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
+    ../usagi/src/animestats.cpp
+    ../usagi/src/cachedanimedata.cpp
+    ../usagi/src/taginfo.cpp
+    ../usagi/src/cardfileinfo.cpp
+    ../usagi/src/cardepisodeinfo.cpp
+    ../usagi/src/relationdata.cpp
+    ../usagi/src/animechain.cpp
+)
+
+set(CHAIN_FILTERING_STANDALONE_TEST_HEADERS
+    ../usagi/src/mylistcardmanager.h
+    ../usagi/src/animecard.h
+    ../usagi/src/flowlayout.h
+    ../usagi/src/virtualflowlayout.h
+    ../usagi/src/playbuttondelegate.h
+    ../usagi/src/epno.h
+    ../usagi/src/aired.h
+    ../usagi/src/anidbapi.h
+    ../usagi/src/main.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/logger.h
+    ../usagi/src/watchsessionmanager.h
+    ../usagi/src/watchchunkmanager.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
+    ../usagi/src/sessioninfo.h
+    ../usagi/src/animechain.h
+    ../usagi/src/animestats.h
+    ../usagi/src/cachedanimedata.h
+    ../usagi/src/taginfo.h
+    ../usagi/src/cardfileinfo.h
+    ../usagi/src/cardepisodeinfo.h
+    ../usagi/src/relationdata.h
+)
+
+add_executable(test_chain_filtering_standalone ${CHAIN_FILTERING_STANDALONE_TEST_SOURCES} ${CHAIN_FILTERING_STANDALONE_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_chain_filtering_standalone)
+
+target_compile_definitions(test_chain_filtering_standalone PRIVATE CRYPTOPP_DEBUG=0)
+
+target_link_libraries(test_chain_filtering_standalone PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Widgets
+    z
+)
+
+target_include_directories(test_chain_filtering_standalone PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_chain_filtering_standalone PRIVATE
+        "-Wl,--subsystem,console"
+    )
+    
+    # For static Qt builds on Windows, import platform plugins
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        qt_import_plugins(test_chain_filtering_standalone
+            INCLUDE
+                Qt::QWindowsIntegrationPlugin
+                Qt::QWindowsVistaStylePlugin
+                Qt::QSQLiteDriverPlugin
+        )
+    endif()
+endif()
+
+add_test(NAME test_chain_filtering_standalone COMMAND test_chain_filtering_standalone -v2)
+
+# ==========================================================
 # test_filter_system - Comprehensive filter system tests
 # ==========================================================
 add_executable(test_filter_system
