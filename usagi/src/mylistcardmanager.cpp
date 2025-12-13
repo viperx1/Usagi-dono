@@ -2095,7 +2095,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         .arg(m_cardCreationDataCache.size()).arg(totalElapsed));
     
     // NOTE: Chain building is now done explicitly by the caller after all data loading is complete
-    // Callers should call buildChainsFromCache() immediately after preloadCardCreationData() completes
+    // Callers use buildChainsWithLogging() (or call buildChainsFromCache() directly) after preloadCardCreationData()
     // (See: onMylistLoadingFinished, loadMylistAsCards, applyMylistFilters in window.cpp)
     // This ensures chains are built from the complete dataset, not incrementally during loading
 }
