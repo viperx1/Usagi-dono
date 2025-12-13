@@ -33,6 +33,7 @@ private slots:
     void testStandaloneAnimeInChainMode();
     void testMixedChainAndStandalone();
     void testMultipleStandaloneAnime();
+    void testStandaloneChainSurvivesSorting();
     
 private:
     MyListCardManager *manager;
@@ -309,6 +310,61 @@ void TestChainFilteringStandalone::testMultipleStandaloneAnime()
     
     // Verify we have 3 chains (all standalone)
     QCOMPARE(countChains(displayedAnime), 3);
+}
+
+void TestChainFilteringStandalone::testStandaloneChainSurvivesSorting()
+{
+    // This test reproduces the exact Arifureta issue:
+    // - Anime 13624 is standalone (no relation data)
+    // - Anime 15135 and 17615 form a chain
+    // - After sorting, the standalone chain should NOT be lost
+    
+    // Setup: Create the exact Arifureta scenario
+    insertTestAnime(13624, "Arifureta Shokugyou de Sekai Saikyou", 0, 0);  // Standalone
+    insertTestAnime(15135, "Arifureta Shokugyou de Sekai Saikyou 2nd Season", 0, 17615);
+    insertTestAnime(17615, "Arifureta Shokugyou de Sekai Saikyou Season 3", 15135, 0);
+    
+    QList<int> allAnime = {13624, 15135, 17615};
+    manager->preloadCardCreationData(allAnime);
+    
+    // Step 1: Enable chain mode - should create standalone chain for 13624
+    manager->setAnimeIdList(allAnime, true);
+    
+    QList<int> afterChainMode = manager->getAnimeIdList();
+    QCOMPARE(afterChainMode.size(), 3);
+    QVERIFY(afterChainMode.contains(13624));
+    QVERIFY(afterChainMode.contains(15135));
+    QVERIFY(afterChainMode.contains(17615));
+    
+    // Should have 2 chains: one standalone (13624) and one connected (15135-17615)
+    QCOMPARE(countChains(afterChainMode), 2);
+    
+    // Step 2: Trigger sorting - this is where the bug would occur
+    // Sort by title (criteria 0) in ascending order
+    manager->sortChains(AnimeChain::SortCriteria::ByRepresentativeTitle, true);
+    
+    QList<int> afterSorting = manager->getAnimeIdList();
+    
+    // CRITICAL: After sorting, all 3 anime must still be present
+    QCOMPARE(afterSorting.size(), 3);
+    QVERIFY(afterSorting.contains(13624));
+    QVERIFY(afterSorting.contains(15135));
+    QVERIFY(afterSorting.contains(17615));
+    
+    // Still should have 2 chains after sorting
+    QCOMPARE(countChains(afterSorting), 2);
+    
+    // Test sorting in different directions and criteria to ensure robustness
+    manager->sortChains(AnimeChain::SortCriteria::ByRepresentativeTitle, false);
+    QList<int> afterDescSort = manager->getAnimeIdList();
+    QCOMPARE(afterDescSort.size(), 3);
+    QVERIFY(afterDescSort.contains(13624));
+    
+    // Sort by type
+    manager->sortChains(AnimeChain::SortCriteria::ByRepresentativeType, true);
+    QList<int> afterTypeSort = manager->getAnimeIdList();
+    QCOMPARE(afterTypeSort.size(), 3);
+    QVERIFY(afterTypeSort.contains(13624));
 }
 
 QTEST_MAIN(TestChainFilteringStandalone)
