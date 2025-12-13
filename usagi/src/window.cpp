@@ -1447,10 +1447,7 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     }
     
     // Build chains from all cached data BEFORE applying any filters
-    // This ensures chains are built from complete data, independent of filter state
-    LOG("[Window] Building chains from cached data before applying filters...");
-    cardManager->buildChainsFromCache();
-    LOG("[Window] Chain building complete");
+    buildChainsWithLogging();
     
     // Get all cards for backward compatibility (will be empty initially with virtual scrolling)
     animeCards = cardManager->getAllCards();
@@ -3577,10 +3574,7 @@ void Window::loadMylistAsCards()
 	}
 	
 	// Build chains from all cached data BEFORE applying any filters
-	// This ensures chains are built from complete data, independent of filter state
-	LOG("[Window] Building chains from cached data before applying filters...");
-	cardManager->buildChainsFromCache();
-	LOG("[Window] Chain building complete");
+	buildChainsWithLogging();
 	
 	// Get all cards for backward compatibility (will be empty initially with virtual scrolling)
 	animeCards = cardManager->getAllCards();
@@ -3883,6 +3877,14 @@ void Window::checkAndRequestChainRelations(int aid)
 	}
 }
 
+// Helper method to build chains with consistent logging
+void Window::buildChainsWithLogging()
+{
+	LOG("[Window] Building chains from cached data before applying filters...");
+	cardManager->buildChainsFromCache();
+	LOG("[Window] Chain building complete");
+}
+
 // Apply filters to mylist cards
 void Window::applyMylistFilters()
 {
@@ -3964,10 +3966,7 @@ void Window::applyMylistFilters()
 			}
 			
 			// Build chains from all cached data BEFORE applying any filters
-			// This ensures chains are built from complete data, independent of filter state
-			LOG("[Window] Building chains from cached data before applying filters...");
-			cardManager->buildChainsFromCache();
-			LOG("[Window] Chain building complete");
+			buildChainsWithLogging();
 			
 			// Mark all anime titles as loaded
 			allAnimeTitlesLoaded = true;
