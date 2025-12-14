@@ -20,9 +20,6 @@ DirectoryScanWorker::DirectoryScanWorker(const QString &directory, const QSet<QS
 
 void DirectoryScanWorker::scan()
 {
-    QElapsedTimer timer;
-    timer.start();
-    
     QStringList newFiles;
     
     if (m_directory.isEmpty() || !QDir(m_directory).exists()) {
@@ -51,8 +48,6 @@ void DirectoryScanWorker::scan()
         
         newFiles.append(filePath);
     }
-    
-    qint64 elapsed = timer.elapsed();
     
     emit scanComplete(newFiles);
 }
@@ -100,9 +95,6 @@ DirectoryWatcher::~DirectoryWatcher()
 
 void DirectoryWatcher::startWatching(const QString &directory)
 {
-    QElapsedTimer totalTimer;
-    totalTimer.start();
-    
     if (directory.isEmpty() || !QDir(directory).exists()) {
         LOG("DirectoryWatcher: Invalid directory: " + directory);
         return;
@@ -111,24 +103,15 @@ void DirectoryWatcher::startWatching(const QString &directory)
     // Stop watching current directory if any
     stopWatching();
     
-    QElapsedTimer timer;
-    timer.start();
-    
     m_watchedDirectory = directory;
     m_watcher->addPath(directory);
     m_isWatching = true;
     
-    qint64 setupTime = timer.elapsed();
-    
     // Load previously processed files
-    timer.restart();
     loadProcessedFiles();
-    qint64 loadTime = timer.elapsed();
     
     // Defer initial scan to avoid UI freeze
     m_initialScanTimer->start();
-    
-    qint64 totalTime = totalTimer.elapsed();
 }
 
 void DirectoryWatcher::stopWatching()
@@ -275,41 +258,31 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
 
 void DirectoryWatcher::loadProcessedFiles()
 {
-    QElapsedTimer timer;
-    timer.start();
-    
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isValid() || !db.isOpen()) {
         LOG("DirectoryWatcher: Database not available, cannot load processed files");
         return;
     }
     
-    qint64 dbCheckTime = timer.elapsed();
-    
     QSqlQuery query(db);
     
     // Query only files that have been checked by API (status >= 2)
     // Status: 0=not hashed, 1=hashed but not checked by API, 2=in anidb, 3=not in anidb
     // Files with status=1 need to be detected so they can be checked against API
-    timer.restart();
     bool querySuccess = query.exec("SELECT path FROM local_files WHERE status >= 2");
-    qint64 queryTime = timer.elapsed();
     
     if (!querySuccess) {
-        LOG(QString("DirectoryWatcher: Failed to query local_files table (query time: %1 ms): %2")
-                    .arg(queryTime).arg(query.lastError().text()));
+        LOG(QString("DirectoryWatcher: Failed to query local_files table: %1")
+                    .arg(query.lastError().text()));
         return;
     }
     
-    timer.restart();
     while (query.next()) {
         QString filePath = query.value(0).toString();
         if (!filePath.isEmpty()) {
             m_processedFiles.insert(filePath);
         }
     }
-    
-    qint64 rowProcessTime = timer.elapsed();
 }
 
 void DirectoryWatcher::saveProcessedFile(const QString &filePath)
