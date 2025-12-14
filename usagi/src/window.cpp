@@ -3455,53 +3455,55 @@ void Window::sortMylistCards(int sortIndex)
 			});
 			break;
 		case 6: // Recent Episode Air Date
-			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
-				// Get data from cache (cards don't directly expose air date)
-				const MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
-				const MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+			{
+				// Get current timestamp once to avoid repeated system calls during sorting
+				const qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
 				
-				const bool hiddenA = cachedA.isHidden();
-				const bool hiddenB = cachedB.isHidden();
-				
-				// Hidden cards always go to the bottom
-				if (hiddenA != hiddenB) {
-					return hiddenB;  // non-hidden comes before hidden
-				}
-				
-				const qint64 airDateA = cachedA.recentEpisodeAirDate();
-				const qint64 airDateB = cachedB.recentEpisodeAirDate();
-				
-				// Get current timestamp to check for not-yet-aired anime
-				qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
-				
-				// Check if anime haven't aired yet (air date is in the future)
-				bool notYetAiredA = (airDateA > 0 && airDateA > currentTimestamp);
-				bool notYetAiredB = (airDateB > 0 && airDateB > currentTimestamp);
-				
-				// Not-yet-aired anime go to the end regardless of sort order
-				if (notYetAiredA != notYetAiredB) {
-					return notYetAiredB;  // aired comes before not-yet-aired
-				}
-				
-				// Episodes with no air date (0) go to the end regardless of sort order
-				if (airDateA == 0 && airDateB == 0) {
-					const QString titleA = cachedA.animeName();
-					const QString titleB = cachedB.animeName();
-					return titleA < titleB;
-				}
-				if (airDateA == 0) {
-					return false;  // a goes after b
-				}
-				if (airDateB == 0) {
-					return true;   // a goes before b
-				}
-				
-				if (sortAscending) {
-					return airDateA < airDateB;
-				} else {
-					return airDateA > airDateB;
-				}
-			});
+				std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending, currentTimestamp](int aidA, int aidB) {
+					// Get data from cache (cards don't directly expose air date)
+					const MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+					const MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+					
+					const bool hiddenA = cachedA.isHidden();
+					const bool hiddenB = cachedB.isHidden();
+					
+					// Hidden cards always go to the bottom
+					if (hiddenA != hiddenB) {
+						return hiddenB;  // non-hidden comes before hidden
+					}
+					
+					const qint64 airDateA = cachedA.recentEpisodeAirDate();
+					const qint64 airDateB = cachedB.recentEpisodeAirDate();
+					
+					// Check if anime haven't aired yet (air date is in the future)
+					bool notYetAiredA = (airDateA > 0 && airDateA > currentTimestamp);
+					bool notYetAiredB = (airDateB > 0 && airDateB > currentTimestamp);
+					
+					// Not-yet-aired anime go to the end regardless of sort order
+					if (notYetAiredA != notYetAiredB) {
+						return notYetAiredB;  // aired comes before not-yet-aired
+					}
+					
+					// Episodes with no air date (0) go to the end regardless of sort order
+					if (airDateA == 0 && airDateB == 0) {
+						const QString titleA = cachedA.animeName();
+						const QString titleB = cachedB.animeName();
+						return titleA < titleB;
+					}
+					if (airDateA == 0) {
+						return false;  // a goes after b
+					}
+					if (airDateB == 0) {
+						return true;   // a goes before b
+					}
+					
+					if (sortAscending) {
+						return airDateA < airDateB;
+					} else {
+						return airDateA > airDateB;
+					}
+				});
+			}
 			break;
 	}
 	

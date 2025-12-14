@@ -2073,14 +2073,9 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         
         // Failover: If no episode air date available, use anime startDate
         if (maxAirDate == 0 && !data.startDate.isEmpty()) {
-            QString cleanStartDate = data.startDate;
-            if (cleanStartDate.endsWith("Z")) {
-                cleanStartDate.chop(1);
-            }
-            QDate startDate = QDate::fromString(cleanStartDate, Qt::ISODate);
-            if (startDate.isValid()) {
-                // Convert QDate to Unix timestamp (seconds since epoch)
-                QDateTime startDateTime(startDate, QTime(0, 0, 0), Qt::UTC);
+            // Parse ISO date format (handles "YYYY-MM-DDZ" or "YYYY-MM-DD")
+            QDateTime startDateTime = QDateTime::fromString(data.startDate, Qt::ISODate);
+            if (startDateTime.isValid()) {
                 maxAirDate = startDateTime.toSecsSinceEpoch();
             }
         }

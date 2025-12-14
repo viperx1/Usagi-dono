@@ -235,6 +235,7 @@ int AnimeChain::compareWith(
                 qint64 otherRecentAirDate = otherData.recentEpisodeAirDate;
                 
                 // Get current timestamp to check for not-yet-aired anime
+                // Note: Called once per comparison - sorting completes quickly so impact is minimal
                 qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
                 
                 // Check if anime haven't aired yet (air date is in the future)
