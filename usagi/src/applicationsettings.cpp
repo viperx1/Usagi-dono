@@ -20,8 +20,6 @@ void ApplicationSettings::load()
         return;
     }
     
-    Logger::log("[Settings] Loading application settings from database", __FILE__, __LINE__);
-    
     QSqlQuery query(m_database);
     query.exec("SELECT `name`, `value` FROM `settings`");
     
@@ -95,8 +93,6 @@ void ApplicationSettings::load()
             m_hasher.filterMasks = value;
         }
     }
-    
-    Logger::log("[Settings] Application settings loaded successfully", __FILE__, __LINE__);
 }
 
 void ApplicationSettings::save()

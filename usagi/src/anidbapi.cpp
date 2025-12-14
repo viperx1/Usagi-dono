@@ -20,7 +20,6 @@ myAniDBApi *adbapi = nullptr;
 AniDBApi::AniDBApi(QString client_, int clientver_)
 	: m_settings()  // Initialize ApplicationSettings (will set database later)
 {
-	Logger::log("[AniDB Init] Constructor started", __FILE__, __LINE__);
 	protover = 3;
 	client = client_; //"usagi";
 	clientver = clientver_; //1;
@@ -29,14 +28,11 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	// Skip DNS lookup in test mode to avoid network-related crashes on Windows
 	if (qgetenv("USAGI_TEST_MODE") != "1")
 	{
-		Logger::log("[AniDB Init] Starting DNS lookup for api.anidb.net (this may block)", __FILE__, __LINE__);
 		host = QHostInfo::fromName("api.anidb.net");
-		Logger::log("[AniDB Init] DNS lookup completed", __FILE__, __LINE__);
 		const QList<QHostAddress> addresses = host.addresses();
 		if(!addresses.isEmpty())
 		{
 			anidbaddr.setAddress(addresses.first().toIPv4Address());
-			Logger::log("[AniDB Init] DNS resolved successfully to " + addresses.first().toString(), __FILE__, __LINE__);
 		}
 		else
 		{
@@ -47,7 +43,7 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	}
 	else
 	{
-		Logger::log("[AniDB Init] Test mode: Skipping DNS lookup for api.anidb.net", __FILE__, __LINE__);
+		// Test mode - skip DNS lookup
 	}
 	
 	anidbport = 9000;
@@ -56,7 +52,6 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	Socket = nullptr;
 	currentTag = ""; // Initialize current tag tracker
 
-	Logger::log("[AniDB Init] Setting up database connection", __FILE__, __LINE__);
 	// Check if default database connection already exists (e.g., in tests)
 	if(QSqlDatabase::contains(QSqlDatabase::defaultConnection))
 	{
@@ -80,10 +75,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 
     aes_key = "8fsd789f7sd7f6sd78695g35345g34gf4";
 
-	Logger::log("[AniDB Init] Opening database", __FILE__, __LINE__);
 	if(db.open())
 	{
-		Logger::log("[AniDB Init] Database opened, starting transaction", __FILE__, __LINE__);
 		db.transaction();
 //		Debug("AniDBApi: Database opened");
 		query = QSqlQuery(db);
@@ -200,12 +193,9 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// Create index for efficient chunk lookups
 		query.exec("CREATE INDEX IF NOT EXISTS `idx_watch_chunks_lid` ON `watch_chunks`(`lid`);");
 		
-		Logger::log("[AniDB Init] Committing database transaction", __FILE__, __LINE__);
 		db.commit();
-		Logger::log("[AniDB Init] Database transaction committed", __FILE__, __LINE__);
 	}
 //	QStringList names = QStringList()<<"username"<<"password";
-	Logger::log("[AniDB Init] Reading settings from database", __FILE__, __LINE__);
 	
 	// Execute SELECT query after transaction commit to read settings
 	query.exec("SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC");
@@ -239,10 +229,8 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	hasherFilterMasks = "*.!qB,*.tmp";  // Default masks for incomplete downloads
 	
 	// Initialize ApplicationSettings with database connection and load settings
-	Logger::log("[AniDB Init] Initializing ApplicationSettings", __FILE__, __LINE__);
 	m_settings = ApplicationSettings(db);
 	m_settings.load();
-	Logger::log("[AniDB Init] ApplicationSettings loaded", __FILE__, __LINE__);
 	
 	while(query.next())
 	{
@@ -329,11 +317,9 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	}
 
 	// Initialize network manager for anime titles download
-	Logger::log("[AniDB Init] Initializing network manager", __FILE__, __LINE__);
 	networkManager = new QNetworkAccessManager(this);
 	connect(networkManager, &QNetworkAccessManager::finished, this, &AniDBApi::onAnimeTitlesDownloaded);
 
-	Logger::log("[AniDB Init] Setting up packet sender timer", __FILE__, __LINE__);
 	packetsender = new QTimer();
 	connect(packetsender, SIGNAL(timeout()), this, SLOT(SendPacket()));
 
@@ -341,7 +327,6 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	packetsender->start();
 	
 	// Initialize notification checking timer
-	Logger::log("[AniDB Init] Setting up notification check timer", __FILE__, __LINE__);
 	notifyCheckTimer = new QTimer();
 	connect(notifyCheckTimer, SIGNAL(timeout()), this, SLOT(checkForNotifications()));
 	isExportQueued = false;
@@ -354,37 +339,30 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 	loadExportQueueState();
 
 	// Check and download anime titles if needed (automatically on startup if auto-fetch is enabled)
-	Logger::log("[AniDB Init] Checking if anime titles need update", __FILE__, __LINE__);
 	if(autoFetchEnabled && shouldUpdateAnimeTitles())
 	{
-		Logger::log("[AniDB Init] Auto-fetch enabled - starting anime titles download", __FILE__, __LINE__);
 		downloadAnimeTitles();
 	}
 	else if(!autoFetchEnabled)
 	{
-		Logger::log("[AniDB Init] Auto-fetch disabled - skipping anime titles download", __FILE__, __LINE__);
+		// Auto-fetch disabled - skipping
 	}
 	else
 	{
-		Logger::log("[AniDB Init] Anime titles are up to date, skipping download", __FILE__, __LINE__);
+		// Anime titles are up to date
 	}
 	
 	// Check if we need to perform a CALENDAR check (on startup)
-	Logger::log("[AniDB Init] Checking if calendar check is needed", __FILE__, __LINE__);
 	// Calendar check will happen after login, we just initialize the last check time here
 	query.exec("SELECT `value` FROM `settings` WHERE `name` = 'last_calendar_check'");
 	if(query.next())
 	{
 		lastCalendarCheck = QDateTime::fromSecsSinceEpoch(query.value(0).toLongLong());
-		Logger::log("[AniDB Init] Last calendar check was: " + lastCalendarCheck.toString(), __FILE__, __LINE__);
 	}
 	else
 	{
 		lastCalendarCheck = QDateTime::fromSecsSinceEpoch(0); // Never checked
-		Logger::log("[AniDB Init] No previous calendar check found", __FILE__, __LINE__);
 	}
-
-	Logger::log("[AniDB Init] Constructor completed successfully", __FILE__, __LINE__);
 
 //	codec = QTextCodec::codecForName("UTF-8");
 }
@@ -471,7 +449,7 @@ int AniDBApi::CreateSocket()
  	{
 		if(Socket->isValid())
 	 	{
-			LOG("AniDBApi: UDP socket created");
+			// UDP socket created successfully
 		}
 		else
 		{
@@ -4036,7 +4014,6 @@ QString AniDBApi::GetTag(QString str)
 
 bool AniDBApi::shouldUpdateAnimeTitles()
 {
-	Logger::log("[AniDB Anime Titles] Checking if anime titles need update", __FILE__, __LINE__);
 	// Check if we should download anime titles
 	// Download if: never downloaded before OR last update was more than 24 hours ago
 	// Read from database to ensure we have the most up-to-date timestamp
@@ -4046,14 +4023,12 @@ bool AniDBApi::shouldUpdateAnimeTitles()
 	if(!query.next())
 	{
 		// Never downloaded before
-		Logger::log("[AniDB Anime Titles] No previous download found, download needed", __FILE__, __LINE__);
 		return true;
 	}
 	
 	QDateTime lastUpdate = QDateTime::fromSecsSinceEpoch(query.value(0).toLongLong());
 	qint64 secondsSinceLastUpdate = lastUpdate.secsTo(QDateTime::currentDateTime());
 	bool needsUpdate = secondsSinceLastUpdate > 86400; // 86400 seconds = 24 hours
-	Logger::log("[AniDB Anime Titles] Last update was " + QString::number(secondsSinceLastUpdate) + " seconds ago, needs update: " + (needsUpdate ? "yes" : "no"), __FILE__, __LINE__);
 	return needsUpdate;
 }
 
@@ -4438,7 +4413,7 @@ void AniDBApi::loadExportQueueState()
 	}
 	else
 	{
-		Logger::log("[AniDB Export] No pending export found in database", __FILE__, __LINE__);
+		// No pending export
 	}
 }
 

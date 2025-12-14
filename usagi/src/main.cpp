@@ -18,9 +18,6 @@ int main(int argc, char *argv[])
     // Install crash log handler
     CrashLog::install();
     
-    // Test unified logging system
-    LOG("Usagi-dono application starting [main.cpp]");
-    
     app.addLibraryPath(".\\plugins");
     window = new Window;
     window->show();
