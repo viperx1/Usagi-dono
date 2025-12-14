@@ -3471,6 +3471,18 @@ void Window::sortMylistCards(int sortIndex)
 				const qint64 airDateA = cachedA.recentEpisodeAirDate();
 				const qint64 airDateB = cachedB.recentEpisodeAirDate();
 				
+				// Get current timestamp to check for not-yet-aired anime
+				qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
+				
+				// Check if anime haven't aired yet (air date is in the future)
+				bool notYetAiredA = (airDateA > 0 && airDateA > currentTimestamp);
+				bool notYetAiredB = (airDateB > 0 && airDateB > currentTimestamp);
+				
+				// Not-yet-aired anime go to the end regardless of sort order
+				if (notYetAiredA != notYetAiredB) {
+					return notYetAiredB;  // aired comes before not-yet-aired
+				}
+				
 				// Episodes with no air date (0) go to the end regardless of sort order
 				if (airDateA == 0 && airDateB == 0) {
 					const QString titleA = cachedA.animeName();

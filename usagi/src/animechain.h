@@ -5,6 +5,7 @@
 #include <QString>
 #include <QPair>
 #include <QMap>
+#include <QDateTime>
 #include <functional>
 
 // Forward declaration - use full namespace path in MyListCardManager
@@ -233,8 +234,19 @@ int AnimeChain::compareWith(
                 qint64 myRecentAirDate = myData.recentEpisodeAirDate;
                 qint64 otherRecentAirDate = otherData.recentEpisodeAirDate;
                 
-                // Episodes with no air date (0) should appear at the end
-                if (myRecentAirDate == 0 && otherRecentAirDate == 0) {
+                // Get current timestamp to check for not-yet-aired anime
+                qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
+                
+                // Check if anime haven't aired yet (air date is in the future)
+                bool myNotYetAired = (myRecentAirDate > 0 && myRecentAirDate > currentTimestamp);
+                bool otherNotYetAired = (otherRecentAirDate > 0 && otherRecentAirDate > currentTimestamp);
+                
+                // Not-yet-aired anime go to the end regardless of sort order
+                if (myNotYetAired != otherNotYetAired) {
+                    // If only one is not-yet-aired, the aired one comes first
+                    result = otherNotYetAired ? -1 : 1;
+                } else if (myRecentAirDate == 0 && otherRecentAirDate == 0) {
+                    // Both have no air date
                     result = 0;
                 } else if (myRecentAirDate == 0) {
                     // No air date: should appear after the other

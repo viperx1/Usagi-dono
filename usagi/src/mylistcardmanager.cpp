@@ -2070,6 +2070,21 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                 });
             maxAirDate = maxAirIt->airDate;
         }
+        
+        // Failover: If no episode air date available, use anime startDate
+        if (maxAirDate == 0 && !data.startDate.isEmpty()) {
+            QString cleanStartDate = data.startDate;
+            if (cleanStartDate.endsWith("Z")) {
+                cleanStartDate.chop(1);
+            }
+            QDate startDate = QDate::fromString(cleanStartDate, Qt::ISODate);
+            if (startDate.isValid()) {
+                // Convert QDate to Unix timestamp (seconds since epoch)
+                QDateTime startDateTime(startDate, QTime(0, 0, 0), Qt::UTC);
+                maxAirDate = startDateTime.toSecsSinceEpoch();
+            }
+        }
+        
         data.recentEpisodeAirDate = maxAirDate;
     }
     LOG(QString("[MyListCardManager] Step 4: Loaded %1 episodes in %2 ms").arg(totalEpisodes).arg(step4Elapsed));

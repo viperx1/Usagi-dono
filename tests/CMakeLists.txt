@@ -2376,3 +2376,30 @@ if(WIN32)
 endif()
 
 add_test(NAME test_recent_episode_air_date_sort COMMAND test_recent_episode_air_date_sort -v2)
+
+# ==========================================================
+# test_recent_episode_sort_improvements - Recent episode sorting improvements tests
+# ==========================================================
+add_executable(test_recent_episode_sort_improvements
+    test_recent_episode_sort_improvements.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animechain.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animestats.cpp
+)
+
+target_link_libraries(test_recent_episode_sort_improvements PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_recent_episode_sort_improvements PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_recent_episode_sort_improvements PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_recent_episode_sort_improvements COMMAND test_recent_episode_sort_improvements -v2)
