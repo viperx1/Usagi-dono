@@ -68,6 +68,7 @@ void MyListFilterSidebar::setupUI()
     m_sortComboBox->addItem("Episodes (Count)");
     m_sortComboBox->addItem("Completion %");
     m_sortComboBox->addItem("Last Played");
+    m_sortComboBox->addItem("Recent Episode Air Date");
     m_sortComboBox->setCurrentIndex(2);  // Default to Aired Date
     connect(m_sortComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MyListFilterSidebar::onSortChanged);

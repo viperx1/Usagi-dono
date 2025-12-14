@@ -823,6 +823,9 @@ MyListCardManager::CachedAnimeData MyListCardManager::getCachedAnimeData(int aid
     }
     result.setLastPlayed(maxLastPlayed);
     
+    // Set recent episode air date from cached data
+    result.setRecentEpisodeAirDate(data.recentEpisodeAirDate);
+    
     result.setHasData(data.hasData);
     
     return result;
@@ -2002,7 +2005,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                                    "f.resolution, f.quality, "
                                    "g.name as group_name, "
                                    "m.local_watched, "
-                                   "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched "
+                                   "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched, "
+                                   "f.airdate "
                                    "FROM mylist m "
                                    "LEFT JOIN episode e ON m.eid = e.eid "
                                    "LEFT JOIN file f ON m.fid = f.fid "
@@ -2035,6 +2039,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                 entry.groupName = episodesQ.value(14).toString();
                 entry.localWatched = episodesQ.value(15).toInt();
                 entry.episodeWatched = episodesQ.value(16).toInt();
+                entry.airDate = episodesQ.value(17).toLongLong();
                 
                 m_cardCreationDataCache[aid].episodes.append(entry);
             }
@@ -2055,6 +2060,17 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
             maxLastPlayed = maxIt->lastPlayed;
         }
         data.lastPlayed = maxLastPlayed;
+        
+        // Calculate recentEpisodeAirDate as the maximum air date from all episodes
+        qint64 maxAirDate = 0;
+        if (!data.episodes.isEmpty()) {
+            auto maxAirIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+                [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
+                    return a.airDate < b.airDate;
+                });
+            maxAirDate = maxAirIt->airDate;
+        }
+        data.recentEpisodeAirDate = maxAirDate;
     }
     LOG(QString("[MyListCardManager] Step 4: Loaded %1 episodes in %2 ms").arg(totalEpisodes).arg(step4Elapsed));
     emit progressUpdate(QString("Loaded episodes (%1 of 3)...").arg(3));

@@ -3173,6 +3173,9 @@ void Window::sortMylistCards(int sortIndex)
 			case 5:  // Last Played
 				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeLastPlayed;
 				break;
+			case 6:  // Recent Episode Air Date
+				chainCriteria = AnimeChain::SortCriteria::ByRecentEpisodeAirDate;
+				break;
 			default:
 				chainCriteria = AnimeChain::SortCriteria::ByRepresentativeDate;
 				break;
@@ -3448,6 +3451,43 @@ void Window::sortMylistCards(int sortIndex)
 					return lastPlayedA < lastPlayedB;
 				} else {
 					return lastPlayedA > lastPlayedB;
+				}
+			});
+			break;
+		case 6: // Recent Episode Air Date
+			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
+				// Get data from cache (cards don't directly expose air date)
+				MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+				MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+				
+				bool hiddenA = cachedA.isHidden();
+				bool hiddenB = cachedB.isHidden();
+				QString titleA = cachedA.animeName();
+				QString titleB = cachedB.animeName();
+				
+				// Hidden cards always go to the bottom
+				if (hiddenA != hiddenB) {
+					return hiddenB;  // non-hidden comes before hidden
+				}
+				
+				qint64 airDateA = cachedA.recentEpisodeAirDate();
+				qint64 airDateB = cachedB.recentEpisodeAirDate();
+				
+				// Episodes with no air date (0) go to the end regardless of sort order
+				if (airDateA == 0 && airDateB == 0) {
+					return titleA < titleB;
+				}
+				if (airDateA == 0) {
+					return false;  // a goes after b
+				}
+				if (airDateB == 0) {
+					return true;   // a goes before b
+				}
+				
+				if (sortAscending) {
+					return airDateA < airDateB;
+				} else {
+					return airDateA > airDateB;
 				}
 			});
 			break;

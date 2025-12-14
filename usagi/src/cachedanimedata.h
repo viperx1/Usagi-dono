@@ -43,6 +43,7 @@ public:
     int eptotal() const { return m_eptotal; }
     const AnimeStats& stats() const { return m_stats; }
     qint64 lastPlayed() const { return m_lastPlayed; }
+    qint64 recentEpisodeAirDate() const { return m_recentEpisodeAirDate; }
     bool hasData() const { return m_hasData; }
     
     // Setters
@@ -55,6 +56,7 @@ public:
     void setEptotal(int total) { m_eptotal = total; }
     void setStats(const AnimeStats& stats) { m_stats = stats; }
     void setLastPlayed(qint64 timestamp) { m_lastPlayed = timestamp; }
+    void setRecentEpisodeAirDate(qint64 timestamp) { m_recentEpisodeAirDate = timestamp; }
     void setHasData(bool hasData) { m_hasData = hasData; }
     
     /**
@@ -96,6 +98,7 @@ private:
     int m_eptotal;              ///< Total episode count from anime data
     AnimeStats m_stats;         ///< Episode statistics
     qint64 m_lastPlayed;        ///< Most recent play timestamp from episodes
+    qint64 m_recentEpisodeAirDate; ///< Most recent episode air date from files
     bool m_hasData;             ///< Whether this cache entry has been populated
 };
 

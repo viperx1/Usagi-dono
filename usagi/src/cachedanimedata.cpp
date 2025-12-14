@@ -5,6 +5,7 @@ CachedAnimeData::CachedAnimeData()
     , m_is18Restricted(false)
     , m_eptotal(0)
     , m_lastPlayed(0)
+    , m_recentEpisodeAirDate(0)
     , m_hasData(false)
 {
 }
@@ -54,5 +55,6 @@ void CachedAnimeData::reset()
     m_eptotal = 0;
     m_stats.reset();
     m_lastPlayed = 0;
+    m_recentEpisodeAirDate = 0;
     m_hasData = false;
 }
