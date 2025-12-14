@@ -2349,3 +2349,29 @@ endif()
 
 add_test(NAME test_filter_classes COMMAND test_filter_classes -v2)
 
+
+# ==========================================================
+# test_recent_episode_air_date_sort - Recent episode air date sorting tests
+# ==========================================================
+add_executable(test_recent_episode_air_date_sort
+    test_recent_episode_air_date_sort.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animechain.cpp
+)
+
+target_link_libraries(test_recent_episode_air_date_sort PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_recent_episode_air_date_sort PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_recent_episode_air_date_sort PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_recent_episode_air_date_sort COMMAND test_recent_episode_air_date_sort -v2)
