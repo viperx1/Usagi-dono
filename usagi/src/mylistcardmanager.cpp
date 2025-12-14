@@ -2053,7 +2053,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         // Calculate lastPlayed as the maximum timestamp from all episodes
         qint64 maxLastPlayed = 0;
         if (!data.episodes.isEmpty()) {
-            auto maxIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+            QList<EpisodeCacheEntry>::const_iterator maxIt = std::max_element(data.episodes.begin(), data.episodes.end(),
                 [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
                     return a.lastPlayed < b.lastPlayed;
                 });
@@ -2064,7 +2064,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         // Calculate recentEpisodeAirDate as the maximum air date from all episodes
         qint64 maxAirDate = 0;
         if (!data.episodes.isEmpty()) {
-            auto maxAirIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+            QList<EpisodeCacheEntry>::const_iterator maxAirIt = std::max_element(data.episodes.begin(), data.episodes.end(),
                 [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
                     return a.airDate < b.airDate;
                 });
