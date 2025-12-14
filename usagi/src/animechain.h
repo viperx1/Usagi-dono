@@ -231,8 +231,33 @@ int AnimeChain::compareWith(
                 break;
             }
             case SortCriteria::ByRecentEpisodeAirDate: {
-                qint64 myRecentAirDate = myData.recentEpisodeAirDate;
-                qint64 otherRecentAirDate = otherData.recentEpisodeAirDate;
+                // For chains with mixed hidden/non-hidden anime, use the most recent air date
+                // from non-hidden anime only. This prevents chains with some hidden anime
+                // from appearing at the top when they should be at the bottom.
+                auto getChainAirDate = [&dataCache](const QList<int>& animeIds, bool chainFullyHidden) -> qint64 {
+                    if (chainFullyHidden || animeIds.isEmpty()) {
+                        // For fully hidden chains or empty chains, use representative (first) anime
+                        if (animeIds.isEmpty() || !dataCache.contains(animeIds.first())) {
+                            return 0;
+                        }
+                        return dataCache[animeIds.first()].recentEpisodeAirDate;
+                    }
+                    
+                    // For chains with at least one non-hidden anime, find the most recent
+                    // air date among non-hidden anime only
+                    qint64 maxAirDate = 0;
+                    for (int aid : animeIds) {
+                        if (dataCache.contains(aid) && !dataCache[aid].isHidden) {
+                            if (dataCache[aid].recentEpisodeAirDate > maxAirDate) {
+                                maxAirDate = dataCache[aid].recentEpisodeAirDate;
+                            }
+                        }
+                    }
+                    return maxAirDate;
+                };
+                
+                qint64 myRecentAirDate = getChainAirDate(m_animeIds, myChainAllHidden);
+                qint64 otherRecentAirDate = getChainAirDate(other.m_animeIds, otherChainAllHidden);
                 
                 // Get current timestamp to check for not-yet-aired anime
                 // Note: Called once per comparison during std::sort. While this could be optimized

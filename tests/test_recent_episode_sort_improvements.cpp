@@ -24,6 +24,7 @@ private slots:
     void testHiddenTakesPrecedenceOverNotYetAired();
     void testChainModeNotYetAired();
     void testChainModeHiddenWithNotYetAired();
+    void testMixedHiddenChainUsesNonHiddenAirDate();
 
 private:
     // Helper: Create a simple lookup function with no relations
@@ -254,6 +255,53 @@ void TestRecentEpisodeSortImprovements::testChainModeHiddenWithNotYetAired()
     
     int result_3_4 = chain3.compareWith(chain4, dataCache, AnimeChain::SortCriteria::ByRecentEpisodeAirDate, false);
     QVERIFY2(result_3_4 < 0, "Within hidden: Aired < Not yet aired");
+}
+
+void TestRecentEpisodeSortImprovements::testMixedHiddenChainUsesNonHiddenAirDate()
+{
+    // Test that chains with both hidden and non-hidden anime use the most recent
+    // air date from non-hidden anime, not from the representative (first) anime
+    AnimeChain::RelationLookupFunc lookup = noRelationsLookup();
+    
+    // Create a chain with 3 anime: [hidden with no data, non-hidden old, non-hidden recent]
+    AnimeChain chain1({100, 101, 102});
+    
+    // Create another chain with all visible anime, older air date
+    AnimeChain chain2(200, lookup);
+    
+    qint64 currentTime = QDateTime::currentSecsSinceEpoch();
+    qint64 oldDate = currentTime - (365 * 24 * 60 * 60);  // 1 year ago
+    qint64 recentDate = currentTime - (30 * 24 * 60 * 60);  // 1 month ago
+    qint64 veryOldDate = currentTime - (730 * 24 * 60 * 60);  // 2 years ago
+    
+    QMap<int, MockCardDataImproved> dataCache;
+    
+    // Chain 1: Mixed hidden/non-hidden
+    dataCache[100].animeTitle = "Hidden No Data";  // Representative anime
+    dataCache[100].recentEpisodeAirDate = 0;  // No air date
+    dataCache[100].isHidden = true;
+    
+    dataCache[101].animeTitle = "Old Non-Hidden";
+    dataCache[101].recentEpisodeAirDate = oldDate;
+    dataCache[101].isHidden = false;
+    
+    dataCache[102].animeTitle = "Recent Non-Hidden";
+    dataCache[102].recentEpisodeAirDate = recentDate;  // Most recent in chain
+    dataCache[102].isHidden = false;
+    
+    // Chain 2: All visible, but older than chain1's non-hidden anime
+    dataCache[200].animeTitle = "Very Old Visible";
+    dataCache[200].recentEpisodeAirDate = veryOldDate;
+    dataCache[200].isHidden = false;
+    
+    // Chain 1 should come BEFORE chain 2 because it has a non-hidden anime with more recent air date
+    // Even though chain 1's representative anime is hidden with no data
+    int result = chain1.compareWith(chain2, dataCache, AnimeChain::SortCriteria::ByRecentEpisodeAirDate, false);
+    QVERIFY2(result < 0, "Mixed chain with recent non-hidden anime should come before older visible chain");
+    
+    // Test the reverse to make sure
+    int result_reverse = chain2.compareWith(chain1, dataCache, AnimeChain::SortCriteria::ByRecentEpisodeAirDate, false);
+    QVERIFY2(result_reverse > 0, "Reverse comparison should also work correctly");
 }
 
 QTEST_MAIN(TestRecentEpisodeSortImprovements)
