@@ -173,7 +173,6 @@ void DirectoryWatcherManager::startWatching(const QString &dir)
 {
     m_directoryWatcher->startWatching(dir);
     setStatusText("Status: Watching " + dir);
-    LOG("Directory watcher started: " + dir);
     syncWatchSessionPath(dir);
 }
 

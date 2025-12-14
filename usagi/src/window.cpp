@@ -148,9 +148,6 @@ Window::Window()
 //	adbapi->SetUsername(settings->value("username").toString());
 //	adbapi->SetPassword(settings->value("password").toString());
 	
-	// Test unified logging system
-	LOG("Window constructor initializing [window.cpp]");
-	
 	// Initialize notification tracking
 	expectedNotificationsToCheck = 0;
 	notificationsCheckedWithoutExport = 0;
@@ -806,7 +803,6 @@ Window::Window()
     
     // Initialize watch session manager
     watchSessionManager = new WatchSessionManager(this);
-    LOG("[Window] WatchSessionManager initialized");
     if (directoryWatcherManager) {
         directoryWatcherManager->setWatchSessionManager(watchSessionManager);
     }
@@ -4279,14 +4275,11 @@ QIcon Window::loadUsagiIcon()
         ":/usagi.png"          // Qt resource (if added to .qrc in future)
     };
     
-    LOG(QString("Searching for icon. Application dir: %1").arg(QCoreApplication::applicationDirPath()));
-    
     for (const QString &path : iconPaths) {
         // Handle Qt resource paths separately (they don't exist as files)
         if (path.startsWith(":/")) {
             QIcon icon(path);
             if (!icon.isNull()) {
-                LOG(QString("Loaded icon from Qt resource: %1").arg(path));
                 return icon;
             }
         } else {
@@ -4294,7 +4287,6 @@ QIcon Window::loadUsagiIcon()
             if (QFile::exists(path)) {
                 QIcon icon(path);
                 if (!icon.isNull()) {
-                    LOG(QString("Loaded icon from: %1").arg(path));
                     return icon;
                 } else {
                     LOG(QString("Icon file exists but failed to load: %1").arg(path));

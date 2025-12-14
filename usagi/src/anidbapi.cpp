@@ -449,7 +449,7 @@ int AniDBApi::CreateSocket()
  	{
 		if(Socket->isValid())
 	 	{
-			LOG("AniDBApi: UDP socket created");
+			// UDP socket created successfully
 		}
 		else
 		{
