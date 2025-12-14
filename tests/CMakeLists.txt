@@ -2356,6 +2356,7 @@ add_test(NAME test_filter_classes COMMAND test_filter_classes -v2)
 add_executable(test_recent_episode_air_date_sort
     test_recent_episode_air_date_sort.cpp
     ${CMAKE_SOURCE_DIR}/usagi/src/animechain.cpp
+    ${CMAKE_SOURCE_DIR}/usagi/src/animestats.cpp
 )
 
 target_link_libraries(test_recent_episode_air_date_sort PRIVATE
