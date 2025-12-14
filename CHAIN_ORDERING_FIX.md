@@ -4,14 +4,18 @@
 
 Anime chains were being ordered incorrectly. For the Inuyasha series:
 
-**Expected order:**
-1. 144 - Inuyasha (first in series)
-2. 6716 - Inuyasha Kanketsuhen (sequel of 144)
-3. 15546 - Han'you no Yashahime (sequel of 6716)
-4. 16141 - Han'you no Yashahime S2 (sequel of 15546)
+**Expected order (after reversal):**
+1. 16141 - Han'you no Yashahime S2 (last in series)
+2. 15546 - Han'you no Yashahime (prequel of 16141)
+3. 6716 - Inuyasha Kanketsuhen (prequel of 15546)
+4. 144 - Inuyasha (first in series)
 
-**Actual order:**
-15546, 144, 16141, 6716 (completely wrong!)
+**Previous order (before reversal):**
+144, 6716, 15546, 16141 (prequel to sequel)
+
+## Current Behavior
+
+Chains are now ordered from **sequel to prequel** (reversed chronological order), showing the most recent anime first.
 
 ## Root Cause
 
@@ -94,12 +98,12 @@ The topological sort in `orderChain()` works as follows:
    - When a sequel's in-degree reaches 0, it can be processed next
 
 For the Inuyasha chain:
-- 144 has in-degree 0 (no prequel) → processed first
-- 6716 has in-degree 1 (prequel=144) → processed after 144
-- 15546 has in-degree 1 (prequel=6716) → processed after 6716
-- 16141 has in-degree 1 (prequel=15546) → processed last
+- 16141 has in-degree 1 (prequel=15546) → processed first (most recent)
+- 15546 has in-degree 1 (prequel=6716) → processed second
+- 6716 has in-degree 1 (prequel=144) → processed third
+- 144 has in-degree 0 (no prequel) → processed last (oldest)
 
-Result: **144 → 6716 → 15546 → 16141** ✅
+After reversal: **16141 → 15546 → 6716 → 144** ✅ (sequel to prequel)
 
 ## Testing
 
@@ -111,7 +115,7 @@ Added comprehensive test suite (`tests/test_animechain.cpp`):
 4. **testMultipleRootsOrdered**: Verify disconnected chains are ordered by ID
 5. **testDisconnectedComponents**: Verify two separate chains merge correctly
 
-All tests verify that after expansion and merging, chains are ordered from prequel to sequel.
+All tests verify that after expansion and merging, chains are ordered from sequel to prequel (reversed chronological order).
 
 ## Files Changed
 

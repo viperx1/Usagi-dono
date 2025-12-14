@@ -142,7 +142,7 @@ void AnimeChain::expand(RelationLookupFunc lookupFunc)
     orderChain();
 }
 
-// Order the anime IDs in the chain from prequel to sequel
+// Order the anime IDs in the chain from sequel to prequel (reversed)
 void AnimeChain::orderChain()
 {
     if (m_animeIds.size() <= 1) {
@@ -217,6 +217,9 @@ void AnimeChain::orderChain()
             }
         }
     }
+    
+    // Reverse the order to go from sequel to prequel instead of prequel to sequel
+    std::reverse(orderedChain.begin(), orderedChain.end());
     
     m_animeIds = orderedChain;
 }
