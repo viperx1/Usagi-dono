@@ -99,9 +99,6 @@ The sorting now follows this priority order (from highest to lowest):
 6. `testChainModeNotYetAired` - Verifies chain mode handles not-yet-aired correctly
 7. `testChainModeHiddenWithNotYetAired` - Verifies chain mode with mixed conditions
 8. `testMixedHiddenChainUsesNonHiddenAirDate` - **NEW:** Verifies chains with both hidden and non-hidden anime use air dates from non-hidden anime only
-5. `testHiddenTakesPrecedenceOverNotYetAired` - Verifies hidden status takes precedence
-6. `testChainModeNotYetAired` - Verifies chain mode handles not-yet-aired correctly
-7. `testChainModeHiddenWithNotYetAired` - Verifies chain mode with mixed conditions
 
 ### tests/CMakeLists.txt
 **Changes:**
