@@ -18,8 +18,6 @@ HasherThreadPool::HasherThreadPool(int numThreads, QObject *parent)
     // Clamp to reasonable range: minimum 1, maximum 16
     numThreads = std::max(1, std::min(numThreads, 16));
     
-    LOG(QString("HasherThreadPool: Creating pool with %1 worker threads").arg(numThreads));
-    
     // Create worker threads with sequential thread IDs
     for (int i = 0; i < numThreads; ++i)
     {
