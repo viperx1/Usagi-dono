@@ -193,6 +193,31 @@ AniDBApi::AniDBApi(QString client_, int clientver_)
 		// Create index for efficient chunk lookups
 		query.exec("CREATE INDEX IF NOT EXISTS `idx_watch_chunks_lid` ON `watch_chunks`(`lid`);");
 		
+		// Create watched_episodes table for episode-level watch tracking
+		// This persists watch state at episode level, independent of file replacements
+		if (!query.exec("CREATE TABLE IF NOT EXISTS `watched_episodes`("
+		                "`eid` INTEGER PRIMARY KEY, "
+		                "`watched_at` INTEGER NOT NULL"
+		                ");")) {
+			LOG(QString("Error creating watched_episodes table: %1").arg(query.lastError().text()));
+		}
+		
+		// Migrate existing local_watched data to episode-level tracking
+		// This ensures previously watched episodes remain marked as watched
+		// Use COALESCE to ensure we always have a valid timestamp even if viewdate is NULL
+		if (!query.exec("INSERT OR IGNORE INTO `watched_episodes` (eid, watched_at) "
+		                "SELECT DISTINCT m.eid, COALESCE(MAX(m.viewdate), strftime('%s', 'now')) "
+		                "FROM mylist m "
+		                "WHERE m.local_watched = 1 AND m.eid > 0 "
+		                "GROUP BY m.eid")) {
+			LOG(QString("Error migrating watched episodes data: %1").arg(query.lastError().text()));
+		} else {
+			int migrated = query.numRowsAffected();
+			if (migrated > 0) {
+				LOG(QString("Migrated %1 episode(s) to episode-level watch tracking").arg(migrated));
+			}
+		}
+		
 		db.commit();
 	}
 //	QStringList names = QStringList()<<"username"<<"password";

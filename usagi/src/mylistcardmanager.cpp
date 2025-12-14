@@ -1582,12 +1582,14 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
               "lf.path as local_file_path, "
               "f.resolution, f.quality, "
               "g.name as group_name, "
-              "m.local_watched "
+              "m.local_watched, "
+              "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched "
               "FROM mylist m "
               "LEFT JOIN episode e ON m.eid = e.eid "
               "LEFT JOIN file f ON m.fid = f.fid "
               "LEFT JOIN local_files lf ON m.local_file = lf.id "
               "LEFT JOIN `group` g ON m.gid = g.gid "
+              "LEFT JOIN watched_episodes we ON m.eid = we.eid "
               "WHERE m.aid = ? "
               "ORDER BY e.epno, m.lid");
     q.addBindValue(aid);
@@ -1610,6 +1612,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
             entry.quality = q.value(12).toString();
             entry.groupName = q.value(13).toString();
             entry.localWatched = q.value(14).toInt();
+            entry.episodeWatched = q.value(15).toInt();
             
             episodes.append(entry);
         }
@@ -1645,6 +1648,9 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
             }
             
             episodeInfo.setEpisodeTitle(entry.episodeName.isEmpty() ? "Episode" : entry.episodeName);
+            
+            // Set episode-level watched status (persists across file replacements)
+            episodeInfo.setEpisodeWatched(entry.episodeWatched != 0);
             
             if (entry.episodeName.isEmpty()) {
                 m_episodesNeedingData.insert(eid);
@@ -1995,12 +2001,14 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                                    "lf.path as local_file_path, "
                                    "f.resolution, f.quality, "
                                    "g.name as group_name, "
-                                   "m.local_watched "
+                                   "m.local_watched, "
+                                   "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched "
                                    "FROM mylist m "
                                    "LEFT JOIN episode e ON m.eid = e.eid "
                                    "LEFT JOIN file f ON m.fid = f.fid "
                                    "LEFT JOIN local_files lf ON m.local_file = lf.id "
                                    "LEFT JOIN `group` g ON m.gid = g.gid "
+                                   "LEFT JOIN watched_episodes we ON m.eid = we.eid "
                                    "WHERE m.aid IN (%1) "
                                    "ORDER BY m.aid, e.epno, m.lid").arg(aidsList);
     
@@ -2026,6 +2034,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                 entry.quality = episodesQ.value(13).toString();
                 entry.groupName = episodesQ.value(14).toString();
                 entry.localWatched = episodesQ.value(15).toInt();
+                entry.episodeWatched = episodesQ.value(16).toInt();
                 
                 m_cardCreationDataCache[aid].episodes.append(entry);
             }
@@ -2316,6 +2325,18 @@ void MyListCardManager::onMarkEpisodeWatchedRequested(int eid)
     int rowsAffected = q.numRowsAffected();
     LOG(QString("[MyListCardManager] Marked %1 file(s) as watched for episode eid=%2").arg(rowsAffected).arg(eid));
     
+    // Mark episode as watched at episode level (persists across file replacements)
+    q.prepare("INSERT OR REPLACE INTO watched_episodes (eid, watched_at) VALUES (?, ?)");
+    q.addBindValue(eid);
+    q.addBindValue(currentTimestamp);
+    
+    if (!q.exec()) {
+        LOG(QString("[MyListCardManager] Failed to mark episode watched at episode level eid=%1: %2")
+            .arg(eid).arg(q.lastError().text()));
+    } else {
+        LOG(QString("[MyListCardManager] Marked episode eid=%1 as watched at episode level").arg(eid));
+    }
+    
     // Get all files for this episode to update API
     q.prepare("SELECT m.lid, f.size, f.ed2k, m.aid FROM mylist m "
               "INNER JOIN file f ON m.fid = f.fid "
@@ -2374,8 +2395,8 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
     
     LOG(QString("[MyListCardManager] Marked file lid=%1 as watched").arg(lid));
     
-    // Get file info for API update
-    q.prepare("SELECT m.aid, f.size, f.ed2k FROM mylist m "
+    // Get file info for API update and episode ID
+    q.prepare("SELECT m.aid, f.size, f.ed2k, m.eid FROM mylist m "
               "INNER JOIN file f ON m.fid = f.fid "
               "WHERE m.lid = ?");
     q.addBindValue(lid);
@@ -2388,6 +2409,21 @@ void MyListCardManager::onMarkFileWatchedRequested(int lid)
     int aid = q.value(0).toInt();
     int size = q.value(1).toInt();
     QString ed2k = q.value(2).toString();
+    int eid = q.value(3).toInt();
+    
+    // Mark episode as watched at episode level (persists across file replacements)
+    if (eid > 0) {
+        q.prepare("INSERT OR REPLACE INTO watched_episodes (eid, watched_at) VALUES (?, ?)");
+        q.addBindValue(eid);
+        q.addBindValue(currentTimestamp);
+        
+        if (!q.exec()) {
+            LOG(QString("[MyListCardManager] Failed to mark episode watched at episode level eid=%1: %2")
+                .arg(eid).arg(q.lastError().text()));
+        } else {
+            LOG(QString("[MyListCardManager] Marked episode eid=%1 as watched at episode level").arg(eid));
+        }
+    }
     
     LOG(QString("[MyListCardManager] Marked file lid=%1 as watched, updating card for aid=%2").arg(lid).arg(aid));
     
