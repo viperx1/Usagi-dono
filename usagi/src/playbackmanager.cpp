@@ -272,7 +272,10 @@ void PlaybackManager::handleStatusReply()
                         q.prepare("INSERT OR REPLACE INTO watched_episodes (eid, watched_at) VALUES (?, ?)");
                         q.addBindValue(eid);
                         q.addBindValue(currentTimestamp);
-                        q.exec();
+                        if (!q.exec()) {
+                            LOG(QString("Error marking episode eid=%1 as watched at episode level: %2")
+                                .arg(eid).arg(q.lastError().text()));
+                        }
                     }
                 }
             }

@@ -153,6 +153,9 @@ void WatchChunkManager::updateLocalWatchedStatus(int lid, bool watched)
                     q.addBindValue(currentTimestamp);
                     if (q.exec()) {
                         LOG(QString("Marked episode eid=%1 as watched at episode level").arg(eid));
+                    } else {
+                        LOG(QString("Error marking episode eid=%1 as watched at episode level: %2")
+                            .arg(eid).arg(q.lastError().text()));
                     }
                 }
             }
