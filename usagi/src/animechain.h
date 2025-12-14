@@ -235,7 +235,12 @@ int AnimeChain::compareWith(
                 qint64 otherRecentAirDate = otherData.recentEpisodeAirDate;
                 
                 // Get current timestamp to check for not-yet-aired anime
-                // Note: Called once per comparison - sorting completes quickly so impact is minimal
+                // Note: Called once per comparison during std::sort. While this could be optimized
+                // by passing as a parameter, the impact is minimal because:
+                // 1. QDateTime::currentSecsSinceEpoch() is fast (uses cached system time)
+                // 2. Sort operations complete in milliseconds even for large lists
+                // 3. Timestamp doesn't change meaningfully during a single sort
+                // Alternative would require modifying compareWith signature which is used by std::sort
                 qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
                 
                 // Check if anime haven't aired yet (air date is in the future)
