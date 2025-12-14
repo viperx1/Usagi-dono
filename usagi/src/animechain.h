@@ -5,6 +5,7 @@
 #include <QString>
 #include <QPair>
 #include <QMap>
+#include <QDateTime>
 #include <functional>
 
 // Forward declaration - use full namespace path in MyListCardManager
@@ -230,11 +231,53 @@ int AnimeChain::compareWith(
                 break;
             }
             case SortCriteria::ByRecentEpisodeAirDate: {
-                qint64 myRecentAirDate = myData.recentEpisodeAirDate;
-                qint64 otherRecentAirDate = otherData.recentEpisodeAirDate;
+                // For chains with mixed hidden/non-hidden anime, use the most recent air date
+                // from non-hidden anime only. This prevents chains with some hidden anime
+                // from appearing at the top when they should be at the bottom.
+                auto getChainAirDate = [&dataCache](const QList<int>& animeIds, bool chainFullyHidden) -> qint64 {
+                    if (chainFullyHidden || animeIds.isEmpty()) {
+                        // For fully hidden chains or empty chains, use representative (first) anime
+                        if (animeIds.isEmpty() || !dataCache.contains(animeIds.first())) {
+                            return 0;
+                        }
+                        return dataCache[animeIds.first()].recentEpisodeAirDate;
+                    }
+                    
+                    // For chains with at least one non-hidden anime, find the most recent
+                    // air date among non-hidden anime only
+                    qint64 maxAirDate = 0;
+                    for (int aid : animeIds) {
+                        if (dataCache.contains(aid) && !dataCache[aid].isHidden) {
+                            if (dataCache[aid].recentEpisodeAirDate > maxAirDate) {
+                                maxAirDate = dataCache[aid].recentEpisodeAirDate;
+                            }
+                        }
+                    }
+                    return maxAirDate;
+                };
                 
-                // Episodes with no air date (0) should appear at the end
-                if (myRecentAirDate == 0 && otherRecentAirDate == 0) {
+                qint64 myRecentAirDate = getChainAirDate(m_animeIds, myChainAllHidden);
+                qint64 otherRecentAirDate = getChainAirDate(other.m_animeIds, otherChainAllHidden);
+                
+                // Get current timestamp to check for not-yet-aired anime
+                // Note: Called once per comparison during std::sort. While this could be optimized
+                // by passing as a parameter, the impact is minimal because:
+                // 1. QDateTime::currentSecsSinceEpoch() is fast (uses cached system time)
+                // 2. Sort operations complete in milliseconds even for large lists
+                // 3. Timestamp doesn't change meaningfully during a single sort
+                // Alternative would require modifying compareWith signature which is used by std::sort
+                qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
+                
+                // Check if anime haven't aired yet (air date is in the future)
+                bool myNotYetAired = (myRecentAirDate > 0 && myRecentAirDate > currentTimestamp);
+                bool otherNotYetAired = (otherRecentAirDate > 0 && otherRecentAirDate > currentTimestamp);
+                
+                // Not-yet-aired anime go to the end regardless of sort order
+                if (myNotYetAired != otherNotYetAired) {
+                    // If only one is not-yet-aired, the aired one comes first
+                    result = otherNotYetAired ? -1 : 1;
+                } else if (myRecentAirDate == 0 && otherRecentAirDate == 0) {
+                    // Both have no air date
                     result = 0;
                 } else if (myRecentAirDate == 0) {
                     // No air date: should appear after the other
