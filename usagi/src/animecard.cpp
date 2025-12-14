@@ -116,26 +116,16 @@ void AnimeCard::setupUI()
     m_playButton->setStyleSheet("font-size: 9pt; padding: 4px 8px;");
     m_playButton->setToolTip("Play the next unwatched episode");
     connect(m_playButton, &QPushButton::clicked, this, [this]() {
-        // Find first unwatched episode using same logic as updateNextEpisodeIndicator()
+        // Find first unwatched episode by checking episode-level watch status
         int topLevelCount = m_episodeTree->topLevelItemCount();
         
         for (int i = 0; i < topLevelCount; i++) {
             QTreeWidgetItem *episodeItem = m_episodeTree->topLevelItem(i);
             
-            // Check if this episode has an unwatched file
-            bool episodeWatched = true;
-            int childCount = episodeItem->childCount();
-            
-            for (int j = 0; j < childCount; j++) {
-                QTreeWidgetItem *fileItem = episodeItem->child(j);
-                QString playText = fileItem->text(1);
-                if (playText != "✓" && playText == "▶") {
-                    episodeWatched = false;
-                    break;
-                }
-            }
-            
-            if (!episodeWatched) {
+            // Check episode-level watch status from the play button column
+            QString episodePlayText = episodeItem->text(1);
+            // Episode is unwatched if it shows play button (▶), not checkmark (✓) or X (✗)
+            if (episodePlayText == "▶") {
                 // Found first unwatched episode - get its lid and emit episodeClicked
                 int lid = episodeItem->data(2, Qt::UserRole).toInt();
                 if (lid > 0) {
@@ -419,46 +409,28 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     // Column 0: Empty - expand button only (Qt handles this automatically)
     episodeItem->setText(0, "");
     
-    // Column 1: Play button for episode - check file availability and watch status
-    // Check if any file in this episode exists locally and watch status
-    // Prefer highest version (newest) file for playback
+    // Column 1: Play button for episode - check file availability and episode watch status
+    // Find any existing file for playback (prefer highest version)
     bool anyFileExists = false;
-    bool allFilesWatched = true;
-    int unwatchedFileLid = 0;
-    int unwatchedFileVersion = -1;  // Start at -1 to handle files with version 0
-    int watchedFileLid = 0;
-    int watchedFileVersion = -1;  // Start at -1 to handle files with version 0
+    int existingFileLid = 0;
+    int highestFileVersion = -1;  // Start at -1 to handle files with version 0
     
     for (const FileInfo& file : episode.files()) {      
         if (!file.localFilePath().isEmpty()) {
             bool exists = QFile::exists(file.localFilePath());
             if (exists) {
                 anyFileExists = true;
-                if (!file.localWatched()) {
-                    allFilesWatched = false;
-                    // Track highest version unwatched file
-                    if (file.version() > unwatchedFileVersion) {
-                        unwatchedFileLid = file.lid();
-                        unwatchedFileVersion = file.version();
-                    }
-                } else {
-                    // Track highest version watched file (fallback)
-                    if (file.version() > watchedFileVersion) {
-                        watchedFileLid = file.lid();
-                        watchedFileVersion = file.version();
-                    }
+                // Track highest version file for playback
+                if (file.version() > highestFileVersion) {
+                    existingFileLid = file.lid();
+                    highestFileVersion = file.version();
                 }
             }
         } 
     }
     
-    // Prefer unwatched file with highest version, fallback to watched file with highest version
-    int existingFileLid = unwatchedFileLid > 0 ? unwatchedFileLid : watchedFileLid;
-    
-    // Set play button based on watch status and file availability
-    // Episode is considered watched if episode-level watched flag is set OR all files are watched
-    bool episodeWatched = episode.episodeWatched() || (anyFileExists && allFilesWatched);
-    
+    // Set play button based on episode watch status and file availability
+    // Watch state is tracked at episode level only (persists across file replacements)
     if (!anyFileExists) {
         // Show X marker for episodes with missing files
         episodeItem->setText(1, "✗"); // X for missing files
@@ -466,15 +438,15 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
         episodeItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND)); // Red for missing
         episodeItem->setData(2, Qt::UserRole, 0);
-    } else if (episodeWatched) {
-        // Show checkmark if episode is watched (either at episode level or all files watched)
+    } else if (episode.episodeWatched()) {
+        // Show checkmark if episode is watched at episode level
         episodeItem->setText(1, "✓"); // Checkmark for watched
         episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 2);  // 2 means watched
         episodeItem->setForeground(1, QBrush(UIColors::FILE_WATCHED));
         episodeItem->setData(2, Qt::UserRole, existingFileLid);
     } else {
-        // Show play button if files exist and not watched
+        // Show play button if files exist and episode not watched
         episodeItem->setText(1, "▶"); // Play button if files exist
         episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 1);  // 1 means show button
@@ -493,7 +465,8 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         // Column 0: Empty - no expand button for files
         fileItem->setText(0, "");
         
-        // Column 1: Play button - reflects local watch status and file existence
+        // Column 1: Indicator - show file availability only
+        // Watch state is tracked at episode level, not file level
         // Check if local file exists
         bool fileExists = false;
         if (!file.localFilePath().isEmpty()) {
@@ -503,11 +476,8 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         if (!fileExists) {
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
-        } else if (file.localWatched()) {
-            fileItem->setText(1, "✓"); // Checkmark for locally watched
-            fileItem->setForeground(1, QBrush(UIColors::FILE_WATCHED));
         } else {
-            fileItem->setText(1, "▶"); // Play button for unwatched files
+            fileItem->setText(1, "▶"); // Play button for available files
             fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         }
         
@@ -603,27 +573,16 @@ void AnimeCard::clearEpisodes()
 
 void AnimeCard::updateNextEpisodeIndicator()
 {
-    // Find the first unwatched episode (based on local_watched status)
+    // Find the first unwatched episode (based on episode-level watch status)
     int topLevelCount = m_episodeTree->topLevelItemCount();
     
     for (int i = 0; i < topLevelCount; i++) {
         QTreeWidgetItem *episodeItem = m_episodeTree->topLevelItem(i);
         
-        // Check if any file in this episode is unwatched
-        bool episodeWatched = true;
-        int childCount = episodeItem->childCount();
-        
-        for (int j = 0; j < childCount; j++) {
-            QTreeWidgetItem *fileItem = episodeItem->child(j);
-            // Check if file's play button is not a checkmark (meaning not locally watched)
-            QString playText = fileItem->text(1);
-            if (playText != "✓" && playText == "▶") {
-                episodeWatched = false;
-                break;
-            }
-        }
-        
-        if (!episodeWatched) {
+        // Check episode-level watch status from the play button column
+        QString episodePlayText = episodeItem->text(1);
+        // Episode is unwatched if it shows play button (▶), not checkmark (✓) or X (✗)
+        if (episodePlayText == "▶") {
             // Found the first unwatched episode
             QString episodeText = episodeItem->text(2);
             m_nextEpisodeLabel->setText("Next: " + episodeText);
@@ -900,20 +859,11 @@ void AnimeCard::updateCardBackgroundForUnwatchedEpisodes()
     for (int i = 0; i < topLevelCount; i++) {
         QTreeWidgetItem *episodeItem = m_episodeTree->topLevelItem(i);
         
-        // Check if any file in this episode is unwatched
-        int childCount = episodeItem->childCount();
-        
-        for (int j = 0; j < childCount; j++) {
-            QTreeWidgetItem *fileItem = episodeItem->child(j);
-            // Check if file's play button is a play symbol (meaning not locally watched)
-            QString playText = fileItem->text(1);
-            if (playText == "▶") {
-                hasUnwatchedEpisodes = true;
-                break;
-            }
-        }
-        
-        if (hasUnwatchedEpisodes) {
+        // Check episode-level watch status from the play button column
+        QString episodePlayText = episodeItem->text(1);
+        // Episode is unwatched if it shows play button (▶)
+        if (episodePlayText == "▶") {
+            hasUnwatchedEpisodes = true;
             break;
         }
     }

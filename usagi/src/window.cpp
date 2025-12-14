@@ -4141,7 +4141,7 @@ void Window::onPlayAnimeFromCard(int aid)
 {
 	LOG(QString("Play anime requested from card for anime ID: %1").arg(aid));
 	
-	// Find the first unwatched episode (based on episode-level and local_watched) for this anime
+	// Find the first unwatched episode (based on episode-level watch state only) for this anime
 	// Prefer highest version (newest file with highest lid) within each episode
 	QSqlDatabase db = QSqlDatabase::database();
 	if (!db.isOpen()) {
@@ -4152,7 +4152,7 @@ void Window::onPlayAnimeFromCard(int aid)
 	QSqlQuery q(db);
 	// Order by episode number, then by lid DESC to get newest files first
 	// Include episode-level watch state from watched_episodes table
-	q.prepare("SELECT m.lid, e.epno, m.local_watched, lf.path, m.eid, "
+	q.prepare("SELECT m.lid, e.epno, lf.path, m.eid, "
 	          "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched "
 	          "FROM mylist m "
 	          "LEFT JOIN episode e ON m.eid = e.eid "
@@ -4170,10 +4170,9 @@ void Window::onPlayAnimeFromCard(int aid)
 		// Find first unwatched episode (with highest version file)
 		while (q.next()) {
 			int lid = q.value(0).toInt();
-			int localWatched = q.value(2).toInt();
-			QString localPath = q.value(3).toString();
-			int eid = q.value(4).toInt();
-			int episodeWatched = q.value(5).toInt();
+			QString localPath = q.value(2).toString();
+			int eid = q.value(3).toInt();
+			int episodeWatched = q.value(4).toInt();
 			
 			// Skip if we've already processed this episode (we want the first file, which is highest version due to DESC order)
 			if (seenEpisodes.contains(eid)) {
@@ -4187,9 +4186,9 @@ void Window::onPlayAnimeFromCard(int aid)
 					firstAvailableLid = lid;
 				}
 				
-				// Episode is considered unwatched only if BOTH episode-level and file-level are unwatched
-				// This ensures we skip episodes marked as watched even if the current file is new
-				if (localWatched == 0 && episodeWatched == 0) {
+				// Episode is considered unwatched only if episode-level watch state is not set
+				// Watch state is tracked at episode level only
+				if (episodeWatched == 0) {
 					// Found first unwatched episode with available file (highest version)
 					LOG(QString("Playing first unwatched episode LID: %1, EID: %2 (highest version)").arg(lid).arg(eid));
 					startPlaybackForFile(lid);

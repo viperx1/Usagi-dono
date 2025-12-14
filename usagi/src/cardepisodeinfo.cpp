@@ -26,19 +26,9 @@ bool CardEpisodeInfo::isValid() const
 
 bool CardEpisodeInfo::isWatched() const
 {
-    // Episode is watched if either:
-    // 1. Episode is marked as watched at episode level (persists across file replacements)
-    // 2. At least one file is watched
-    if (m_episodeWatched) {
-        return true;
-    }
-    
-    for (const CardFileInfo& file : m_files) {
-        if (file.isWatched()) {
-            return true;
-        }
-    }
-    return false;
+    // Episode watch state is tracked at episode level only
+    // This persists across file replacements
+    return m_episodeWatched;
 }
 
 void CardEpisodeInfo::clearFiles()
