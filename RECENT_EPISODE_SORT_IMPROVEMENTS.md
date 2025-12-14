@@ -32,6 +32,20 @@ All sorting logic properly handles both chain and non-chain modes:
 
 Anime with air dates in the future are now placed at the end, after aired anime but before anime with no air date.
 
+### 5. Fix mixed hidden chain sorting ✓
+**Status:** Implemented (bug fix from user feedback)
+
+**Problem:** When a chain contains both hidden anime (with no episode data) and non-hidden anime (that finished airing long ago), the chain was incorrectly appearing at the beginning of the list because it was using the representative (first) anime's air date, which was 0.
+
+**Solution:** For chains with mixed hidden/non-hidden anime, the sorting now uses the most recent air date from **non-hidden anime only**. This ensures chains are sorted based on their visible content, not hidden anime.
+
+**Example scenario:**
+- Chain A: [Hidden anime (no data), Non-hidden anime (finished 2 years ago)]
+- Chain B: [Visible anime (finished 1 year ago)]
+
+**Before fix:** Chain A appeared first (using air date 0 from hidden representative)  
+**After fix:** Chain B appears first (Chain A uses the 2-year-old date from non-hidden anime)
+
 ## Sorting Priority
 
 The sorting now follows this priority order (from highest to lowest):
@@ -43,7 +57,9 @@ The sorting now follows this priority order (from highest to lowest):
 5. **Hidden, not-yet-aired anime** - Sorted by air date (ascending/descending)
 6. **Hidden, no air date** - Sorted by title
 
-**Key principle:** Hidden status always takes precedence over all other criteria.
+**Key principles:** 
+- Hidden status always takes precedence over all other criteria
+- For mixed chains, only non-hidden anime air dates are considered
 
 ## Files Modified
 
@@ -55,11 +71,12 @@ The sorting now follows this priority order (from highest to lowest):
 - Improved date parsing using `QDateTime::fromString()` for better ISO format handling
 
 ### usagi/src/animechain.h
-**Function:** `compareWith()` template (lines 233-269)
+**Function:** `compareWith()` template (lines 233-290)
 
 **Changes:**
 - Added detection of not-yet-aired anime (air date > current timestamp)
 - Implemented sorting logic to place not-yet-aired anime after aired anime
+- **Fixed mixed hidden chain sorting:** For chains with both hidden and non-hidden anime, now uses the most recent air date from non-hidden anime only, preventing chains with some hidden anime from incorrectly appearing at the top
 - Added detailed comments explaining performance tradeoffs
 
 ### usagi/src/window.cpp
@@ -78,6 +95,10 @@ The sorting now follows this priority order (from highest to lowest):
 2. `testNotYetAiredAtEnd` - Verifies not-yet-aired anime appear after aired anime
 3. `testNotYetAiredVsNoAirDate` - Verifies not-yet-aired appear before no-air-date
 4. `testMixedAiredNotYetAiredAndNoDate` - Verifies complete sorting order
+5. `testHiddenTakesPrecedenceOverNotYetAired` - Verifies hidden status takes precedence
+6. `testChainModeNotYetAired` - Verifies chain mode handles not-yet-aired correctly
+7. `testChainModeHiddenWithNotYetAired` - Verifies chain mode with mixed conditions
+8. `testMixedHiddenChainUsesNonHiddenAirDate` - **NEW:** Verifies chains with both hidden and non-hidden anime use air dates from non-hidden anime only
 5. `testHiddenTakesPrecedenceOverNotYetAired` - Verifies hidden status takes precedence
 6. `testChainModeNotYetAired` - Verifies chain mode handles not-yet-aired correctly
 7. `testChainModeHiddenWithNotYetAired` - Verifies chain mode with mixed conditions
