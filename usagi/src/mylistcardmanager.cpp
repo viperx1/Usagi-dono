@@ -85,24 +85,14 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
 {
     QList<int> finalAnimeIds;
     
-    LOG(QString("[MyListCardManager] [DEBUG] setAnimeIdList called with %1 anime, chainMode=%2")
-        .arg(aids.size()).arg(chainModeEnabled));
-    
     {
-        LOG("[MyListCardManager] [DEBUG] Acquiring mutex in setAnimeIdList");
         QMutexLocker locker(&m_mutex);
-        LOG("[MyListCardManager] [DEBUG] Mutex acquired in setAnimeIdList");
         
         // Wait for ALL data to be ready (preload + chain building complete)
         while (!m_dataReady) {
             LOG("[MyListCardManager] Waiting for data to be ready (preload + chain building)...");
-            LOG(QString("[MyListCardManager] [DEBUG] Data ready status: m_dataReady=%1, m_chainsBuilt=%2, m_chainBuildInProgress=%3")
-                .arg(m_dataReady).arg(m_chainsBuilt).arg(m_chainBuildInProgress));
             m_dataReadyCondition.wait(&m_mutex);
-            LOG("[MyListCardManager] [DEBUG] Woke up from wait condition");
         }
-        
-        LOG("[MyListCardManager] [DEBUG] Data is ready, proceeding with setAnimeIdList");
         
         m_chainModeEnabled = chainModeEnabled;
         m_expandedChainAnimeIds.clear();
@@ -241,8 +231,6 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
     // Track which chain indices have been merged (deleted)
     QSet<int> deletedChains;
     
-    LOG("[MyListCardManager] [DEBUG] Starting chain expansion and merging...");
-    
     // Process each chain: expand and merge as needed
     for (int i = 0; i < chains.size(); i++) {
         if (deletedChains.contains(i)) {
@@ -323,8 +311,6 @@ QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& a
             LOG(QString("[MyListCardManager] [DEBUG] WARNING: Chain %1 hit MAX_ITERATIONS limit!").arg(i));
         }
     }
-    
-    LOG("[MyListCardManager] [DEBUG] Chain expansion and merging complete");
     
     // Remove deleted chains
     QList<AnimeChain> finalChains;
@@ -620,7 +606,6 @@ void MyListCardManager::loadRelationDataForAnime(int aid) const
     
     // If not in cache, it means preloading didn't include this anime
     // This is expected for anime that are not in the database or were filtered out
-    LOG(QString("[MyListCardManager] [DEBUG] aid=%1 not in cache - relation data should have been preloaded").arg(aid));
 }
 
 void MyListCardManager::sortChains(AnimeChain::SortCriteria criteria, bool ascending)
@@ -2090,14 +2075,11 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
 
 void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& baseAids)
 {
-    LOG(QString("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion called with %1 base AIDs").arg(baseAids.size()));
-    
     // Collect all related anime IDs (prequels/sequels) that might be discovered during chain building
     QSet<int> relatedAids;
     
     {
         QMutexLocker locker(&m_mutex);
-        LOG("[MyListCardManager] [DEBUG] Collecting related AIDs from cache");
         
         for (int aid : baseAids) {
             if (m_cardCreationDataCache.contains(aid)) {
@@ -2117,8 +2099,6 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
         }
     }
     
-    LOG(QString("[MyListCardManager] [DEBUG] Found %1 related AIDs to preload").arg(relatedAids.size()));
-    
     // Filter out AIDs that are already in cache
     QSet<int> aidsToLoad;
     {
@@ -2131,11 +2111,8 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     }
     
     if (aidsToLoad.isEmpty()) {
-        LOG("[MyListCardManager] [DEBUG] All related AIDs already in cache, nothing to preload");
         return;
     }
-    
-    LOG(QString("[MyListCardManager] [DEBUG] Loading %1 missing related AIDs").arg(aidsToLoad.size()));
     
     // Bulk-load relation data for missing AIDs
     QStringList aidStrings;
@@ -2146,39 +2123,28 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        LOG("[MyListCardManager] [DEBUG] Database not open, cannot preload relations");
         return;
     }
     
     QString query = QString("SELECT aid, relaidlist, relaidtype FROM anime WHERE aid IN (%1)").arg(aidsList);
     QSqlQuery q(db);
     
-    LOG(QString("[MyListCardManager] [DEBUG] Executing bulk query for %1 AIDs").arg(aidsToLoad.size()));
     if (q.exec(query)) {
         QMutexLocker locker(&m_mutex);
-        int loaded = 0;
         while (q.next()) {
             int aid = q.value(0).toInt();
             CardCreationData data;
             data.setRelations(q.value(1).toString(), q.value(2).toString());
             data.hasData = false;  // Mark as partial data (only relations loaded)
             m_cardCreationDataCache[aid] = data;
-            loaded++;
         }
-        LOG(QString("[MyListCardManager] [DEBUG] Preloaded relation data for %1 AIDs").arg(loaded));
-    } else {
-        LOG(QString("[MyListCardManager] [DEBUG] Failed to execute bulk query: %1").arg(q.lastError().text()));
     }
 }
 
 void MyListCardManager::buildChainsFromCache()
 {
-    LOG("[MyListCardManager] [DEBUG] buildChainsFromCache called");
-    
     {
-        LOG("[MyListCardManager] [DEBUG] Acquiring mutex in buildChainsFromCache");
         QMutexLocker locker(&m_mutex);
-        LOG("[MyListCardManager] [DEBUG] Mutex acquired in buildChainsFromCache");
         
         // Get current cache size to check if rebuild is needed
         int currentCacheSize = m_cardCreationDataCache.size();
@@ -2196,7 +2162,6 @@ void MyListCardManager::buildChainsFromCache()
                 // Ensure data is marked ready even when skipping rebuild
                 // (this handles case where preloadCardCreationData was called again after chains were built)
                 if (!m_dataReady) {
-                    LOG("[MyListCardManager] [DEBUG] Chains already built but data not ready, marking ready now");
                     m_dataReady = true;
                     locker.unlock();  // Release mutex before waking threads
                     m_dataReadyCondition.wakeAll();
@@ -2224,20 +2189,15 @@ void MyListCardManager::buildChainsFromCache()
         
         // Mark that we're starting the build
         m_chainBuildInProgress = true;
-        LOG("[MyListCardManager] [DEBUG] Set m_chainBuildInProgress=true");
     } // Release mutex before the actual building work
-    
-    LOG("[MyListCardManager] [DEBUG] Mutex released in buildChainsFromCache");
     
     emit progressUpdate("Building anime chains...");
     
     // Get all anime IDs from the cache (need to lock again to access cache)
     QList<int> allCachedAids;
     {
-        LOG("[MyListCardManager] [DEBUG] Re-acquiring mutex to get cached AIDs");
         QMutexLocker locker(&m_mutex);
         allCachedAids = m_cardCreationDataCache.keys();
-        LOG(QString("[MyListCardManager] [DEBUG] Retrieved %1 cached AIDs").arg(allCachedAids.size()));
     }
     
     if (allCachedAids.isEmpty()) {
@@ -2250,19 +2210,12 @@ void MyListCardManager::buildChainsFromCache()
         return;
     }
     
-    LOG(QString("[MyListCardManager] Building chains from %1 cached anime (complete dataset)")
-        .arg(allCachedAids.size()));
-    
     // PRE-LOAD all relation data for related anime that might be discovered during chain expansion
     // This prevents individual DB queries during chain building (which would cause race conditions)
-    LOG("[MyListCardManager] [DEBUG] Calling preloadRelationDataForChainExpansion");
     preloadRelationDataForChainExpansion(allCachedAids);
-    LOG("[MyListCardManager] [DEBUG] preloadRelationDataForChainExpansion completed");
     
     // Build chains from ALL cached anime (this is the expensive operation, done without holding mutex)
-    LOG("[MyListCardManager] [DEBUG] Calling buildChainsFromAnimeIds");
     QList<AnimeChain> newChains = buildChainsFromAnimeIds(allCachedAids);
-    LOG(QString("[MyListCardManager] [DEBUG] buildChainsFromAnimeIds returned %1 chains").arg(newChains.size()));
     
     emit progressUpdate(QString("Processed %1 chains...").arg(newChains.size()));
     
