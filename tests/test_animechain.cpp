@@ -38,12 +38,12 @@ void TestAnimeChain::testSimpleChainOrder()
     // Expand the chain
     chain.expand(lookup);
     
-    // Verify order: 100 -> 200 -> 300
+    // Verify order: 300 -> 200 -> 100 (reversed: sequel to prequel)
     QList<int> ids = chain.getAnimeIds();
     QCOMPARE(ids.size(), 3);
-    QCOMPARE(ids[0], 100);
+    QCOMPARE(ids[0], 300);
     QCOMPARE(ids[1], 200);
-    QCOMPARE(ids[2], 300);
+    QCOMPARE(ids[2], 100);
 }
 
 void TestAnimeChain::testMergePreservesOrder()
@@ -71,10 +71,10 @@ void TestAnimeChain::testMergePreservesOrder()
     QVERIFY(ids.contains(100));
     QVERIFY(ids.contains(200));
     
-    // After orderChain(), 100 should come before 200
+    // After orderChain(), 200 should come before 100 (reversed order)
     int idx100 = ids.indexOf(100);
     int idx200 = ids.indexOf(200);
-    QVERIFY(idx100 < idx200);
+    QVERIFY(idx200 < idx100);
 }
 
 void TestAnimeChain::testInuyashaChainOrdering()
@@ -193,11 +193,11 @@ void TestAnimeChain::testInuyashaChainOrdering()
     QList<int> ids = finalChain.getAnimeIds();
     QCOMPARE(ids.size(), 4);
     
-    // Verify correct order: 144 -> 6716 -> 15546 -> 16141
-    QCOMPARE(ids[0], 144);    // Inuyasha first
-    QCOMPARE(ids[1], 6716);   // Kanketsuhen second (even with no relation data)
-    QCOMPARE(ids[2], 15546);  // Yashahime third
-    QCOMPARE(ids[3], 16141);  // Yashahime S2 fourth
+    // Verify correct order (reversed): 16141 -> 15546 -> 6716 -> 144
+    QCOMPARE(ids[0], 16141);  // Yashahime S2 first (most recent sequel)
+    QCOMPARE(ids[1], 15546);  // Yashahime second
+    QCOMPARE(ids[2], 6716);   // Kanketsuhen third (even with no relation data)
+    QCOMPARE(ids[3], 144);    // Inuyasha last (original prequel)
 }
 
 void TestAnimeChain::testMultipleRootsOrdered()
@@ -222,12 +222,11 @@ void TestAnimeChain::testMultipleRootsOrdered()
     QList<int> ids = chain.getAnimeIds();
     QCOMPARE(ids.size(), 3);
     
-    // Roots (100 and 500) are sorted by ID and processed first
-    // Topological sort processes all roots before their dependents
-    // Order: 100 (root), 500 (root), 200 (depends on 100)
-    QCOMPARE(ids[0], 100);
+    // Reversed order: dependents first, then roots in reverse ID order
+    // Order (reversed): 200 (depends on 100), 500 (root), 100 (root)
+    QCOMPARE(ids[0], 200);
     QCOMPARE(ids[1], 500);
-    QCOMPARE(ids[2], 200);
+    QCOMPARE(ids[2], 100);
 }
 
 void TestAnimeChain::testDisconnectedComponents()
@@ -255,13 +254,12 @@ void TestAnimeChain::testDisconnectedComponents()
     QList<int> ids = chainA.getAnimeIds();
     QCOMPARE(ids.size(), 4);
     
-    // Roots (10 and 30) are sorted by ID and processed first
-    // Topological sort processes all roots before their dependents
-    // Order: 10 (root), 30 (root), 20 (depends on 10), 40 (depends on 30)
-    QCOMPARE(ids[0], 10);
-    QCOMPARE(ids[1], 30);
-    QCOMPARE(ids[2], 20);
-    QCOMPARE(ids[3], 40);
+    // Reversed order: dependents first, then roots in reverse ID order
+    // Order (reversed): 40 (depends on 30), 20 (depends on 10), 30 (root), 10 (root)
+    QCOMPARE(ids[0], 40);
+    QCOMPARE(ids[1], 20);
+    QCOMPARE(ids[2], 30);
+    QCOMPARE(ids[3], 10);
 }
 
 QTEST_MAIN(TestAnimeChain)
