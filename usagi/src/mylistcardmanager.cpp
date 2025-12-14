@@ -1338,20 +1338,14 @@ int MyListCardManager::extractFileVersion(int fileState)
     //   Bit 7 (128): FILE_CEN - censored
     // If no version bits are set, the file is version 1
     
-    // Named constants for version bit flags
-    constexpr int FILE_ISV5_BIT = 32;  // Bit 5
-    constexpr int FILE_ISV4_BIT = 16;  // Bit 4
-    constexpr int FILE_ISV3_BIT = 8;   // Bit 3
-    constexpr int FILE_ISV2_BIT = 4;   // Bit 2
-    
     // Check version flags in priority order (v5 > v4 > v3 > v2)
-    if (fileState & FILE_ISV5_BIT) {
+    if (fileState & AniDBFileStateBits::FILE_ISV5) {
         return 5;
-    } else if (fileState & FILE_ISV4_BIT) {
+    } else if (fileState & AniDBFileStateBits::FILE_ISV4) {
         return 4;
-    } else if (fileState & FILE_ISV3_BIT) {
+    } else if (fileState & AniDBFileStateBits::FILE_ISV3) {
         return 3;
-    } else if (fileState & FILE_ISV2_BIT) {
+    } else if (fileState & AniDBFileStateBits::FILE_ISV2) {
         return 2;
     }
     
@@ -1707,10 +1701,10 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
         // State string
         QString stateStr;
         switch(entry.state) {
-            case 0: stateStr = "Unknown"; break;
-            case 1: stateStr = "HDD"; break;
-            case 2: stateStr = "CD/DVD"; break;
-            case 3: stateStr = "Deleted"; break;
+            case 0: stateStr = FileStates::UNKNOWN; break;
+            case 1: stateStr = FileStates::HDD; break;
+            case 2: stateStr = FileStates::CD_DVD; break;
+            case 3: stateStr = FileStates::DELETED; break;
             default: stateStr = QString::number(entry.state); break;
         }
         fileInfo.setState(stateStr);

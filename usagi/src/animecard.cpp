@@ -417,7 +417,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     
     for (const FileInfo& file : episode.files()) {
         // Skip deleted files - they don't count as playable
-        if (file.state() == "Deleted") {
+        if (file.state() == FileStates::DELETED) {
             continue;
         }
         
@@ -472,8 +472,8 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         
         // Column 1: Indicator - show file availability and deletion status
         // Watch state is tracked at episode level, not file level
-        // Check if file is marked as deleted (state == "Deleted")
-        bool fileDeleted = (file.state() == "Deleted");
+        // Check if file is marked as deleted (state == FileStates::DELETED)
+        bool fileDeleted = (file.state() == FileStates::DELETED);
         
         // Check if local file exists
         bool fileExists = false;
