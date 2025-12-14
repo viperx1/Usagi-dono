@@ -4187,7 +4187,8 @@ void Window::onPlayAnimeFromCard(int aid)
 					firstAvailableLid = lid;
 				}
 				
-				// Episode is unwatched if both episode-level AND file-level are not watched
+				// Episode is considered unwatched only if BOTH episode-level and file-level are unwatched
+				// This ensures we skip episodes marked as watched even if the current file is new
 				if (localWatched == 0 && episodeWatched == 0) {
 					// Found first unwatched episode with available file (highest version)
 					LOG(QString("Playing first unwatched episode LID: %1, EID: %2 (highest version)").arg(lid).arg(eid));
