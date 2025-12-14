@@ -256,11 +256,25 @@ void PlaybackManager::handleStatusReply()
             // Update viewed and local_watched status in mylist
             QSqlDatabase db = QSqlDatabase::database();
             if (db.isOpen()) {
+                qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
                 QSqlQuery q(db);
                 q.prepare("UPDATE mylist SET viewed = 1, local_watched = 1, viewdate = ? WHERE lid = ?");
-                q.addBindValue(QDateTime::currentSecsSinceEpoch());
+                q.addBindValue(currentTimestamp);
                 q.addBindValue(m_currentLid);
                 q.exec();
+                
+                // Mark episode as watched at episode level (persists across file replacements)
+                q.prepare("SELECT eid FROM mylist WHERE lid = ?");
+                q.addBindValue(m_currentLid);
+                if (q.exec() && q.next()) {
+                    int eid = q.value(0).toInt();
+                    if (eid > 0) {
+                        q.prepare("INSERT OR REPLACE INTO watched_episodes (eid, watched_at) VALUES (?, ?)");
+                        q.addBindValue(eid);
+                        q.addBindValue(currentTimestamp);
+                        q.exec();
+                    }
+                }
             }
             
             stopTracking();

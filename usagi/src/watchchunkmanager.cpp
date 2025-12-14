@@ -141,6 +141,22 @@ void WatchChunkManager::updateLocalWatchedStatus(int lid, bool watched)
             .arg(lid).arg(watched ? "watched" : "not watched"));
         
         if (watched) {
+            // Mark episode as watched at episode level (persists across file replacements)
+            q.prepare("SELECT eid FROM mylist WHERE lid = ?");
+            q.addBindValue(lid);
+            if (q.exec() && q.next()) {
+                int eid = q.value(0).toInt();
+                if (eid > 0) {
+                    qint64 currentTimestamp = QDateTime::currentSecsSinceEpoch();
+                    q.prepare("INSERT OR REPLACE INTO watched_episodes (eid, watched_at) VALUES (?, ?)");
+                    q.addBindValue(eid);
+                    q.addBindValue(currentTimestamp);
+                    if (q.exec()) {
+                        LOG(QString("Marked episode eid=%1 as watched at episode level").arg(eid));
+                    }
+                }
+            }
+            
             emit fileMarkedAsWatched(lid);
         }
     }

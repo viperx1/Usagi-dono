@@ -228,6 +228,7 @@ private:
         QString quality;
         QString groupName;
         int localWatched;
+        int episodeWatched;  // Episode-level watch state (persists across file replacements)
     };
     
     /**

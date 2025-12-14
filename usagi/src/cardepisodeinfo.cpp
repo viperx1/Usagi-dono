@@ -2,6 +2,7 @@
 
 CardEpisodeInfo::CardEpisodeInfo()
     : m_eid(0)
+    , m_episodeWatched(false)
 {
 }
 
@@ -9,6 +10,7 @@ CardEpisodeInfo::CardEpisodeInfo(int eid, const epno& episodeNumber, const QStri
     : m_eid(eid)
     , m_episodeNumber(episodeNumber)
     , m_episodeTitle(episodeTitle)
+    , m_episodeWatched(false)
 {
 }
 
@@ -24,6 +26,13 @@ bool CardEpisodeInfo::isValid() const
 
 bool CardEpisodeInfo::isWatched() const
 {
+    // Episode is watched if either:
+    // 1. Episode is marked as watched at episode level (persists across file replacements)
+    // 2. At least one file is watched
+    if (m_episodeWatched) {
+        return true;
+    }
+    
     for (const CardFileInfo& file : m_files) {
         if (file.isWatched()) {
             return true;
@@ -43,4 +52,5 @@ void CardEpisodeInfo::reset()
     m_episodeNumber = epno();
     m_episodeTitle.clear();
     m_files.clear();
+    m_episodeWatched = false;
 }

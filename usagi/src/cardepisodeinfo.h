@@ -74,9 +74,21 @@ public:
     
     /**
      * @brief Check if any file in this episode has been watched
-     * @return true if at least one file is watched
+     * @return true if at least one file is watched OR if episode is marked as watched
      */
     bool isWatched() const;
+    
+    /**
+     * @brief Set episode-level watched status
+     * @param watched Episode watched state
+     */
+    void setEpisodeWatched(bool watched) { m_episodeWatched = watched; }
+    
+    /**
+     * @brief Get episode-level watched status
+     * @return true if episode is marked as watched at episode level
+     */
+    bool episodeWatched() const { return m_episodeWatched; }
     
     /**
      * @brief Clear all files from this episode
@@ -93,6 +105,7 @@ private:
     epno m_episodeNumber;               ///< Episode number (can be special episodes)
     QString m_episodeTitle;             ///< Episode title
     QList<CardFileInfo> m_files;        ///< Files associated with this episode
+    bool m_episodeWatched;              ///< Episode-level watch state (persists across file replacements)
 };
 
 #endif // CARDEPISODEINFO_H

@@ -456,6 +456,9 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     int existingFileLid = unwatchedFileLid > 0 ? unwatchedFileLid : watchedFileLid;
     
     // Set play button based on watch status and file availability
+    // Episode is considered watched if episode-level watched flag is set OR all files are watched
+    bool episodeWatched = episode.episodeWatched() || (anyFileExists && allFilesWatched);
+    
     if (!anyFileExists) {
         // Show X marker for episodes with missing files
         episodeItem->setText(1, "✗"); // X for missing files
@@ -463,15 +466,15 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
         episodeItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND)); // Red for missing
         episodeItem->setData(2, Qt::UserRole, 0);
-    } else if (anyFileExists && allFilesWatched) {
-        // Show checkmark if all files are locally watched
+    } else if (episodeWatched) {
+        // Show checkmark if episode is watched (either at episode level or all files watched)
         episodeItem->setText(1, "✓"); // Checkmark for watched
         episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 2);  // 2 means watched
         episodeItem->setForeground(1, QBrush(UIColors::FILE_WATCHED));
         episodeItem->setData(2, Qt::UserRole, existingFileLid);
     } else {
-        // Show play button if files exist and not all watched
+        // Show play button if files exist and not watched
         episodeItem->setText(1, "▶"); // Play button if files exist
         episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 1);  // 1 means show button
