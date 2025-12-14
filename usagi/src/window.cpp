@@ -3457,24 +3457,24 @@ void Window::sortMylistCards(int sortIndex)
 		case 6: // Recent Episode Air Date
 			std::sort(animeIds.begin(), animeIds.end(), [&cardsMap, &getCachedData, sortAscending](int aidA, int aidB) {
 				// Get data from cache (cards don't directly expose air date)
-				MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
-				MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
+				const MyListCardManager::CachedAnimeData cachedA = getCachedData(aidA);
+				const MyListCardManager::CachedAnimeData cachedB = getCachedData(aidB);
 				
-				bool hiddenA = cachedA.isHidden();
-				bool hiddenB = cachedB.isHidden();
-				QString titleA = cachedA.animeName();
-				QString titleB = cachedB.animeName();
+				const bool hiddenA = cachedA.isHidden();
+				const bool hiddenB = cachedB.isHidden();
 				
 				// Hidden cards always go to the bottom
 				if (hiddenA != hiddenB) {
 					return hiddenB;  // non-hidden comes before hidden
 				}
 				
-				qint64 airDateA = cachedA.recentEpisodeAirDate();
-				qint64 airDateB = cachedB.recentEpisodeAirDate();
+				const qint64 airDateA = cachedA.recentEpisodeAirDate();
+				const qint64 airDateB = cachedB.recentEpisodeAirDate();
 				
 				// Episodes with no air date (0) go to the end regardless of sort order
 				if (airDateA == 0 && airDateB == 0) {
+					const QString titleA = cachedA.animeName();
+					const QString titleB = cachedB.animeName();
 					return titleA < titleB;
 				}
 				if (airDateA == 0) {
