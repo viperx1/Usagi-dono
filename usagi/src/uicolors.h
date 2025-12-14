@@ -9,6 +9,7 @@ namespace UIColors {
     inline const QColor FILE_NOT_FOUND = QColor(Qt::red);        // Red for missing/unavailable files
     inline const QColor FILE_AVAILABLE = QColor(0, 150, 0);      // Green for available files
     inline const QColor FILE_WATCHED = QColor(0, 150, 0);        // Green for watched files
+    inline const QColor FILE_DELETED = QColor(Qt::black);        // Black for deleted files (state=3)
     
     // File quality colors (for file items background)
     inline const QColor FILE_QUALITY_HIGH = QColor(230, 240, 255);   // Light blue (highest quality)

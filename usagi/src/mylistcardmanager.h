@@ -216,7 +216,8 @@ private:
         int lid;
         int eid;
         int fid;
-        int state;
+        int state;           // MyList state (HDD, CD/DVD, Deleted, etc.)
+        int fileState;       // File state bits (contains version info)
         int viewed;
         QString storage;
         QString episodeName;
@@ -374,6 +375,9 @@ private:
     QString determineAnimeName(const QString& nameRomaji, const QString& nameEnglish, const QString& animeTitle, int aid);
     QList<AnimeCard::TagInfo> getTagsOrCategoryFallback(const QString& tagNames, const QString& tagIds, const QString& tagWeights, const QString& category);
     void updateCardAiredDates(AnimeCard* card, const QString& startDate, const QString& endDate);
+    
+    // Extract file version from AniDB file state bits
+    static int extractFileVersion(int fileState);
     
     // Cache anime titles for bulk loading (aid -> title)
     void preloadAnimeTitlesCache(const QList<int>& aids);

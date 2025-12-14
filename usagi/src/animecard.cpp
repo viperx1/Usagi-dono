@@ -410,12 +410,17 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     episodeItem->setText(0, "");
     
     // Column 1: Play button for episode - check file availability and episode watch status
-    // Find any existing file for playback (prefer highest version)
+    // Find any existing playable file (exclude deleted files, prefer highest version)
     bool anyFileExists = false;
     int existingFileLid = 0;
     int highestFileVersion = -1;  // Start at -1 to handle files with version 0
     
-    for (const FileInfo& file : episode.files()) {      
+    for (const FileInfo& file : episode.files()) {
+        // Skip deleted files - they don't count as playable
+        if (file.state() == "Deleted") {
+            continue;
+        }
+        
         if (!file.localFilePath().isEmpty()) {
             bool exists = QFile::exists(file.localFilePath());
             if (exists) {
@@ -465,18 +470,27 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         // Column 0: Empty - no expand button for files
         fileItem->setText(0, "");
         
-        // Column 1: Indicator - show file availability only
+        // Column 1: Indicator - show file availability and deletion status
         // Watch state is tracked at episode level, not file level
+        // Check if file is marked as deleted (state == "Deleted")
+        bool fileDeleted = (file.state() == "Deleted");
+        
         // Check if local file exists
         bool fileExists = false;
         if (!file.localFilePath().isEmpty()) {
             fileExists = QFile::exists(file.localFilePath());
         }
         
-        if (!fileExists) {
+        if (fileDeleted) {
+            // Deleted files get black color
+            fileItem->setText(1, "✗"); // X for deleted files
+            fileItem->setForeground(1, QBrush(UIColors::FILE_DELETED));
+        } else if (!fileExists) {
+            // Missing files get red color
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
         } else {
+            // Available files get green color
             fileItem->setText(1, "▶"); // Indicator for available files
             fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         }
@@ -520,7 +534,14 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         fileItem->setData(2, Qt::UserRole + 1, file.fid());
         
         // Color code file text based on state
-        if (file.viewed()) {
+        if (fileDeleted) {
+            // Deleted files get black color and strikethrough
+            fileItem->setForeground(2, QBrush(UIColors::FILE_DELETED));
+            QFont font = fileItem->font(2);
+            font.setStrikeOut(true);
+            fileItem->setFont(2, font);
+        } else if (file.viewed()) {
+            // Viewed files get green color
             fileItem->setForeground(2, QBrush(UIColors::FILE_WATCHED)); // Green for viewed
         }
         
