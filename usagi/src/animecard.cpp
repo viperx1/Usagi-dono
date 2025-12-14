@@ -477,7 +477,7 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
         } else {
-            fileItem->setText(1, "▶"); // Play button for available files
+            fileItem->setText(1, "▶"); // Indicator for available files
             fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         }
         
