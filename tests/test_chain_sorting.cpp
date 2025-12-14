@@ -28,9 +28,10 @@ struct MockCardData {
     QString startDate;
     AnimeStats stats;
     qint64 lastPlayed;
+    qint64 recentEpisodeAirDate;
     bool isHidden;
     
-    MockCardData() : lastPlayed(0), isHidden(false) {}
+    MockCardData() : lastPlayed(0), recentEpisodeAirDate(0), isHidden(false) {}
 };
 
 void TestChainSorting::testSortByTitle()

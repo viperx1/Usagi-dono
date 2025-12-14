@@ -34,7 +34,8 @@ public:
         ByRepresentativeId,
         ByRepresentativeEpisodeCount,
         ByRepresentativeCompletion,
-        ByRepresentativeLastPlayed
+        ByRepresentativeLastPlayed,
+        ByRecentEpisodeAirDate
     };
     
     // Forward declaration of CardCreationData from MyListCardManager
@@ -224,6 +225,27 @@ int AnimeChain::compareWith(
                     // Normal comparison: both have been played
                     if (myLastPlayed < otherLastPlayed) result = -1;
                     else if (myLastPlayed > otherLastPlayed) result = 1;
+                    else result = 0;
+                }
+                break;
+            }
+            case SortCriteria::ByRecentEpisodeAirDate: {
+                qint64 myRecentAirDate = myData.recentEpisodeAirDate;
+                qint64 otherRecentAirDate = otherData.recentEpisodeAirDate;
+                
+                // Episodes with no air date (0) should appear at the end
+                if (myRecentAirDate == 0 && otherRecentAirDate == 0) {
+                    result = 0;
+                } else if (myRecentAirDate == 0) {
+                    // No air date: should appear after the other
+                    result = ascending ? 1 : -1;
+                } else if (otherRecentAirDate == 0) {
+                    // Other has no air date: should appear after this
+                    result = ascending ? -1 : 1;
+                } else {
+                    // Normal comparison: both have air dates
+                    if (myRecentAirDate < otherRecentAirDate) result = -1;
+                    else if (myRecentAirDate > otherRecentAirDate) result = 1;
                     else result = 0;
                 }
                 break;

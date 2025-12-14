@@ -229,6 +229,7 @@ private:
         QString groupName;
         int localWatched;
         int episodeWatched;  // Episode-level watch state (persists across file replacements)
+        qint64 airDate;      // Episode air date from file table
     };
     
     /**
@@ -242,7 +243,7 @@ private:
     class CardCreationData {
     public:
         CardCreationData() 
-            : isHidden(false), is18Restricted(false), eptotal(0), lastPlayed(0), hasData(false) {}
+            : isHidden(false), is18Restricted(false), eptotal(0), lastPlayed(0), recentEpisodeAirDate(0), hasData(false) {}
         
         // Anime basic info - public members for direct access (struct-like interface)
         QString nameRomaji;
@@ -262,6 +263,7 @@ private:
         bool is18Restricted;
         int eptotal;
         qint64 lastPlayed;
+        qint64 recentEpisodeAirDate;
         
         // Statistics
         AnimeStats stats;
