@@ -482,15 +482,15 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         }
         
         if (fileDeleted) {
-            // Deleted files get black color
-            fileItem->setText(1, "✗"); // X for deleted files
+            // Deleted files get black color with circled X symbol
+            fileItem->setText(1, "⊗"); // Circled times for deleted files
             fileItem->setForeground(1, QBrush(UIColors::FILE_DELETED));
         } else if (!fileExists) {
-            // Missing files get red color
+            // Missing files get red color with X symbol
             fileItem->setText(1, "✗"); // X for missing files
             fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
         } else {
-            // Available files get green color
+            // Available files get green color with play button
             fileItem->setText(1, "▶"); // Indicator for available files
             fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         }

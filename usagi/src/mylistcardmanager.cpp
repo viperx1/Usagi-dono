@@ -1338,14 +1338,20 @@ int MyListCardManager::extractFileVersion(int fileState)
     //   Bit 7 (128): FILE_CEN - censored
     // If no version bits are set, the file is version 1
     
+    // Named constants for version bit flags
+    constexpr int FILE_ISV5_BIT = 32;  // Bit 5
+    constexpr int FILE_ISV4_BIT = 16;  // Bit 4
+    constexpr int FILE_ISV3_BIT = 8;   // Bit 3
+    constexpr int FILE_ISV2_BIT = 4;   // Bit 2
+    
     // Check version flags in priority order (v5 > v4 > v3 > v2)
-    if (fileState & 32) {      // Bit 5: FILE_ISV5
+    if (fileState & FILE_ISV5_BIT) {
         return 5;
-    } else if (fileState & 16) { // Bit 4: FILE_ISV4
+    } else if (fileState & FILE_ISV4_BIT) {
         return 4;
-    } else if (fileState & 8) {  // Bit 3: FILE_ISV3
+    } else if (fileState & FILE_ISV3_BIT) {
         return 3;
-    } else if (fileState & 4) {  // Bit 2: FILE_ISV2
+    } else if (fileState & FILE_ISV2_BIT) {
         return 2;
     }
     
