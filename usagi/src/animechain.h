@@ -272,21 +272,32 @@ int AnimeChain::compareWith(
                 bool myNotYetAired = (myRecentAirDate > 0 && myRecentAirDate > currentTimestamp);
                 bool otherNotYetAired = (otherRecentAirDate > 0 && otherRecentAirDate > currentTimestamp);
                 
-                // Not-yet-aired anime go to the end regardless of sort order
-                if (myNotYetAired != otherNotYetAired) {
-                    // If only one is not-yet-aired, the aired one comes first
-                    result = otherNotYetAired ? -1 : 1;
-                } else if (myRecentAirDate == 0 && otherRecentAirDate == 0) {
+                // Handle special cases first: no air date always goes to the very end
+                // Pre-adjust result for 'ascending' flag since result will be negated at line 303 for descending
+                if (myRecentAirDate == 0 && otherRecentAirDate == 0) {
                     // Both have no air date
                     result = 0;
                 } else if (myRecentAirDate == 0) {
-                    // No air date: should appear after the other
+                    // No air date: should appear after everything (aired AND not-yet-aired)
+                    // When ascending=true: return result as-is, so 1 means this > other
+                    // When ascending=false: return -result, so -1 becomes 1, meaning this > other
                     result = ascending ? 1 : -1;
                 } else if (otherRecentAirDate == 0) {
-                    // Other has no air date: should appear after this
+                    // Other has no air date: should appear after this (whether this is aired or not-yet-aired)
                     result = ascending ? -1 : 1;
+                } else if (myNotYetAired != otherNotYetAired) {
+                    // One is not-yet-aired (with date), other has aired (both have non-zero dates)
+                    // Aired anime comes first
+                    // When ascending=true: return result as-is, so -1 means aired < not-yet-aired (correct)
+                    // When ascending=false: return -result, so 1 becomes -1, meaning aired < not-yet-aired (correct)
+                    result = otherNotYetAired ? (ascending ? -1 : 1) : (ascending ? 1 : -1);
+                } else if (myNotYetAired && otherNotYetAired) {
+                    // Both are not-yet-aired: compare normally but they both stay at the end
+                    if (myRecentAirDate < otherRecentAirDate) result = -1;
+                    else if (myRecentAirDate > otherRecentAirDate) result = 1;
+                    else result = 0;
                 } else {
-                    // Normal comparison: both have air dates
+                    // Normal comparison: both have air dates and both have aired
                     if (myRecentAirDate < otherRecentAirDate) result = -1;
                     else if (myRecentAirDate > otherRecentAirDate) result = 1;
                     else result = 0;

@@ -264,7 +264,8 @@ void TestRecentEpisodeSortImprovements::testMixedHiddenChainUsesNonHiddenAirDate
     AnimeChain::RelationLookupFunc lookup = noRelationsLookup();
     
     // Create a chain with 3 anime: [hidden with no data, non-hidden old, non-hidden recent]
-    AnimeChain chain1({100, 101, 102});
+    QList<int> chain1Ids = {100, 101, 102};
+    AnimeChain chain1(chain1Ids);
     
     // Create another chain with all visible anime, older air date
     AnimeChain chain2(200, lookup);
