@@ -211,10 +211,11 @@ void TestMyListCardManager::testCardCreation()
     insertTestEpisode(1, 1, "Episode 1", "1");
     insertTestMylistEntry(1, 1, 1);
     
-    // Preload data and create card directly
+    // Preload data and build chains (required for m_dataReady flag)
     QList<int> aids;
     aids.append(1);
     manager->preloadCardCreationData(aids);
+    manager->buildChainsFromCache();
     AnimeCard *card = manager->createCard(1);
     
     // Verify card exists
@@ -234,6 +235,7 @@ void TestMyListCardManager::testCardCaching()
     QList<int> aids;
     aids.append(1);
     manager->preloadCardCreationData(aids);
+    manager->buildChainsFromCache();
     manager->createCard(1);
     AnimeCard *card1 = manager->getCard(1);
     
@@ -260,6 +262,7 @@ void TestMyListCardManager::testIndividualUpdate()
     aids.append(1);
     aids.append(2);
     manager->preloadCardCreationData(aids);
+    manager->buildChainsFromCache();
     manager->createCard(1);
     manager->createCard(2);
     
@@ -297,6 +300,7 @@ void TestMyListCardManager::testBatchUpdates()
         aids.append(i);
     }
     manager->preloadCardCreationData(aids);
+    manager->buildChainsFromCache();
     for (int i = 1; i <= 5; i++) {
         manager->createCard(i);
     }
@@ -328,6 +332,7 @@ void TestMyListCardManager::testAsynchronousOperations()
     QList<int> aids;
     aids.append(1);
     manager->preloadCardCreationData(aids);
+    manager->buildChainsFromCache();
     manager->createCard(1);
     
     // Update card - should not block (uses batched timer)
@@ -357,6 +362,7 @@ void TestMyListCardManager::testMemoryManagement()
         aids.append(i);
     }
     manager->preloadCardCreationData(aids);
+    manager->buildChainsFromCache();
     for (int i = 1; i <= 10; i++) {
         manager->createCard(i);
     }

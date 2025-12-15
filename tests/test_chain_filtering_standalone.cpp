@@ -232,9 +232,10 @@ void TestChainFilteringStandalone::testStandaloneAnimeInChainMode()
     insertTestAnime(15135, "Arifureta Shokugyou de Sekai Saikyou 2nd Season", 0, 17615);  // sequel=17615
     insertTestAnime(17615, "Arifureta Shokugyou de Sekai Saikyou Season 3", 15135, 0);  // prequel=15135
     
-    // Preload data for all 3 anime
+    // Preload data for all 3 anime and build chains
     QList<int> allAnime = {13624, 15135, 17615};
     manager->preloadCardCreationData(allAnime);
+    manager->buildChainsFromCache();
     
     // Simulate the search result: all 3 anime found
     QList<int> searchResults = {13624, 15135, 17615};
@@ -277,6 +278,7 @@ void TestChainFilteringStandalone::testMixedChainAndStandalone()
     
     QList<int> allAnime = {100, 101, 102, 200, 300, 301, 400};
     manager->preloadCardCreationData(allAnime);
+    manager->buildChainsFromCache();
     
     // Set chain mode with all anime
     manager->setAnimeIdList(allAnime, true);
@@ -299,6 +301,7 @@ void TestChainFilteringStandalone::testMultipleStandaloneAnime()
     
     QList<int> allAnime = {1, 2, 3};
     manager->preloadCardCreationData(allAnime);
+    manager->buildChainsFromCache();
     
     // Enable chain mode
     manager->setAnimeIdList(allAnime, true);
@@ -326,6 +329,7 @@ void TestChainFilteringStandalone::testStandaloneChainSurvivesSorting()
     
     QList<int> allAnime = {13624, 15135, 17615};
     manager->preloadCardCreationData(allAnime);
+    manager->buildChainsFromCache();
     
     // Step 1: Enable chain mode - should create standalone chain for 13624
     manager->setAnimeIdList(allAnime, true);
