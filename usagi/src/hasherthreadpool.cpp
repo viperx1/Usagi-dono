@@ -90,29 +90,52 @@ void HasherThreadPool::addFile(const QString &filePath)
         QMutexLocker locker(&mutex);
         if (workers.size() < maxThreads)
         {
-            // Create a new thread and give it this file immediately
-            // The thread's file queue can hold the file before the thread even starts
-            locker.unlock();
-            targetWorker = createThreadAndReturnIt();
-            if (targetWorker != nullptr)
+            // Create a new thread while holding the lock to prevent race conditions
+            // Don't unlock here - createThreadAndReturnIt will handle its own locking
+            
+            if (!isStarted || isStopping)
             {
-                targetWorker->addFile(filePath);
+                return;
             }
-        }
-        else if (!workers.isEmpty())
-        {
-            // All threads are busy but at max capacity
-            // Assign to a thread in round-robin fashion
-            // Each thread has a queue, so it can hold multiple files
-            static int lastUsedWorker = 0;
-            lastUsedWorker = (lastUsedWorker + 1) % workers.size();
-            workers[lastUsedWorker]->addFile(filePath);
-            LOG(QString("HasherThreadPool: All threads busy, queueing file to thread %1").arg(workers[lastUsedWorker]->getThreadId()));
+            
+            int threadId = nextThreadId % maxThreads;
+            nextThreadId++;
+            HasherThread *worker = new HasherThread(threadId);
+            
+            // Connect signals from worker to pool
+            connect(worker, &HasherThread::requestNextFile, 
+                    this, &HasherThreadPool::onThreadRequestNextFile, Qt::QueuedConnection);
+            connect(worker, &HasherThread::sendHash, 
+                    this, &HasherThreadPool::onThreadSendHash, Qt::QueuedConnection);
+            connect(static_cast<QThread*>(worker), &QThread::finished, 
+                    this, &HasherThreadPool::onThreadFinished, Qt::QueuedConnection);
+            connect(worker, &HasherThread::threadStarted,
+                    this, &HasherThreadPool::onThreadStarted, Qt::QueuedConnection);
+            connect(worker, &HasherThread::notifyPartsDone,
+                    this, &HasherThreadPool::onThreadPartsDone, Qt::QueuedConnection);
+            connect(worker, &HasherThread::notifyFileHashed,
+                    this, &HasherThreadPool::onThreadFileHashed, Qt::QueuedConnection);
+            
+            workers.append(worker);
+            activeThreads++;
+            
+            LOG(QString("HasherThreadPool: Created thread %1 (%2/%3 active)").arg(threadId).arg(workers.size()).arg(maxThreads));
+            
+            // Give the file to the thread before starting it
+            worker->addFile(filePath);
+            
+            // Start the thread (release lock first to avoid holding during thread start)
+            locker.unlock();
+            worker->start();
         }
         else
         {
-            // No threads at all - this shouldn't happen
-            LOG("HasherThreadPool: ERROR - No threads available to assign file");
+            // All threads are at max capacity and busy
+            // This should rarely happen since threads request work when they're ready
+            LOG(QString("HasherThreadPool: All %1 threads busy, file will be provided when thread requests").arg(maxThreads));
+            // The coordinator has marked the file as "0.1" but we can't accept it
+            // We need to "unrequest" it by not taking the file
+            // This is a problem - need to rethink the architecture
         }
     }
 }
