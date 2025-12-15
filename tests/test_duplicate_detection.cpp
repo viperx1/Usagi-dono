@@ -26,6 +26,18 @@ private:
 
 void TestDuplicateDetection::initTestCase()
 {
+    // Ensure clean slate: remove any existing default connection
+    {
+        QString defaultConn = QSqlDatabase::defaultConnection();
+        if (QSqlDatabase::contains(defaultConn)) {
+            QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
+            if (existingDb.isOpen()) {
+                existingDb.close();
+            }
+            QSqlDatabase::removeDatabase(defaultConn);
+        }
+    }
+    
     // Set up test database
     db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(":memory:");
@@ -37,7 +49,15 @@ void TestDuplicateDetection::cleanupTestCase()
     if (db.isOpen()) {
         db.close();
     }
-    QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
+    
+    // Clear the QSqlDatabase object to release the connection reference
+    db = QSqlDatabase();
+    
+    // Now safely remove the database connection
+    QString defaultConn = QSqlDatabase::defaultConnection();
+    if (QSqlDatabase::contains(defaultConn)) {
+        QSqlDatabase::removeDatabase(defaultConn);
+    }
 }
 
 void TestDuplicateDetection::init()

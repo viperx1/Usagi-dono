@@ -28,6 +28,18 @@ private:
 
 void TestWatchChunkManager::initTestCase()
 {
+    // Ensure clean slate: remove any existing default connection
+    {
+        QString defaultConn = QSqlDatabase::defaultConnection();
+        if (QSqlDatabase::contains(defaultConn)) {
+            QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
+            if (existingDb.isOpen()) {
+                existingDb.close();
+            }
+            QSqlDatabase::removeDatabase(defaultConn);
+        }
+    }
+    
     // Create a temporary database for testing
     tempDbFile = new QTemporaryFile();
     QVERIFY(tempDbFile->open());
@@ -67,8 +79,22 @@ void TestWatchChunkManager::initTestCase()
 void TestWatchChunkManager::cleanupTestCase()
 {
     delete manager;
-    QSqlDatabase::database().close();
-    QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
+    
+    // Close the database first
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        db.close();
+    }
+    
+    // Clear the QSqlDatabase object to release the connection reference
+    db = QSqlDatabase();
+    
+    // Now safely remove the database connection
+    QString defaultConn = QSqlDatabase::defaultConnection();
+    if (QSqlDatabase::contains(defaultConn)) {
+        QSqlDatabase::removeDatabase(defaultConn);
+    }
+    
     delete tempDbFile;
 }
 

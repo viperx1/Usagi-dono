@@ -35,6 +35,18 @@ private:
 
 void TestMylist221Fix::initTestCase()
 {
+    // Ensure clean slate: remove any existing default connection
+    {
+        QString defaultConn = QSqlDatabase::defaultConnection();
+        if (QSqlDatabase::contains(defaultConn)) {
+            QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
+            if (existingDb.isOpen()) {
+                existingDb.close();
+            }
+            QSqlDatabase::removeDatabase(defaultConn);
+        }
+    }
+    
     // Setup test database
     db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(":memory:");
@@ -49,6 +61,15 @@ void TestMylist221Fix::initTestCase()
 void TestMylist221Fix::cleanupTestCase()
 {
     db.close();
+    
+    // Clear the QSqlDatabase object to release the connection reference
+    db = QSqlDatabase();
+    
+    // Now safely remove the database connection
+    QString defaultConn = QSqlDatabase::defaultConnection();
+    if (QSqlDatabase::contains(defaultConn)) {
+        QSqlDatabase::removeDatabase(defaultConn);
+    }
 }
 
 void TestMylist221Fix::cleanup()

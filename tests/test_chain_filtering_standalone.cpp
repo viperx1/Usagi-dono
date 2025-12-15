@@ -54,6 +54,21 @@ void TestChainFilteringStandalone::initTestCase()
     // Initialize the global adbapi object
     adbapi = new myAniDBApi("test", 1);
     
+    // Ensure clean slate: remove any existing default connection
+    // This is critical when running tests in sequence
+    {
+        QString defaultConn = QSqlDatabase::defaultConnection();
+        if (QSqlDatabase::contains(defaultConn)) {
+            // Close any existing default database first
+            QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
+            if (existingDb.isOpen()) {
+                existingDb.close();
+            }
+            // Now remove the connection
+            QSqlDatabase::removeDatabase(defaultConn);
+        }
+    }
+    
     // Create in-memory test database
     db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(":memory:");
@@ -70,10 +85,19 @@ void TestChainFilteringStandalone::cleanupTestCase()
     delete adbapi;
     adbapi = nullptr;
     
+    // Close the database before removing the connection
     if (db.isOpen()) {
         db.close();
     }
-    QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
+    
+    // Clear the QSqlDatabase object to release the connection reference
+    db = QSqlDatabase();
+    
+    // Now safely remove the database connection
+    QString defaultConn = QSqlDatabase::defaultConnection();
+    if (QSqlDatabase::contains(defaultConn)) {
+        QSqlDatabase::removeDatabase(defaultConn);
+    }
 }
 
 void TestChainFilteringStandalone::init()
