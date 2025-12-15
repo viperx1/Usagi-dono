@@ -37,7 +37,7 @@ void TestHasherThread::initTestCase()
     
     // Ensure clean slate: remove any existing default connection
     {
-        QString defaultConn = QSqlDatabase::defaultConnection;
+        QString defaultConn = QSqlDatabase::defaultConnection();
         if (QSqlDatabase::contains(defaultConn)) {
             QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
             if (existingDb.isOpen()) {
@@ -78,7 +78,7 @@ void TestHasherThread::cleanupTestCase()
     db = QSqlDatabase();
     
     // Now safely remove the database connection
-    QString defaultConn = QSqlDatabase::defaultConnection;
+    QString defaultConn = QSqlDatabase::defaultConnection();
     if (QSqlDatabase::contains(defaultConn)) {
         QSqlDatabase::removeDatabase(defaultConn);
     }

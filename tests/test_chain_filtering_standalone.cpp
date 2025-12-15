@@ -57,7 +57,7 @@ void TestChainFilteringStandalone::initTestCase()
     // Ensure clean slate: remove any existing default connection
     // This is critical when running tests in sequence
     {
-        QString defaultConn = QSqlDatabase::defaultConnection;
+        QString defaultConn = QSqlDatabase::defaultConnection();
         if (QSqlDatabase::contains(defaultConn)) {
             // Close any existing default database first
             QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
@@ -94,7 +94,7 @@ void TestChainFilteringStandalone::cleanupTestCase()
     db = QSqlDatabase();
     
     // Now safely remove the database connection
-    QString defaultConn = QSqlDatabase::defaultConnection;
+    QString defaultConn = QSqlDatabase::defaultConnection();
     if (QSqlDatabase::contains(defaultConn)) {
         QSqlDatabase::removeDatabase(defaultConn);
     }
