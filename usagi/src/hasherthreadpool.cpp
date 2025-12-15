@@ -67,13 +67,14 @@ void HasherThreadPool::addFile(const QString &filePath)
     }
     
     // We have a file to hash
+    // A thread must have requested it, so it should be in the request queue
     HasherThread* targetWorker = nullptr;
     
     {
         QMutexLocker requestLocker(&requestMutex);
         if (!requestQueue.isEmpty())
         {
-            // A worker is waiting for work
+            // A worker is waiting for work - give it the file
             targetWorker = requestQueue.dequeue();
         }
     }
@@ -82,61 +83,13 @@ void HasherThreadPool::addFile(const QString &filePath)
     {
         // Assign to the waiting worker
         targetWorker->addFile(filePath);
+        LOG(QString("HasherThreadPool: Assigned file to waiting thread"));
     }
     else
     {
-        // No worker is currently waiting
-        // Check if we can create a new thread
-        QMutexLocker locker(&mutex);
-        if (workers.size() < maxThreads)
-        {
-            // Create a new thread while holding the lock to prevent race conditions
-            // Don't unlock here - createThreadAndReturnIt will handle its own locking
-            
-            if (!isStarted || isStopping)
-            {
-                return;
-            }
-            
-            int threadId = nextThreadId % maxThreads;
-            nextThreadId++;
-            HasherThread *worker = new HasherThread(threadId);
-            
-            // Connect signals from worker to pool
-            connect(worker, &HasherThread::requestNextFile, 
-                    this, &HasherThreadPool::onThreadRequestNextFile, Qt::QueuedConnection);
-            connect(worker, &HasherThread::sendHash, 
-                    this, &HasherThreadPool::onThreadSendHash, Qt::QueuedConnection);
-            connect(static_cast<QThread*>(worker), &QThread::finished, 
-                    this, &HasherThreadPool::onThreadFinished, Qt::QueuedConnection);
-            connect(worker, &HasherThread::threadStarted,
-                    this, &HasherThreadPool::onThreadStarted, Qt::QueuedConnection);
-            connect(worker, &HasherThread::notifyPartsDone,
-                    this, &HasherThreadPool::onThreadPartsDone, Qt::QueuedConnection);
-            connect(worker, &HasherThread::notifyFileHashed,
-                    this, &HasherThreadPool::onThreadFileHashed, Qt::QueuedConnection);
-            
-            workers.append(worker);
-            activeThreads++;
-            
-            LOG(QString("HasherThreadPool: Created thread %1 (%2/%3 active)").arg(threadId).arg(workers.size()).arg(maxThreads));
-            
-            // Give the file to the thread before starting it
-            worker->addFile(filePath);
-            
-            // Start the thread (release lock first to avoid holding during thread start)
-            locker.unlock();
-            worker->start();
-        }
-        else
-        {
-            // All threads are at max capacity and busy
-            // This should rarely happen since threads request work when they're ready
-            LOG(QString("HasherThreadPool: All %1 threads busy, file will be provided when thread requests").arg(maxThreads));
-            // The coordinator has marked the file as "0.1" but we can't accept it
-            // We need to "unrequest" it by not taking the file
-            // This is a problem - need to rethink the architecture
-        }
+        // No worker is waiting - this shouldn't happen!
+        // addFile() should only be called in response to requestNextFile()
+        LOG("HasherThreadPool: ERROR - addFile() called but no thread waiting for work!");
     }
 }
 
@@ -238,6 +191,20 @@ void HasherThreadPool::onThreadRequestNextFile()
         if (requestingWorker != nullptr)
         {
             requestQueue.enqueue(requestingWorker);
+        }
+    }
+    
+    // Proactively create more threads if needed
+    // This ensures we have threads ready to handle additional work
+    {
+        QMutexLocker locker(&mutex);
+        if (workers.size() < maxThreads && requestQueue.size() > 0)
+        {
+            // We have pending requests and room for more threads
+            // Create additional thread to handle future work
+            locker.unlock();
+            createThread();
+            locker.relock();
         }
     }
     
