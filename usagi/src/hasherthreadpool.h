@@ -14,26 +14,33 @@ class HasherThread;
 /**
  * HasherThreadPool manages multiple HasherThread workers to hash files in parallel.
  * This allows utilizing multiple CPU cores for faster hashing of large file collections.
+ * 
+ * Thread lifecycle:
+ * - Threads are created on-demand when work is available
+ * - When a thread finishes hashing and no more work is available, it terminates
+ * - Maximum number of concurrent threads is limited by maxThreads
  */
 class HasherThreadPool : public QObject
 {
     Q_OBJECT
 public:
     /**
-     * Creates a thread pool with the specified number of worker threads.
-     * @param numThreads Number of worker threads (defaults to available CPU cores, min 1, max 16)
+     * Creates a thread pool that will spawn up to maxThreads workers.
+     * @param maxThreads Maximum number of concurrent worker threads (defaults to available CPU cores, min 1, max 16)
      */
-    explicit HasherThreadPool(int numThreads = 0, QObject *parent = nullptr);
+    explicit HasherThreadPool(int maxThreads = 0, QObject *parent = nullptr);
     ~HasherThreadPool();
     
     /**
      * Adds a file to the queue to be hashed by any available worker thread.
+     * Creates a new thread if one is available and work is pending.
      * @param filePath Path to the file to hash (empty string signals completion)
      */
     void addFile(const QString &filePath);
     
     /**
-     * Starts all worker threads to begin processing files.
+     * Starts the pool to begin processing files.
+     * Threads will be created on-demand as work becomes available.
      */
     void start();
     
@@ -56,7 +63,7 @@ public:
     bool wait(unsigned long msecs = ULONG_MAX);
     
     /**
-     * Returns the number of worker threads in the pool.
+     * Returns the number of currently active worker threads.
      */
     int threadCount() const { return workers.size(); }
     
@@ -113,13 +120,18 @@ private slots:
     
 private:
     void checkAllThreadsFinished();
+    void createThread();
+    HasherThread* createThreadAndReturnIt();
+    void cleanupFinishedThreads();
     
     QVector<HasherThread*> workers;
     QMutex mutex;
     QMutex requestMutex;  // Protects requestQueue
     QQueue<HasherThread*> requestQueue;  // FIFO queue of workers requesting files
-    int activeThreads;
-    int finishedThreads;
+    int maxThreads;  // Maximum number of concurrent threads
+    int nextThreadId;  // Counter for assigning unique thread IDs
+    int activeThreads;  // Number of threads currently running
+    int finishedThreads;  // Number of threads that have finished
     bool isStarted;
     bool isStopping;
 };
