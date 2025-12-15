@@ -439,21 +439,21 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
     // Watch state is tracked at episode level only (persists across file replacements)
     if (!anyFileExists) {
         // Show X marker for episodes with missing files
-        episodeItem->setText(1, "✗"); // X for missing files
+        episodeItem->setText(1, FileSymbols::X_MARK); // X for missing files
         episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 0);  // 0 means no playable file
         episodeItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND)); // Red for missing
         episodeItem->setData(2, Qt::UserRole, 0);
     } else if (episode.episodeWatched()) {
         // Show checkmark if episode is watched at episode level
-        episodeItem->setText(1, "✓"); // Checkmark for watched
+        episodeItem->setText(1, FileSymbols::CHECKMARK); // Checkmark for watched
         episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 2);  // 2 means watched
         episodeItem->setForeground(1, QBrush(UIColors::FILE_WATCHED));
         episodeItem->setData(2, Qt::UserRole, existingFileLid);
     } else {
         // Show play button if files exist and episode not watched
-        episodeItem->setText(1, "▶"); // Play button if files exist
+        episodeItem->setText(1, FileSymbols::PLAY_BUTTON); // Play button if files exist
         episodeItem->setTextAlignment(1, Qt::AlignCenter);
         episodeItem->setData(1, Qt::UserRole, 1);  // 1 means show button
         episodeItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
@@ -484,15 +484,15 @@ void AnimeCard::addEpisode(const EpisodeInfo& episode)
         
         if (fileDeleted) {
             // Deleted files get black color with circled X symbol
-            fileItem->setText(1, "⊗"); // Circled times for deleted files
+            fileItem->setText(1, FileSymbols::CIRCLED_TIMES); // Circled times for deleted files
             fileItem->setForeground(1, QBrush(UIColors::FILE_DELETED));
         } else if (!fileExists) {
             // Missing files get red color with X symbol
-            fileItem->setText(1, "✗"); // X for missing files
+            fileItem->setText(1, FileSymbols::X_MARK); // X for missing files
             fileItem->setForeground(1, QBrush(UIColors::FILE_NOT_FOUND));
         } else {
             // Available files get green color with play button
-            fileItem->setText(1, "▶"); // Indicator for available files
+            fileItem->setText(1, FileSymbols::PLAY_BUTTON); // Indicator for available files
             fileItem->setForeground(1, QBrush(UIColors::FILE_AVAILABLE)); // Green for available
         }
         

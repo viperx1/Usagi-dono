@@ -1328,16 +1328,7 @@ void MyListCardManager::updateCardAiredDates(AnimeCard* card, const QString& sta
 int MyListCardManager::extractFileVersion(int fileState)
 {
     // Extract file version from AniDB file state bits
-    // State field bit encoding (from AniDB UDP API):
-    //   Bit 0 (1): FILE_CRCOK
-    //   Bit 1 (2): FILE_CRCERR
-    //   Bit 2 (4): FILE_ISV2 - file is version 2
-    //   Bit 3 (8): FILE_ISV3 - file is version 3
-    //   Bit 4 (16): FILE_ISV4 - file is version 4
-    //   Bit 5 (32): FILE_ISV5 - file is version 5
-    //   Bit 6 (64): FILE_UNC - uncensored
-    //   Bit 7 (128): FILE_CEN - censored
-    // If no version bits are set, the file is version 1
+    // See fileconsts.h (AniDBFileStateBits namespace) for bit flag documentation
     
     // Check version flags in priority order (v5 > v4 > v3 > v2)
     if (fileState & AniDBFileStateBits::FILE_ISV5) {
@@ -1719,7 +1710,9 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
         fileInfo.setQuality(entry.quality);
         fileInfo.setGroupName(entry.groupName);
         
-        // Extract file version from file state bits
+        // Extract file version from AniDB file state bits (not file order)
+        // Previously used episodeFileCount as index, but this didn't reflect actual version
+        // Now extracts version from state bits (FILE_ISV2-5) which matches AniDB data
         int version = extractFileVersion(entry.fileState);
         fileInfo.setVersion(version);
         

@@ -31,6 +31,20 @@ namespace FileStates {
 }
 
 /**
+ * @namespace FileSymbols
+ * @brief UI symbols for file status indicators
+ * 
+ * Unicode symbols used in the episode/file tree display.
+ * Defined as constants to allow easy changes if rendering issues occur.
+ */
+namespace FileSymbols {
+    inline const QString PLAY_BUTTON = QString::fromUtf8("\xE2\x96\xB6");     // ▶ Play button for available files
+    inline const QString CHECKMARK = QString::fromUtf8("\xE2\x9C\x93");       // ✓ Checkmark for watched
+    inline const QString X_MARK = QString::fromUtf8("\xE2\x9C\x97");          // ✗ X for missing files
+    inline const QString CIRCLED_TIMES = QString::fromUtf8("\xE2\x8A\x97");   // ⊗ Circled times for deleted files
+}
+
+/**
  * @namespace AniDBFileStateBits
  * @brief AniDB file state bit flags
  * 
