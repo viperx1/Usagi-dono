@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "main.h"
 #include "watchsessionmanager.h"
+#include "fileconsts.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>

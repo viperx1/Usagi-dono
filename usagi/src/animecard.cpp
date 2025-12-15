@@ -2,6 +2,7 @@
 #include "playbuttondelegate.h"
 #include "logger.h"
 #include "uicolors.h"
+#include "fileconsts.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
