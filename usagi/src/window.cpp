@@ -247,6 +247,18 @@ Window::Window()
     topSplitter->setStretchFactor(0, 3);  // Hashes table gets more space
     topSplitter->setStretchFactor(1, 1);  // Unknown files gets less space
     
+    // Make splitter handle more visible
+    topSplitter->setHandleWidth(6);
+    topSplitter->setStyleSheet(
+        "QSplitter::handle {"
+        "    background-color: palette(mid);"
+        "    border: 1px solid palette(dark);"
+        "}"
+        "QSplitter::handle:hover {"
+        "    background-color: palette(light);"
+        "}"
+    );
+    
     // Create collapse button for thread progress bars
     QPushButton *collapseThreadProgressButton = new QPushButton("▼");
     collapseThreadProgressButton->setMaximumWidth(30);
@@ -291,6 +303,12 @@ Window::Window()
     connect(unknownFilesManager, &UnknownFilesManager::logMessage, this, &Window::getNotifyLogAppend);
     connect(unknownFilesManager, &UnknownFilesManager::fileNeedsHashing, this, [this](const QFileInfo& fileInfo, Qt::CheckState renameState, const QString& preloadedHash) {
         hashesinsertrow(fileInfo, renameState, preloadedHash);
+    });
+    connect(unknownFilesManager, &UnknownFilesManager::requestStartHasher, this, [this, hasherCoordinator]() {
+        // Only start if the button is enabled (i.e., hasher is not already running)
+        if (hasherCoordinator->getButtonStart()->isEnabled()) {
+            hasherCoordinator->startHashing();
+        }
     });
     
     // Connect hasher thread pool signals to HasherCoordinator
@@ -2061,6 +2079,7 @@ void Window::getNotifyMylistAdd(QString tag, int code)
                 }
                 
                 // Remove from unknown files widget if present (re-check succeeded)
+                unknownFilesManager->removeFileByPath(localPath);
                 return;
             }
             if(code == 320)
@@ -2141,6 +2160,8 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 						.arg(lid).arg(localPath).arg(code));
 				}
 				
+				// Remove from unknown files widget if present (file was successfully added)
+				unknownFilesManager->removeFileByPath(localPath);
 				
 				return;
 			}

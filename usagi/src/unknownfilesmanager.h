@@ -17,6 +17,7 @@
 // Forward declarations
 class AniDBApi;
 class HasherCoordinator;
+class unknown_files_;
 
 /**
  * @class UnknownFilesManager
@@ -62,7 +63,7 @@ public:
      * @brief Get the unknown files table widget (for direct access if needed)
      * @return Pointer to the table widget
      */
-    QTableWidget* getTableWidget() const { return m_tableWidget; }
+    unknown_files_* getTableWidget() const { return m_tableWidget; }
     
     /**
      * @brief Get unknown files data map (read-only access)
@@ -114,6 +115,11 @@ signals:
      * @param preloadedHash Pre-computed hash (if available)
      */
     void fileNeedsHashing(const QFileInfo& fileInfo, Qt::CheckState renameState, const QString& preloadedHash);
+    
+    /**
+     * @brief Emitted when the hasher should be started
+     */
+    void requestStartHasher();
 
 private slots:
     /**
@@ -185,7 +191,7 @@ private:
     
     // UI Widgets
     QWidget *m_containerWidget;                   // Container for label + table
-    QTableWidget *m_tableWidget;                  // Main table widget
+    unknown_files_ *m_tableWidget;                // Main table widget
     QLabel *m_titleLabel;                         // Title label
     
     // Data Storage
