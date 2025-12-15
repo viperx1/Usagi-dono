@@ -568,6 +568,28 @@ endif()
 
 add_test(NAME test_epno COMMAND test_epno -v2)
 
+# Test for file version extraction from AniDB state bits
+add_executable(test_file_version_extraction test_file_version_extraction.cpp ../usagi/src/logger.cpp ../usagi/src/logger.h)
+skip_automoc_for_usagi_sources(test_file_version_extraction)
+
+target_link_libraries(test_file_version_extraction PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(test_file_version_extraction PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_file_version_extraction PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_file_version_extraction COMMAND test_file_version_extraction -v2)
+
 # Test 9: Episode column format verification
 add_executable(test_episode_column_format test_episode_column_format.cpp)
 skip_automoc_for_usagi_sources(test_episode_column_format)
