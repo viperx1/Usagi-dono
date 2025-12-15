@@ -277,8 +277,9 @@ void HasherThreadPool::checkAllThreadsFinished()
 
 void HasherThreadPool::createThread()
 {
-    HasherThread* worker = createThreadAndReturnIt();
-    // Thread created, it will request work when it starts
+    // Create and start a new thread
+    // The thread will request work when it starts
+    (void)createThreadAndReturnIt();
 }
 
 HasherThread* HasherThreadPool::createThreadAndReturnIt()
