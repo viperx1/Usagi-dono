@@ -68,6 +68,11 @@ public:
     int threadCount() const { return workers.size(); }
     
     /**
+     * Returns the maximum number of threads that can be created.
+     */
+    int maxThreadCount() const { return maxThreads; }
+    
+    /**
      * Returns true if any worker thread is currently running.
      */
     bool isRunning() const;

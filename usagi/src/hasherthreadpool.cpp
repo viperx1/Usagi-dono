@@ -297,7 +297,8 @@ HasherThread* HasherThreadPool::createThreadAndReturnIt()
         return nullptr;
     }
     
-    int threadId = nextThreadId++;
+    int threadId = nextThreadId % maxThreads;  // Reuse thread IDs in range [0, maxThreads)
+    nextThreadId++;
     HasherThread *worker = new HasherThread(threadId);
     
     // Connect signals from worker to pool
