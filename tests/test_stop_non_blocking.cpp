@@ -35,6 +35,18 @@ void TestStopNonBlocking::initTestCase()
     // Set environment variable to signal test mode before any Qt network operations
     qputenv("USAGI_TEST_MODE", "1");
     
+    // Ensure clean slate: remove any existing default connection
+    {
+        QString defaultConn = QSqlDatabase::defaultConnection;
+        if (QSqlDatabase::contains(defaultConn)) {
+            QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
+            if (existingDb.isOpen()) {
+                existingDb.close();
+            }
+            QSqlDatabase::removeDatabase(defaultConn);
+        }
+    }
+    
     // Initialize the database for testing
     QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(":memory:");
@@ -56,7 +68,20 @@ void TestStopNonBlocking::cleanupTestCase()
 {
     delete adbapi;
     adbapi = nullptr;
-    QSqlDatabase::database().close();
+    
+    QSqlDatabase db = QSqlDatabase::database();
+    if (db.isOpen()) {
+        db.close();
+    }
+    
+    // Clear the QSqlDatabase object to release the connection reference
+    db = QSqlDatabase();
+    
+    // Now safely remove the database connection
+    QString defaultConn = QSqlDatabase::defaultConnection;
+    if (QSqlDatabase::contains(defaultConn)) {
+        QSqlDatabase::removeDatabase(defaultConn);
+    }
 }
 
 void TestStopNonBlocking::testStopReturnsQuickly()
