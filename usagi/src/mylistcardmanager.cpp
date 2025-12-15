@@ -1661,7 +1661,6 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
             }
             
             episodeMap[eid] = episodeInfo;
-            episodeFileCount[eid] = 0;
         }
         
         // Create file info
