@@ -216,7 +216,8 @@ private:
         int lid;
         int eid;
         int fid;
-        int state;
+        int state;           // MyList storage state (HDD, CD/DVD, Deleted, etc.)
+        int fileState;       // File state bits (includes version information)
         int viewed;
         QString storage;
         QString episodeName;

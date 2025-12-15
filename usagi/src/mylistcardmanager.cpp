@@ -1586,7 +1586,8 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
               "f.resolution, f.quality, "
               "g.name as group_name, "
               "m.local_watched, "
-              "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched "
+              "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched, "
+              "f.state as file_state "
               "FROM mylist m "
               "LEFT JOIN episode e ON m.eid = e.eid "
               "LEFT JOIN file f ON m.fid = f.fid "
@@ -1616,6 +1617,7 @@ void MyListCardManager::loadEpisodesForCard(AnimeCard *card, int aid)
             entry.groupName = q.value(13).toString();
             entry.localWatched = q.value(14).toInt();
             entry.episodeWatched = q.value(15).toInt();
+            entry.fileState = q.value(16).toInt();  // File state bits for version extraction
             
             episodes.append(entry);
         }
@@ -1636,7 +1638,6 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
     // Load episodes from the provided cache data - NO SQL QUERIES
     // Group files by episode
     QMap<int, AnimeCard::EpisodeInfo> episodeMap;
-    QMap<int, int> episodeFileCount;
     
     for (const EpisodeCacheEntry& entry : episodes) {
         int eid = entry.eid;
@@ -1689,8 +1690,8 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
         fileInfo.setQuality(entry.quality);
         fileInfo.setGroupName(entry.groupName);
         
-        episodeFileCount[eid]++;
-        fileInfo.setVersion(episodeFileCount[eid]);
+        // Extract file version from file state bits (not a simple counter!)
+        fileInfo.setVersion(AnimeUtils::extractFileVersion(entry.fileState));
         
         // Add file to episode
         episodeMap[eid].files().append(fileInfo);
@@ -2006,7 +2007,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                                    "g.name as group_name, "
                                    "m.local_watched, "
                                    "CASE WHEN we.eid IS NOT NULL THEN 1 ELSE 0 END as episode_watched, "
-                                   "f.airdate "
+                                   "f.airdate, "
+                                   "f.state as file_state "
                                    "FROM mylist m "
                                    "LEFT JOIN episode e ON m.eid = e.eid "
                                    "LEFT JOIN file f ON m.fid = f.fid "
@@ -2040,6 +2042,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
                 entry.localWatched = episodesQ.value(15).toInt();
                 entry.episodeWatched = episodesQ.value(16).toInt();
                 entry.airDate = episodesQ.value(17).toLongLong();
+                entry.fileState = episodesQ.value(18).toInt();  // File state bits for version extraction
                 
                 m_cardCreationDataCache[aid].episodes.append(entry);
             }
