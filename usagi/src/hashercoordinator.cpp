@@ -757,6 +757,7 @@ QStringList HasherCoordinator::getFilesNeedingHash()
 
 void HasherCoordinator::queueHashedFileForProcessing(const HashingTask &task)
 {
+    QMutexLocker locker(&m_deferredProcessingMutex);
     m_pendingHashedFilesQueue.append(task);
     
     // Start timer if not already running
@@ -770,8 +771,15 @@ void HasherCoordinator::processPendingHashedFiles()
     // Process files in small batches to keep UI responsive
     int processed = 0;
     
+    // Lock the mutex for queue access
+    m_deferredProcessingMutex.lock();
+    
     while (!m_pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
         HashingTask task = m_pendingHashedFilesQueue.takeFirst();
+        
+        // Unlock while processing to allow new files to be queued
+        m_deferredProcessingMutex.unlock();
+        
         processed++;
         
         // Mark as hashed in UI (use pre-allocated color object)
@@ -819,10 +827,16 @@ void HasherCoordinator::processPendingHashedFiles()
         } else {
             LOG(QString("Skipping API processing for already-hashed file: %1 (addToMylist=false)").arg(task.filename()));
         }
+        
+        // Re-lock before checking the queue again
+        m_deferredProcessingMutex.lock();
     }
     
-    // Stop timer if queue is empty
-    if (m_pendingHashedFilesQueue.isEmpty()) {
+    // Check if queue is empty and stop timer if so
+    bool queueEmpty = m_pendingHashedFilesQueue.isEmpty();
+    m_deferredProcessingMutex.unlock();
+    
+    if (queueEmpty) {
         m_hashedFilesProcessingTimer->stop();
         LOG("Finished processing all already-hashed files");
     }

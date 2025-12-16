@@ -172,6 +172,7 @@ private:
     QList<HashingTask> m_pendingHashedFilesQueue;
     QTimer *m_hashedFilesProcessingTimer;
     QColor m_hashedFileColor;
+    QMutex m_deferredProcessingMutex;  // Protects m_pendingHashedFilesQueue
     
     // Filter cache
     QString m_cachedFilterMasks;
