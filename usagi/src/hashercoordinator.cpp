@@ -16,6 +16,10 @@
 // External hasher thread pool
 extern HasherThreadPool *hasherThreadPool;
 
+// Define static const members
+const int HasherCoordinator::HASHED_FILES_BATCH_SIZE;
+const int HasherCoordinator::HASHED_FILES_TIMER_INTERVAL;
+
 HasherCoordinator::HasherCoordinator(AniDBApi *adbapi, QWidget *parent)
     : QObject(parent)
     , m_adbapi(adbapi)
@@ -755,15 +759,40 @@ QStringList HasherCoordinator::getFilesNeedingHash()
     return files;
 }
 
+void HasherCoordinator::queueHashedFileForProcessing(const HashingTask &task)
+{
+    // NOTE: This method must be called from the main UI thread since it accesses QTimer
+    // The signal/slot connection from DirectoryWatcher ensures this is the case
+    QMutexLocker locker(&m_deferredProcessingMutex);
+    m_pendingHashedFilesQueue.append(task);
+    
+    // Start timer if not already running (protected by mutex to prevent race conditions)
+    // QTimer is thread-affine and must be accessed from the thread that created it
+    if (!m_hashedFilesProcessingTimer->isActive()) {
+        m_hashedFilesProcessingTimer->start();
+    }
+}
+
 void HasherCoordinator::processPendingHashedFiles()
 {
-    // Process files in small batches to keep UI responsive
-    int processed = 0;
-    
-    while (!m_pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
-        HashingTask task = m_pendingHashedFilesQueue.takeFirst();
-        processed++;
+    // Extract a batch of tasks from the queue
+    QList<HashingTask> tasksToProcess;
+    {
+        QMutexLocker locker(&m_deferredProcessingMutex);
         
+        // Take up to HASHED_FILES_BATCH_SIZE tasks from the queue
+        // Use takeLast() to avoid O(n) shifting on each removal (LIFO instead of FIFO)
+        // Processing order doesn't matter - all tasks are independent API calls
+        int batchSize = qMin(HASHED_FILES_BATCH_SIZE, m_pendingHashedFilesQueue.size());
+        tasksToProcess.reserve(batchSize);
+        for (int i = 0; i < batchSize; ++i) {
+            tasksToProcess.append(m_pendingHashedFilesQueue.takeLast());
+        }
+    }
+    
+    // Process tasks outside the mutex lock
+    // Order doesn't matter - each task is an independent set of API calls (LocalIdentify, File, MylistAdd)
+    for (const HashingTask &task : tasksToProcess) {
         // Mark as hashed in UI (use pre-allocated color object)
         m_hashes->item(task.rowIndex(), 0)->setBackground(m_hashedFileColor);
         m_hashes->item(task.rowIndex(), 1)->setText("1");
@@ -811,9 +840,12 @@ void HasherCoordinator::processPendingHashedFiles()
         }
     }
     
-    // Stop timer if queue is empty
-    if (m_pendingHashedFilesQueue.isEmpty()) {
-        m_hashedFilesProcessingTimer->stop();
-        LOG("Finished processing all already-hashed files");
+    // Check if queue is empty and stop timer if so
+    {
+        QMutexLocker locker(&m_deferredProcessingMutex);
+        if (m_pendingHashedFilesQueue.isEmpty()) {
+            m_hashedFilesProcessingTimer->stop();
+            LOG("Finished processing all already-hashed files");
+        }
     }
 }

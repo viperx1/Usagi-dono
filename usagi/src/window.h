@@ -182,9 +182,8 @@ private:
     // Mutex to protect file assignment from concurrent thread requests
     QMutex fileRequestMutex;
     
-    // Constants for deferred processing
-    static const int HASHED_FILES_BATCH_SIZE = 5; // Process 5 files per timer tick
-    static const int HASHED_FILES_TIMER_INTERVAL = 10; // Process every 10ms
+    // Note: Constants HASHED_FILES_BATCH_SIZE and HASHED_FILES_TIMER_INTERVAL 
+    // are now defined in HasherCoordinator
     QColor m_hashedFileColor; // Reusable color object for UI updates
     
     // Logout timeout constant
@@ -301,9 +300,8 @@ private:
 	// Only keep hash updates for efficient database batching
 	QList<QPair<QString, QString>> pendingHashUpdates; // path, hash pairs for database update
 	
-	// Deferred processing for already-hashed files to prevent UI freeze
-	QList<HashingTask> pendingHashedFilesQueue;
-	QTimer *hashedFilesProcessingTimer;
+	// Note: Deferred processing for already-hashed files is now handled by HasherCoordinator
+	// (pendingHashedFilesQueue and hashedFilesProcessingTimer removed)
 	
 	// Background loading support to prevent UI freeze
 	QThread *mylistLoadingThread;
