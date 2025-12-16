@@ -760,7 +760,7 @@ void HasherCoordinator::queueHashedFileForProcessing(const HashingTask &task)
     QMutexLocker locker(&m_deferredProcessingMutex);
     m_pendingHashedFilesQueue.append(task);
     
-    // Start timer if not already running
+    // Start timer if not already running (protected by mutex to prevent race conditions)
     if (!m_hashedFilesProcessingTimer->isActive()) {
         m_hashedFilesProcessingTimer->start();
     }
@@ -774,13 +774,15 @@ void HasherCoordinator::processPendingHashedFiles()
         QMutexLocker locker(&m_deferredProcessingMutex);
         
         // Take up to HASHED_FILES_BATCH_SIZE tasks from the queue
+        // Use takeLast() to avoid O(n) shifting on each removal
         int batchSize = qMin(HASHED_FILES_BATCH_SIZE, m_pendingHashedFilesQueue.size());
+        tasksToProcess.reserve(batchSize);
         for (int i = 0; i < batchSize; ++i) {
-            tasksToProcess.append(m_pendingHashedFilesQueue.takeFirst());
+            tasksToProcess.append(m_pendingHashedFilesQueue.takeLast());
         }
     }
     
-    // Process tasks outside the mutex lock
+    // Process tasks outside the mutex lock (order doesn't matter for processing)
     for (const HashingTask &task : tasksToProcess) {
         // Mark as hashed in UI (use pre-allocated color object)
         m_hashes->item(task.rowIndex(), 0)->setBackground(m_hashedFileColor);
