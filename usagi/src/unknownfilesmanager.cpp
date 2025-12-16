@@ -579,12 +579,10 @@ int UnknownFilesManager::rescanAndFilterFiles()
     emit logMessage("Re-scanning unknown files with current filter settings...");
     
     int removedCount = 0;
+    QList<QString> filesToRemove;
     
-    // Disable table updates during batch removal for performance
-    m_tableWidget->setUpdatesEnabled(false);
-    
-    // Iterate backwards to avoid index issues when removing rows
-    for (int row = m_tableWidget->rowCount() - 1; row >= 0; --row) {
+    // First pass: collect files to remove (avoid modifying while iterating)
+    for (int row = 0; row < m_tableWidget->rowCount(); ++row) {
         if (!m_filesData.contains(row)) {
             // Data synchronization issue - log for debugging
             emit logMessage(QString("Warning: Row %1 exists in table but not in filesData map").arg(row));
@@ -597,18 +595,30 @@ int UnknownFilesManager::rescanAndFilterFiles()
         // Check if file should be filtered based on current settings
         if (m_hasherCoordinator->shouldFilterFile(filepath)) {
             QString filename = fileInfo.filename();
-            emit logMessage(QString("Removing filtered file from unknown files: %1").arg(filename));
-            
-            // Remove the row
-            removeFileByPath(filepath, row);
-            removedCount++;
+            emit logMessage(QString("Marking filtered file for removal: %1").arg(filename));
+            filesToRemove.append(filepath);
         }
     }
     
-    // Re-enable table updates
-    m_tableWidget->setUpdatesEnabled(true);
+    // Second pass: remove the marked files
+    if (!filesToRemove.isEmpty()) {
+        // Disable table updates during batch removal for performance
+        m_tableWidget->setUpdatesEnabled(false);
+        
+        for (const QString &filepath : filesToRemove) {
+            removeFileByPath(filepath);
+            removedCount++;
+        }
+        
+        // Re-enable table updates
+        m_tableWidget->setUpdatesEnabled(true);
+    }
     
-    emit logMessage(QString("Re-scan complete. Removed %1 file(s) matching filter patterns.").arg(removedCount));
+    if (removedCount > 0) {
+        emit logMessage(QString("Re-scan complete: removed %1 file(s) matching filter patterns").arg(removedCount));
+    } else {
+        emit logMessage("Re-scan complete: no files matched filter patterns");
+    }
     
     return removedCount;
 }
