@@ -586,6 +586,8 @@ int UnknownFilesManager::rescanAndFilterFiles()
     // Iterate backwards to avoid index issues when removing rows
     for (int row = m_tableWidget->rowCount() - 1; row >= 0; --row) {
         if (!m_filesData.contains(row)) {
+            // Data synchronization issue - log for debugging
+            emit logMessage(QString("Warning: Row %1 exists in table but not in filesData map").arg(row));
             continue;
         }
         

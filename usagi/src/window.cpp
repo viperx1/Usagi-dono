@@ -2025,9 +2025,11 @@ void Window::saveSettings()
 		// Save the new filter masks
 		adbapi->setHasherFilterMasks(newFilterMasks);
 		
-		// Check if filter masks changed and re-scan option is enabled
-		if (rescanUnknownFilesCheckbox && rescanUnknownFilesCheckbox->isChecked() && 
-		    oldFilterMasks != newFilterMasks) {
+		// Check if re-scan should be triggered
+		bool filterMasksChanged = (oldFilterMasks != newFilterMasks);
+		bool rescanEnabled = (rescanUnknownFilesCheckbox && rescanUnknownFilesCheckbox->isChecked());
+		
+		if (filterMasksChanged && rescanEnabled) {
 			LOG("Hasher filter masks changed, re-scanning unknown files...");
 			
 			// Trigger re-scan of unknown files with new filter settings
