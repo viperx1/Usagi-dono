@@ -901,12 +901,7 @@ Window::Window()
     m_animationTimer->setInterval(300);  // 300ms between animation frames
     connect(m_animationTimer, &QTimer::timeout, this, &Window::onAnimationTimerTimeout);
     
-    // Initialize timer for deferred processing of already-hashed files
-    hashedFilesProcessingTimer = new QTimer(this);
-    hashedFilesProcessingTimer->setSingleShot(false);
-    hashedFilesProcessingTimer->setInterval(HASHED_FILES_TIMER_INTERVAL);
-    // Note: processPendingHashedFiles is now handled by HasherCoordinator
-    // hashedFilesProcessingTimer is kept for backward compatibility but not used
+    // Note: Deferred processing of already-hashed files is now handled by HasherCoordinator
     
     // Initialize background loading threads
     mylistLoadingThread = nullptr;
@@ -2918,20 +2913,19 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			QFileInfo fileInfo(filePath);
 			qint64 fileSize = fileInfo.size();
 			
-			// Queue for deferred processing using new HashingTask class
+			// Queue for deferred processing using HasherCoordinator
 			HashingTask task(filePath, filename, hexdigest, fileSize);
 			task.setRowIndex(rowIndex);
 			task.setUseUserSettings(false);  // Use auto-watcher defaults
 			task.setAddToMylist(true);  // Auto-watcher always adds to mylist when logged in
 			task.setMarkWatchedState(Qt::Unchecked);  // Default for auto-watcher
 			task.setFileState(1);  // Internal (HDD)
-			pendingHashedFilesQueue.append(task);
+			hasherCoordinator->queueHashedFileForProcessing(task);
 		}
 		
-		// Start timer to process queued files in batches (keeps UI responsive)
+		// Log queued files count
 		if (!filesWithHashes.isEmpty()) {
 			LOG(QString("Queued %1 already-hashed file(s) for deferred processing").arg(filesWithHashes.size()));
-			hashedFilesProcessingTimer->start();
 		}
 		
 		// Start hashing for files without existing hashes

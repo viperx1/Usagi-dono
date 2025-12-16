@@ -755,6 +755,16 @@ QStringList HasherCoordinator::getFilesNeedingHash()
     return files;
 }
 
+void HasherCoordinator::queueHashedFileForProcessing(const HashingTask &task)
+{
+    m_pendingHashedFilesQueue.append(task);
+    
+    // Start timer if not already running
+    if (!m_hashedFilesProcessingTimer->isActive()) {
+        m_hashedFilesProcessingTimer->start();
+    }
+}
+
 void HasherCoordinator::processPendingHashedFiles()
 {
     // Process files in small batches to keep UI responsive

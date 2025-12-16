@@ -83,6 +83,7 @@ public:
     void hashesInsertRow(QFileInfo file, Qt::CheckState renameState, const QString& preloadedHash = QString());
     QStringList getFilesNeedingHash();
     void setupHashingProgress(const QStringList &files);
+    void queueHashedFileForProcessing(const HashingTask &task);
     
 signals:
     // Signal to notify when hashing is finished
