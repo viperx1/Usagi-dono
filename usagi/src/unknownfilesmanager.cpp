@@ -2,6 +2,7 @@
 #include "anidbapi.h"
 #include "hashercoordinator.h"
 #include "logger.h"
+#include "window.h"  // For unknown_files_ class definition
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -26,8 +27,8 @@ UnknownFilesManager::~UnknownFilesManager()
 
 void UnknownFilesManager::createUI()
 {
-    // Create the table widget
-    m_tableWidget = new QTableWidget();
+    // Create the table widget using unknown_files_ custom class
+    m_tableWidget = new unknown_files_();
     m_tableWidget->setColumnCount(4);
     m_tableWidget->setHorizontalHeaderLabels({"Filename", "Anime", "Episode", "Actions"});
     m_tableWidget->horizontalHeader()->setStretchLastSection(false);
@@ -415,6 +416,9 @@ void UnknownFilesManager::onRecheckClicked(int row)
     
     emit logMessage(QString("Sent re-check request with tag: %1").arg(tag));
     emit logMessage(QString("Re-check initiated for file: %1").arg(fileInfo.filename()));
+    
+    // Request hasher to start if not already running
+    emit requestStartHasher();
 }
 
 void UnknownFilesManager::onDeleteClicked(int row)
