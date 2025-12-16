@@ -4,41 +4,21 @@
 #include <QThread>
 #include <algorithm>
 
-HasherThreadPool::HasherThreadPool(int numThreads, QObject *parent)
-    : QObject(parent), activeThreads(0), finishedThreads(0), isStarted(false), isStopping(false)
+HasherThreadPool::HasherThreadPool(int maxThreads, QObject *parent)
+    : QObject(parent), maxThreads(0), nextThreadId(0), activeThreads(0), finishedThreads(0), isStarted(false), isStopping(false)
 {
-    // Determine optimal number of threads
-    if (numThreads <= 0)
+    // Determine optimal maximum number of threads
+    if (maxThreads <= 0)
     {
         // Use number of CPU cores, but limit to reasonable range
-        numThreads = QThread::idealThreadCount();
-        if (numThreads <= 0) numThreads = 4; // Default if idealThreadCount fails
+        maxThreads = QThread::idealThreadCount();
+        if (maxThreads <= 0) maxThreads = 4; // Default if idealThreadCount fails
     }
     
     // Clamp to reasonable range: minimum 1, maximum 16
-    numThreads = std::max(1, std::min(numThreads, 16));
+    this->maxThreads = std::max(1, std::min(maxThreads, 16));
     
-    // Create worker threads with sequential thread IDs
-    for (int i = 0; i < numThreads; ++i)
-    {
-        HasherThread *worker = new HasherThread(i); // Pass thread ID
-        
-        // Connect signals from worker to pool
-        connect(worker, &HasherThread::requestNextFile, 
-                this, &HasherThreadPool::onThreadRequestNextFile, Qt::QueuedConnection);
-        connect(worker, &HasherThread::sendHash, 
-                this, &HasherThreadPool::onThreadSendHash, Qt::QueuedConnection);
-        connect(static_cast<QThread*>(worker), &QThread::finished, 
-                this, &HasherThreadPool::onThreadFinished, Qt::QueuedConnection);
-        connect(worker, &HasherThread::threadStarted,
-                this, &HasherThreadPool::onThreadStarted, Qt::QueuedConnection);
-        connect(worker, &HasherThread::notifyPartsDone,
-                this, &HasherThreadPool::onThreadPartsDone, Qt::QueuedConnection);
-        connect(worker, &HasherThread::notifyFileHashed,
-                this, &HasherThreadPool::onThreadFileHashed, Qt::QueuedConnection);
-        
-        workers.append(worker);
-    }
+    LOG(QString("HasherThreadPool: Configured for up to %1 worker threads").arg(this->maxThreads));
 }
 
 HasherThreadPool::~HasherThreadPool()
@@ -48,57 +28,63 @@ HasherThreadPool::~HasherThreadPool()
     wait();
     
     // Clean up worker threads
-    for (HasherThread* const worker : std::as_const(workers))
-    {
-        delete worker;
-    }
-    workers.clear();
+    cleanupFinishedThreads();
 }
 
-void HasherThreadPool::addFile(const QString &filePath)
+bool HasherThreadPool::addFile(const QString &filePath)
 {
-    // Empty file path signals completion to all threads
-    if (filePath.isEmpty())
+    if (!isStarted || isStopping)
     {
-        LOG("HasherThreadPool: Signaling completion to all worker threads");
-        for (HasherThread* const worker : std::as_const(workers))
-        {
-            worker->addFile(QString());
-        }
-        return;
+        return false;
     }
     
-    if (isStarted && !workers.isEmpty())
+    // Empty file path signals completion
+    if (filePath.isEmpty())
     {
-        // Assign the file to the worker that requested it from the queue
-        // This ensures threads don't sit idle while other threads have queued work
+        // Get a worker from the request queue
         HasherThread* targetWorker = nullptr;
-        
         {
-            QMutexLocker locker(&requestMutex);
+            QMutexLocker requestLocker(&requestMutex);
             if (!requestQueue.isEmpty())
             {
                 targetWorker = requestQueue.dequeue();
             }
         }
         
-        // If we have a specific requesting worker, assign to it
-        // Otherwise fall back to round-robin (e.g., initial file distribution)
         if (targetWorker != nullptr)
         {
-            targetWorker->addFile(filePath);
+            // Signal this specific worker to finish (no more files)
+            targetWorker->addFile(QString());
+            return true;
         }
-        else
+        return false;
+    }
+    
+    // We have a file to hash
+    // A thread must have requested it, so it should be in the request queue
+    HasherThread* targetWorker = nullptr;
+    
+    {
+        QMutexLocker requestLocker(&requestMutex);
+        if (!requestQueue.isEmpty())
         {
-            // Fallback to round-robin for initial file distribution
-            static int lastUsedWorker = 0;
-            lastUsedWorker = (lastUsedWorker + 1) % workers.size();
-            workers[lastUsedWorker]->addFile(filePath);
+            // A worker is waiting for work - give it the file
+            targetWorker = requestQueue.dequeue();
         }
     }
+    
+    if (targetWorker != nullptr)
+    {
+        // Assign to the waiting worker
+        targetWorker->addFile(filePath);
+        return true;
+    }
+    
+    // No thread was waiting for this file
+    return false;
 }
 
-void HasherThreadPool::start()
+void HasherThreadPool::start(int fileCount)
 {
     if (isStarted)
     {
@@ -106,18 +92,34 @@ void HasherThreadPool::start()
         return;
     }
     
-    LOG(QString("HasherThreadPool: Starting %1 worker threads").arg(workers.size()));
-    
     QMutexLocker locker(&mutex);
     isStarted = true;
     isStopping = false;
-    activeThreads = workers.size();
+    activeThreads = 0;
     finishedThreads = 0;
     
-    // Start all worker threads
-    for (HasherThread* const worker : std::as_const(workers))
+    // Determine how many threads to create
+    // Create min(fileCount, maxThreads) threads
+    // If fileCount is 0 or negative, create 0 threads (wait for files to be added)
+    int threadsToCreate = 0;
+    if (fileCount > 0)
     {
-        worker->start();
+        threadsToCreate = std::min(fileCount, maxThreads);
+    }
+    
+    LOG(QString("HasherThreadPool: Starting pool with %1 file(s) - creating %2 thread(s) (max %3)")
+        .arg(fileCount).arg(threadsToCreate).arg(maxThreads));
+    
+    // Create all threads upfront
+    locker.unlock();
+    for (int i = 0; i < threadsToCreate; ++i)
+    {
+        createThread();
+    }
+    
+    if (threadsToCreate == 0)
+    {
+        LOG("HasherThreadPool: No threads created - no files to hash");
     }
 }
 
@@ -135,8 +137,14 @@ void HasherThreadPool::stop()
         isStopping = true;
     }
     
-    // Stop all worker threads
-    for (HasherThread* const worker : std::as_const(workers))
+    // Stop all active worker threads
+    QVector<HasherThread*> workersCopy;
+    {
+        QMutexLocker locker(&mutex);
+        workersCopy = workers;
+    }
+    
+    for (HasherThread* const worker : std::as_const(workersCopy))
     {
         worker->stop();
     }
@@ -184,16 +192,14 @@ void HasherThreadPool::onThreadRequestNextFile()
 {
     // Track which worker is requesting the next file in a FIFO queue
     // Use sender() to identify the worker that sent the signal
+    HasherThread* requestingWorker = qobject_cast<HasherThread*>(sender());
+    if (requestingWorker != nullptr)
     {
         QMutexLocker locker(&requestMutex);
-        HasherThread* requestingWorker = qobject_cast<HasherThread*>(sender());
-        if (requestingWorker != nullptr)
-        {
-            requestQueue.enqueue(requestingWorker);
-        }
+        requestQueue.enqueue(requestingWorker);
     }
     
-    // Forward the request to the Window class to provide the next file
+    // Forward the request to the coordinator to provide the next file
     // IMPORTANT: Signal must be emitted AFTER releasing requestMutex to avoid deadlock
     // because Window::provideNextFileToHash() will call addFile() which also locks requestMutex
     emit requestNextFile();
@@ -237,11 +243,84 @@ void HasherThreadPool::onThreadFileHashed(int threadId, ed2k::ed2kfilestruct fil
 void HasherThreadPool::checkAllThreadsFinished()
 {
     // Must be called with mutex locked
-    if (finishedThreads >= activeThreads)
+    if (finishedThreads >= activeThreads && activeThreads > 0)
     {
         LOG("HasherThreadPool: All worker threads finished");
         isStarted = false;
         isStopping = false;
+        
+        // Clean up finished threads
+        cleanupFinishedThreads();
+        
         emit finished();
     }
+}
+
+void HasherThreadPool::createThread()
+{
+    // Create and start a new thread
+    // The thread will request work when it starts
+    (void)createThreadAndReturnIt();
+}
+
+HasherThread* HasherThreadPool::createThreadAndReturnIt()
+{
+    // Must be called without mutex locked (will lock internally)
+    QMutexLocker locker(&mutex);
+    
+    if (workers.size() >= maxThreads)
+    {
+        LOG(QString("HasherThreadPool: Cannot create thread - already at max (%1)").arg(maxThreads));
+        return nullptr;
+    }
+    
+    if (!isStarted || isStopping)
+    {
+        return nullptr;
+    }
+    
+    int threadId = nextThreadId % maxThreads;  // Reuse thread IDs in range [0, maxThreads)
+    nextThreadId++;
+    HasherThread *worker = new HasherThread(threadId);
+    
+    // Connect signals from worker to pool
+    connect(worker, &HasherThread::requestNextFile, 
+            this, &HasherThreadPool::onThreadRequestNextFile, Qt::QueuedConnection);
+    connect(worker, &HasherThread::sendHash, 
+            this, &HasherThreadPool::onThreadSendHash, Qt::QueuedConnection);
+    connect(static_cast<QThread*>(worker), &QThread::finished, 
+            this, &HasherThreadPool::onThreadFinished, Qt::QueuedConnection);
+    connect(worker, &HasherThread::threadStarted,
+            this, &HasherThreadPool::onThreadStarted, Qt::QueuedConnection);
+    connect(worker, &HasherThread::notifyPartsDone,
+            this, &HasherThreadPool::onThreadPartsDone, Qt::QueuedConnection);
+    connect(worker, &HasherThread::notifyFileHashed,
+            this, &HasherThreadPool::onThreadFileHashed, Qt::QueuedConnection);
+    
+    workers.append(worker);
+    activeThreads++;
+    
+    LOG(QString("HasherThreadPool: Created thread %1 (%2/%3 active)").arg(threadId).arg(workers.size()).arg(maxThreads));
+    
+    // Start the thread
+    worker->start();
+    
+    return worker;
+}
+
+void HasherThreadPool::cleanupFinishedThreads()
+{
+    // Clean up all finished threads
+    // This should be called when all threads are done or from destructor
+    for (HasherThread* const worker : std::as_const(workers))
+    {
+        if (worker->isFinished())
+        {
+            worker->wait(); // Ensure thread is completely finished
+        }
+        delete worker;
+    }
+    workers.clear();
+    activeThreads = 0;
+    finishedThreads = 0;
 }

@@ -60,7 +60,7 @@ void TestMyListCardManager::initTestCase()
     
     // Ensure clean slate: remove any existing default connection
     {
-        QString defaultConn = QSqlDatabase::defaultConnection();
+        QString defaultConn = QSqlDatabase::defaultConnection;
         if (QSqlDatabase::contains(defaultConn)) {
             QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
             if (existingDb.isOpen()) {
@@ -95,7 +95,7 @@ void TestMyListCardManager::cleanupTestCase()
     db = QSqlDatabase();
     
     // Remove default database connection (no name parameter)
-    QString defaultConn = QSqlDatabase::defaultConnection();
+    QString defaultConn = QSqlDatabase::defaultConnection;
     if (QSqlDatabase::contains(defaultConn)) {
         QSqlDatabase::removeDatabase(defaultConn);
     }

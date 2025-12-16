@@ -41,7 +41,7 @@ void TestHasherThreadPool::initTestCase()
     
     // Ensure clean slate: remove any existing default connection
     {
-        QString defaultConn = QSqlDatabase::defaultConnection();
+        QString defaultConn = QSqlDatabase::defaultConnection;
         if (QSqlDatabase::contains(defaultConn)) {
             QSqlDatabase existingDb = QSqlDatabase::database(defaultConn, false);
             if (existingDb.isOpen()) {
@@ -82,7 +82,7 @@ void TestHasherThreadPool::cleanupTestCase()
     db = QSqlDatabase();
     
     // Now safely remove the database connection
-    QString defaultConn = QSqlDatabase::defaultConnection();
+    QString defaultConn = QSqlDatabase::defaultConnection;
     if (QSqlDatabase::contains(defaultConn)) {
         QSqlDatabase::removeDatabase(defaultConn);
     }
@@ -90,11 +90,20 @@ void TestHasherThreadPool::cleanupTestCase()
 
 void TestHasherThreadPool::testMultipleThreadsCreated()
 {
-    // Create a thread pool with 4 threads
+    // Create a thread pool with max 4 threads
     HasherThreadPool pool(4);
     
-    // Verify the pool was created with the correct number of threads
-    QCOMPARE(pool.threadCount(), 4);
+    // Verify the pool was configured with the correct max thread count
+    // With upfront creation, threads are created based on file count passed to start()
+    QCOMPARE(pool.maxThreadCount(), 4);
+    QCOMPARE(pool.threadCount(), 0); // No threads created yet
+    
+    // Start the pool with 2 files - should create 2 threads
+    pool.start(2);
+    QTest::qWait(100); // Wait for threads to be created
+    
+    // Should have two threads now
+    QCOMPARE(pool.threadCount(), 2);
 }
 
 void TestHasherThreadPool::testParallelHashing()
@@ -122,12 +131,12 @@ void TestHasherThreadPool::testParallelHashing()
     QSignalSpy hashSpy(&pool, &HasherThreadPool::sendHash);
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
     
-    // Start the pool
-    pool.start();
+    // Start the pool with 4 files - creates min(4, 2) = 2 threads
+    pool.start(4);
     
-    // Wait for initial requestNextFile signals from all threads
+    // Wait for initial requestNextFile signals from threads
     QTest::qWait(1000);
-    QVERIFY(requestSpy.count() >= 2); // At least one request per thread
+    QVERIFY(requestSpy.count() >= 2); // Two threads should request files
     
     // Add files to the pool
     for (const QString &filePath : filePaths)
@@ -175,8 +184,8 @@ void TestHasherThreadPool::testStopAllThreads()
     // Create a thread pool with 2 threads
     HasherThreadPool pool(2);
     
-    // Start the pool
-    pool.start();
+    // Start the pool with 3 files - creates min(3, 2) = 2 threads
+    pool.start(3);
     
     // Wait for threads to start
     QTest::qWait(1000);
@@ -221,16 +230,28 @@ void TestHasherThreadPool::testMultipleThreadIdsUsed()
         tempFiles.append(tempFile);
     }
     
-    // Create a thread pool with 3 threads
+    // Create a thread pool with max 3 threads
     HasherThreadPool pool(3);
     
-    // Set up signal spy to capture thread IDs
+    // Set up signal spies
     QSignalSpy threadStartedSpy(&pool, &HasherThreadPool::threadStarted);
+    QSignalSpy requestSpy(&pool, &HasherThreadPool::requestNextFile);
     
-    // Start the pool
-    pool.start();
+    // Start the pool with 3 files - creates 3 threads
+    pool.start(3);
     
-    // Wait for all threads to start
+    // Wait for threads to start and request work
+    QTest::qWait(1000);
+    QVERIFY(requestSpy.count() >= 3);
+    
+    // Add files to the waiting threads
+    for (const QString &filePath : filePaths)
+    {
+        pool.addFile(filePath);
+        QTest::qWait(100); // Allow file assignment
+    }
+    
+    // Wait for threads to process
     QTest::qWait(2000);
     
     // Collect all unique thread IDs
@@ -241,8 +262,8 @@ void TestHasherThreadPool::testMultipleThreadIdsUsed()
         threadIds.insert(threadId);
     }
     
-    // Verify we have at least 2 different thread IDs (ideally 3, but system may reuse)
-    // This confirms that multiple threads are actually being used
+    // Verify we have at least 2 different thread IDs (ideally 3, but timing may vary)
+    // This confirms that multiple threads are actually being used with on-demand creation
     QVERIFY(threadIds.size() >= 2);
     
     // Stop the pool
@@ -261,12 +282,13 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     // This test verifies the fix for the idle thread issue:
     // When a thread finishes and requests more work, it should get that work
     // immediately, not have it assigned to another thread's queue.
+    // With on-demand thread creation, threads are only created when needed.
     
-    // Create multiple temporary files to hash (more files than threads)
+    // Create multiple temporary files to hash (more files than max threads)
     QVector<QTemporaryFile*> tempFiles;
     QVector<QString> filePaths;
     
-    const int numFiles = 6;  // More files than threads to ensure overlap
+    const int numFiles = 6;  // More files than max threads to ensure overlap
     for (int i = 0; i < numFiles; ++i)
     {
         QTemporaryFile *tempFile = new QTemporaryFile();
@@ -280,7 +302,7 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
         tempFiles.append(tempFile);
     }
     
-    // Create a thread pool with 3 threads
+    // Create a thread pool with max 3 threads
     HasherThreadPool pool(3);
     
     // Set up signal spies to track activity
@@ -288,22 +310,22 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     QSignalSpy hashSpy(&pool, &HasherThreadPool::sendHash);
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
     
-    // Track which thread IDs hash files to verify all threads are used
+    // Track which thread IDs hash files to verify threads are being used efficiently
     QSignalSpy fileHashedSpy(&pool, &HasherThreadPool::notifyFileHashed);
     
-    // Start the pool
-    pool.start();
+    // Start the pool with all files - creates min(numFiles, 3) = 3 threads
+    pool.start(numFiles);
     
-    // Wait for initial requests from all threads
+    // Wait for initial requests from threads
     QTest::qWait(1000);
     int initialRequests = requestSpy.count();
     QVERIFY(initialRequests >= 3); // Should have requests from all 3 threads
     
-    // Feed initial batch of files immediately (one per thread)
+    // Feed files to waiting threads
     int filesAdded = 0;
-    for (int i = 0; i < 3 && i < numFiles; i++)
+    while (filesAdded < numFiles && requestSpy.count() > 0)
     {
-        pool.addFile(filePaths[i]);
+        pool.addFile(filePaths[filesAdded]);
         filesAdded++;
     }
     

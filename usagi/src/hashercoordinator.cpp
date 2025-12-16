@@ -72,11 +72,12 @@ void HasherCoordinator::createUI(QWidget *parent)
     QPushButton *movetodirbutton = new QPushButton("...");
     QPushButton *patternhelpbutton = new QPushButton("?");
     
-    // Create progress bars for each thread
-    int numThreads = m_hasherThreadPool->threadCount();
-    for (int i = 0; i < numThreads; ++i) {
+    // Create progress bars for each potential thread (up to max threads)
+    int maxThreads = m_hasherThreadPool->maxThreadCount();
+    for (int i = 0; i < maxThreads; ++i) {
         QProgressBar *threadProgress = new QProgressBar;
         threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
+        threadProgress->setVisible(false); // Initially hidden, shown when thread becomes active
         m_threadProgressBars.append(threadProgress);
     }
     
@@ -448,7 +449,7 @@ void HasherCoordinator::startHashing()
         
         m_buttonStart->setEnabled(false);
         m_buttonClear->setEnabled(false);
-        m_hasherThreadPool->start();
+        m_hasherThreadPool->start(filesToHashCount);
     }
     else if (rowsWithHashes.isEmpty())
     {
@@ -475,6 +476,7 @@ void HasherCoordinator::stopHashing()
     for (QProgressBar* bar : m_threadProgressBars) {
         bar->setValue(0);
         bar->setMaximum(1);
+        bar->setVisible(false); // Hide progress bars when stopping
     }
     
     // Reset progress of files that were assigned but not completed
@@ -609,8 +611,13 @@ void HasherCoordinator::onProgressUpdate(int threadId, int total, int done)
 {
     // Update individual thread progress bar
     if (threadId >= 0 && threadId < m_threadProgressBars.size()) {
-        m_threadProgressBars[threadId]->setMaximum(total);
-        m_threadProgressBars[threadId]->setValue(done);
+        QProgressBar *bar = m_threadProgressBars[threadId];
+        bar->setMaximum(total);
+        bar->setValue(done);
+        // Show the progress bar if it's hidden (thread just became active)
+        if (!bar->isVisible()) {
+            bar->setVisible(true);
+        }
     }
     
     // Update total progress
@@ -645,6 +652,7 @@ void HasherCoordinator::onHashingFinished()
     for (QProgressBar* bar : m_threadProgressBars) {
         bar->setValue(0);
         bar->setMaximum(1);
+        bar->setVisible(false); // Hide thread progress bars when hashing is done
     }
     
     emit hashingFinished();
@@ -665,11 +673,15 @@ void HasherCoordinator::provideNextFileToHash()
         {
             QString filePath = m_hashes->item(i, 2)->text();
             
-            // Immediately mark this file as assigned to prevent other threads from picking it up
-            QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
-            m_hashes->setItem(i, 1, itemProgressAssigned);
-            
-            m_hasherThreadPool->addFile(filePath);
+            // Try to assign the file to a waiting thread
+            // addFile() will return true if a thread was waiting and received the file
+            if (m_hasherThreadPool->addFile(filePath))
+            {
+                // File was successfully assigned to a waiting thread
+                // Now mark it as 0.1 to show it's being processed
+                QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
+                m_hashes->setItem(i, 1, itemProgressAssigned);
+            }
             return;
         }
     }

@@ -58,8 +58,16 @@ void HasherThread::run()
     // Emit the thread ID so tests can verify we're running in a separate thread
     emit threadStarted(QThread::currentThreadId());
     
-    // Request the first file to hash
-    emit requestNextFile();
+    // Request the first file to hash only if queue is empty
+    // With on-demand thread creation, a file may already be in the queue
+    {
+        QMutexLocker locker(&mutex);
+        if (fileQueue.isEmpty())
+        {
+            locker.unlock();
+            emit requestNextFile();
+        }
+    }
     
     while (!shouldStop)
     {
