@@ -16,6 +16,10 @@
 // External hasher thread pool
 extern HasherThreadPool *hasherThreadPool;
 
+// Define static const members
+const int HasherCoordinator::HASHED_FILES_BATCH_SIZE;
+const int HasherCoordinator::HASHED_FILES_TIMER_INTERVAL;
+
 HasherCoordinator::HasherCoordinator(AniDBApi *adbapi, QWidget *parent)
     : QObject(parent)
     , m_adbapi(adbapi)
