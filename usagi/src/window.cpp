@@ -2027,7 +2027,7 @@ void Window::saveSettings()
 		
 		// Check if re-scan should be triggered
 		bool filterMasksChanged = (oldFilterMasks != newFilterMasks);
-		bool rescanEnabled = (rescanUnknownFilesCheckbox && rescanUnknownFilesCheckbox->isChecked());
+		bool rescanEnabled = (rescanUnknownFilesCheckbox != nullptr && rescanUnknownFilesCheckbox->isChecked());
 		
 		if (filterMasksChanged && rescanEnabled) {
 			LOG("Hasher filter masks changed, re-scanning unknown files...");
