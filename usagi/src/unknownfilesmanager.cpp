@@ -568,3 +568,58 @@ void UnknownFilesManager::removeFileByPath(const QString& filepath, int fromRow)
         m_containerWidget->hide();
     }
 }
+
+int UnknownFilesManager::rescanAndFilterFiles()
+{
+    if (!m_hasherCoordinator) {
+        emit logMessage("Error: HasherCoordinator not available for filter check");
+        return 0;
+    }
+    
+    emit logMessage("Re-scanning unknown files with current filter settings...");
+    
+    int removedCount = 0;
+    QList<QString> filesToRemove;
+    
+    // First pass: collect files to remove (avoid modifying while iterating)
+    for (int row = 0; row < m_tableWidget->rowCount(); ++row) {
+        if (!m_filesData.contains(row)) {
+            // Data synchronization issue - log for debugging
+            emit logMessage(QString("Warning: Row %1 exists in table but not in filesData map").arg(row));
+            continue;
+        }
+        
+        const LocalFileInfo &fileInfo = m_filesData[row];
+        QString filepath = fileInfo.filepath();
+        
+        // Check if file should be filtered based on current settings
+        if (m_hasherCoordinator->shouldFilterFile(filepath)) {
+            QString filename = fileInfo.filename();
+            emit logMessage(QString("Marking filtered file for removal: %1").arg(filename));
+            filesToRemove.append(filepath);
+        }
+    }
+    
+    // Second pass: remove the marked files
+    if (!filesToRemove.isEmpty()) {
+        // Disable table updates during batch removal for performance
+        m_tableWidget->setUpdatesEnabled(false);
+        
+        for (const QString &filepath : filesToRemove) {
+            removeFileByPath(filepath);
+        }
+        
+        // Re-enable table updates
+        m_tableWidget->setUpdatesEnabled(true);
+        
+        removedCount = filesToRemove.size();
+    }
+    
+    if (removedCount > 0) {
+        emit logMessage(QString("Re-scan complete: removed %1 file(s) matching filter patterns").arg(removedCount));
+    } else {
+        emit logMessage("Re-scan complete: no files matched filter patterns");
+    }
+    
+    return removedCount;
+}
