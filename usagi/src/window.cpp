@@ -304,7 +304,7 @@ Window::Window()
     connect(unknownFilesManager, &UnknownFilesManager::fileNeedsHashing, this, [this](const QFileInfo& fileInfo, Qt::CheckState renameState, const QString& preloadedHash) {
         hashesinsertrow(fileInfo, renameState, preloadedHash);
     });
-    connect(unknownFilesManager, &UnknownFilesManager::requestStartHasher, this, [this, hasherCoordinator]() {
+    connect(unknownFilesManager, &UnknownFilesManager::requestStartHasher, this, [this]() {
         // Only start if the button is enabled (i.e., hasher is not already running)
         if (hasherCoordinator->getButtonStart()->isEnabled()) {
             hasherCoordinator->startHashing();
