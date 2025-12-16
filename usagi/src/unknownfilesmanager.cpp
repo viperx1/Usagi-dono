@@ -623,3 +623,53 @@ int UnknownFilesManager::rescanAndFilterFiles()
     
     return removedCount;
 }
+
+int UnknownFilesManager::removeMissingFiles()
+{
+    emit logMessage("Scanning unknown files for missing files...");
+    
+    int removedCount = 0;
+    QList<QString> filesToRemove;
+    
+    // First pass: collect missing files (avoid modifying while iterating)
+    for (int row = 0; row < m_tableWidget->rowCount(); ++row) {
+        if (!m_filesData.contains(row)) {
+            // Data synchronization issue - log for debugging
+            emit logMessage(QString("Warning: Row %1 exists in table but not in filesData map").arg(row));
+            continue;
+        }
+        
+        const LocalFileInfo &fileInfo = m_filesData[row];
+        QString filepath = fileInfo.filepath();
+        
+        // Check if file exists on filesystem
+        if (!QFile::exists(filepath)) {
+            QString filename = fileInfo.filename();
+            emit logMessage(QString("Found missing file: %1").arg(filename));
+            filesToRemove.append(filepath);
+        }
+    }
+    
+    // Second pass: remove the missing files
+    if (!filesToRemove.isEmpty()) {
+        // Disable table updates during batch removal for performance
+        m_tableWidget->setUpdatesEnabled(false);
+        
+        for (const QString &filepath : filesToRemove) {
+            removeFileByPath(filepath);
+        }
+        
+        // Re-enable table updates
+        m_tableWidget->setUpdatesEnabled(true);
+        
+        removedCount = filesToRemove.size();
+    }
+    
+    if (removedCount > 0) {
+        emit logMessage(QString("Scan complete: auto-removed %1 missing file(s)").arg(removedCount));
+    } else {
+        emit logMessage("Scan complete: all files exist on filesystem");
+    }
+    
+    return removedCount;
+}
