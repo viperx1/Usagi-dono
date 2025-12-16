@@ -209,6 +209,8 @@ void HasherThreadPool::onThreadRequestNextFile()
     
     // Proactively create more threads if needed
     // This ensures we have threads ready to handle additional work
+    bool shouldCreateThread = false;
+    bool shouldRequestFile = false;
     {
         QMutexLocker locker(&mutex);
         int currentThreads = workers.size();
@@ -219,17 +221,30 @@ void HasherThreadPool::onThreadRequestNextFile()
             // Create additional thread to handle future work
             LOG(QString("HasherThreadPool: Creating additional thread (%1/%2 active, %3 in requestQueue)")
                 .arg(currentThreads).arg(maxThreads).arg(queuedRequests));
-            locker.unlock();
-            createThread();
-            locker.relock();
+            shouldCreateThread = true;
+        }
+        else if (queuedRequests > 0)
+        {
+            // We have threads waiting but can't create more (at max)
+            // Need to request files from coordinator
+            shouldRequestFile = true;
         }
     }
     
-    // Forward the request to the Window class to provide the next file
-    // IMPORTANT: Signal must be emitted AFTER releasing requestMutex to avoid deadlock
-    // because Window::provideNextFileToHash() will call addFile() which also locks requestMutex
-    LOG(QString("HasherThreadPool: Emitting requestNextFile signal to coordinator"));
-    emit requestNextFile();
+    if (shouldCreateThread)
+    {
+        createThread();
+        // New thread will request work on its own when it starts
+        // Don't emit requestNextFile here
+    }
+    else if (shouldRequestFile)
+    {
+        // Forward the request to the Window class to provide the next file
+        // IMPORTANT: Signal must be emitted AFTER releasing requestMutex to avoid deadlock
+        // because Window::provideNextFileToHash() will call addFile() which also locks requestMutex
+        LOG(QString("HasherThreadPool: Emitting requestNextFile signal to coordinator"));
+        emit requestNextFile();
+    }
 }
 
 void HasherThreadPool::onThreadSendHash(QString hash)
