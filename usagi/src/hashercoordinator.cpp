@@ -663,6 +663,19 @@ void HasherCoordinator::provideNextFileToHash()
     // Thread-safe file assignment: only one thread can request a file at a time
     QMutexLocker locker(&m_fileRequestMutex);
     
+    LOG("HasherCoordinator::provideNextFileToHash() called");
+    
+    // Count current files with 0.1 progress for debugging
+    int filesMarked = 0;
+    for(int i=0; i<m_hashes->rowCount(); i++)
+    {
+        if(m_hashes->item(i, 1)->text() == "0.1")
+        {
+            filesMarked++;
+        }
+    }
+    LOG(QString("HasherCoordinator: Currently %1 files marked as 0.1 (assigned)").arg(filesMarked));
+    
     // Look through the hashes widget for the next file that needs hashing (progress="0" and no hash)
     for(int i=0; i<m_hashes->rowCount(); i++)
     {
@@ -672,16 +685,22 @@ void HasherCoordinator::provideNextFileToHash()
         if(progress == "0" && existingHash.isEmpty())
         {
             QString filePath = m_hashes->item(i, 2)->text();
+            QString fileName = m_hashes->item(i, 0)->text();
+            
+            LOG(QString("HasherCoordinator: Found file to assign: %1 (row %2)").arg(fileName).arg(i));
             
             // Immediately mark this file as assigned to prevent other threads from picking it up
             QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
             m_hashes->setItem(i, 1, itemProgressAssigned);
             
+            LOG(QString("HasherCoordinator: Marked file as 0.1 and calling addFile()"));
             m_hasherThreadPool->addFile(filePath);
+            LOG(QString("HasherCoordinator: addFile() returned for %1").arg(fileName));
             return;
         }
     }
     
+    LOG("HasherCoordinator: No more files to hash, sending empty string");
     // No more files to hash, send empty string to signal completion
     m_hasherThreadPool->addFile(QString());
 }
