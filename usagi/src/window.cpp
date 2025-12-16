@@ -1801,6 +1801,21 @@ void unknown_files_::contextMenuEvent(QContextMenuEvent *event)
     }
 }
 
+bool unknown_files_::checkFileExistsOrRemove(int row, const QString& filePath, Window* window)
+{
+    if (!QFile::exists(filePath))
+    {
+        LOG(QString("File not found, auto-removing from unknown files: %1").arg(filePath));
+        QMessageBox::information(this, "File Not Found", 
+            QString("The file no longer exists and will be removed from the list:\n%1").arg(filePath));
+        
+        // Auto-remove the missing file from the unknown files list
+        window->getUnknownFilesManager()->removeFileByPath(filePath, row);
+        return false;
+    }
+    return true;
+}
+
 void unknown_files_::executeFile()
 {
     int row = currentRow();
@@ -1817,14 +1832,8 @@ void unknown_files_::executeFile()
         if (!filePath.isEmpty())
         {
             // Check if file exists before trying to open it
-            if (!QFile::exists(filePath))
+            if (!checkFileExistsOrRemove(row, filePath, window))
             {
-                LOG(QString("File not found, auto-removing from unknown files: %1").arg(filePath));
-                QMessageBox::information(nullptr, "File Not Found", 
-                    QString("The file no longer exists and will be removed from the list:\n%1").arg(filePath));
-                
-                // Auto-remove the missing file from the unknown files list
-                window->getUnknownFilesManager()->removeFileByPath(filePath, row);
                 return;
             }
             
@@ -1849,14 +1858,8 @@ void unknown_files_::openFileLocation()
         if (!filePath.isEmpty())
         {
             // Check if file exists before trying to open its location
-            if (!QFile::exists(filePath))
+            if (!checkFileExistsOrRemove(row, filePath, window))
             {
-                LOG(QString("File not found, auto-removing from unknown files: %1").arg(filePath));
-                QMessageBox::information(nullptr, "File Not Found", 
-                    QString("The file no longer exists and will be removed from the list:\n%1").arg(filePath));
-                
-                // Auto-remove the missing file from the unknown files list
-                window->getUnknownFilesManager()->removeFileByPath(filePath, row);
                 return;
             }
             
