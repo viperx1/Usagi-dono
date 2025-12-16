@@ -607,11 +607,12 @@ int UnknownFilesManager::rescanAndFilterFiles()
         
         for (const QString &filepath : filesToRemove) {
             removeFileByPath(filepath);
-            removedCount++;
         }
         
         // Re-enable table updates
         m_tableWidget->setUpdatesEnabled(true);
+        
+        removedCount = filesToRemove.size();
     }
     
     if (removedCount > 0) {
