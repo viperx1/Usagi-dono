@@ -568,3 +568,45 @@ void UnknownFilesManager::removeFileByPath(const QString& filepath, int fromRow)
         m_containerWidget->hide();
     }
 }
+
+int UnknownFilesManager::rescanAndFilterFiles()
+{
+    if (!m_hasherCoordinator) {
+        emit logMessage("Error: HasherCoordinator not available for filter check");
+        return 0;
+    }
+    
+    emit logMessage("Re-scanning unknown files with current filter settings...");
+    
+    int removedCount = 0;
+    
+    // Disable table updates during batch removal for performance
+    m_tableWidget->setUpdatesEnabled(false);
+    
+    // Iterate backwards to avoid index issues when removing rows
+    for (int row = m_tableWidget->rowCount() - 1; row >= 0; --row) {
+        if (!m_filesData.contains(row)) {
+            continue;
+        }
+        
+        const LocalFileInfo &fileInfo = m_filesData[row];
+        QString filepath = fileInfo.filepath();
+        
+        // Check if file should be filtered based on current settings
+        if (m_hasherCoordinator->shouldFilterFile(filepath)) {
+            QString filename = fileInfo.filename();
+            emit logMessage(QString("Removing filtered file from unknown files: %1").arg(filename));
+            
+            // Remove the row
+            removeFileByPath(filepath, row);
+            removedCount++;
+        }
+    }
+    
+    // Re-enable table updates
+    m_tableWidget->setUpdatesEnabled(true);
+    
+    emit logMessage(QString("Re-scan complete. Removed %1 file(s) matching filter patterns.").arg(removedCount));
+    
+    return removedCount;
+}

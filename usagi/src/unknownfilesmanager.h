@@ -100,6 +100,12 @@ public:
      * @param fromRow Starting row hint for search optimization (optional, -1 to search all)
      */
     void removeFileByPath(const QString& filepath, int fromRow = -1);
+    
+    /**
+     * @brief Re-scan unknown files and remove those matching current filter patterns
+     * @return Number of files removed
+     */
+    int rescanAndFilterFiles();
 
 signals:
     /**

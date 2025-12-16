@@ -707,8 +707,16 @@ Window::Window()
     hasherFilterMasksEdit->setText(adbapi->getHasherFilterMasks());
     hasherFilterMasksEdit->setPlaceholderText("*.!qB,*.tmp,*.part");
     
+    QCheckBox *rescanUnknownFilesCheckbox = new QCheckBox("Re-scan unknown files when filter changes");
+    rescanUnknownFilesCheckbox->setObjectName("rescanUnknownFilesCheckbox");
+    rescanUnknownFilesCheckbox->setChecked(true);  // Default to enabled
+    rescanUnknownFilesCheckbox->setToolTip("When enabled, unknown files (not in AniDB) will be re-scanned\n"
+                                           "and those matching the filter patterns will be removed from the list.\n"
+                                           "This helps keep the unknown files list clean after filter changes.");
+    
     hasherFilterLayout->addWidget(hasherFilterLabel);
     hasherFilterLayout->addWidget(hasherFilterMasksEdit);
+    hasherFilterLayout->addWidget(rescanUnknownFilesCheckbox);
     
     settingsMainLayout->addWidget(hasherFilterGroup);
     
@@ -2008,8 +2016,26 @@ void Window::saveSettings()
 	
 	// Save hasher filter masks
 	QLineEdit *hasherFilterMasksEdit = this->findChild<QLineEdit*>("hasherFilterMasksEdit");
+	QCheckBox *rescanUnknownFilesCheckbox = this->findChild<QCheckBox*>("rescanUnknownFilesCheckbox");
+	
 	if (hasherFilterMasksEdit) {
-		adbapi->setHasherFilterMasks(hasherFilterMasksEdit->text());
+		QString oldFilterMasks = adbapi->getHasherFilterMasks();
+		QString newFilterMasks = hasherFilterMasksEdit->text();
+		
+		// Save the new filter masks
+		adbapi->setHasherFilterMasks(newFilterMasks);
+		
+		// Check if filter masks changed and re-scan option is enabled
+		if (rescanUnknownFilesCheckbox && rescanUnknownFilesCheckbox->isChecked() && 
+		    oldFilterMasks != newFilterMasks) {
+			LOG("Hasher filter masks changed, re-scanning unknown files...");
+			
+			// Trigger re-scan of unknown files with new filter settings
+			if (unknownFilesManager) {
+				int removedCount = unknownFilesManager->rescanAndFilterFiles();
+				LOG(QString("Re-scan complete: %1 file(s) removed from unknown files list").arg(removedCount));
+			}
+		}
 	}
 	
 	LOG("Settings saved");
