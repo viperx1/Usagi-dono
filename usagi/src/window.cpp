@@ -1347,10 +1347,18 @@ void Window::loadUnboundFiles()
     // Re-enable updates after bulk insertion
     unknownFilesManager->setUpdatesEnabled(true);
     
-    LOG(QString("Successfully loaded %1 unbound files").arg(unboundFiles.size() - skippedMissingFiles));
+    int loadedCount = unboundFiles.size() - skippedMissingFiles;
+    if(loadedCount > 0)
+    {
+        LOG(QString("Successfully loaded %1 unbound file(s)").arg(loadedCount));
+    }
     if(skippedMissingFiles > 0)
     {
         LOG(QString("Skipped %1 missing file(s)").arg(skippedMissingFiles));
+    }
+    if(loadedCount == 0 && skippedMissingFiles == 0)
+    {
+        LOG("No unbound files to load");
     }
 }
 
@@ -1806,7 +1814,7 @@ bool unknown_files_::checkFileExistsOrRemove(int row, const QString& filePath, W
     if (!QFile::exists(filePath))
     {
         LOG(QString("File not found, auto-removing from unknown files: %1").arg(filePath));
-        QMessageBox::information(this, "File Not Found", 
+        QMessageBox::information(window, "File Not Found", 
             QString("The file no longer exists and will be removed from the list:\n%1").arg(filePath));
         
         // Auto-remove the missing file from the unknown files list

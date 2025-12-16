@@ -631,15 +631,11 @@ int UnknownFilesManager::removeMissingFiles()
     int removedCount = 0;
     QList<QString> filesToRemove;
     
-    // First pass: collect missing files (avoid modifying while iterating)
-    for (int row = 0; row < m_tableWidget->rowCount(); ++row) {
-        if (!m_filesData.contains(row)) {
-            // Data synchronization issue - log for debugging
-            emit logMessage(QString("Warning: Row %1 exists in table but not in filesData map").arg(row));
-            continue;
-        }
-        
-        const LocalFileInfo &fileInfo = m_filesData[row];
+    // First pass: collect missing files by iterating over the data map
+    // (not row indices, as rows may not match map keys after removals)
+    for(auto it = m_filesData.constBegin(); it != m_filesData.constEnd(); ++it)
+    {
+        const LocalFileInfo &fileInfo = it.value();
         QString filepath = fileInfo.filepath();
         
         // Check if file exists on filesystem
