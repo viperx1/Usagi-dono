@@ -774,7 +774,8 @@ void HasherCoordinator::processPendingHashedFiles()
         QMutexLocker locker(&m_deferredProcessingMutex);
         
         // Take up to HASHED_FILES_BATCH_SIZE tasks from the queue
-        // Use takeLast() to avoid O(n) shifting on each removal
+        // Use takeLast() to avoid O(n) shifting on each removal (LIFO instead of FIFO)
+        // Processing order doesn't matter - all tasks are independent API calls
         int batchSize = qMin(HASHED_FILES_BATCH_SIZE, m_pendingHashedFilesQueue.size());
         tasksToProcess.reserve(batchSize);
         for (int i = 0; i < batchSize; ++i) {
@@ -782,7 +783,8 @@ void HasherCoordinator::processPendingHashedFiles()
         }
     }
     
-    // Process tasks outside the mutex lock (order doesn't matter for processing)
+    // Process tasks outside the mutex lock
+    // Order doesn't matter - each task is an independent set of API calls (LocalIdentify, File, MylistAdd)
     for (const HashingTask &task : tasksToProcess) {
         // Mark as hashed in UI (use pre-allocated color object)
         m_hashes->item(task.rowIndex(), 0)->setBackground(m_hashedFileColor);
