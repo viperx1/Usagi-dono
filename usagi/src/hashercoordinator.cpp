@@ -757,10 +757,13 @@ QStringList HasherCoordinator::getFilesNeedingHash()
 
 void HasherCoordinator::queueHashedFileForProcessing(const HashingTask &task)
 {
+    // NOTE: This method must be called from the main UI thread since it accesses QTimer
+    // The signal/slot connection from DirectoryWatcher ensures this is the case
     QMutexLocker locker(&m_deferredProcessingMutex);
     m_pendingHashedFilesQueue.append(task);
     
     // Start timer if not already running (protected by mutex to prevent race conditions)
+    // QTimer is thread-affine and must be accessed from the thread that created it
     if (!m_hashedFilesProcessingTimer->isActive()) {
         m_hashedFilesProcessingTimer->start();
     }
