@@ -672,22 +672,20 @@ void HasherCoordinator::provideNextFileToHash()
         if(progress == "0" && existingHash.isEmpty())
         {
             QString filePath = m_hashes->item(i, 2)->text();
-            QString fileName = m_hashes->item(i, 0)->text();
             
-            LOG(QString("HasherCoordinator: Found file to assign: %1 (row %2)").arg(fileName).arg(i));
-            
-            // Immediately mark this file as assigned to prevent other threads from picking it up
-            QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
-            m_hashes->setItem(i, 1, itemProgressAssigned);
-            
-            LOG(QString("HasherCoordinator: Marked file as 0.1 and calling addFile()"));
-            m_hasherThreadPool->addFile(filePath);
-            LOG(QString("HasherCoordinator: addFile() returned for %1").arg(fileName));
+            // Try to assign the file to a waiting thread
+            // addFile() will return true if a thread was waiting and received the file
+            if (m_hasherThreadPool->addFile(filePath))
+            {
+                // File was successfully assigned to a waiting thread
+                // Now mark it as 0.1 to show it's being processed
+                QTableWidgetItem *itemProgressAssigned = new QTableWidgetItem(QString("0.1"));
+                m_hashes->setItem(i, 1, itemProgressAssigned);
+            }
             return;
         }
     }
     
-    LOG("HasherCoordinator: No more files to hash, sending empty string");
     // No more files to hash, send empty string to signal completion
     m_hasherThreadPool->addFile(QString());
 }

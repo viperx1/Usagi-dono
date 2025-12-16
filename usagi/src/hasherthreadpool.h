@@ -33,10 +33,10 @@ public:
     
     /**
      * Adds a file to the queue to be hashed by any available worker thread.
-     * Creates a new thread if one is available and work is pending.
      * @param filePath Path to the file to hash (empty string signals completion)
+     * @return true if the file was successfully assigned to a waiting thread, false otherwise
      */
-    void addFile(const QString &filePath);
+    bool addFile(const QString &filePath);
     
     /**
      * Starts the pool to begin processing files.

@@ -31,11 +31,11 @@ HasherThreadPool::~HasherThreadPool()
     cleanupFinishedThreads();
 }
 
-void HasherThreadPool::addFile(const QString &filePath)
+bool HasherThreadPool::addFile(const QString &filePath)
 {
     if (!isStarted || isStopping)
     {
-        return;
+        return false;
     }
     
     // Empty file path signals completion
@@ -55,8 +55,9 @@ void HasherThreadPool::addFile(const QString &filePath)
         {
             // Signal this specific worker to finish (no more files)
             targetWorker->addFile(QString());
+            return true;
         }
-        return;
+        return false;
     }
     
     // We have a file to hash
@@ -76,7 +77,11 @@ void HasherThreadPool::addFile(const QString &filePath)
     {
         // Assign to the waiting worker
         targetWorker->addFile(filePath);
+        return true;
     }
+    
+    // No thread was waiting for this file
+    return false;
 }
 
 void HasherThreadPool::start(int fileCount)
