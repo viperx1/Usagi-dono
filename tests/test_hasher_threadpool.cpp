@@ -94,16 +94,16 @@ void TestHasherThreadPool::testMultipleThreadsCreated()
     HasherThreadPool pool(4);
     
     // Verify the pool was configured with the correct max thread count
-    // With on-demand creation, no threads are created until work is available
+    // With upfront creation, threads are created based on file count passed to start()
     QCOMPARE(pool.maxThreadCount(), 4);
     QCOMPARE(pool.threadCount(), 0); // No threads created yet
     
-    // Start the pool - this creates the first thread
-    pool.start();
-    QTest::qWait(100); // Wait for thread to be created
+    // Start the pool with 2 files - should create 2 threads
+    pool.start(2);
+    QTest::qWait(100); // Wait for threads to be created
     
-    // Should have one thread now
-    QCOMPARE(pool.threadCount(), 1);
+    // Should have two threads now
+    QCOMPARE(pool.threadCount(), 2);
 }
 
 void TestHasherThreadPool::testParallelHashing()
@@ -131,12 +131,12 @@ void TestHasherThreadPool::testParallelHashing()
     QSignalSpy hashSpy(&pool, &HasherThreadPool::sendHash);
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
     
-    // Start the pool - this creates the first thread
-    pool.start();
+    // Start the pool with 4 files - creates min(4, 2) = 2 threads
+    pool.start(4);
     
-    // Wait for initial requestNextFile signal from the first thread
+    // Wait for initial requestNextFile signals from threads
     QTest::qWait(1000);
-    QVERIFY(requestSpy.count() >= 1); // At least one request from the initial thread
+    QVERIFY(requestSpy.count() >= 2); // Two threads should request files
     
     // Add files to the pool
     for (const QString &filePath : filePaths)
@@ -184,8 +184,8 @@ void TestHasherThreadPool::testStopAllThreads()
     // Create a thread pool with 2 threads
     HasherThreadPool pool(2);
     
-    // Start the pool
-    pool.start();
+    // Start the pool with 3 files - creates min(3, 2) = 2 threads
+    pool.start(3);
     
     // Wait for threads to start
     QTest::qWait(1000);
@@ -237,22 +237,21 @@ void TestHasherThreadPool::testMultipleThreadIdsUsed()
     QSignalSpy threadStartedSpy(&pool, &HasherThreadPool::threadStarted);
     QSignalSpy requestSpy(&pool, &HasherThreadPool::requestNextFile);
     
-    // Start the pool - creates first thread
-    pool.start();
+    // Start the pool with 3 files - creates 3 threads
+    pool.start(3);
     
-    // Wait for first thread to start and request work
+    // Wait for threads to start and request work
     QTest::qWait(1000);
-    QVERIFY(requestSpy.count() >= 1);
+    QVERIFY(requestSpy.count() >= 3);
     
-    // Add files to trigger creation of additional threads
-    // Each file should cause a new thread to be created (up to max)
+    // Add files to the waiting threads
     for (const QString &filePath : filePaths)
     {
         pool.addFile(filePath);
-        QTest::qWait(100); // Allow thread creation
+        QTest::qWait(100); // Allow file assignment
     }
     
-    // Wait for threads to start
+    // Wait for threads to process
     QTest::qWait(2000);
     
     // Collect all unique thread IDs
@@ -314,17 +313,17 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     // Track which thread IDs hash files to verify threads are being used efficiently
     QSignalSpy fileHashedSpy(&pool, &HasherThreadPool::notifyFileHashed);
     
-    // Start the pool - creates first thread
-    pool.start();
+    // Start the pool with all files - creates min(numFiles, 3) = 3 threads
+    pool.start(numFiles);
     
-    // Wait for initial request from the first thread
+    // Wait for initial requests from threads
     QTest::qWait(1000);
     int initialRequests = requestSpy.count();
-    QVERIFY(initialRequests >= 1); // Should have at least one request from the initial thread
+    QVERIFY(initialRequests >= 3); // Should have requests from all 3 threads
     
-    // Feed initial file to first thread
+    // Feed files to waiting threads
     int filesAdded = 0;
-    if (filesAdded < numFiles)
+    while (filesAdded < numFiles && requestSpy.count() > 0)
     {
         pool.addFile(filePaths[filesAdded]);
         filesAdded++;

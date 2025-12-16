@@ -176,8 +176,8 @@ void TestStopNonBlocking::testStopWithBroadcastReturnsQuickly()
     // Set up signal spy to track when threads finish
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
     
-    // Start the pool
-    pool.start();
+    // Start the pool with 3 files
+    pool.start(3);
     
     // Wait for threads to start
     QTest::qWait(500);
@@ -256,7 +256,7 @@ void TestStopNonBlocking::testStopAndRestart()
     HasherThreadPool pool(2);
     
     // First run: Start, add files, and stop
-    pool.start();
+    pool.start(3);
     QTest::qWait(500);
     
     for (const QString &filePath : filePaths)
@@ -285,7 +285,7 @@ void TestStopNonBlocking::testStopAndRestart()
     // Second run: Restart the pool (this should not crash)
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
     
-    pool.start();
+    pool.start(3);
     QTest::qWait(500);
     
     // Add files again

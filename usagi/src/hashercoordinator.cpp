@@ -449,7 +449,7 @@ void HasherCoordinator::startHashing()
         
         m_buttonStart->setEnabled(false);
         m_buttonClear->setEnabled(false);
-        m_hasherThreadPool->start();
+        m_hasherThreadPool->start(filesToHashCount);
     }
     else if (rowsWithHashes.isEmpty())
     {
@@ -662,19 +662,6 @@ void HasherCoordinator::provideNextFileToHash()
 {
     // Thread-safe file assignment: only one thread can request a file at a time
     QMutexLocker locker(&m_fileRequestMutex);
-    
-    LOG("HasherCoordinator::provideNextFileToHash() called");
-    
-    // Count current files with 0.1 progress for debugging
-    int filesMarked = 0;
-    for(int i=0; i<m_hashes->rowCount(); i++)
-    {
-        if(m_hashes->item(i, 1)->text() == "0.1")
-        {
-            filesMarked++;
-        }
-    }
-    LOG(QString("HasherCoordinator: Currently %1 files marked as 0.1 (assigned)").arg(filesMarked));
     
     // Look through the hashes widget for the next file that needs hashing (progress="0" and no hash)
     for(int i=0; i<m_hashes->rowCount(); i++)

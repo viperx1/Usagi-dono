@@ -2922,7 +2922,7 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 			// Start hashing all detected files that need hashing
 			hasherCoordinator->getButtonStart()->setEnabled(false);
 			hasherCoordinator->getButtonClear()->setEnabled(false);
-			hasherThreadPool->start();
+			hasherThreadPool->start(filesToHashCount);
 			
 			if (adbapi->LoggedIn()) {
 				LOG(QString("Auto-hashing %1 file(s) - will be added to MyList as HDD unwatched").arg(filesToHashCount));

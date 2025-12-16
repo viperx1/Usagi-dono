@@ -35,7 +35,6 @@ void HasherThreadPool::addFile(const QString &filePath)
 {
     if (!isStarted || isStopping)
     {
-        LOG("HasherThreadPool::addFile() - pool not started or stopping, ignoring");
         return;
     }
     
@@ -46,7 +45,6 @@ void HasherThreadPool::addFile(const QString &filePath)
         HasherThread* targetWorker = nullptr;
         {
             QMutexLocker requestLocker(&requestMutex);
-            LOG(QString("HasherThreadPool::addFile(empty) - requestQueue size: %1").arg(requestQueue.size()));
             if (!requestQueue.isEmpty())
             {
                 targetWorker = requestQueue.dequeue();
@@ -57,13 +55,6 @@ void HasherThreadPool::addFile(const QString &filePath)
         {
             // Signal this specific worker to finish (no more files)
             targetWorker->addFile(QString());
-            LOG(QString("HasherThreadPool: Signaling thread %1 to finish - no more work").arg(targetWorker->getThreadId()));
-        }
-        else
-        {
-            // No worker waiting for work, which is expected if all threads are busy
-            // They will finish naturally when they complete their current file and request next
-            LOG("HasherThreadPool: No worker waiting when signaling completion (threads may be busy)");
         }
         return;
     }
@@ -74,8 +65,6 @@ void HasherThreadPool::addFile(const QString &filePath)
     
     {
         QMutexLocker requestLocker(&requestMutex);
-        LOG(QString("HasherThreadPool::addFile() - requestQueue size before dequeue: %1, active threads: %2")
-            .arg(requestQueue.size()).arg(workers.size()));
         if (!requestQueue.isEmpty())
         {
             // A worker is waiting for work - give it the file
@@ -87,19 +76,10 @@ void HasherThreadPool::addFile(const QString &filePath)
     {
         // Assign to the waiting worker
         targetWorker->addFile(filePath);
-        LOG(QString("HasherThreadPool: Assigned file to thread %1 (requestQueue now has %2 waiting)")
-            .arg(targetWorker->getThreadId()).arg(requestQueue.size()));
-    }
-    else
-    {
-        // No worker is waiting - this shouldn't happen!
-        // addFile() should only be called in response to requestNextFile()
-        LOG("HasherThreadPool: ERROR - addFile() called but no thread waiting for work!");
-        LOG(QString("HasherThreadPool: ERROR - Current state: %1 active threads, requestQueue empty").arg(workers.size()));
     }
 }
 
-void HasherThreadPool::start()
+void HasherThreadPool::start(int fileCount)
 {
     if (isStarted)
     {
@@ -107,19 +87,35 @@ void HasherThreadPool::start()
         return;
     }
     
-    LOG(QString("HasherThreadPool: Starting pool (max %1 threads, on-demand creation)").arg(maxThreads));
-    
     QMutexLocker locker(&mutex);
     isStarted = true;
     isStopping = false;
     activeThreads = 0;
     finishedThreads = 0;
     
-    // Create the first thread to kick off the process
-    // This thread will request work, which triggers the coordinator to provide files
-    // Additional threads will be created on-demand if more work is available
+    // Determine how many threads to create
+    // Create min(fileCount, maxThreads) threads
+    // If fileCount is 0 or negative, create 0 threads (wait for files to be added)
+    int threadsToCreate = 0;
+    if (fileCount > 0)
+    {
+        threadsToCreate = std::min(fileCount, maxThreads);
+    }
+    
+    LOG(QString("HasherThreadPool: Starting pool with %1 file(s) - creating %2 thread(s) (max %3)")
+        .arg(fileCount).arg(threadsToCreate).arg(maxThreads));
+    
+    // Create all threads upfront
     locker.unlock();
-    createThread();
+    for (int i = 0; i < threadsToCreate; ++i)
+    {
+        createThread();
+    }
+    
+    if (threadsToCreate == 0)
+    {
+        LOG("HasherThreadPool: No threads created - no files to hash");
+    }
 }
 
 void HasherThreadPool::stop()
@@ -191,60 +187,17 @@ void HasherThreadPool::onThreadRequestNextFile()
 {
     // Track which worker is requesting the next file in a FIFO queue
     // Use sender() to identify the worker that sent the signal
-    HasherThread* requestingWorker = nullptr;
+    HasherThread* requestingWorker = qobject_cast<HasherThread*>(sender());
+    if (requestingWorker != nullptr)
     {
         QMutexLocker locker(&requestMutex);
-        requestingWorker = qobject_cast<HasherThread*>(sender());
-        if (requestingWorker != nullptr)
-        {
-            requestQueue.enqueue(requestingWorker);
-            LOG(QString("HasherThreadPool: Thread %1 requesting file (requestQueue size now: %2)")
-                .arg(requestingWorker->getThreadId()).arg(requestQueue.size()));
-        }
-        else
-        {
-            LOG("HasherThreadPool: WARNING - requestNextFile from unknown sender");
-        }
+        requestQueue.enqueue(requestingWorker);
     }
     
-    // Proactively create more threads if needed
-    // This ensures we have threads ready to handle additional work
-    bool shouldCreateThread = false;
-    bool shouldRequestFile = false;
-    {
-        QMutexLocker locker(&mutex);
-        int currentThreads = workers.size();
-        int queuedRequests = requestQueue.size();
-        if (currentThreads < maxThreads && queuedRequests > 0)
-        {
-            // We have pending requests and room for more threads
-            // Create additional thread to handle future work
-            LOG(QString("HasherThreadPool: Creating additional thread (%1/%2 active, %3 in requestQueue)")
-                .arg(currentThreads).arg(maxThreads).arg(queuedRequests));
-            shouldCreateThread = true;
-        }
-        else if (queuedRequests > 0)
-        {
-            // We have threads waiting but can't create more (at max)
-            // Need to request files from coordinator
-            shouldRequestFile = true;
-        }
-    }
-    
-    if (shouldCreateThread)
-    {
-        createThread();
-        // New thread will request work on its own when it starts
-        // Don't emit requestNextFile here
-    }
-    else if (shouldRequestFile)
-    {
-        // Forward the request to the Window class to provide the next file
-        // IMPORTANT: Signal must be emitted AFTER releasing requestMutex to avoid deadlock
-        // because Window::provideNextFileToHash() will call addFile() which also locks requestMutex
-        LOG(QString("HasherThreadPool: Emitting requestNextFile signal to coordinator"));
-        emit requestNextFile();
-    }
+    // Forward the request to the coordinator to provide the next file
+    // IMPORTANT: Signal must be emitted AFTER releasing requestMutex to avoid deadlock
+    // because Window::provideNextFileToHash() will call addFile() which also locks requestMutex
+    emit requestNextFile();
 }
 
 void HasherThreadPool::onThreadSendHash(QString hash)

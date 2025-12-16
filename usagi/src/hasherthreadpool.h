@@ -40,9 +40,10 @@ public:
     
     /**
      * Starts the pool to begin processing files.
-     * Threads will be created on-demand as work becomes available.
+     * Creates threads immediately based on the number of files to hash.
+     * @param fileCount Number of files to be hashed (determines initial thread count)
      */
-    void start();
+    void start(int fileCount = 0);
     
     /**
      * Stops all worker threads gracefully.
