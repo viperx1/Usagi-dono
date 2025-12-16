@@ -768,20 +768,20 @@ void HasherCoordinator::queueHashedFileForProcessing(const HashingTask &task)
 
 void HasherCoordinator::processPendingHashedFiles()
 {
-    // Process files in small batches to keep UI responsive
-    int processed = 0;
+    // Extract a batch of tasks from the queue
+    QList<HashingTask> tasksToProcess;
+    {
+        QMutexLocker locker(&m_deferredProcessingMutex);
+        
+        // Take up to HASHED_FILES_BATCH_SIZE tasks from the queue
+        int batchSize = qMin(HASHED_FILES_BATCH_SIZE, m_pendingHashedFilesQueue.size());
+        for (int i = 0; i < batchSize; ++i) {
+            tasksToProcess.append(m_pendingHashedFilesQueue.takeFirst());
+        }
+    }
     
-    // Lock the mutex for queue access
-    m_deferredProcessingMutex.lock();
-    
-    while (!m_pendingHashedFilesQueue.isEmpty() && processed < HASHED_FILES_BATCH_SIZE) {
-        HashingTask task = m_pendingHashedFilesQueue.takeFirst();
-        
-        // Unlock while processing to allow new files to be queued
-        m_deferredProcessingMutex.unlock();
-        
-        processed++;
-        
+    // Process tasks outside the mutex lock
+    for (const HashingTask &task : tasksToProcess) {
         // Mark as hashed in UI (use pre-allocated color object)
         m_hashes->item(task.rowIndex(), 0)->setBackground(m_hashedFileColor);
         m_hashes->item(task.rowIndex(), 1)->setText("1");
@@ -827,17 +827,14 @@ void HasherCoordinator::processPendingHashedFiles()
         } else {
             LOG(QString("Skipping API processing for already-hashed file: %1 (addToMylist=false)").arg(task.filename()));
         }
-        
-        // Re-lock before checking the queue again
-        m_deferredProcessingMutex.lock();
     }
     
     // Check if queue is empty and stop timer if so
-    bool queueEmpty = m_pendingHashedFilesQueue.isEmpty();
-    m_deferredProcessingMutex.unlock();
-    
-    if (queueEmpty) {
-        m_hashedFilesProcessingTimer->stop();
-        LOG("Finished processing all already-hashed files");
+    {
+        QMutexLocker locker(&m_deferredProcessingMutex);
+        if (m_pendingHashedFilesQueue.isEmpty()) {
+            m_hashedFilesProcessingTimer->stop();
+            LOG("Finished processing all already-hashed files");
+        }
     }
 }
