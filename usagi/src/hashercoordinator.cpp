@@ -195,11 +195,13 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
     connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
     
-    // Connect to hasher thread pool
-    connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
-    connect(m_hasherThreadPool, &HasherThreadPool::notifyPartsDone, this, &HasherCoordinator::onProgressUpdate);
-    connect(m_hasherThreadPool, &HasherThreadPool::notifyFileHashed, this, &HasherCoordinator::onFileHashed);
-    connect(m_hasherThreadPool, &HasherThreadPool::finished, this, &HasherCoordinator::onHashingFinished);
+    // Connect to hasher thread pool (if available - may be null in tests)
+    if (m_hasherThreadPool) {
+        connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
+        connect(m_hasherThreadPool, &HasherThreadPool::notifyPartsDone, this, &HasherCoordinator::onProgressUpdate);
+        connect(m_hasherThreadPool, &HasherThreadPool::notifyFileHashed, this, &HasherCoordinator::onFileHashed);
+        connect(m_hasherThreadPool, &HasherThreadPool::finished, this, &HasherCoordinator::onHashingFinished);
+    }
 }
 
 void HasherCoordinator::addFiles()

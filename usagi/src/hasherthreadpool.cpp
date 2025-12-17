@@ -135,6 +135,17 @@ void HasherThreadPool::stop()
     {
         QMutexLocker locker(&mutex);
         isStopping = true;
+        
+        // If no threads were ever created, emit finished signal immediately
+        if (activeThreads == 0)
+        {
+            LOG("HasherThreadPool: No active threads, emitting finished signal");
+            isStarted = false;
+            isStopping = false;
+            locker.unlock();
+            emit finished();
+            return;
+        }
     }
     
     // Stop all active worker threads
