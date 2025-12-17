@@ -996,7 +996,7 @@ Window::Window()
             
             // Connect signals
             connect(deletionThread, &QThread::started, worker, &FileDeletionWorker::doWork);
-            connect(worker, &FileDeletionWorker::finished, this, [this, deleteFromDisk](const FileDeletionResult &result) {
+            connect(worker, &FileDeletionWorker::finished, this, [this](const FileDeletionResult &result) {
                 LOG(QString("[Window] File I/O operations finished for lid=%1, aid=%2, success=%3")
                     .arg(result.lid).arg(result.aid).arg(result.success));
                 
