@@ -54,51 +54,22 @@ void TestHasherCardUpdateSignal::initTestCase()
     db.setDatabaseName(":memory:");
     QVERIFY(db.open());
     
-    // Create necessary tables
-    QSqlQuery query(db);
-    
-    // Create local_files table
-    query.exec("CREATE TABLE IF NOT EXISTS local_files ("
-               "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-               "path TEXT UNIQUE NOT NULL, "
-               "filename TEXT, "
-               "ed2k_hash TEXT, "
-               "status INTEGER DEFAULT 0, "
-               "binding_status INTEGER DEFAULT 0)");
-    
-    // Create file table
-    query.exec("CREATE TABLE IF NOT EXISTS file ("
-               "fid INTEGER PRIMARY KEY, "
-               "aid INTEGER, "
-               "eid INTEGER, "
-               "size INTEGER, "
-               "ed2k TEXT)");
-    
-    // Create mylist table
-    query.exec("CREATE TABLE IF NOT EXISTS mylist ("
-               "lid INTEGER PRIMARY KEY, "
-               "fid INTEGER, "
-               "aid INTEGER, "
-               "eid INTEGER, "
-               "local_file INTEGER, "
-               "state INTEGER, "
-               "filestate INTEGER, "
-               "viewed INTEGER, "
-               "storage TEXT)");
-    
-    // Insert test data: a file in the file table and mylist
-    query.exec("INSERT INTO file (fid, aid, eid, size, ed2k) "
-               "VALUES (1, 100, 200, 1024, 'testhash123')");
-    query.exec("INSERT INTO mylist (lid, fid, aid, eid, state, filestate, viewed, storage) "
-               "VALUES (1, 1, 100, 200, 1, 0, 0, '')");
-    
-    // Insert a local_file entry
-    query.exec("INSERT INTO local_files (path, filename, ed2k_hash, status, binding_status) "
-               "VALUES ('/test/file.mkv', 'file.mkv', 'testhash123', 2, 1)");
-    
-    // Create API and HasherCoordinator using QScopedPointer for automatic cleanup
+    // Create API first - this will create all the necessary tables with proper schema
     m_api.reset(new AniDBApi("usagitest", 1));
     m_hasher.reset(new HasherCoordinator(m_api.data()));
+    
+    // Now insert test data into the properly structured tables
+    QSqlQuery query(db);
+    
+    // Insert test data: a file in the file table and mylist
+    QVERIFY(query.exec("INSERT INTO file (fid, aid, eid, size, ed2k) "
+                       "VALUES (1, 100, 200, 1024, 'testhash123')"));
+    QVERIFY(query.exec("INSERT INTO mylist (lid, fid, aid, eid, state, filestate, viewed, storage) "
+                       "VALUES (1, 1, 100, 200, 1, 0, 0, '')"));
+    
+    // Insert a local_file entry
+    QVERIFY(query.exec("INSERT INTO local_files (path, filename, ed2k_hash, status, binding_status) "
+                       "VALUES ('/test/file.mkv', 'file.mkv', 'testhash123', 2, 1)"));
 }
 
 void TestHasherCardUpdateSignal::cleanupTestCase()

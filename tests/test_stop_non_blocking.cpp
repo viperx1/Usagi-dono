@@ -245,7 +245,7 @@ void TestStopNonBlocking::testStopAndRestart()
     {
         QTemporaryFile *tempFile = new QTemporaryFile();
         QVERIFY(tempFile->open());
-        QByteArray data(10 * 1024 * 1024, 'C' + i); // 10MB each
+        QByteArray data(5 * 1024 * 1024, 'C' + i); // 5MB each - reduced from 10MB for faster testing
         tempFile->write(data);
         tempFile->close();
         filePaths.append(tempFile->fileName());
@@ -256,7 +256,7 @@ void TestStopNonBlocking::testStopAndRestart()
     HasherThreadPool pool(2);
     
     // First run: Start, add files, and stop
-    pool.start(3);
+    pool.start(2);  // Start with correct file count
     QTest::qWait(500);
     
     for (const QString &filePath : filePaths)
@@ -272,7 +272,6 @@ void TestStopNonBlocking::testStopAndRestart()
     pool.stop();
     
     // Wait for threads to finish and the pool to update its state
-    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
     QSignalSpy firstFinishedSpy(&pool, &HasherThreadPool::finished);
     for (int i = 0; i < 500 && firstFinishedSpy.count() == 0; ++i) {
         QTest::qWait(10);
@@ -284,8 +283,9 @@ void TestStopNonBlocking::testStopAndRestart()
     
     // Second run: Restart the pool (this should not crash)
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
+    QSignalSpy hashSpy(&pool, &HasherThreadPool::sendHash);
     
-    pool.start(3);
+    pool.start(2);  // Start with correct file count
     QTest::qWait(500);
     
     // Add files again
@@ -295,17 +295,21 @@ void TestStopNonBlocking::testStopAndRestart()
         QTest::qWait(50);
     }
     
-    // Wait for threads to process files and request next file
-    // This ensures requestNextFile signals are processed before we signal completion
-    QTest::qWait(500);
-    
-    // Signal completion
+    // Signal completion immediately after adding files
     pool.addFile(QString());
     
-    // Wait for completion
-    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
-    for (int i = 0; i < 1500 && finishedSpy.count() == 0; ++i) {
-        QTest::qWait(10);
+    // Wait for all hashing to complete (similar to testParallelHashing pattern)
+    // Allow up to 3 seconds per file
+    const int waitIntervalMs = 100;
+    const int maxWaitIterations = (filePaths.size() * 3000) / waitIntervalMs;
+    for (int i = 0; i < maxWaitIterations && hashSpy.count() < filePaths.size(); ++i) {
+        QTest::qWait(waitIntervalMs);
+    }
+    
+    // Wait for finished signal
+    const int maxFinishedWaitIterations = 100;
+    for (int i = 0; i < maxFinishedWaitIterations && finishedSpy.count() == 0; ++i) {
+        QTest::qWait(waitIntervalMs);
     }
     QVERIFY2(finishedSpy.count() > 0, "Threads should finish after restart");
     
