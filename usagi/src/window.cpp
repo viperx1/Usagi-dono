@@ -134,11 +134,53 @@ QList<LocalFileInfo> UnboundFilesLoaderWorker::executeQuery(QSqlDatabase &db)
     return tempUnboundFiles;
 }
 
+// FileDeletionWorker implementation
+void FileDeletionWorker::doWork()
+{
+    LOG(QString("[FileDeletionWorker] Starting deletion for lid=%1, deleteFromDisk=%2 in background thread")
+        .arg(m_lid).arg(m_deleteFromDisk));
+    
+    FileDeletionResult result;
+    result.lid = m_lid;
+    result.aid = 0;
+    result.success = false;
+    
+    // Call the AniDBApi deletion method
+    // This will handle database queries, file deletion, and API updates
+    if (m_api) {
+        QString apiResult = m_api->deleteFileFromMylist(m_lid, m_deleteFromDisk);
+        result.success = !apiResult.isEmpty();
+        
+        if (!result.success) {
+            result.errorMessage = "Failed to delete file from mylist";
+        }
+        
+        // Get the aid for the result
+        QSqlDatabase db = QSqlDatabase::database();
+        if (db.isOpen()) {
+            QSqlQuery q(db);
+            q.prepare("SELECT aid FROM mylist WHERE lid = ?");
+            q.addBindValue(m_lid);
+            if (q.exec() && q.next()) {
+                result.aid = q.value(0).toInt();
+            }
+        }
+    } else {
+        result.errorMessage = "AniDBApi not available";
+    }
+    
+    LOG(QString("[FileDeletionWorker] Deletion completed for lid=%1, success=%2")
+        .arg(m_lid).arg(result.success));
+    
+    emit finished(result);
+}
+
 
 Window::Window()
 {
 	qRegisterMetaType<ed2k::ed2kfilestruct>("ed2k::ed2kfilestruct");
 	qRegisterMetaType<Qt::HANDLE>("Qt::HANDLE");
+	qRegisterMetaType<FileDeletionResult>("FileDeletionResult");
 	
 	// Initialize global hasher thread pool
 	hasherThreadPool = new HasherThreadPool();
@@ -869,30 +911,40 @@ Window::Window()
     sessionForceDeletePermissionsCheckbox->blockSignals(false);
     
     
-    // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion
+    // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion in background thread
     connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
-        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2").arg(lid).arg(deleteFromDisk));
+        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2 - starting background thread")
+            .arg(lid).arg(deleteFromDisk));
+        
         if (adbapi) {
-            // Get the aid before deletion for the callback
-            int aid = 0;
+            // Get database name before starting thread
             QSqlDatabase db = QSqlDatabase::database();
-            if (db.isOpen()) {
-                QSqlQuery q(db);
-                q.prepare("SELECT aid FROM mylist WHERE lid = ?");
-                q.addBindValue(lid);
-                if (q.exec() && q.next()) {
-                    aid = q.value(0).toInt();
+            QString dbName = db.databaseName();
+            
+            // Create worker and thread
+            QThread *deletionThread = new QThread(this);
+            FileDeletionWorker *worker = new FileDeletionWorker(dbName, lid, deleteFromDisk, adbapi);
+            worker->moveToThread(deletionThread);
+            
+            // Connect signals
+            connect(deletionThread, &QThread::started, worker, &FileDeletionWorker::doWork);
+            connect(worker, &FileDeletionWorker::finished, this, [this](const FileDeletionResult &result) {
+                LOG(QString("[Window] File deletion finished for lid=%1, aid=%2, success=%3")
+                    .arg(result.lid).arg(result.aid).arg(result.success));
+                
+                // Notify WatchSessionManager of the result
+                if (watchSessionManager) {
+                    watchSessionManager->onFileDeletionResult(result.lid, result.aid, result.success);
                 }
-            }
+            });
+            connect(worker, &FileDeletionWorker::finished, deletionThread, &QThread::quit);
+            connect(deletionThread, &QThread::finished, worker, &QObject::deleteLater);
+            connect(deletionThread, &QThread::finished, deletionThread, &QObject::deleteLater);
             
-            // Perform deletion and check result
-            QString result = adbapi->deleteFileFromMylist(lid, deleteFromDisk);
-            bool success = !result.isEmpty();
+            // Start the thread
+            deletionThread->start();
             
-            // Notify WatchSessionManager of the result
-            if (watchSessionManager) {
-                watchSessionManager->onFileDeletionResult(lid, aid, success);
-            }
+            LOG(QString("[Window] File deletion thread started for lid=%1").arg(lid));
         }
     });
     
