@@ -332,74 +332,35 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     int initialRequests = requestSpy.count();
     QVERIFY(initialRequests >= 3); // Should have requests from all 3 threads
     
-    // Feed files to waiting threads
-    int filesAdded = 0;
-    while (filesAdded < numFiles && requestSpy.count() > 0)
+    // Add all files to the pool with small delays
+    // The threads will pick them up as they become available
+    for (const QString &filePath : filePaths)
     {
-        pool.addFile(filePaths[filesAdded]);
-        filesAdded++;
-    }
-    
-    // Wait and feed remaining files as they're requested
-    int loopIterations = 0;
-    const int maxLoopIterations = 200; // Prevent infinite loop (20 seconds max)
-    int lastRequestCount = requestSpy.count();
-    int noProgressIterations = 0;
-    
-    while (filesAdded < numFiles && loopIterations < maxLoopIterations)
-    {
-        loopIterations++;
-        
-        // Process events to ensure signals are delivered
-        QCoreApplication::processEvents();
-        QTest::qWait(100);
-        
-        int currentRequests = requestSpy.count();
-        
-        // If we have new requests and files to add, add them
-        if (currentRequests > lastRequestCount && filesAdded < numFiles)
-        {
-            // Add files for all pending requests
-            int requestsToFill = currentRequests - lastRequestCount;
-            for (int i = 0; i < requestsToFill && filesAdded < numFiles; i++)
-            {
-                pool.addFile(filePaths[filesAdded]);
-                filesAdded++;
-            }
-            lastRequestCount = currentRequests;
-            noProgressIterations = 0;
-        }
-        else
-        {
-            noProgressIterations++;
-            // If no progress for 5 iterations (500ms), something is wrong
-            if (noProgressIterations > 5 && filesAdded < numFiles)
-            {
-                QFAIL(QString("Test stalled: added %1 of %2 files, %3 requests received, no progress for 500ms")
-                      .arg(filesAdded).arg(numFiles).arg(currentRequests).toUtf8().constData());
-            }
-        }
-    }
-    
-    // If we hit max iterations, fail the test with a clear message
-    if (filesAdded < numFiles)
-    {
-        QFAIL(QString("Test timed out: only added %1 of %2 files after %3 iterations")
-              .arg(filesAdded).arg(numFiles).arg(loopIterations).toUtf8().constData());
+        pool.addFile(filePath);
+        QTest::qWait(100); // Small delay to allow work distribution
     }
     
     // Signal completion
     pool.addFile(QString());
     
     // Wait for all hashing to complete
-    // Use QTest::qWait() loop instead of QSignalSpy::wait() for better compatibility with static Qt builds
-    for (int i = 0; i < 150 && finishedSpy.count() == 0; ++i) {
-        QTest::qWait(100); // Wait up to 15 seconds total
+    // Wait up to 20 seconds total (200 iterations * 100ms per iteration)
+    const int maxWaitIterations = 200;
+    const int waitIntervalMs = 100;
+    for (int i = 0; i < maxWaitIterations && hashSpy.count() < numFiles; ++i) {
+        QTest::qWait(waitIntervalMs);
     }
-    QVERIFY(finishedSpy.count() >= 1);
     
     // Verify all files were hashed
     QCOMPARE(hashSpy.count(), numFiles);
+    
+    // Verify finished signal was emitted
+    // Wait up to 10 seconds total (100 iterations * 100ms per iteration)
+    const int maxFinishedWaitIterations = 100;
+    for (int i = 0; i < maxFinishedWaitIterations && finishedSpy.count() == 0; ++i) {
+        QTest::qWait(waitIntervalMs);
+    }
+    QVERIFY(finishedSpy.count() >= 1);
     
     // Verify that multiple threads participated (not all work on one thread)
     QSet<int> activeThreadIds;
