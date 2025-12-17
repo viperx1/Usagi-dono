@@ -302,9 +302,6 @@ void PlaybackManager::savePlaybackPosition(int position, int duration)
     
     if (!q.exec()) {
         LOG(QString("Error saving playback position: %1").arg(q.lastError().text()));
-    } else {
-        LOG(QString("Saved playback position: LID %1, position %2/%3s")
-            .arg(m_currentLid).arg(position).arg(duration));
     }
 }
 
