@@ -51,6 +51,7 @@ signals:
     
 private slots:
     void onDirectoryChanged(const QString &path);
+    void onFileChanged(const QString &path);
     void checkForNewFiles();
     void onScanComplete(const QStringList &newFiles);
     

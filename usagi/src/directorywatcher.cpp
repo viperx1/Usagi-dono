@@ -72,6 +72,8 @@ DirectoryWatcher::DirectoryWatcher(QObject *parent)
     
     connect(m_watcher, &QFileSystemWatcher::directoryChanged,
             this, &DirectoryWatcher::onDirectoryChanged);
+    connect(m_watcher, &QFileSystemWatcher::fileChanged,
+            this, &DirectoryWatcher::onFileChanged);
     connect(m_debounceTimer, &QTimer::timeout,
             this, &DirectoryWatcher::checkForNewFiles);
     connect(m_initialScanTimer, &QTimer::timeout,
@@ -148,6 +150,14 @@ void DirectoryWatcher::onDirectoryChanged(const QString &path)
     Q_UNUSED(path);
     
     // Restart debounce timer
+    m_debounceTimer->start();
+}
+
+void DirectoryWatcher::onFileChanged(const QString &path)
+{
+    LOG(QString("DirectoryWatcher: File changed: %1").arg(path));
+    
+    // Restart debounce timer when files change
     m_debounceTimer->start();
 }
 
