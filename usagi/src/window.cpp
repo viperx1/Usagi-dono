@@ -3048,8 +3048,10 @@ void Window::onPlayButtonClicked(const QModelIndex &index)
 
 void Window::onPlaybackPositionUpdated(int lid, int position, int duration)
 {
-	LOG(QString("Playback position updated: LID %1, %2/%3s").arg(lid).arg(position).arg(duration));
 	// The position is already saved by PlaybackManager, no need to do anything here
+	Q_UNUSED(lid);
+	Q_UNUSED(position);
+	Q_UNUSED(duration);
 }
 
 
