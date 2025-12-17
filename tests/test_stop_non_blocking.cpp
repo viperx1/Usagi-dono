@@ -237,6 +237,7 @@ void TestStopNonBlocking::testStopWithBroadcastReturnsQuickly()
 
 void TestStopNonBlocking::testStopAndRestart()
 {
+    qDebug() << "[TEST] testStopAndRestart: Creating temporary files";
     // Create temporary files to hash
     QVector<QTemporaryFile*> tempFiles;
     QVector<QString> filePaths;
@@ -251,25 +252,33 @@ void TestStopNonBlocking::testStopAndRestart()
         filePaths.append(tempFile->fileName());
         tempFiles.append(tempFile);
     }
+    qDebug() << "[TEST] testStopAndRestart: Created" << tempFiles.size() << "temp files";
     
     // Create a thread pool with 2 threads
     HasherThreadPool pool(2);
+    qDebug() << "[TEST] testStopAndRestart: Created thread pool";
     
     // First run: Start, add files, and stop
+    qDebug() << "[TEST] testStopAndRestart: Starting pool (first run)";
     pool.start(3);
     QTest::qWait(500);
     
+    qDebug() << "[TEST] testStopAndRestart: Adding files (first run)";
     for (const QString &filePath : filePaths)
     {
         pool.addFile(filePath);
         QTest::qWait(50);
     }
+    qDebug() << "[TEST] testStopAndRestart: Added" << filePaths.size() << "files (first run)";
     
     QTest::qWait(200);
     
     // Stop the pool
+    qDebug() << "[TEST] testStopAndRestart: Broadcasting stop (first run)";
     pool.broadcastStopHasher();
+    qDebug() << "[TEST] testStopAndRestart: Calling stop (first run)";
     pool.stop();
+    qDebug() << "[TEST] testStopAndRestart: Stop called, waiting for finish signal (first run)";
     
     // Wait for threads to finish and the pool to update its state
     // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
@@ -277,43 +286,58 @@ void TestStopNonBlocking::testStopAndRestart()
     for (int i = 0; i < 500 && firstFinishedSpy.count() == 0; ++i) {
         QTest::qWait(10);
     }
+    qDebug() << "[TEST] testStopAndRestart: First finished signal count:" << firstFinishedSpy.count();
     QVERIFY2(firstFinishedSpy.count() > 0, "Threads should finish after stop");
     
     // Process any pending events to ensure state is updated
+    qDebug() << "[TEST] testStopAndRestart: Processing pending events";
     QTest::qWait(100);
     
     // Second run: Restart the pool (this should not crash)
+    qDebug() << "[TEST] testStopAndRestart: Starting second run - creating signal spy";
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
     
+    qDebug() << "[TEST] testStopAndRestart: Restarting pool (second run)";
     pool.start(3);
     QTest::qWait(500);
     
     // Add files again
+    qDebug() << "[TEST] testStopAndRestart: Adding files (second run)";
     for (const QString &filePath : filePaths)
     {
         pool.addFile(filePath);
         QTest::qWait(50);
     }
+    qDebug() << "[TEST] testStopAndRestart: Added" << filePaths.size() << "files (second run)";
     
     // Wait for threads to process files and request next file
     // This ensures requestNextFile signals are processed before we signal completion
+    qDebug() << "[TEST] testStopAndRestart: Waiting for threads to start processing";
     QTest::qWait(500);
     
     // Signal completion
+    qDebug() << "[TEST] testStopAndRestart: Signaling completion with empty string";
     pool.addFile(QString());
     
     // Wait for completion
     // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
+    qDebug() << "[TEST] testStopAndRestart: Waiting for finish signal (second run)";
     for (int i = 0; i < 1500 && finishedSpy.count() == 0; ++i) {
+        if (i % 100 == 0) {
+            qDebug() << "[TEST] testStopAndRestart: Still waiting for finish signal, iteration" << i << "of 1500, count:" << finishedSpy.count();
+        }
         QTest::qWait(10);
     }
+    qDebug() << "[TEST] testStopAndRestart: Second finished signal count:" << finishedSpy.count();
     QVERIFY2(finishedSpy.count() > 0, "Threads should finish after restart");
     
     // Clean up temp files
+    qDebug() << "[TEST] testStopAndRestart: Cleaning up temp files";
     for (QTemporaryFile *tempFile : tempFiles)
     {
         delete tempFile;
     }
+    qDebug() << "[TEST] testStopAndRestart: Test complete";
 }
 
 QTEST_MAIN(TestStopNonBlocking)
