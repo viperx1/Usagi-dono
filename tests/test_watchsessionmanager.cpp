@@ -504,6 +504,9 @@ void TestWatchSessionManager::testPerformInitialScanWithDeletionEnabled()
     // Test that performInitialScan properly triggers deletion when both settings are enabled
     // This test verifies the fix for the bug where deletion didn't happen on startup
     
+    // Very high threshold to ensure deletion is triggered (want isDeletionNeeded() to return true)
+    constexpr double HIGH_THRESHOLD_GB = 999999.0;
+    
     // Create a signal spy to monitor deletion requests
     QSignalSpy deletionSpy(manager, &WatchSessionManager::deleteFileRequested);
     
@@ -512,9 +515,8 @@ void TestWatchSessionManager::testPerformInitialScanWithDeletionEnabled()
     manager->setActualDeletionEnabled(true);
     
     // Set a very high threshold to ensure deletion is triggered
-    // (We want isDeletionNeeded() to return true)
     manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
-    manager->setDeletionThresholdValue(999999.0); // Very high threshold to trigger deletion
+    manager->setDeletionThresholdValue(HIGH_THRESHOLD_GB);
     
     // Verify settings are saved
     QVERIFY(manager->isAutoMarkDeletionEnabled());
