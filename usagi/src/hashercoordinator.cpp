@@ -604,6 +604,9 @@ void HasherCoordinator::onFileHashed(int /*threadId*/, ed2k::ed2kfilestruct file
                     if (lid > 0) {
                         LOG(QString("File linked to mylist, emitting signal for lid=%1").arg(lid));
                         emit fileLinkedToMylist(lid);
+                    } else {
+                        LOG(QString("WARNING: Failed to link file to mylist: %1 (size=%2, hash=%3)")
+                            .arg(filePath).arg(fileData.size).arg(fileData.hexdigest));
                     }
                 }
             }
