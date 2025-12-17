@@ -1090,7 +1090,7 @@ void WatchSessionManager::performInitialScan()
     
     // Scan for files that should be marked for deletion if auto-deletion is enabled
     // (this will emit markingsUpdated with the set of updated lids)
-    if (m_autoMarkDeletionEnabled) {
+    if (m_enableActualDeletion) {
         autoMarkFilesForDeletion();
     }
     
