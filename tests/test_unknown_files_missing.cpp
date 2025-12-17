@@ -22,6 +22,7 @@ class TestUnknownFilesMissing : public QObject
 private slots:
     void initTestCase();
     void cleanupTestCase();
+    void testInsertMissingFileSkipped();
     void testRemoveMissingFilesEmpty();
     void testRemoveMissingFilesSingle();
     void testRemoveMissingFilesMultiple();
@@ -55,6 +56,21 @@ void TestUnknownFilesMissing::cleanupTestCase()
 {
     delete m_manager;
     delete m_tempDir;
+}
+
+void TestUnknownFilesMissing::testInsertMissingFileSkipped()
+{
+    // Test that insertFile() skips files that don't exist
+    QString nonExistentPath = m_tempDir->path() + "/nonexistent.mkv";
+    
+    // Verify file doesn't exist
+    QVERIFY(!QFile::exists(nonExistentPath));
+    
+    // Try to insert the missing file
+    m_manager->insertFile("nonexistent.mkv", nonExistentPath, "testhash", 1024);
+    
+    // Verify it was NOT added to the table
+    QCOMPARE(m_manager->getTableWidget()->rowCount(), 0);
 }
 
 void TestUnknownFilesMissing::testRemoveMissingFilesEmpty()

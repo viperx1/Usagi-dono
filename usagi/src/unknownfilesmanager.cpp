@@ -104,6 +104,12 @@ void UnknownFilesManager::reindexFilesData(int removedRow)
 
 void UnknownFilesManager::insertFile(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
 {
+    // Check if file exists before adding to table
+    if (!QFile::exists(filepath)) {
+        emit logMessage(QString("Skipping missing file, not adding to unknown files: %1").arg(filepath));
+        return;
+    }
+    
     // Show the container if hidden
     if(m_containerWidget->isHidden()) {
         m_containerWidget->show();
