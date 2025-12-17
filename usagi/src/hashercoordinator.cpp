@@ -598,7 +598,13 @@ void HasherCoordinator::onFileHashed(int /*threadId*/, ed2k::ed2kfilestruct file
                 {
                     m_hashes->item(i, 6)->setText("0");
                     // File already in mylist - link the local_file and update status
-                    m_adbapi->LinkLocalFileToMylist(fileData.size, fileData.hexdigest, filePath);
+                    int lid = m_adbapi->LinkLocalFileToMylist(fileData.size, fileData.hexdigest, filePath);
+                    
+                    // Emit signal to notify that a file was linked to mylist (for card updates)
+                    if (lid > 0) {
+                        LOG(QString("File linked to mylist, emitting signal for lid=%1").arg(lid));
+                        emit fileLinkedToMylist(lid);
+                    }
                 }
             }
             else

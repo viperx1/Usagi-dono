@@ -298,6 +298,10 @@ Window::Window()
     // Connect HasherCoordinator signals
     connect(hasherCoordinator, &HasherCoordinator::hashingFinished, this, &Window::hasherFinished);
     connect(hasherCoordinator, &HasherCoordinator::logMessage, this, &Window::getNotifyLogAppend);
+    connect(hasherCoordinator, &HasherCoordinator::fileLinkedToMylist, this, [this](int lid) {
+        LOG(QString("HasherCoordinator: File linked to mylist, updating anime card for lid=%1").arg(lid));
+        updateOrAddMylistEntry(lid);
+    });
     
     // Connect UnknownFilesManager signals
     connect(unknownFilesManager, &UnknownFilesManager::logMessage, this, &Window::getNotifyLogAppend);

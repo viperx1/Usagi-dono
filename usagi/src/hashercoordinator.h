@@ -92,6 +92,9 @@ signals:
     // Signal for log messages
     void logMessage(const QString &message);
     
+    // Signal to notify when a file is linked to mylist (for card updates)
+    void fileLinkedToMylist(int lid);
+    
 public slots:
     // File selection slots
     void addFiles();
