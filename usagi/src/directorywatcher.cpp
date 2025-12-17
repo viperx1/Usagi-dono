@@ -243,7 +243,7 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
     LOG("DirectoryWatcher: Finished adding files to m_processedFiles set");
     
     // Add files to watcher to monitor for changes
-    QStringList currentlyWatchedFiles = m_watcher->files();
+    QSet<QString> currentlyWatchedFiles = m_watcher->files().toSet();
     for (const QString &filePath : newFiles) {
         if (!currentlyWatchedFiles.contains(filePath)) {
             m_watcher->addPath(filePath);
