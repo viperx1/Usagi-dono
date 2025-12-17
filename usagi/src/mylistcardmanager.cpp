@@ -90,11 +90,11 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         
         // Wait for ALL data to be ready (preload + chain building complete)
         // Add timeout to prevent infinite hang in case of issues
+        // Note: Proceeds with execution even if timeout occurs to prevent deadlock
         int waitIterations = 0;
-        const int MAX_WAIT_ITERATIONS = 100; // 10 seconds max (100 * 100ms)
-        while (!m_dataReady && waitIterations < MAX_WAIT_ITERATIONS) {
+        while (!m_dataReady && waitIterations < DATA_READY_MAX_WAIT_ITERATIONS) {
             LOG("[MyListCardManager] Waiting for data to be ready (preload + chain building)...");
-            m_dataReadyCondition.wait(&m_mutex, 100); // Wait up to 100ms
+            m_dataReadyCondition.wait(&m_mutex, DATA_READY_WAIT_TIMEOUT_MS);
             waitIterations++;
         }
         
@@ -720,11 +720,11 @@ AnimeCard* MyListCardManager::createCardForIndex(int index)
     
     // Wait for ALL data to be ready before creating cards
     // Add timeout to prevent infinite hang in case of issues
+    // Note: Returns nullptr if timeout occurs (card creation requires valid data)
     int waitIterations = 0;
-    const int MAX_WAIT_ITERATIONS = 100; // 10 seconds max (100 * 100ms)
-    while (!m_dataReady && waitIterations < MAX_WAIT_ITERATIONS) {
+    while (!m_dataReady && waitIterations < DATA_READY_MAX_WAIT_ITERATIONS) {
         LOG("[MyListCardManager] createCardForIndex: Waiting for data to be ready...");
-        m_dataReadyCondition.wait(&m_mutex, 100); // Wait up to 100ms
+        m_dataReadyCondition.wait(&m_mutex, DATA_READY_WAIT_TIMEOUT_MS);
         waitIterations++;
     }
     

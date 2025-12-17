@@ -434,6 +434,8 @@ private:
     
     // Constants
     static const int BATCH_UPDATE_DELAY = 50; // ms
+    static const int DATA_READY_WAIT_TIMEOUT_MS = 100; // Timeout for each wait iteration
+    static const int DATA_READY_MAX_WAIT_ITERATIONS = 100; // 10 seconds max total
 };
 
 #endif // MYLISTCARDMANAGER_H
