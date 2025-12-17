@@ -2425,3 +2425,74 @@ if(WIN32)
 endif()
 
 add_test(NAME test_recent_episode_sort_improvements COMMAND test_recent_episode_sort_improvements -v2)
+
+# ==========================================================
+# test_hasher_card_update_signal - Signal connection for anime card updates
+# ==========================================================
+set(HASHER_CARD_UPDATE_SIGNAL_TEST_SOURCES
+    test_hasher_card_update_signal.cpp
+    ../usagi/src/hashercoordinator.cpp
+    ../usagi/src/anidbapi.cpp
+    ../usagi/src/mask.cpp
+    ../usagi/src/myanidbapi.cpp
+    ../usagi/src/anidbapi_settings.cpp
+    ../usagi/src/Qt-AES-master/qaesencryption.cpp
+    ../usagi/src/logger.cpp
+    ../usagi/src/anidbanimeinfo.cpp
+    ../usagi/src/anidbfileinfo.cpp
+    ../usagi/src/anidbepisodeinfo.cpp
+    ../usagi/src/anidbgroupinfo.cpp
+    ../usagi/src/applicationsettings.cpp
+    ../usagi/src/truncatedresponseinfo.cpp
+    ../usagi/src/replywaiter.cpp
+    ../usagi/src/filehashinfo.cpp
+    ../usagi/src/hash/ed2k.cpp
+    ../usagi/src/hash/md4.cpp
+    ../usagi/src/hasherthreadpool.cpp
+    ../usagi/src/hasherthread.cpp
+    ../usagi/src/progresstracker.cpp
+)
+
+set(HASHER_CARD_UPDATE_SIGNAL_TEST_HEADERS
+    ../usagi/src/hashercoordinator.h
+    ../usagi/src/anidbapi.h
+    ../usagi/src/logger.h
+    ../usagi/src/main.h
+    ../usagi/src/Qt-AES-master/qaesencryption.h
+    ../usagi/src/anidbanimeinfo.h
+    ../usagi/src/anidbfileinfo.h
+    ../usagi/src/anidbepisodeinfo.h
+    ../usagi/src/anidbgroupinfo.h
+    ../usagi/src/applicationsettings.h
+    ../usagi/src/hash/ed2k.h
+    ../usagi/src/hash/md4.h
+    ../usagi/src/hasherthreadpool.h
+    ../usagi/src/hasherthread.h
+)
+
+add_executable(test_hasher_card_update_signal ${HASHER_CARD_UPDATE_SIGNAL_TEST_SOURCES} ${HASHER_CARD_UPDATE_SIGNAL_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_hasher_card_update_signal)
+
+target_compile_definitions(test_hasher_card_update_signal PRIVATE CRYPTOPP_DEBUG=0)
+
+target_link_libraries(test_hasher_card_update_signal PRIVATE
+    Qt6::Test
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::Sql
+    Qt6::Core
+    z
+)
+
+target_include_directories(test_hasher_card_update_signal PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_hasher_card_update_signal PRIVATE
+        "-Wl,--subsystem,console"
+    )
+endif()
+
+add_test(NAME test_hasher_card_update_signal COMMAND test_hasher_card_update_signal -v2)
