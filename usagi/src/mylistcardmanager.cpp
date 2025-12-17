@@ -89,17 +89,9 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
         QMutexLocker locker(&m_mutex);
         
         // Wait for ALL data to be ready (preload + chain building complete)
-        // Add timeout to prevent infinite hang in case of issues
-        // Note: Proceeds with execution even if timeout occurs to prevent deadlock
-        int waitIterations = 0;
-        while (!m_dataReady && waitIterations < DATA_READY_MAX_WAIT_ITERATIONS) {
+        while (!m_dataReady) {
             LOG("[MyListCardManager] Waiting for data to be ready (preload + chain building)...");
-            m_dataReadyCondition.wait(&m_mutex, DATA_READY_WAIT_TIMEOUT_MS);
-            waitIterations++;
-        }
-        
-        if (!m_dataReady) {
-            LOG("[MyListCardManager] WARNING: Data not ready after timeout, proceeding anyway");
+            m_dataReadyCondition.wait(&m_mutex);
         }
         
         m_chainModeEnabled = chainModeEnabled;
@@ -719,18 +711,9 @@ AnimeCard* MyListCardManager::createCardForIndex(int index)
     QMutexLocker locker(&m_mutex);
     
     // Wait for ALL data to be ready before creating cards
-    // Add timeout to prevent infinite hang in case of issues
-    // Note: Returns nullptr if timeout occurs (card creation requires valid data)
-    int waitIterations = 0;
-    while (!m_dataReady && waitIterations < DATA_READY_MAX_WAIT_ITERATIONS) {
+    while (!m_dataReady) {
         LOG("[MyListCardManager] createCardForIndex: Waiting for data to be ready...");
-        m_dataReadyCondition.wait(&m_mutex, DATA_READY_WAIT_TIMEOUT_MS);
-        waitIterations++;
-    }
-    
-    if (!m_dataReady) {
-        LOG("[MyListCardManager] WARNING: Data not ready after timeout in createCardForIndex");
-        return nullptr;
+        m_dataReadyCondition.wait(&m_mutex);
     }
     
     if (index < 0 || index >= m_orderedAnimeIds.size()) {
