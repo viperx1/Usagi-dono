@@ -2460,6 +2460,7 @@ set(HASHER_CARD_UPDATE_SIGNAL_TEST_HEADERS
     ../usagi/src/anidbapi.h
     ../usagi/src/logger.h
     ../usagi/src/main.h
+    ../usagi/src/window.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/anidbanimeinfo.h
     ../usagi/src/anidbfileinfo.h

@@ -17,5 +17,8 @@ HasherThreadPool *hasherThreadPool = nullptr;
 bool hashes_::event(QEvent *e)
 {
     // For test purposes, just forward to base class
+    if (!e) {
+        return false;
+    }
     return QTableWidget::event(e);
 }
