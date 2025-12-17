@@ -72,6 +72,8 @@ DirectoryWatcher::DirectoryWatcher(QObject *parent)
     
     connect(m_watcher, &QFileSystemWatcher::directoryChanged,
             this, &DirectoryWatcher::onDirectoryChanged);
+    connect(m_watcher, &QFileSystemWatcher::fileChanged,
+            this, &DirectoryWatcher::onFileChanged);
     connect(m_debounceTimer, &QTimer::timeout,
             this, &DirectoryWatcher::checkForNewFiles);
     connect(m_initialScanTimer, &QTimer::timeout,
@@ -125,6 +127,11 @@ void DirectoryWatcher::stopWatching()
         m_watcher->removePaths(dirs);
     }
     
+    QStringList files = m_watcher->files();
+    if (!files.isEmpty()) {
+        m_watcher->removePaths(files);
+    }
+    
     m_watchedDirectory.clear();
     m_isWatching = false;
     m_debounceTimer->stop();
@@ -145,9 +152,17 @@ QString DirectoryWatcher::watchedDirectory() const
 
 void DirectoryWatcher::onDirectoryChanged(const QString &path)
 {
-    Q_UNUSED(path);
+    LOG(QString("DirectoryWatcher: Directory changed: %1").arg(path));
     
     // Restart debounce timer
+    m_debounceTimer->start();
+}
+
+void DirectoryWatcher::onFileChanged(const QString &path)
+{
+    LOG(QString("DirectoryWatcher: File changed: %1").arg(path));
+    
+    // Restart debounce timer when files change
     m_debounceTimer->start();
 }
 
@@ -226,6 +241,15 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
         }
     }
     LOG("DirectoryWatcher: Finished adding files to m_processedFiles set");
+    
+    // Add files to watcher to monitor for changes
+    QStringList watchedFilesList = m_watcher->files();
+    QSet<QString> currentlyWatchedFiles(watchedFilesList.begin(), watchedFilesList.end());
+    for (const QString &filePath : newFiles) {
+        if (!currentlyWatchedFiles.contains(filePath)) {
+            m_watcher->addPath(filePath);
+        }
+    }
     
     // Save to database if available
     QSqlDatabase db = QSqlDatabase::database();
