@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QSignalSpy>
+#include <QScopedPointer>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include "../usagi/src/hashercoordinator.h"
@@ -24,8 +25,8 @@ private slots:
     void testFileLinkedToMylistSignalEmitted();
 
 private:
-    AniDBApi *m_api = nullptr;
-    HasherCoordinator *m_hasher = nullptr;
+    QScopedPointer<AniDBApi> m_api;
+    QScopedPointer<HasherCoordinator> m_hasher;
 };
 
 void TestHasherCardUpdateSignal::initTestCase()
@@ -95,15 +96,16 @@ void TestHasherCardUpdateSignal::initTestCase()
     query.exec("INSERT INTO local_files (path, filename, ed2k_hash, status, binding_status) "
                "VALUES ('/test/file.mkv', 'file.mkv', 'testhash123', 2, 1)");
     
-    // Create API and HasherCoordinator
-    m_api = new AniDBApi();
-    m_hasher = new HasherCoordinator(m_api);
+    // Create API and HasherCoordinator using QScopedPointer for automatic cleanup
+    m_api.reset(new AniDBApi());
+    m_hasher.reset(new HasherCoordinator(m_api.data()));
 }
 
 void TestHasherCardUpdateSignal::cleanupTestCase()
 {
-    delete m_hasher;
-    delete m_api;
+    // QScopedPointer will automatically delete m_hasher and m_api in correct order
+    m_hasher.reset();
+    m_api.reset();
     
     // Clean up database
     QSqlDatabase db = QSqlDatabase::database();
@@ -116,7 +118,7 @@ void TestHasherCardUpdateSignal::cleanupTestCase()
 void TestHasherCardUpdateSignal::testFileLinkedToMylistSignalEmitted()
 {
     // Create a signal spy to monitor the fileLinkedToMylist signal
-    QSignalSpy spy(m_hasher, &HasherCoordinator::fileLinkedToMylist);
+    QSignalSpy spy(m_hasher.data(), &HasherCoordinator::fileLinkedToMylist);
     QVERIFY(spy.isValid());
     
     // Simulate the scenario: a file is hashed and is already in mylist
