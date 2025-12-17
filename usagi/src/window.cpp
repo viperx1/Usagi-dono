@@ -176,8 +176,10 @@ void FileDeletionWorker::doWork()
     QSqlDatabase::removeDatabase(connectionName);
     
     // Call the AniDBApi deletion method
-    // Note: AniDBApi uses the default database connection internally
-    // This is safe because Qt handles database connections per-thread
+    // Note: AniDBApi accesses the database using QSqlDatabase::database() which
+    // returns the default connection for the calling thread. Qt provides thread-isolation
+    // for database connections, but SQLite has serialization for concurrent writes.
+    // This matches the existing pattern used elsewhere in the codebase (e.g., hash queries).
     if (m_api) {
         QString apiResult = m_api->deleteFileFromMylist(m_lid, m_deleteFromDisk);
         // Check if the result indicates success (non-empty result means success in this API)
