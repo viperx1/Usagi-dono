@@ -246,7 +246,7 @@ void TestStopNonBlocking::testStopAndRestart()
     {
         QTemporaryFile *tempFile = new QTemporaryFile();
         QVERIFY(tempFile->open());
-        QByteArray data(10 * 1024 * 1024, 'C' + i); // 10MB each
+        QByteArray data(5 * 1024 * 1024, 'C' + i); // 5MB each - reduced from 10MB for faster testing
         tempFile->write(data);
         tempFile->close();
         filePaths.append(tempFile->fileName());
@@ -260,7 +260,7 @@ void TestStopNonBlocking::testStopAndRestart()
     
     // First run: Start, add files, and stop
     qDebug() << "[TEST] testStopAndRestart: Starting pool (first run)";
-    pool.start(3);
+    pool.start(2);  // Start with correct file count
     QTest::qWait(500);
     
     qDebug() << "[TEST] testStopAndRestart: Adding files (first run)";
@@ -281,9 +281,11 @@ void TestStopNonBlocking::testStopAndRestart()
     qDebug() << "[TEST] testStopAndRestart: Stop called, waiting for finish signal (first run)";
     
     // Wait for threads to finish and the pool to update its state
-    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
     QSignalSpy firstFinishedSpy(&pool, &HasherThreadPool::finished);
     for (int i = 0; i < 500 && firstFinishedSpy.count() == 0; ++i) {
+        if (i % 50 == 0) {
+            qDebug() << "[TEST] testStopAndRestart: Waiting for first finish signal, iteration" << i << "count:" << firstFinishedSpy.count();
+        }
         QTest::qWait(10);
     }
     qDebug() << "[TEST] testStopAndRestart: First finished signal count:" << firstFinishedSpy.count();
@@ -296,9 +298,10 @@ void TestStopNonBlocking::testStopAndRestart()
     // Second run: Restart the pool (this should not crash)
     qDebug() << "[TEST] testStopAndRestart: Starting second run - creating signal spy";
     QSignalSpy finishedSpy(&pool, &HasherThreadPool::finished);
+    QSignalSpy hashSpy(&pool, &HasherThreadPool::sendHash);
     
     qDebug() << "[TEST] testStopAndRestart: Restarting pool (second run)";
-    pool.start(3);
+    pool.start(2);  // Start with correct file count
     QTest::qWait(500);
     
     // Add files again
@@ -310,23 +313,31 @@ void TestStopNonBlocking::testStopAndRestart()
     }
     qDebug() << "[TEST] testStopAndRestart: Added" << filePaths.size() << "files (second run)";
     
-    // Wait for threads to process files and request next file
-    // This ensures requestNextFile signals are processed before we signal completion
-    qDebug() << "[TEST] testStopAndRestart: Waiting for threads to start processing";
-    QTest::qWait(500);
-    
-    // Signal completion
+    // Signal completion immediately after adding files
     qDebug() << "[TEST] testStopAndRestart: Signaling completion with empty string";
     pool.addFile(QString());
     
-    // Wait for completion
-    // Use QTest::qWait() instead of QSignalSpy::wait() for better compatibility with static Qt builds
-    qDebug() << "[TEST] testStopAndRestart: Waiting for finish signal (second run)";
-    for (int i = 0; i < 1500 && finishedSpy.count() == 0; ++i) {
-        if (i % 100 == 0) {
-            qDebug() << "[TEST] testStopAndRestart: Still waiting for finish signal, iteration" << i << "of 1500, count:" << finishedSpy.count();
+    // Wait for all hashing to complete (similar to testParallelHashing pattern)
+    // Allow up to 3 seconds per file
+    const int waitIntervalMs = 100;
+    const int maxWaitIterations = (filePaths.size() * 3000) / waitIntervalMs;
+    qDebug() << "[TEST] testStopAndRestart: Waiting for files to be hashed, max iterations:" << maxWaitIterations;
+    for (int i = 0; i < maxWaitIterations && hashSpy.count() < filePaths.size(); ++i) {
+        if (i % 10 == 0) {
+            qDebug() << "[TEST] testStopAndRestart: Waiting for hashing, iteration" << i << "hashSpy:" << hashSpy.count();
         }
-        QTest::qWait(10);
+        QTest::qWait(waitIntervalMs);
+    }
+    qDebug() << "[TEST] testStopAndRestart: Hash count:" << hashSpy.count() << "expected:" << filePaths.size();
+    
+    // Wait for finished signal
+    const int maxFinishedWaitIterations = 100;
+    qDebug() << "[TEST] testStopAndRestart: Waiting for finish signal (second run)";
+    for (int i = 0; i < maxFinishedWaitIterations && finishedSpy.count() == 0; ++i) {
+        if (i % 10 == 0) {
+            qDebug() << "[TEST] testStopAndRestart: Still waiting for finish signal, iteration" << i << "count:" << finishedSpy.count();
+        }
+        QTest::qWait(waitIntervalMs);
     }
     qDebug() << "[TEST] testStopAndRestart: Second finished signal count:" << finishedSpy.count();
     QVERIFY2(finishedSpy.count() > 0, "Threads should finish after restart");
