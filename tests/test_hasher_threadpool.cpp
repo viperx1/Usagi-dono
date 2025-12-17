@@ -337,16 +337,16 @@ void TestHasherThreadPool::testNoIdleThreadsWithWork()
     for (const QString &filePath : filePaths)
     {
         pool.addFile(filePath);
-        QTest::qWait(100); // Small delay to allow work distribution
+        QTest::qWait(50); // Small delay to allow work distribution
     }
     
     // Signal completion
     pool.addFile(QString());
     
     // Wait for all hashing to complete
-    // Wait up to 20 seconds total (200 iterations * 100ms per iteration)
-    const int maxWaitIterations = 200;
+    // Allow up to 3 seconds per file (conservative estimate for test files)
     const int waitIntervalMs = 100;
+    const int maxWaitIterations = (numFiles * 3000) / waitIntervalMs; // 3 seconds per file
     for (int i = 0; i < maxWaitIterations && hashSpy.count() < numFiles; ++i) {
         QTest::qWait(waitIntervalMs);
     }
