@@ -41,23 +41,23 @@ bool HasherThreadPool::addFile(const QString &filePath)
     // Empty file path signals completion
     if (filePath.isEmpty())
     {
-        // Get a worker from the request queue
-        HasherThread* targetWorker = nullptr;
+        // Signal ALL workers waiting in the request queue that there are no more files
+        QVector<HasherThread*> waitingWorkers;
         {
             QMutexLocker requestLocker(&requestMutex);
-            if (!requestQueue.isEmpty())
+            while (!requestQueue.isEmpty())
             {
-                targetWorker = requestQueue.dequeue();
+                waitingWorkers.append(requestQueue.dequeue());
             }
         }
         
-        if (targetWorker != nullptr)
+        // Send completion signal to all waiting workers
+        for (HasherThread* worker : waitingWorkers)
         {
-            // Signal this specific worker to finish (no more files)
-            targetWorker->addFile(QString());
-            return true;
+            worker->addFile(QString());
         }
-        return false;
+        
+        return !waitingWorkers.isEmpty();
     }
     
     // We have a file to hash
