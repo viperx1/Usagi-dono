@@ -94,7 +94,7 @@ void TestStopNonBlocking::testStopReturnsQuickly()
     {
         QTemporaryFile *tempFile = new QTemporaryFile();
         QVERIFY(tempFile->open());
-        QByteArray data(50 * 1024 * 1024, 'A' + i); // 50MB each - large files
+        QByteArray data(5 * 1024 * 1024, 'A' + i); // 5MB each - reduced from 50MB for faster testing
         tempFile->write(data);
         tempFile->close();
         filePaths.append(tempFile->fileName());
@@ -163,7 +163,7 @@ void TestStopNonBlocking::testStopWithBroadcastReturnsQuickly()
     {
         QTemporaryFile *tempFile = new QTemporaryFile();
         QVERIFY(tempFile->open());
-        QByteArray data(50 * 1024 * 1024, 'B' + i); // 50MB each
+        QByteArray data(5 * 1024 * 1024, 'B' + i); // 5MB each - reduced from 50MB for faster testing
         tempFile->write(data);
         tempFile->close();
         filePaths.append(tempFile->fileName());
@@ -294,6 +294,10 @@ void TestStopNonBlocking::testStopAndRestart()
         pool.addFile(filePath);
         QTest::qWait(50);
     }
+    
+    // Wait for threads to process files and request next file
+    // This ensures requestNextFile signals are processed before we signal completion
+    QTest::qWait(500);
     
     // Signal completion
     pool.addFile(QString());

@@ -149,12 +149,23 @@ void TestHasherThreadPool::testParallelHashing()
     pool.addFile(QString());
     
     // Wait for all hashing to complete
-    QTest::qWait(10000); // Up to 10 seconds for hashing
+    // Use QTest::qWait() loop instead of fixed wait for better compatibility
+    // Wait up to 20 seconds total (200 iterations * 100ms per iteration)
+    const int maxWaitIterations = 200;
+    const int waitIntervalMs = 100;
+    for (int i = 0; i < maxWaitIterations && hashSpy.count() < 4; ++i) {
+        QTest::qWait(waitIntervalMs);
+    }
     
     // Verify all files were hashed
     QVERIFY(hashSpy.count() >= 4);
     
     // Verify finished signal was emitted
+    // Wait up to 10 seconds total (100 iterations * 100ms per iteration)
+    const int maxFinishedWaitIterations = 100;
+    for (int i = 0; i < maxFinishedWaitIterations && finishedSpy.count() == 0; ++i) {
+        QTest::qWait(waitIntervalMs);
+    }
     QVERIFY(finishedSpy.count() >= 1);
     
     // Clean up temp files

@@ -77,12 +77,15 @@ void HasherCoordinator::createUI(QWidget *parent)
     QPushButton *patternhelpbutton = new QPushButton("?");
     
     // Create progress bars for each potential thread (up to max threads)
-    int maxThreads = m_hasherThreadPool->maxThreadCount();
-    for (int i = 0; i < maxThreads; ++i) {
-        QProgressBar *threadProgress = new QProgressBar;
-        threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
-        threadProgress->setVisible(false); // Initially hidden, shown when thread becomes active
-        m_threadProgressBars.append(threadProgress);
+    // Check if hasher thread pool is available (may be null in tests)
+    if (m_hasherThreadPool) {
+        int maxThreads = m_hasherThreadPool->maxThreadCount();
+        for (int i = 0; i < maxThreads; ++i) {
+            QProgressBar *threadProgress = new QProgressBar;
+            threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
+            threadProgress->setVisible(false); // Initially hidden, shown when thread becomes active
+            m_threadProgressBars.append(threadProgress);
+        }
     }
     
     m_progressTotal = new QProgressBar;
@@ -192,11 +195,13 @@ void HasherCoordinator::setupConnections()
     connect(m_buttonClear, &QPushButton::clicked, this, &HasherCoordinator::clearHasher);
     connect(m_markWatched, &QCheckBox::checkStateChanged, this, &HasherCoordinator::onMarkWatchedStateChanged);
     
-    // Connect to hasher thread pool
-    connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
-    connect(m_hasherThreadPool, &HasherThreadPool::notifyPartsDone, this, &HasherCoordinator::onProgressUpdate);
-    connect(m_hasherThreadPool, &HasherThreadPool::notifyFileHashed, this, &HasherCoordinator::onFileHashed);
-    connect(m_hasherThreadPool, &HasherThreadPool::finished, this, &HasherCoordinator::onHashingFinished);
+    // Connect to hasher thread pool (if available - may be null in tests)
+    if (m_hasherThreadPool) {
+        connect(m_hasherThreadPool, &HasherThreadPool::requestNextFile, this, &HasherCoordinator::provideNextFileToHash);
+        connect(m_hasherThreadPool, &HasherThreadPool::notifyPartsDone, this, &HasherCoordinator::onProgressUpdate);
+        connect(m_hasherThreadPool, &HasherThreadPool::notifyFileHashed, this, &HasherCoordinator::onFileHashed);
+        connect(m_hasherThreadPool, &HasherThreadPool::finished, this, &HasherCoordinator::onHashingFinished);
+    }
 }
 
 void HasherCoordinator::addFiles()
@@ -453,7 +458,9 @@ void HasherCoordinator::startHashing()
         
         m_buttonStart->setEnabled(false);
         m_buttonClear->setEnabled(false);
-        m_hasherThreadPool->start(filesToHashCount);
+        if (m_hasherThreadPool) {
+            m_hasherThreadPool->start(filesToHashCount);
+        }
     }
     else if (rowsWithHashes.isEmpty())
     {
@@ -498,10 +505,14 @@ void HasherCoordinator::stopHashing()
     // Notify all worker threads to stop hashing
     // 1. First, notify ed2k instances in all worker threads to interrupt current hashing
     //    This sets a flag that ed2khash checks, causing it to return early
-    m_hasherThreadPool->broadcastStopHasher();
+    if (m_hasherThreadPool) {
+        m_hasherThreadPool->broadcastStopHasher();
+    }
     
     // 2. Then signal the thread pool to stop processing more files
-    m_hasherThreadPool->stop();
+    if (m_hasherThreadPool) {
+        m_hasherThreadPool->stop();
+    }
     
     // 3. Don't wait here - let threads finish asynchronously to prevent UI freeze
     //    The onHashingFinished() slot will be called automatically when all threads complete
@@ -688,7 +699,7 @@ void HasherCoordinator::provideNextFileToHash()
             
             // Try to assign the file to a waiting thread
             // addFile() will return true if a thread was waiting and received the file
-            if (m_hasherThreadPool->addFile(filePath))
+            if (m_hasherThreadPool && m_hasherThreadPool->addFile(filePath))
             {
                 // File was successfully assigned to a waiting thread
                 // Now mark it as 0.1 to show it's being processed
@@ -700,7 +711,9 @@ void HasherCoordinator::provideNextFileToHash()
     }
     
     // No more files to hash, send empty string to signal completion
-    m_hasherThreadPool->addFile(QString());
+    if (m_hasherThreadPool) {
+        m_hasherThreadPool->addFile(QString());
+    }
 }
 
 void HasherCoordinator::onMarkWatchedStateChanged(Qt::CheckState state)
