@@ -295,6 +295,10 @@ void TestStopNonBlocking::testStopAndRestart()
         QTest::qWait(50);
     }
     
+    // Wait for threads to process files and request next file
+    // This ensures requestNextFile signals are processed before we signal completion
+    QTest::qWait(500);
+    
     // Signal completion
     pool.addFile(QString());
     
