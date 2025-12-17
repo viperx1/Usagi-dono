@@ -97,7 +97,7 @@ void TestHasherCardUpdateSignal::initTestCase()
                "VALUES ('/test/file.mkv', 'file.mkv', 'testhash123', 2, 1)");
     
     // Create API and HasherCoordinator using QScopedPointer for automatic cleanup
-    m_api.reset(new AniDBApi());
+    m_api.reset(new AniDBApi("usagitest", 1));
     m_hasher.reset(new HasherCoordinator(m_api.data()));
 }
 

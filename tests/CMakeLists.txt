@@ -2431,7 +2431,9 @@ add_test(NAME test_recent_episode_sort_improvements COMMAND test_recent_episode_
 # ==========================================================
 set(HASHER_CARD_UPDATE_SIGNAL_TEST_SOURCES
     test_hasher_card_update_signal.cpp
+    test_stubs.cpp
     ../usagi/src/hashercoordinator.cpp
+    ../usagi/src/hashingtask.cpp
     ../usagi/src/anidbapi.cpp
     ../usagi/src/mask.cpp
     ../usagi/src/myanidbapi.cpp
@@ -2454,6 +2456,7 @@ set(HASHER_CARD_UPDATE_SIGNAL_TEST_SOURCES
 )
 
 set(HASHER_CARD_UPDATE_SIGNAL_TEST_HEADERS
+    test_hashes_stub.h
     ../usagi/src/hashercoordinator.h
     ../usagi/src/anidbapi.h
     ../usagi/src/logger.h
