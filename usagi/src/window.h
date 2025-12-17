@@ -168,18 +168,20 @@ struct FileDeletionResult {
     int aid;
     bool success;
     QString errorMessage;
+    QString filePath;  // File path for reference
 };
 
 // Worker for file deletion operations - runs in background thread
+// This worker only handles file system operations (the I/O heavy part)
+// Database and API operations are handled on the main thread
 class FileDeletionWorker : public QObject
 {
     Q_OBJECT
 public:
-    explicit FileDeletionWorker(const QString &dbName, int lid, bool deleteFromDisk, AniDBApi *api)
+    explicit FileDeletionWorker(const QString &dbName, int lid, bool deleteFromDisk)
         : m_dbName(dbName)
         , m_lid(lid)
         , m_deleteFromDisk(deleteFromDisk)
-        , m_api(api)
     {
     }
 
@@ -193,7 +195,6 @@ private:
     QString m_dbName;
     int m_lid;
     bool m_deleteFromDisk;
-    AniDBApi *m_api;  // Pointer to AniDBApi for deletion operations
 };
 
 class Window : public QWidget
