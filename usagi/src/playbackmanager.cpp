@@ -148,11 +148,8 @@ void PlaybackManager::stopTracking()
 void PlaybackManager::checkPlaybackStatus()
 {
     if (!m_tracking) {
-        LOG("checkPlaybackStatus: Not tracking");
         return;
     }
-    
-    LOG(QString("Checking playback status for LID %1...").arg(m_currentLid));
     
     // Request status from MPC-HC web interface
     QUrl url(m_mpcStatusUrl);
@@ -195,8 +192,6 @@ void PlaybackManager::handleStatusReply()
     // We extract: state (capture 1), position_ms (capture 2), duration_ms (capture 3)
     QString response = QString::fromUtf8(reply->readAll());
     
-    LOG(QString("Received MPC-HC status response (length %1): %2").arg(response.length()).arg(response));
-    
     // Use regex to extract position and duration
     // Pattern matches: OnStatus("file", "state", pos_ms, "pos_str", dur_ms, "dur_str"...)
     // The first field is a quoted filename (match \"...\"), then state, position, etc.
@@ -210,9 +205,6 @@ void PlaybackManager::handleStatusReply()
         
         int position = positionMs / 1000; // Convert to seconds
         int duration = durationMs / 1000;
-        
-        LOG(QString("Parsed playback status: state=%1, position=%2s, duration=%3s")
-            .arg(state).arg(position).arg(duration));
         
         // Update position if changed
         if (position != m_lastPosition || duration != m_lastDuration) {
@@ -235,7 +227,6 @@ void PlaybackManager::handleStatusReply()
             
             // Save to database periodically
             m_saveCounter++;
-            LOG(QString("Save counter: %1/%2").arg(m_saveCounter).arg(SAVE_INTERVAL_SECONDS));
             
             if (m_saveCounter >= SAVE_INTERVAL_SECONDS) {
                 savePlaybackPosition(position, duration);
@@ -311,9 +302,6 @@ void PlaybackManager::savePlaybackPosition(int position, int duration)
     
     if (!q.exec()) {
         LOG(QString("Error saving playback position: %1").arg(q.lastError().text()));
-    } else {
-        LOG(QString("Saved playback position: LID %1, position %2/%3s")
-            .arg(m_currentLid).arg(position).arg(duration));
     }
 }
 
