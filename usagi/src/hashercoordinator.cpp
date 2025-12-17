@@ -78,12 +78,14 @@ void HasherCoordinator::createUI(QWidget *parent)
     
     // Create progress bars for each potential thread (up to max threads)
     // Check if hasher thread pool is available (may be null in tests)
-    int maxThreads = m_hasherThreadPool ? m_hasherThreadPool->maxThreadCount() : 4;
-    for (int i = 0; i < maxThreads; ++i) {
-        QProgressBar *threadProgress = new QProgressBar;
-        threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
-        threadProgress->setVisible(false); // Initially hidden, shown when thread becomes active
-        m_threadProgressBars.append(threadProgress);
+    if (m_hasherThreadPool) {
+        int maxThreads = m_hasherThreadPool->maxThreadCount();
+        for (int i = 0; i < maxThreads; ++i) {
+            QProgressBar *threadProgress = new QProgressBar;
+            threadProgress->setFormat(QString("Thread %1: %p%").arg(i));
+            threadProgress->setVisible(false); // Initially hidden, shown when thread becomes active
+            m_threadProgressBars.append(threadProgress);
+        }
     }
     
     m_progressTotal = new QProgressBar;
