@@ -900,6 +900,15 @@ void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
         // Remove from failed deletions list if it was there
         m_failedDeletions.remove(lid);
         emit fileDeleted(lid, aid);
+        
+        // Continue deleting if auto-deletion is enabled and space is still below threshold
+        if (m_enableActualDeletion && isDeletionNeeded()) {
+            LOG("[WatchSessionManager] Space still below threshold after deletion, continuing with next file");
+            bool deletedNext = deleteNextEligibleFile(true);
+            if (!deletedNext) {
+                LOG("[WatchSessionManager] No more files available for deletion (space may still be below threshold)");
+            }
+        }
     } else {
         LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - attempting next file").arg(lid).arg(aid));
         
@@ -914,10 +923,6 @@ void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
             }
         }
     }
-    
-    // Note: On success, we do NOT automatically process the next file.
-    // The caller must explicitly call deleteNextEligibleFile() again after receiving
-    // API confirmation to ensure proper sequencing and gap protection.
 }
 
 void WatchSessionManager::autoMarkFilesForDeletion()
