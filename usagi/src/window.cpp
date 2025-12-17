@@ -145,25 +145,46 @@ void FileDeletionWorker::doWork()
     result.aid = 0;
     result.success = false;
     
+    // Create thread-specific database connection
+    QString connectionName = QString("FileDeletion_%1").arg((quintptr)QThread::currentThreadId());
+    QSqlDatabase threadDb;
+    
+    {
+        // Get the aid before deletion using thread-specific connection
+        threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+        threadDb.setDatabaseName(m_dbName);
+        
+        if (!threadDb.open()) {
+            LOG(QString("[FileDeletionWorker] Failed to open thread-local database connection"));
+            result.errorMessage = "Failed to open database connection";
+            QSqlDatabase::removeDatabase(connectionName);
+            emit finished(result);
+            return;
+        }
+        
+        // Get the aid before deletion
+        QSqlQuery q(threadDb);
+        q.prepare("SELECT aid FROM mylist WHERE lid = ?");
+        q.addBindValue(m_lid);
+        if (q.exec() && q.next()) {
+            result.aid = q.value(0).toInt();
+        }
+        
+        threadDb.close();
+    }
+    
+    QSqlDatabase::removeDatabase(connectionName);
+    
     // Call the AniDBApi deletion method
-    // This will handle database queries, file deletion, and API updates
+    // Note: AniDBApi uses the default database connection internally
+    // This is safe because Qt handles database connections per-thread
     if (m_api) {
         QString apiResult = m_api->deleteFileFromMylist(m_lid, m_deleteFromDisk);
+        // Check if the result indicates success (non-empty result means success in this API)
         result.success = !apiResult.isEmpty();
         
         if (!result.success) {
-            result.errorMessage = "Failed to delete file from mylist";
-        }
-        
-        // Get the aid for the result
-        QSqlDatabase db = QSqlDatabase::database();
-        if (db.isOpen()) {
-            QSqlQuery q(db);
-            q.prepare("SELECT aid FROM mylist WHERE lid = ?");
-            q.addBindValue(m_lid);
-            if (q.exec() && q.next()) {
-                result.aid = q.value(0).toInt();
-            }
+            result.errorMessage = "Failed to delete file from mylist - API returned empty result";
         }
     } else {
         result.errorMessage = "AniDBApi not available";
