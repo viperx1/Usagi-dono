@@ -1323,18 +1323,23 @@ void Window::loadUnboundFiles()
     // Disable updates during bulk insertion for performance
     unknownFilesManager->setUpdatesEnabled(false);
     
+    int skippedMissingFiles = 0;
+    
     // Add each unbound file to the unknown files widget
     for(const FileHashInfo& fileInfo : std::as_const(unboundFiles))
     {
         QFileInfo qFileInfo(fileInfo.path());
-        QString filename = qFileInfo.fileName();
         
-        // Get file size from filesystem if available
-        qint64 fileSize = 0;
-        if(qFileInfo.exists())
+        // Skip files that don't exist on the filesystem
+        if(!qFileInfo.exists())
         {
-            fileSize = qFileInfo.size();
+            LOG(QString("Skipping missing file during load: %1").arg(fileInfo.path()));
+            skippedMissingFiles++;
+            continue;
         }
+        
+        QString filename = qFileInfo.fileName();
+        qint64 fileSize = qFileInfo.size();
         
         unknownFilesManager->insertFile(filename, fileInfo.path(), fileInfo.hash(), fileSize);
     }
@@ -1342,7 +1347,19 @@ void Window::loadUnboundFiles()
     // Re-enable updates after bulk insertion
     unknownFilesManager->setUpdatesEnabled(true);
     
-    LOG(QString("Successfully loaded %1 unbound files").arg(unboundFiles.size()));
+    int loadedCount = unboundFiles.size() - skippedMissingFiles;
+    if(loadedCount > 0)
+    {
+        LOG(QString("Successfully loaded %1 unbound file(s)").arg(loadedCount));
+    }
+    if(skippedMissingFiles > 0)
+    {
+        LOG(QString("Skipped %1 missing file(s)").arg(skippedMissingFiles));
+    }
+    if(loadedCount == 0 && skippedMissingFiles == 0)
+    {
+        LOG("No unbound files to load");
+    }
 }
 
 void Window::loadAnimeTitlesCache()
@@ -1792,6 +1809,21 @@ void unknown_files_::contextMenuEvent(QContextMenuEvent *event)
     }
 }
 
+bool unknown_files_::checkFileExistsOrRemove(int row, const QString& filePath, Window* window)
+{
+    if (!QFile::exists(filePath))
+    {
+        LOG(QString("File not found, auto-removing from unknown files: %1").arg(filePath));
+        QMessageBox::information(window, "File Not Found", 
+            QString("The file no longer exists and will be removed from the list:\n%1").arg(filePath));
+        
+        // Auto-remove the missing file from the unknown files list
+        window->getUnknownFilesManager()->removeFileByPath(filePath, row);
+        return false;
+    }
+    return true;
+}
+
 void unknown_files_::executeFile()
 {
     int row = currentRow();
@@ -1807,6 +1839,12 @@ void unknown_files_::executeFile()
         QString filePath = filesData[row].filepath();
         if (!filePath.isEmpty())
         {
+            // Check if file exists before trying to open it
+            if (!checkFileExistsOrRemove(row, filePath, window))
+            {
+                return;
+            }
+            
             QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
         }
     }
@@ -1827,6 +1865,12 @@ void unknown_files_::openFileLocation()
         QString filePath = filesData[row].filepath();
         if (!filePath.isEmpty())
         {
+            // Check if file exists before trying to open its location
+            if (!checkFileExistsOrRemove(row, filePath, window))
+            {
+                return;
+            }
+            
             QFileInfo fileInfo(filePath);
             QString dirPath = fileInfo.absolutePath();
             QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath));

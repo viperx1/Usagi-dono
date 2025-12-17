@@ -104,6 +104,12 @@ void UnknownFilesManager::reindexFilesData(int removedRow)
 
 void UnknownFilesManager::insertFile(const QString& filename, const QString& filepath, const QString& hash, qint64 size)
 {
+    // Check if file exists before adding to table
+    if (!QFile::exists(filepath)) {
+        emit logMessage(QString("Skipping missing file, not adding to unknown files: %1").arg(filepath));
+        return;
+    }
+    
     // Show the container if hidden
     if(m_containerWidget->isHidden()) {
         m_containerWidget->show();
@@ -619,6 +625,52 @@ int UnknownFilesManager::rescanAndFilterFiles()
         emit logMessage(QString("Re-scan complete: removed %1 file(s) matching filter patterns").arg(removedCount));
     } else {
         emit logMessage("Re-scan complete: no files matched filter patterns");
+    }
+    
+    return removedCount;
+}
+
+int UnknownFilesManager::removeMissingFiles()
+{
+    emit logMessage("Scanning unknown files for missing files...");
+    
+    int removedCount = 0;
+    QList<QString> filesToRemove;
+    
+    // First pass: collect missing files by iterating over the data map
+    // (not row indices, as rows may not match map keys after removals)
+    for(auto it = m_filesData.constBegin(); it != m_filesData.constEnd(); ++it)
+    {
+        const LocalFileInfo &fileInfo = it.value();
+        QString filepath = fileInfo.filepath();
+        
+        // Check if file exists on filesystem
+        if (!QFile::exists(filepath)) {
+            QString filename = fileInfo.filename();
+            emit logMessage(QString("Found missing file: %1").arg(filename));
+            filesToRemove.append(filepath);
+        }
+    }
+    
+    // Second pass: remove the missing files
+    if (!filesToRemove.isEmpty()) {
+        // Disable table updates during batch removal for performance
+        m_tableWidget->setUpdatesEnabled(false);
+        
+        for (const QString &filepath : filesToRemove) {
+            removeFileByPath(filepath);
+        }
+        
+        // Re-enable table updates
+        m_tableWidget->setUpdatesEnabled(true);
+        
+        removedCount = filesToRemove.size();
+    }
+    
+    if (removedCount > 0) {
+        emit logMessage(QString("Scan complete: auto-removed %1 missing file(s)").arg(removedCount));
+    } else {
+        emit logMessage("Scan complete: all files exist on filesystem");
     }
     
     return removedCount;

@@ -106,6 +106,12 @@ public:
      * @return Number of files removed
      */
     int rescanAndFilterFiles();
+    
+    /**
+     * @brief Scan unknown files and auto-remove those that no longer exist on filesystem
+     * @return Number of missing files removed
+     */
+    int removeMissingFiles();
 
 signals:
     /**

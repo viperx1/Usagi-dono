@@ -96,6 +96,10 @@ protected:
 private slots:
     void executeFile();
     void openFileLocation();
+    
+private:
+    // Helper method to check file existence and auto-remove if missing
+    bool checkFileExistsOrRemove(int row, const QString& filePath, Window* window);
 };
 
 // Worker thread for loading mylist anime IDs
