@@ -152,7 +152,7 @@ QString DirectoryWatcher::watchedDirectory() const
 
 void DirectoryWatcher::onDirectoryChanged(const QString &path)
 {
-    Q_UNUSED(path);
+    LOG(QString("DirectoryWatcher: Directory changed: %1").arg(path));
     
     // Restart debounce timer
     m_debounceTimer->start();
@@ -243,8 +243,9 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
     LOG("DirectoryWatcher: Finished adding files to m_processedFiles set");
     
     // Add files to watcher to monitor for changes
+    QStringList currentlyWatchedFiles = m_watcher->files();
     for (const QString &filePath : newFiles) {
-        if (!m_watcher->files().contains(filePath)) {
+        if (!currentlyWatchedFiles.contains(filePath)) {
             m_watcher->addPath(filePath);
         }
     }
