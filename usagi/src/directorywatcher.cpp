@@ -127,6 +127,11 @@ void DirectoryWatcher::stopWatching()
         m_watcher->removePaths(dirs);
     }
     
+    QStringList files = m_watcher->files();
+    if (!files.isEmpty()) {
+        m_watcher->removePaths(files);
+    }
+    
     m_watchedDirectory.clear();
     m_isWatching = false;
     m_debounceTimer->stop();
@@ -236,6 +241,13 @@ void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
         }
     }
     LOG("DirectoryWatcher: Finished adding files to m_processedFiles set");
+    
+    // Add files to watcher to monitor for changes
+    for (const QString &filePath : newFiles) {
+        if (!m_watcher->files().contains(filePath)) {
+            m_watcher->addPath(filePath);
+        }
+    }
     
     // Save to database if available
     QSqlDatabase db = QSqlDatabase::database();
