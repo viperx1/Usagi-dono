@@ -6,14 +6,16 @@
  * core functionality.
  */
 
+#include "test_hashes_stub.h"
 #include "../usagi/src/hasherthreadpool.h"
-#include "../usagi/src/window.h"
 #include <QEvent>
 
 // Global hasher thread pool pointer (normally defined in window.cpp)
+// This stub is needed because HasherCoordinator references this global variable
 HasherThreadPool *hasherThreadPool = nullptr;
 
 // Stub implementation of hashes_::event
+// This provides the minimal implementation needed for the vtable
 bool hashes_::event(QEvent *e)
 {
     // For test purposes, just forward to base class

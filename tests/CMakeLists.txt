@@ -2456,11 +2456,11 @@ set(HASHER_CARD_UPDATE_SIGNAL_TEST_SOURCES
 )
 
 set(HASHER_CARD_UPDATE_SIGNAL_TEST_HEADERS
+    test_hashes_stub.h
     ../usagi/src/hashercoordinator.h
     ../usagi/src/anidbapi.h
     ../usagi/src/logger.h
     ../usagi/src/main.h
-    ../usagi/src/window.h
     ../usagi/src/Qt-AES-master/qaesencryption.h
     ../usagi/src/anidbanimeinfo.h
     ../usagi/src/anidbfileinfo.h
