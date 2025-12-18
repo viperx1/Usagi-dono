@@ -162,6 +162,41 @@ protected:
     void emitFinished(const QList<LocalFileInfo> &result) override { emit finished(result); }
 };
 
+// Structure to hold file deletion result
+struct FileDeletionResult {
+    int lid;
+    int aid;
+    bool success;
+    QString errorMessage;
+    QString filePath;  // File path for reference
+};
+
+// Worker for file deletion operations - runs in background thread
+// This worker only handles file system operations (the I/O heavy part)
+// Database and API operations are handled on the main thread
+class FileDeletionWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit FileDeletionWorker(const QString &dbName, int lid, bool deleteFromDisk)
+        : m_dbName(dbName)
+        , m_lid(lid)
+        , m_deleteFromDisk(deleteFromDisk)
+    {
+    }
+
+signals:
+    void finished(const FileDeletionResult &result);
+
+public slots:
+    void doWork();
+
+private:
+    QString m_dbName;
+    int m_lid;
+    bool m_deleteFromDisk;
+};
+
 class Window : public QWidget
 {
     Q_OBJECT
@@ -441,5 +476,8 @@ private:
     void registerAutoStart();
     void unregisterAutoStart();
 };
+
+// Declare FileDeletionResult as a Qt metatype for signal/slot connections across threads
+Q_DECLARE_METATYPE(FileDeletionResult)
 
 #endif // WINDOW_H
