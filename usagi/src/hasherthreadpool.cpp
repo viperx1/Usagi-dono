@@ -323,6 +323,18 @@ void HasherThreadPool::cleanupFinishedThreads()
 {
     // Clean up all finished threads
     // This should be called when all threads are done or from destructor
+    
+    // Clear the request queue to prevent dangling pointers
+    // This is critical for pool restart scenarios where old thread pointers
+    // would otherwise remain in the queue after deletion.
+    // Note: At this point, all threads have finished their run() method and
+    // cannot emit requestNextFile() anymore, so the queue cannot grow.
+    {
+        QMutexLocker locker(&requestMutex);
+        requestQueue.clear();
+    }
+    
+    // Now delete all worker threads
     for (HasherThread* const worker : std::as_const(workers))
     {
         if (worker->isFinished())
@@ -334,14 +346,4 @@ void HasherThreadPool::cleanupFinishedThreads()
     workers.clear();
     activeThreads = 0;
     finishedThreads = 0;
-    
-    // Clear the request queue to prevent dangling pointers
-    // This is critical for pool restart scenarios where old thread pointers
-    // would otherwise remain in the queue after deletion.
-    // Note: At this point, all threads have finished their run() method and
-    // cannot emit requestNextFile() anymore, so the queue cannot grow.
-    {
-        QMutexLocker locker(&requestMutex);
-        requestQueue.clear();
-    }
 }
