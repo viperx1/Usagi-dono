@@ -137,8 +137,10 @@ QList<LocalFileInfo> UnboundFilesLoaderWorker::executeQuery(QSqlDatabase &db)
 // FileDeletionWorker implementation
 void FileDeletionWorker::doWork()
 {
-    LOG(QString("[FileDeletionWorker] Starting file operations for lid=%1, deleteFromDisk=%2 in background thread")
-        .arg(m_lid).arg(m_deleteFromDisk));
+    // Log thread ID to prove this runs in a separate thread
+    Qt::HANDLE threadId = QThread::currentThreadId();
+    LOG(QString("[FileDeletionWorker] Starting file operations for lid=%1, deleteFromDisk=%2 in background thread (ThreadID: %3)")
+        .arg(m_lid).arg(m_deleteFromDisk).arg((quintptr)threadId, 0, 16));
     
     FileDeletionResult result;
     result.lid = m_lid;
@@ -243,6 +245,9 @@ void FileDeletionWorker::doWork()
     
     // If file deletion succeeded, update the database (also in background thread to avoid blocking main thread)
     if (result.success) {
+        LOG(QString("[FileDeletionWorker] Performing database updates in background thread (ThreadID: %1)")
+            .arg((quintptr)threadId, 0, 16));
+            
         // Reopen database connection for updates
         threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
         threadDb.setDatabaseName(m_dbName);
@@ -1027,8 +1032,10 @@ Window::Window()
     
     // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion in background thread
     connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
-        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2 - starting background thread")
-            .arg(lid).arg(deleteFromDisk));
+        // Log main thread ID for comparison
+        Qt::HANDLE mainThreadId = QThread::currentThreadId();
+        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2 - starting background thread (Main ThreadID: %3)")
+            .arg(lid).arg(deleteFromDisk).arg((quintptr)mainThreadId, 0, 16));
         
         if (adbapi) {
             // Get database name before starting thread
@@ -1043,8 +1050,10 @@ Window::Window()
             // Connect signals
             connect(deletionThread, &QThread::started, worker, &FileDeletionWorker::doWork);
             connect(worker, &FileDeletionWorker::finished, this, [this](const FileDeletionResult &result) {
-                LOG(QString("[Window] File deletion completed for lid=%1, aid=%2, success=%3")
-                    .arg(result.lid).arg(result.aid).arg(result.success));
+                // Log thread ID to show we're back on main thread
+                Qt::HANDLE mainThreadId = QThread::currentThreadId();
+                LOG(QString("[Window] File deletion completed for lid=%1, aid=%2, success=%3 (Main ThreadID: %4)")
+                    .arg(result.lid).arg(result.aid).arg(result.success).arg((quintptr)mainThreadId, 0, 16));
                 
                 // Database updates were done in background thread
                 // Now only handle API call on main thread (API class is not thread-safe)
