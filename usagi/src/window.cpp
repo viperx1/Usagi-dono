@@ -169,6 +169,8 @@ void FileDeletionWorker::doWork()
         }
         
         // Get the file information needed for API call and file deletion
+        // Using LEFT JOIN to handle cases where file info might be missing
+        // (e.g., file manually deleted or not yet hashed)
         QSqlQuery q(threadDb);
         q.prepare("SELECT m.aid, lf.path, m.fid, f.size, f.ed2k "
                   "FROM mylist m "
@@ -179,9 +181,9 @@ void FileDeletionWorker::doWork()
         if (q.exec() && q.next()) {
             result.aid = q.value(0).toInt();
             filePath = q.value(1).toString();
-            result.fid = q.value(2).toInt();
-            result.size = q.value(3).toLongLong();
-            result.ed2k = q.value(4).toString();
+            result.fid = q.value(2).toInt();  // Will be 0 if NULL
+            result.size = q.value(3).toLongLong();  // Will be 0 if NULL
+            result.ed2k = q.value(4).toString();  // Will be empty if NULL
             result.filePath = filePath;
         } else {
             LOG(QString("[FileDeletionWorker] Failed to get file info for lid=%1").arg(m_lid));
@@ -1039,7 +1041,7 @@ Window::Window()
                     }
                     
                     // Send MYLISTADD to mark as deleted in AniDB API
-                    // edit=true (1) means we're updating an existing mylist entry
+                    // The 'true' parameter means we're updating an existing mylist entry (edit=1)
                     // Check for valid fid and ed2k hash - size can be 0 for empty files
                     if (result.fid > 0 && !result.ed2k.isEmpty()) {
                         QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
