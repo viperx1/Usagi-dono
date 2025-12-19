@@ -241,6 +241,48 @@ void FileDeletionWorker::doWork()
         result.success = true;
     }
     
+    // If file deletion succeeded, update the database (also in background thread to avoid blocking main thread)
+    if (result.success) {
+        // Reopen database connection for updates
+        threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+        threadDb.setDatabaseName(m_dbName);
+        
+        if (threadDb.open()) {
+            // Remove from local_files table
+            if (!result.filePath.isEmpty()) {
+                QSqlQuery q(threadDb);
+                q.prepare("DELETE FROM local_files WHERE path = ?");
+                q.addBindValue(result.filePath);
+                if (q.exec()) {
+                    LOG(QString("[FileDeletionWorker] Removed from local_files: %1").arg(result.filePath));
+                }
+            }
+            
+            // Update mylist state to deleted
+            QSqlQuery updateQuery(threadDb);
+            updateQuery.prepare("UPDATE mylist SET state = ?, local_file = NULL WHERE lid = ?");
+            updateQuery.addBindValue(MylistState::DELETED);
+            updateQuery.addBindValue(m_lid);
+            if (updateQuery.exec()) {
+                LOG(QString("[FileDeletionWorker] Updated mylist state to deleted for lid=%1").arg(m_lid));
+            }
+            
+            // Clear watch chunks for this lid
+            QSqlQuery deleteChunks(threadDb);
+            deleteChunks.prepare("DELETE FROM watch_chunks WHERE lid = ?");
+            deleteChunks.addBindValue(m_lid);
+            if (deleteChunks.exec()) {
+                LOG(QString("[FileDeletionWorker] Cleared watch chunks for lid=%1").arg(m_lid));
+            }
+            
+            threadDb.close();
+        } else {
+            LOG(QString("[FileDeletionWorker] Failed to reopen database for updates"));
+        }
+        
+        QSqlDatabase::removeDatabase(connectionName);
+    }
+    
     LOG(QString("[FileDeletionWorker] File operations completed for lid=%1, success=%2")
         .arg(m_lid).arg(result.success));
     
@@ -1001,42 +1043,12 @@ Window::Window()
             // Connect signals
             connect(deletionThread, &QThread::started, worker, &FileDeletionWorker::doWork);
             connect(worker, &FileDeletionWorker::finished, this, [this](const FileDeletionResult &result) {
-                LOG(QString("[Window] File I/O operations finished for lid=%1, aid=%2, success=%3")
+                LOG(QString("[Window] File deletion completed for lid=%1, aid=%2, success=%3")
                     .arg(result.lid).arg(result.aid).arg(result.success));
                 
-                // Now handle database and API updates on main thread
+                // Database updates were done in background thread
+                // Now only handle API call on main thread (API class is not thread-safe)
                 if (result.success && adbapi) {
-                    // Update database to mark file as deleted
-                    QSqlDatabase db = QSqlDatabase::database();
-                    if (db.isOpen()) {
-                        // Remove from local_files table
-                        if (!result.filePath.isEmpty()) {
-                            QSqlQuery q(db);
-                            q.prepare("DELETE FROM local_files WHERE path = ?");
-                            q.addBindValue(result.filePath);
-                            if (q.exec()) {
-                                LOG(QString("[Window] Removed from local_files: %1").arg(result.filePath));
-                            }
-                        }
-                        
-                        // Update mylist state to deleted
-                        QSqlQuery updateQuery(db);
-                        updateQuery.prepare("UPDATE mylist SET state = ?, local_file = NULL WHERE lid = ?");
-                        updateQuery.addBindValue(MylistState::DELETED);
-                        updateQuery.addBindValue(result.lid);
-                        if (updateQuery.exec()) {
-                            LOG(QString("[Window] Updated mylist state to deleted for lid=%1").arg(result.lid));
-                        }
-                        
-                        // Clear watch chunks for this lid
-                        QSqlQuery deleteChunks(db);
-                        deleteChunks.prepare("DELETE FROM watch_chunks WHERE lid = ?");
-                        deleteChunks.addBindValue(result.lid);
-                        if (deleteChunks.exec()) {
-                            LOG(QString("[Window] Cleared watch chunks for lid=%1").arg(result.lid));
-                        }
-                    }
-                    
                     // Send MYLISTADD to mark as deleted in AniDB API
                     // The 'true' parameter means we're updating an existing mylist entry (edit=1)
                     // Check for valid fid and ed2k hash - size can be 0 for empty files
