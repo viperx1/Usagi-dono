@@ -45,6 +45,9 @@ private slots:
     
     // Continuous deletion tests
     void testContinuousDeletionUntilThresholdMet();
+    
+    // Sequential deletion with API confirmation test
+    void testSequentialDeletionWithApiConfirmation();
 
 private:
     QTemporaryFile *tempDbFile;
@@ -562,6 +565,59 @@ void TestWatchSessionManager::testContinuousDeletionUntilThresholdMet()
     
     // The key change is that onFileDeletionResult now checks isDeletionNeeded()
     // after a successful deletion and continues if needed
+}
+
+void TestWatchSessionManager::testSequentialDeletionWithApiConfirmation()
+{
+    // Test that deletion waits for API confirmation before deleting next file
+    // This verifies the fix to ensure files are deleted one at a time,
+    // waiting for MYLISTADD API response before triggering the next deletion
+    
+    // Enable actual deletion
+    manager->setActualDeletionEnabled(true);
+    
+    // Set a very high threshold to ensure deletion is needed
+    manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
+    manager->setDeletionThresholdValue(999999.0);
+    
+    // Create signal spies
+    QSignalSpy deletionRequestSpy(manager, &WatchSessionManager::deleteFileRequested);
+    QSignalSpy deletionCompleteSpy(manager, &WatchSessionManager::fileDeleted);
+    
+    // Trigger first deletion (this would be automatic in real scenario)
+    bool firstDeleted = manager->deleteNextEligibleFile(true);
+    
+    if (firstDeleted) {
+        // Verify that deleteFileRequested was emitted once
+        QCOMPARE(deletionRequestSpy.count(), 1);
+        
+        // At this point, no second deletion should have been triggered yet
+        // because we haven't received API confirmation
+        
+        // Simulate the file I/O and database operations completing
+        // but API confirmation NOT yet received
+        int lid = deletionRequestSpy.at(0).at(0).toInt();
+        
+        // Call onFileDeletionResult to simulate file I/O completion
+        // In the fixed implementation, this should NOT trigger the next deletion
+        // until we receive the API confirmation via notifyMylistAdd signal
+        manager->onFileDeletionResult(lid, 1, true);
+        
+        // The fileDeleted signal should be emitted
+        QCOMPARE(deletionCompleteSpy.count(), 1);
+        
+        // But deleteFileRequested should still only have been called once
+        // (The second deletion will only happen after API confirms via notifyMylistAdd)
+        QCOMPARE(deletionRequestSpy.count(), 1);
+        
+        // This test documents the expected behavior:
+        // 1. First file deletion is triggered
+        // 2. File I/O completes and onFileDeletionResult is called
+        // 3. fileDeleted signal is emitted
+        // 4. But the NEXT deletion does NOT happen yet
+        // 5. Only after receiving the MYLISTADD API response (code 311)
+        //    should the next deletion be triggered
+    }
 }
 
 QTEST_MAIN(TestWatchSessionManager)

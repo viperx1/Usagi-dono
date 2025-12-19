@@ -137,21 +137,23 @@ QList<LocalFileInfo> UnboundFilesLoaderWorker::executeQuery(QSqlDatabase &db)
 // FileDeletionWorker implementation
 void FileDeletionWorker::doWork()
 {
-    LOG(QString("[FileDeletionWorker] Starting file operations for lid=%1, deleteFromDisk=%2 in background thread")
-        .arg(m_lid).arg(m_deleteFromDisk));
+    // Log thread ID to prove this runs in a separate thread
+    Qt::HANDLE threadId = QThread::currentThreadId();
+    LOG(QString("[FileDeletionWorker] Starting file operations for lid=%1, deleteFromDisk=%2 in background thread (ThreadID: %3)")
+        .arg(m_lid).arg(m_deleteFromDisk).arg((quintptr)threadId, 0, 16));
     
     FileDeletionResult result;
     result.lid = m_lid;
     result.aid = 0;
+    result.fid = 0;
+    result.size = 0;
+    result.ed2k = "";
     result.success = false;
     result.filePath = "";
     
     // Create thread-specific database connection to get file info
     QString connectionName = QString("FileDeletion_%1").arg((quintptr)QThread::currentThreadId());
     QSqlDatabase threadDb;
-    
-    QString filePath;
-    int fid = 0;
     
     {
         // Get file information using thread-specific connection
@@ -166,18 +168,22 @@ void FileDeletionWorker::doWork()
             return;
         }
         
-        // Get the aid and file path
+        // Get the file information needed for API call and file deletion
+        // Using LEFT JOIN to handle cases where file info might be missing
+        // (e.g., file manually deleted or not yet hashed)
         QSqlQuery q(threadDb);
-        q.prepare("SELECT m.aid, lf.path, m.fid "
+        q.prepare("SELECT m.aid, lf.path, m.fid, f.size, f.ed2k "
                   "FROM mylist m "
                   "LEFT JOIN local_files lf ON m.local_file = lf.id "
+                  "LEFT JOIN file f ON m.fid = f.fid "
                   "WHERE m.lid = ?");
         q.addBindValue(m_lid);
         if (q.exec() && q.next()) {
             result.aid = q.value(0).toInt();
-            filePath = q.value(1).toString();
-            fid = q.value(2).toInt();
-            result.filePath = filePath;
+            result.filePath = q.value(1).toString();
+            result.fid = q.value(2).toInt();  // Will be 0 if NULL
+            result.size = q.value(3).toLongLong();  // Will be 0 if NULL
+            result.ed2k = q.value(4).toString();  // Will be empty if NULL
         } else {
             LOG(QString("[FileDeletionWorker] Failed to get file info for lid=%1").arg(m_lid));
             result.errorMessage = "Failed to get file information from database";
@@ -193,14 +199,14 @@ void FileDeletionWorker::doWork()
     QSqlDatabase::removeDatabase(connectionName);
     
     // Perform file deletion if requested (this is the I/O heavy part)
-    if (m_deleteFromDisk && !filePath.isEmpty()) {
-        QFile file(filePath);
+    if (m_deleteFromDisk && !result.filePath.isEmpty()) {
+        QFile file(result.filePath);
         if (file.exists()) {
             bool deleted = false;
             
             // First attempt: try to remove normally
             if (file.remove()) {
-                LOG(QString("[FileDeletionWorker] Deleted file from disk: %1").arg(filePath));
+                LOG(QString("[FileDeletionWorker] Deleted file from disk: %1").arg(result.filePath));
                 deleted = true;
                 result.success = true;
             } else {
@@ -210,11 +216,11 @@ void FileDeletionWorker::doWork()
                 bool hadReadOnly = !(originalPerms & QFile::WriteUser);
                 
                 if (hadReadOnly) {
-                    LOG(QString("[FileDeletionWorker] File is read-only, attempting to remove read-only attribute: %1").arg(filePath));
+                    LOG(QString("[FileDeletionWorker] File is read-only, attempting to remove read-only attribute: %1").arg(result.filePath));
                     // Add write permission and retry
                     if (file.setPermissions(originalPerms | QFile::WriteUser | QFile::WriteOwner)) {
                         if (file.remove()) {
-                            LOG(QString("[FileDeletionWorker] Deleted file from disk after removing read-only attribute: %1").arg(filePath));
+                            LOG(QString("[FileDeletionWorker] Deleted file from disk after removing read-only attribute: %1").arg(result.filePath));
                             deleted = true;
                             result.success = true;
                         }
@@ -222,19 +228,64 @@ void FileDeletionWorker::doWork()
                 }
                 
                 if (!deleted) {
-                    LOG(QString("[FileDeletionWorker] Failed to delete file from disk: %1").arg(filePath));
+                    LOG(QString("[FileDeletionWorker] Failed to delete file from disk: %1").arg(result.filePath));
                     result.errorMessage = QString("Failed to delete file: %1").arg(file.errorString());
                     result.success = false;
                 }
             }
         } else {
             // File doesn't exist - consider this a success (file already gone)
-            LOG(QString("[FileDeletionWorker] File not found on disk (assuming already deleted): %1").arg(filePath));
+            LOG(QString("[FileDeletionWorker] File not found on disk (assuming already deleted): %1").arg(result.filePath));
             result.success = true;
         }
     } else {
         // Not deleting from disk, just marking in database
         result.success = true;
+    }
+    
+    // If file deletion succeeded, update the database (also in background thread to avoid blocking main thread)
+    if (result.success) {
+        LOG(QString("[FileDeletionWorker] Performing database updates in background thread (ThreadID: %1)")
+            .arg((quintptr)threadId, 0, 16));
+            
+        // Reopen database connection for updates
+        threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+        threadDb.setDatabaseName(m_dbName);
+        
+        if (threadDb.open()) {
+            // Remove from local_files table
+            if (!result.filePath.isEmpty()) {
+                QSqlQuery q(threadDb);
+                q.prepare("DELETE FROM local_files WHERE path = ?");
+                q.addBindValue(result.filePath);
+                if (q.exec()) {
+                    LOG(QString("[FileDeletionWorker] Removed from local_files: %1").arg(result.filePath));
+                }
+            }
+            
+            // Update mylist state to deleted
+            QSqlQuery updateQuery(threadDb);
+            updateQuery.prepare("UPDATE mylist SET state = ?, local_file = NULL WHERE lid = ?");
+            updateQuery.addBindValue(MylistState::DELETED);
+            updateQuery.addBindValue(m_lid);
+            if (updateQuery.exec()) {
+                LOG(QString("[FileDeletionWorker] Updated mylist state to deleted for lid=%1").arg(m_lid));
+            }
+            
+            // Clear watch chunks for this lid
+            QSqlQuery deleteChunks(threadDb);
+            deleteChunks.prepare("DELETE FROM watch_chunks WHERE lid = ?");
+            deleteChunks.addBindValue(m_lid);
+            if (deleteChunks.exec()) {
+                LOG(QString("[FileDeletionWorker] Cleared watch chunks for lid=%1").arg(m_lid));
+            }
+            
+            threadDb.close();
+        } else {
+            LOG(QString("[FileDeletionWorker] Failed to reopen database for updates"));
+        }
+        
+        QSqlDatabase::removeDatabase(connectionName);
     }
     
     LOG(QString("[FileDeletionWorker] File operations completed for lid=%1, success=%2")
@@ -981,8 +1032,10 @@ Window::Window()
     
     // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion in background thread
     connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
-        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2 - starting background thread")
-            .arg(lid).arg(deleteFromDisk));
+        // Log main thread ID for comparison
+        Qt::HANDLE mainThreadId = QThread::currentThreadId();
+        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2 - starting background thread (Main ThreadID: %3)")
+            .arg(lid).arg(deleteFromDisk).arg((quintptr)mainThreadId, 0, 16));
         
         if (adbapi) {
             // Get database name before starting thread
@@ -997,38 +1050,47 @@ Window::Window()
             // Connect signals
             connect(deletionThread, &QThread::started, worker, &FileDeletionWorker::doWork);
             connect(worker, &FileDeletionWorker::finished, this, [this](const FileDeletionResult &result) {
-                LOG(QString("[Window] File I/O operations finished for lid=%1, aid=%2, success=%3")
-                    .arg(result.lid).arg(result.aid).arg(result.success));
+                // Log thread ID to show we're back on main thread
+                Qt::HANDLE mainThreadId = QThread::currentThreadId();
+                LOG(QString("[Window] File deletion completed for lid=%1, aid=%2, success=%3 (Main ThreadID: %4)")
+                    .arg(result.lid).arg(result.aid).arg(result.success).arg((quintptr)mainThreadId, 0, 16));
                 
-                // Now handle database and API updates on main thread
+                // Database updates were done in background thread
+                // Now only handle API call on main thread (API class is not thread-safe)
                 if (result.success && adbapi) {
-                    // Update database to mark file as deleted
-                    QSqlDatabase db = QSqlDatabase::database();
-                    if (db.isOpen()) {
-                        // Remove from local_files table
-                        if (!result.filePath.isEmpty()) {
-                            QSqlQuery q(db);
-                            q.prepare("DELETE FROM local_files WHERE path = ?");
-                            q.addBindValue(result.filePath);
-                            if (q.exec()) {
-                                LOG(QString("[Window] Removed from local_files: %1").arg(result.filePath));
-                            }
-                        }
+                    // Send MYLISTADD to mark as deleted in AniDB API
+                    // The 'true' parameter means we're updating an existing mylist entry (edit=1)
+                    // Check for valid fid and ed2k hash - size can be 0 for empty files
+                    if (result.fid > 0 && !result.ed2k.isEmpty()) {
+                        QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
+                        LOG(QString("[Window] Sent MYLISTADD with state=DELETED for lid=%1, tag=%2 - awaiting API confirmation")
+                            .arg(result.lid).arg(tag));
                         
-                        // Update mylist state to deleted (state=3)
-                        QSqlQuery updateQuery(db);
-                        updateQuery.prepare("UPDATE mylist SET state = 3 WHERE lid = ?");
-                        updateQuery.addBindValue(result.lid);
-                        if (updateQuery.exec()) {
-                            LOG(QString("[Window] Updated mylist state to deleted for lid=%1").arg(result.lid));
+                        // Store pending deletion to process when API confirms
+                        // This ensures sequential deletion - next file won't be deleted
+                        // until this one receives API confirmation (code 311)
+                        m_pendingDeletions[tag] = QPair<int, int>(result.lid, result.aid);
+                    } else {
+                        LOG(QString("[Window] Cannot update AniDB API - missing fid or ed2k for lid=%1")
+                            .arg(result.lid));
+                        
+                        // If we can't send API request, notify WatchSessionManager with failure
+                        // This allows it to try the next file or handle the error appropriately
+                        if (watchSessionManager) {
+                            watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                         }
                     }
+                } else if (!result.success && watchSessionManager) {
+                    // If file deletion failed, notify WatchSessionManager immediately
+                    // This allows it to handle the failure and potentially try the next file
+                    watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                 }
                 
-                // Notify WatchSessionManager of the result
-                if (watchSessionManager) {
-                    watchSessionManager->onFileDeletionResult(result.lid, result.aid, result.success);
-                }
+                // NOTE: For SUCCESSFUL deletions with valid API data:
+                // We do NOT call watchSessionManager->onFileDeletionResult() here
+                // Instead, we wait for the API response (code 311) in getNotifyMylistAdd()
+                // This ensures sequential deletion: one file at a time, waiting for API confirmation
+                // Only for FAILED deletions or missing API data do we notify immediately
             });
             connect(worker, &FileDeletionWorker::finished, deletionThread, &QThread::quit);
             connect(deletionThread, &QThread::finished, worker, &QObject::deleteLater);
@@ -2252,6 +2314,26 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyMylistAdd() tag=" + tag + " code=" + QString::number(code);
     LOG(logMsg);
+    
+    // Check if this is a pending file deletion awaiting API confirmation
+    if (code == 311 && m_pendingDeletions.contains(tag)) {
+        QPair<int, int> deletion = m_pendingDeletions.take(tag);
+        int lid = deletion.first;
+        int aid = deletion.second;
+        
+        LOG(QString("[Window] Received API confirmation (code 311) for file deletion lid=%1, aid=%2 - notifying WatchSessionManager")
+            .arg(lid).arg(aid));
+        
+        // Now that API has confirmed the deletion, notify WatchSessionManager
+        // This will trigger the next deletion if space is still below threshold
+        if (watchSessionManager) {
+            watchSessionManager->onFileDeletionResult(lid, aid, true);
+        }
+        
+        // Don't process this tag further - it was for a deletion, not a regular mylist add
+        return;
+    }
+    
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
         if(hashes->item(i, 5)->text() == tag || hashes->item(i, 6)->text() == tag)

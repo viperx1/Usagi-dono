@@ -162,10 +162,22 @@ protected:
     void emitFinished(const QList<LocalFileInfo> &result) override { emit finished(result); }
 };
 
+// AniDB mylist state constants
+// Used for marking files in the user's mylist with different states
+namespace MylistState {
+    constexpr int UNKNOWN = 0;
+    constexpr int HDD = 1;
+    constexpr int CD_DVD = 2;
+    constexpr int DELETED = 3;
+}
+
 // Structure to hold file deletion result
 struct FileDeletionResult {
     int lid;
     int aid;
+    int fid;
+    qint64 size;
+    QString ed2k;
     bool success;
     QString errorMessage;
     QString filePath;  // File path for reference
@@ -325,6 +337,10 @@ private:
 	
 	// Watch session manager
 	WatchSessionManager *watchSessionManager;
+	
+	// Track pending file deletions awaiting API confirmation
+	// Maps API tag -> (lid, aid) to ensure sequential deletion
+	QMap<QString, QPair<int, int>> m_pendingDeletions;
 	
 	// System tray manager
 	TrayIconManager *trayIconManager;
