@@ -334,4 +334,12 @@ void HasherThreadPool::cleanupFinishedThreads()
     workers.clear();
     activeThreads = 0;
     finishedThreads = 0;
+    
+    // Clear the request queue to prevent dangling pointers
+    // This is critical for pool restart scenarios where old thread pointers
+    // would otherwise remain in the queue after deletion
+    {
+        QMutexLocker locker(&requestMutex);
+        requestQueue.clear();
+    }
 }
