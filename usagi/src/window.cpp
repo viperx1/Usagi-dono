@@ -1074,19 +1074,23 @@ Window::Window()
                         LOG(QString("[Window] Cannot update AniDB API - missing fid or ed2k for lid=%1")
                             .arg(result.lid));
                         
-                        // If we can't send API request, notify immediately (won't trigger next deletion)
+                        // If we can't send API request, notify WatchSessionManager with failure
+                        // This allows it to try the next file or handle the error appropriately
                         if (watchSessionManager) {
                             watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                         }
                     }
                 } else if (!result.success && watchSessionManager) {
-                    // If file deletion failed, notify immediately
+                    // If file deletion failed, notify WatchSessionManager immediately
+                    // This allows it to handle the failure and potentially try the next file
                     watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                 }
                 
-                // NOTE: We do NOT call watchSessionManager->onFileDeletionResult() for successful deletions here
-                // Instead, we wait for the API response in getNotifyMylistAdd()
+                // NOTE: For SUCCESSFUL deletions with valid API data:
+                // We do NOT call watchSessionManager->onFileDeletionResult() here
+                // Instead, we wait for the API response (code 311) in getNotifyMylistAdd()
                 // This ensures sequential deletion: one file at a time, waiting for API confirmation
+                // Only for FAILED deletions or missing API data do we notify immediately
             });
             connect(worker, &FileDeletionWorker::finished, deletionThread, &QThread::quit);
             connect(deletionThread, &QThread::finished, worker, &QObject::deleteLater);
