@@ -1063,18 +1063,30 @@ Window::Window()
                     // Check for valid fid and ed2k hash - size can be 0 for empty files
                     if (result.fid > 0 && !result.ed2k.isEmpty()) {
                         QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
-                        LOG(QString("[Window] Sent MYLISTADD with state=DELETED for lid=%1, tag=%2")
+                        LOG(QString("[Window] Sent MYLISTADD with state=DELETED for lid=%1, tag=%2 - awaiting API confirmation")
                             .arg(result.lid).arg(tag));
+                        
+                        // Store pending deletion to process when API confirms
+                        // This ensures sequential deletion - next file won't be deleted
+                        // until this one receives API confirmation (code 311)
+                        m_pendingDeletions[tag] = QPair<int, int>(result.lid, result.aid);
                     } else {
                         LOG(QString("[Window] Cannot update AniDB API - missing fid or ed2k for lid=%1")
                             .arg(result.lid));
+                        
+                        // If we can't send API request, notify immediately (won't trigger next deletion)
+                        if (watchSessionManager) {
+                            watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
+                        }
                     }
+                } else if (!result.success && watchSessionManager) {
+                    // If file deletion failed, notify immediately
+                    watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                 }
                 
-                // Notify WatchSessionManager of the result
-                if (watchSessionManager) {
-                    watchSessionManager->onFileDeletionResult(result.lid, result.aid, result.success);
-                }
+                // NOTE: We do NOT call watchSessionManager->onFileDeletionResult() for successful deletions here
+                // Instead, we wait for the API response in getNotifyMylistAdd()
+                // This ensures sequential deletion: one file at a time, waiting for API confirmation
             });
             connect(worker, &FileDeletionWorker::finished, deletionThread, &QThread::quit);
             connect(deletionThread, &QThread::finished, worker, &QObject::deleteLater);
@@ -2298,6 +2310,26 @@ void Window::getNotifyMylistAdd(QString tag, int code)
 {
     QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyMylistAdd() tag=" + tag + " code=" + QString::number(code);
     LOG(logMsg);
+    
+    // Check if this is a pending file deletion awaiting API confirmation
+    if (code == 311 && m_pendingDeletions.contains(tag)) {
+        QPair<int, int> deletion = m_pendingDeletions.take(tag);
+        int lid = deletion.first;
+        int aid = deletion.second;
+        
+        LOG(QString("[Window] Received API confirmation (code 311) for file deletion lid=%1, aid=%2 - notifying WatchSessionManager")
+            .arg(lid).arg(aid));
+        
+        // Now that API has confirmed the deletion, notify WatchSessionManager
+        // This will trigger the next deletion if space is still below threshold
+        if (watchSessionManager) {
+            watchSessionManager->onFileDeletionResult(lid, aid, true);
+        }
+        
+        // Don't process this tag further - it was for a deletion, not a regular mylist add
+        return;
+    }
+    
 	for(int i=0; i<hashes->rowCount(); i++)
 	{
         if(hashes->item(i, 5)->text() == tag || hashes->item(i, 6)->text() == tag)

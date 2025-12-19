@@ -338,6 +338,10 @@ private:
 	// Watch session manager
 	WatchSessionManager *watchSessionManager;
 	
+	// Track pending file deletions awaiting API confirmation
+	// Maps API tag -> (lid, aid) to ensure sequential deletion
+	QMap<QString, QPair<int, int>> m_pendingDeletions;
+	
 	// System tray manager
 	TrayIconManager *trayIconManager;
 	
