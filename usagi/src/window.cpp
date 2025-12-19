@@ -153,8 +153,6 @@ void FileDeletionWorker::doWork()
     QString connectionName = QString("FileDeletion_%1").arg((quintptr)QThread::currentThreadId());
     QSqlDatabase threadDb;
     
-    QString filePath;
-    
     {
         // Get file information using thread-specific connection
         threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
@@ -180,11 +178,10 @@ void FileDeletionWorker::doWork()
         q.addBindValue(m_lid);
         if (q.exec() && q.next()) {
             result.aid = q.value(0).toInt();
-            filePath = q.value(1).toString();
+            result.filePath = q.value(1).toString();
             result.fid = q.value(2).toInt();  // Will be 0 if NULL
             result.size = q.value(3).toLongLong();  // Will be 0 if NULL
             result.ed2k = q.value(4).toString();  // Will be empty if NULL
-            result.filePath = filePath;
         } else {
             LOG(QString("[FileDeletionWorker] Failed to get file info for lid=%1").arg(m_lid));
             result.errorMessage = "Failed to get file information from database";
@@ -200,14 +197,14 @@ void FileDeletionWorker::doWork()
     QSqlDatabase::removeDatabase(connectionName);
     
     // Perform file deletion if requested (this is the I/O heavy part)
-    if (m_deleteFromDisk && !filePath.isEmpty()) {
-        QFile file(filePath);
+    if (m_deleteFromDisk && !result.filePath.isEmpty()) {
+        QFile file(result.filePath);
         if (file.exists()) {
             bool deleted = false;
             
             // First attempt: try to remove normally
             if (file.remove()) {
-                LOG(QString("[FileDeletionWorker] Deleted file from disk: %1").arg(filePath));
+                LOG(QString("[FileDeletionWorker] Deleted file from disk: %1").arg(result.filePath));
                 deleted = true;
                 result.success = true;
             } else {
@@ -217,11 +214,11 @@ void FileDeletionWorker::doWork()
                 bool hadReadOnly = !(originalPerms & QFile::WriteUser);
                 
                 if (hadReadOnly) {
-                    LOG(QString("[FileDeletionWorker] File is read-only, attempting to remove read-only attribute: %1").arg(filePath));
+                    LOG(QString("[FileDeletionWorker] File is read-only, attempting to remove read-only attribute: %1").arg(result.filePath));
                     // Add write permission and retry
                     if (file.setPermissions(originalPerms | QFile::WriteUser | QFile::WriteOwner)) {
                         if (file.remove()) {
-                            LOG(QString("[FileDeletionWorker] Deleted file from disk after removing read-only attribute: %1").arg(filePath));
+                            LOG(QString("[FileDeletionWorker] Deleted file from disk after removing read-only attribute: %1").arg(result.filePath));
                             deleted = true;
                             result.success = true;
                         }
@@ -229,14 +226,14 @@ void FileDeletionWorker::doWork()
                 }
                 
                 if (!deleted) {
-                    LOG(QString("[FileDeletionWorker] Failed to delete file from disk: %1").arg(filePath));
+                    LOG(QString("[FileDeletionWorker] Failed to delete file from disk: %1").arg(result.filePath));
                     result.errorMessage = QString("Failed to delete file: %1").arg(file.errorString());
                     result.success = false;
                 }
             }
         } else {
             // File doesn't exist - consider this a success (file already gone)
-            LOG(QString("[FileDeletionWorker] File not found on disk (assuming already deleted): %1").arg(filePath));
+            LOG(QString("[FileDeletionWorker] File not found on disk (assuming already deleted): %1").arg(result.filePath));
             result.success = true;
         }
     } else {
