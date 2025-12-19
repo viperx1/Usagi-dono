@@ -166,6 +166,9 @@ protected:
 struct FileDeletionResult {
     int lid;
     int aid;
+    int fid;
+    qint64 size;
+    QString ed2k;
     bool success;
     QString errorMessage;
     QString filePath;  // File path for reference

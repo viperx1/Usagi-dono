@@ -143,6 +143,9 @@ void FileDeletionWorker::doWork()
     FileDeletionResult result;
     result.lid = m_lid;
     result.aid = 0;
+    result.fid = 0;
+    result.size = 0;
+    result.ed2k = "";
     result.success = false;
     result.filePath = "";
     
@@ -151,7 +154,6 @@ void FileDeletionWorker::doWork()
     QSqlDatabase threadDb;
     
     QString filePath;
-    int fid = 0;
     
     {
         // Get file information using thread-specific connection
@@ -166,17 +168,20 @@ void FileDeletionWorker::doWork()
             return;
         }
         
-        // Get the aid and file path
+        // Get the file information needed for API call and file deletion
         QSqlQuery q(threadDb);
-        q.prepare("SELECT m.aid, lf.path, m.fid "
+        q.prepare("SELECT m.aid, lf.path, m.fid, f.size, f.ed2k "
                   "FROM mylist m "
                   "LEFT JOIN local_files lf ON m.local_file = lf.id "
+                  "LEFT JOIN file f ON m.fid = f.fid "
                   "WHERE m.lid = ?");
         q.addBindValue(m_lid);
         if (q.exec() && q.next()) {
             result.aid = q.value(0).toInt();
             filePath = q.value(1).toString();
-            fid = q.value(2).toInt();
+            result.fid = q.value(2).toInt();
+            result.size = q.value(3).toLongLong();
+            result.ed2k = q.value(4).toString();
             result.filePath = filePath;
         } else {
             LOG(QString("[FileDeletionWorker] Failed to get file info for lid=%1").arg(m_lid));
@@ -1017,11 +1022,31 @@ Window::Window()
                         
                         // Update mylist state to deleted (state=3)
                         QSqlQuery updateQuery(db);
-                        updateQuery.prepare("UPDATE mylist SET state = 3 WHERE lid = ?");
+                        updateQuery.prepare("UPDATE mylist SET state = 3, local_file = NULL WHERE lid = ?");
                         updateQuery.addBindValue(result.lid);
                         if (updateQuery.exec()) {
                             LOG(QString("[Window] Updated mylist state to deleted for lid=%1").arg(result.lid));
                         }
+                        
+                        // Clear watch chunks for this lid
+                        QSqlQuery deleteChunks(db);
+                        deleteChunks.prepare("DELETE FROM watch_chunks WHERE lid = ?");
+                        deleteChunks.addBindValue(result.lid);
+                        if (deleteChunks.exec()) {
+                            LOG(QString("[Window] Cleared watch chunks for lid=%1").arg(result.lid));
+                        }
+                    }
+                    
+                    // Send MYLISTADD with state=3 to mark as deleted in AniDB API
+                    // state=3 means "deleted" in AniDB mylist state enum (0=unknown, 1=HDD, 2=CD/DVD, 3=deleted)
+                    // edit=true (1) means we're updating an existing mylist entry
+                    if (result.size > 0 && !result.ed2k.isEmpty()) {
+                        QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, 3, "", true);
+                        LOG(QString("[Window] Sent MYLISTADD with state=3 for lid=%1, tag=%2")
+                            .arg(result.lid).arg(tag));
+                    } else {
+                        LOG(QString("[Window] Cannot update AniDB API - missing size or ed2k for lid=%1")
+                            .arg(result.lid));
                     }
                 }
                 
