@@ -162,6 +162,15 @@ protected:
     void emitFinished(const QList<LocalFileInfo> &result) override { emit finished(result); }
 };
 
+// AniDB mylist state constants
+// Used for marking files in the user's mylist with different states
+namespace MylistState {
+    constexpr int UNKNOWN = 0;
+    constexpr int HDD = 1;
+    constexpr int CD_DVD = 2;
+    constexpr int DELETED = 3;
+}
+
 // Structure to hold file deletion result
 struct FileDeletionResult {
     int lid;

@@ -1020,9 +1020,10 @@ Window::Window()
                             }
                         }
                         
-                        // Update mylist state to deleted (state=3)
+                        // Update mylist state to deleted
                         QSqlQuery updateQuery(db);
-                        updateQuery.prepare("UPDATE mylist SET state = 3, local_file = NULL WHERE lid = ?");
+                        updateQuery.prepare("UPDATE mylist SET state = ?, local_file = NULL WHERE lid = ?");
+                        updateQuery.addBindValue(MylistState::DELETED);
                         updateQuery.addBindValue(result.lid);
                         if (updateQuery.exec()) {
                             LOG(QString("[Window] Updated mylist state to deleted for lid=%1").arg(result.lid));
@@ -1037,15 +1038,15 @@ Window::Window()
                         }
                     }
                     
-                    // Send MYLISTADD with state=3 to mark as deleted in AniDB API
-                    // state=3 means "deleted" in AniDB mylist state enum (0=unknown, 1=HDD, 2=CD/DVD, 3=deleted)
+                    // Send MYLISTADD to mark as deleted in AniDB API
                     // edit=true (1) means we're updating an existing mylist entry
-                    if (result.size > 0 && !result.ed2k.isEmpty()) {
-                        QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, 3, "", true);
-                        LOG(QString("[Window] Sent MYLISTADD with state=3 for lid=%1, tag=%2")
+                    // Check for valid fid and ed2k hash - size can be 0 for empty files
+                    if (result.fid > 0 && !result.ed2k.isEmpty()) {
+                        QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
+                        LOG(QString("[Window] Sent MYLISTADD with state=DELETED for lid=%1, tag=%2")
                             .arg(result.lid).arg(tag));
                     } else {
-                        LOG(QString("[Window] Cannot update AniDB API - missing size or ed2k for lid=%1")
+                        LOG(QString("[Window] Cannot update AniDB API - missing fid or ed2k for lid=%1")
                             .arg(result.lid));
                     }
                 }
