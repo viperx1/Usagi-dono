@@ -199,12 +199,12 @@ void TestChainFilteringStandalone::insertTestAnime(int aid, const QString &name,
     
     if (prequelAid > 0) {
         relAidList.append(QString::number(prequelAid));
-        relTypeList.append("1");  // 1 = prequel
+        relTypeList.append("2");  // 2 = prequel (from relation type enum)
     }
     
     if (sequelAid > 0) {
         relAidList.append(QString::number(sequelAid));
-        relTypeList.append("2");  // 2 = sequel
+        relTypeList.append("1");  // 1 = sequel (from relation type enum)
     }
     
     QString relaidlist = relAidList.join("'");
