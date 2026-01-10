@@ -397,11 +397,8 @@ void VirtualFlowLayout::paintEvent(QPaintEvent *event)
     // Paint the background/base widget
     QWidget::paintEvent(event);
     
-    // Arrows are now drawn by the overlay widget, so no arrow drawing here
-    // Trigger overlay repaint
-    if (m_arrowOverlay) {
-        m_arrowOverlay->update();
-    }
+    // Note: Arrow overlay is updated in updateVisibleItems() when visible widgets change,
+    // not on every paint event to avoid high CPU usage
 }
 
 void VirtualFlowLayout::showEvent(QShowEvent *event)
@@ -575,6 +572,11 @@ void VirtualFlowLayout::updateVisibleItems()
         if (!m_visibleWidgets.contains(idx)) {
             createOrReuseWidget(idx);
         }
+    }
+    
+    // Update arrow overlay only when visible items change
+    if (m_arrowOverlay) {
+        m_arrowOverlay->update();
     }
 }
 
