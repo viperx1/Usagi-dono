@@ -38,6 +38,7 @@ class WatchSessionManager : public QObject
     
     // Allow test class to access private methods
     friend class TestBitratePreferences;
+    friend class TestWatchSessionManager;
     
 public:
     explicit WatchSessionManager(QObject *parent = nullptr);
