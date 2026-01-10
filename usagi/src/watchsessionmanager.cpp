@@ -1468,8 +1468,8 @@ int WatchSessionManager::getFileRating(int lid) const
             int ratingValue = qRound(rating);
             // Treat zero or invalid rating as high rating to preserve content
             // Zero occurs when: (1) rating field is explicitly "0" or "0.00",
-            // (2) toDouble() returns 0.0 for invalid/unparseable strings
-            // In both cases, we assume the anime is worth keeping (optimistic approach)
+            // (2) toDouble() returns 0.0 (e.g., for non-numeric strings)
+            // In both cases, assume the anime is worth keeping (optimistic approach)
             return (ratingValue == 0) ? RATING_HIGH_THRESHOLD : ratingValue;
         }
     }
