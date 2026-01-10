@@ -633,10 +633,10 @@ void TestWatchSessionManager::testFileRatingWithoutRating()
     QSqlQuery q(db);
     
     // Create anime without rating (NULL rating)
-    q.exec("INSERT INTO anime (aid, name_romaji) VALUES (100, 'Anime Without Rating')");
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji) VALUES (100, 'Anime Without Rating')"));
     
     // Create mylist entry for this anime
-    q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9001, 9001, 100, 101)");
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9001, 9001, 100, 101)"));
     
     // Get the rating for this file
     int rating = manager->getFileRating(9001);
@@ -652,10 +652,10 @@ void TestWatchSessionManager::testFileRatingWithZeroRating()
     QSqlQuery q(db);
     
     // Create anime with zero rating
-    q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (101, 'Anime With Zero Rating', '0.00')");
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (101, 'Anime With Zero Rating', '0.00')"));
     
     // Create mylist entry for this anime
-    q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9002, 9002, 101, 101)");
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9002, 9002, 101, 101)"));
     
     // Get the rating for this file
     int rating = manager->getFileRating(9002);
@@ -671,10 +671,10 @@ void TestWatchSessionManager::testFileRatingWithNormalRating()
     QSqlQuery q(db);
     
     // Create anime with rating 8.75 (should become 875)
-    q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (102, 'Highly Rated Anime', '8.75')");
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (102, 'Highly Rated Anime', '8.75')"));
     
     // Create mylist entry for this anime
-    q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9003, 9003, 102, 101)");
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9003, 9003, 102, 101)"));
     
     // Get the rating for this file
     int rating = manager->getFileRating(9003);
@@ -683,10 +683,10 @@ void TestWatchSessionManager::testFileRatingWithNormalRating()
     QCOMPARE(rating, 875);
     
     // Create anime with low rating 5.50 (should become 550)
-    q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (103, 'Low Rated Anime', '5.50')");
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (103, 'Low Rated Anime', '5.50')"));
     
     // Create mylist entry for this anime
-    q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9004, 9004, 103, 101)");
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9004, 9004, 103, 101)"));
     
     // Get the rating for this file
     rating = manager->getFileRating(9004);
