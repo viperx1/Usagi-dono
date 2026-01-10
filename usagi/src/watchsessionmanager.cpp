@@ -1466,8 +1466,8 @@ int WatchSessionManager::getFileRating(int lid) const
             // Convert "8.23" to 823 using qRound for predictable rounding
             double rating = ratingStr.toDouble() * 100.0;
             int ratingValue = qRound(rating);
-            // Treat zero rating as high rating to preserve unrated content
-            // Zero can occur when: (1) rating field exists but is "0" or "0.00",
+            // Treat zero or invalid rating as high rating to preserve content
+            // Zero occurs when: (1) rating field is explicitly "0" or "0.00",
             // (2) toDouble() returns 0.0 for invalid/unparseable strings
             // In both cases, we assume the anime is worth keeping (optimistic approach)
             return (ratingValue == 0) ? RATING_HIGH_THRESHOLD : ratingValue;
