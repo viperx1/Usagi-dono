@@ -1452,7 +1452,7 @@ int WatchSessionManager::getFileRating(int lid) const
     // Get anime rating for this file (0-1000 scale, where 800+ is excellent)
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
-        return 0;
+        return RATING_HIGH_THRESHOLD;  // Treat as high rating if DB unavailable
     }
     
     QSqlQuery q(db);
@@ -1465,11 +1465,16 @@ int WatchSessionManager::getFileRating(int lid) const
         if (!ratingStr.isEmpty()) {
             // Convert "8.23" to 823 using qRound for predictable rounding
             double rating = ratingStr.toDouble() * 100.0;
-            return qRound(rating);
+            int ratingValue = qRound(rating);
+            // Treat zero or invalid rating as high rating to preserve content
+            // Zero occurs when: (1) rating field is explicitly "0" or "0.00",
+            // (2) toDouble() returns 0.0 (e.g., for non-numeric strings)
+            // In both cases, assume the anime is worth keeping (optimistic approach)
+            return (ratingValue == 0) ? RATING_HIGH_THRESHOLD : ratingValue;
         }
     }
     
-    return 0;  // No rating available
+    return RATING_HIGH_THRESHOLD;  // No rating available - treat as high rating
 }
 
 int WatchSessionManager::getFileGroupId(int lid) const

@@ -48,6 +48,11 @@ private slots:
     
     // Sequential deletion with API confirmation test
     void testSequentialDeletionWithApiConfirmation();
+    
+    // Rating tests
+    void testFileRatingWithoutRating();
+    void testFileRatingWithZeroRating();
+    void testFileRatingWithNormalRating();
 
 private:
     QTemporaryFile *tempDbFile;
@@ -110,7 +115,8 @@ void TestWatchSessionManager::initTestCase()
            "name_romaji TEXT, "
            "relaidlist TEXT, "
            "relaidtype TEXT, "
-           "is_hidden INTEGER DEFAULT 0"
+           "is_hidden INTEGER DEFAULT 0, "
+           "rating TEXT"
            ")");
     
     // Local files table - matches real schema (id, path, filename, status, ed2k_hash, binding_status)
@@ -618,6 +624,75 @@ void TestWatchSessionManager::testSequentialDeletionWithApiConfirmation()
         // 5. Only after receiving the MYLISTADD API response (code 311)
         //    should the next deletion be triggered
     }
+}
+
+void TestWatchSessionManager::testFileRatingWithoutRating()
+{
+    // Test that anime without rating is treated as RATING_HIGH_THRESHOLD (800)
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    
+    // Create anime without rating (NULL rating)
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji) VALUES (100, 'Anime Without Rating')"));
+    
+    // Create mylist entry for this anime
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9001, 9001, 100, 101)"));
+    
+    // Get the rating for this file
+    int rating = manager->getFileRating(9001);
+    
+    // Should return RATING_HIGH_THRESHOLD (800)
+    QCOMPARE(rating, WatchSessionManager::RATING_HIGH_THRESHOLD);
+}
+
+void TestWatchSessionManager::testFileRatingWithZeroRating()
+{
+    // Test that anime with "0" or "0.00" rating is treated as RATING_HIGH_THRESHOLD (800)
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    
+    // Create anime with zero rating
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (101, 'Anime With Zero Rating', '0.00')"));
+    
+    // Create mylist entry for this anime
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9002, 9002, 101, 101)"));
+    
+    // Get the rating for this file
+    int rating = manager->getFileRating(9002);
+    
+    // Should return RATING_HIGH_THRESHOLD (800)
+    QCOMPARE(rating, WatchSessionManager::RATING_HIGH_THRESHOLD);
+}
+
+void TestWatchSessionManager::testFileRatingWithNormalRating()
+{
+    // Test that anime with normal rating works correctly
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    
+    // Create anime with rating 8.75 (should become 875)
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (102, 'Highly Rated Anime', '8.75')"));
+    
+    // Create mylist entry for this anime
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9003, 9003, 102, 101)"));
+    
+    // Get the rating for this file
+    int rating = manager->getFileRating(9003);
+    
+    // Should return 875 (8.75 * 100)
+    QCOMPARE(rating, 875);
+    
+    // Create anime with low rating 5.50 (should become 550)
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, rating) VALUES (103, 'Low Rated Anime', '5.50')"));
+    
+    // Create mylist entry for this anime
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid) VALUES (9004, 9004, 103, 101)"));
+    
+    // Get the rating for this file
+    rating = manager->getFileRating(9004);
+    
+    // Should return 550 (5.50 * 100)
+    QCOMPARE(rating, 550);
 }
 
 QTEST_MAIN(TestWatchSessionManager)
