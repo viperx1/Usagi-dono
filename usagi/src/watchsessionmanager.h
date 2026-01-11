@@ -462,6 +462,9 @@ private:
     static const int SCORE_OLD_CODEC = -15;           // Penalty for old inefficient codecs (MPEG-4, XviD)
     static const int SCORE_ANCIENT_CODEC = -30;       // Penalty for very old codecs (MPEG-2, H.263)
     
+    // Multiple files per episode penalty (priority for deletion when duplicates exist)
+    static const int SCORE_MULTIPLE_FILES_BASE = -100;  // Base penalty when episode has multiple files (priority deletion)
+    
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
     static constexpr double DEFAULT_THRESHOLD_VALUE = 50.0; // 50 GB or 50%

@@ -514,14 +514,18 @@ int WatchSessionManager::calculateDeletionScore(int lid) const
         }
     }
     
-    // Apply file revision penalty - older revisions are more deletable
-    // Only applies when there are multiple local files for the same episode
+    // Apply multiple files priority - when there are multiple files for the same episode
+    // Apply base penalty to prioritize deletion (duplicates waste space)
     int fileCount = getFileCountForEpisode(lid);
     if (fileCount > 1) {
+        // Priority penalty for all files when multiple files exist for same episode
+        // This ensures episodes with multiple files are prioritized for deletion
+        score += SCORE_MULTIPLE_FILES_BASE;  // Negative, more eligible for deletion
+        
         // Count how many local files for this episode have a higher version
         int higherVersionCount = getHigherVersionFileCount(lid);
         
-        // Apply penalty per local file with higher version
+        // Apply additional penalty per local file with higher version
         if (higherVersionCount > 0) {
             score += higherVersionCount * SCORE_OLDER_REVISION;  // Negative, more eligible for deletion
         }
