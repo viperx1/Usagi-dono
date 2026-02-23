@@ -645,6 +645,8 @@ void TestWatchSessionManager::testMissingDuplicateFileDoesNotBypassGapProtection
     q.exec("DELETE FROM file");
     
     // Minimal anime + episodes
+    // Populate both columns because test schema preserves legacy name_romaji while
+    // deletion query reads production-style nameromaji.
     QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, nameromaji) VALUES (10, 'Gap Test', 'Gap Test')"));
     QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1001, '1')"));
     QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1002, '2')"));
