@@ -140,6 +140,7 @@ private:
     int finishedThreads;  // Number of threads that have finished
     bool isStarted;
     bool isStopping;
+    bool noMoreFiles;
 };
 
 #endif // HASHERTHREADPOOL_H

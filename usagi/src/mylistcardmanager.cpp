@@ -111,8 +111,6 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 
                 // Filter chains to only include those with at least one anime from the input list
                 // IMPORTANT: Never modify m_chainList - it's the master list from cache
-                QSet<int> inputAidSet(aids.begin(), aids.end());
-                
                 // Build a map of which chain each input anime belongs to
                 // This preserves the order of input anime
                 QMap<int, int> inputAidToChainIdx;
@@ -662,7 +660,7 @@ void MyListCardManager::updateSeriesChainConnections(bool chainModeEnabled)
 {
     QMutexLocker locker(&m_mutex);
     
-    for (AnimeCard* card : m_cards) {
+    for (AnimeCard* card : std::as_const(m_cards)) {
         if (card) {
             card->setSeriesChainInfo(0, 0);
         }
@@ -1387,7 +1385,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     if (!data.posterData.isEmpty()) {
         // Defer poster loading to avoid blocking
         QByteArray posterDataCopy = data.posterData; // Copy for lambda capture
-        QMetaObject::invokeMethod(this, [this, card, posterDataCopy]() {
+        QMetaObject::invokeMethod(this, [card, posterDataCopy]() {
             QPixmap poster;
             if (poster.loadFromData(posterDataCopy)) {
                 card->setPoster(poster);
@@ -2055,7 +2053,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         // Calculate lastPlayed as the maximum timestamp from all episodes
         qint64 maxLastPlayed = 0;
         if (!data.episodes.isEmpty()) {
-            QList<EpisodeCacheEntry>::const_iterator maxIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+            QList<EpisodeCacheEntry>::const_iterator maxIt = std::max_element(data.episodes.cbegin(), data.episodes.cend(),
                 [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
                     return a.lastPlayed < b.lastPlayed;
                 });
@@ -2066,7 +2064,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         // Calculate recentEpisodeAirDate as the maximum air date from all episodes
         qint64 maxAirDate = 0;
         if (!data.episodes.isEmpty()) {
-            QList<EpisodeCacheEntry>::const_iterator maxAirIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+            QList<EpisodeCacheEntry>::const_iterator maxAirIt = std::max_element(data.episodes.cbegin(), data.episodes.cend(),
                 [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
                     return a.airDate < b.airDate;
                 });
@@ -2165,16 +2163,34 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     
     QString query = QString("SELECT aid, relaidlist, relaidtype FROM anime WHERE aid IN (%1)").arg(aidsList);
     QSqlQuery q(db);
+    QSet<int> loadedAids;
     
     if (q.exec(query)) {
         QMutexLocker locker(&m_mutex);
         while (q.next()) {
             int aid = q.value(0).toInt();
+            loadedAids.insert(aid);
             CardCreationData data;
             data.setRelations(q.value(1).toString(), q.value(2).toString());
             data.hasData = false;  // Mark as partial data (only relations loaded)
             m_cardCreationDataCache[aid] = data;
         }
+    }
+    
+    QList<int> missingAidsToRequest;
+    {
+        QMutexLocker locker(&m_mutex);
+        for (int aid : aidsToLoad) {
+            if (!loadedAids.contains(aid) && !m_animeMetadataRequested.contains(aid)) {
+                m_animeMetadataRequested.insert(aid);
+                missingAidsToRequest.append(aid);
+            }
+        }
+    }
+    
+    for (int aid : std::as_const(missingAidsToRequest)) {
+        LOG(QString("[MyListCardManager] Related anime aid=%1 missing from local cache/database, requesting metadata").arg(aid));
+        requestAnimeMetadata(aid);
     }
 }
 

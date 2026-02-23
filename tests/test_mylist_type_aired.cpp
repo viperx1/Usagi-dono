@@ -109,8 +109,20 @@ void TestMylistTypeAired::testAnimeDataStorage()
 
 void TestMylistTypeAired::testMylistQuery()
 {
-    // Insert test mylist entry
+    // Keep this test self-contained (do not depend on execution order)
     QSqlQuery query(db);
+    query.prepare("INSERT OR REPLACE INTO anime (aid, eptotal, eps, nameromaji, typename, startdate, enddate) "
+                  "VALUES (:aid, :eptotal, :eps, :name, :typename, :startdate, :enddate)");
+    query.bindValue(":aid", 1135);
+    query.bindValue(":eptotal", 1);
+    query.bindValue(":eps", 1);
+    query.bindValue(":name", ".hack//Gift");
+    query.bindValue(":typename", "OVA");
+    query.bindValue(":startdate", "2003-11-16Z");
+    query.bindValue(":enddate", "2003-11-16Z");
+    QVERIFY(query.exec());
+    
+    // Insert test mylist entry
     query.exec("INSERT INTO mylist (lid, aid, eid, state, viewed, storage) "
                "VALUES (1, 1135, 12814, 2, 1, 'a005')");
     
