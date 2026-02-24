@@ -30,7 +30,7 @@ Each file starts at score 50 and is adjusted by:
 | Bitrate deviation | -10 to -40 | Only with multiple files per episode |
 | Codec age | +10 / -15 / -30 | Modern, old, or ancient codec |
 
-Gap protection prevents deleting files that would create holes in episode sequences. Gap protection is **cross-anime**: it considers prequel/sequel chains (via `AnimeChain` relation data) so that e.g. a sequel's episode 1 is not deleted while the prequel's final episode is still present.
+Gap protection prevents deleting files that would create holes in episode sequences. Gap protection is **cross-anime**: it considers prequel/sequel chains (via `AnimeChain` relation data). Only **adjacent anime** in the chain are checked — e.g., if the user has Inuyasha → Final Act → Yashahime, gap protection checks Inuyasha↔Final Act and Final Act↔Yashahime boundaries, not Inuyasha↔Yashahime directly. See Q13 for discussion of deeper chain traversal.
 
 Lower score = higher deletion priority.
 
@@ -409,7 +409,7 @@ This is ambiguous — the anime could be garbage not worth clicking, or planned 
 | **C: Exclude from score** | N/A — factor skipped | Factor has no influence for this file | Most honest — system admits it doesn't know | Complicates score calculation (variable factor count); files with fewer factors are less comparable |
 | **D: Use mylist state** | 0.0 for unknown, 0.3 for "plan to watch" if available | AniDB mylist state provides weak signal | Can distinguish planned-to-watch from truly unknown | Relies on user maintaining mylist state, which many don't |
 
-**Recommendation**: Approach B (default to 0.5). The neutral midpoint ensures that no-session anime is neither favored nor penalized by the view_percentage factor. The other 5 factors (rating, distance, size, group, recency) still contribute meaningful scores. If the user consistently keeps no-session anime via A vs B choices, the system learns from those choices through the other factors — so the view_percentage factor simply stays neutral for these files rather than adding noise.
+**Recommendation**: Approach B (default to 0.5). The neutral midpoint ensures that no-session anime is neither favored nor penalized by the view_percentage factor. The 0.5 value is static for the duration that an anime has no session — it does NOT change through learning. However, the view_percentage **weight** still adjusts from A vs B choices involving files that DO have sessions, so the system's overall sensitivity to view_percentage improves over time. For no-session anime, the other 5 factors (rating, distance, size, group, recency) still contribute meaningful scores.
 
 ### How Factor Weights Produce a Score
 
@@ -610,7 +610,7 @@ The hybrid approach uses **procedural rules for tier assignment** (the "why") an
 
 Locks are simple on/off — no reason or notes. A locked item stays locked until the user unlocks it.
 
-**Key behavior**: A lock guarantees that **at least 1 file** (the highest-rated) remains for the locked episode/anime. It does NOT prevent deletion of duplicate files for the same episode. This means a locked episode with 3 files (v1, v2, v3) can still have v1 and v2 deleted — only v3 (highest quality) is protected.
+**Key behavior**: A lock guarantees that **at least 1 file** (the highest-rated) remains for the locked episode/anime. It does NOT prevent deletion of duplicate files for the same episode. This means a locked episode with 3 files (v1, v2, v3) can still have v1 and v2 deleted — only v3 (highest-rated) is protected. See Q12 for how "highest-rated" is determined.
 
 ### Database Schema
 
@@ -775,8 +775,12 @@ function classifyFile(file):
     if isLocked(file):  // checks lock + highest-rated-for-episode
         return { tier: PROTECTED, reason: lockReason(file) }
 
-    if wouldCreateGap(file):  // cross-anime: considers prequel/sequel chains
-        return { tier: PROTECTED, reason: "Gap protection (cross-anime)" }
+    if wouldCreateGap(file):
+        if isIntraAnimeGap(file):
+            return { tier: PROTECTED, reason: "Gap protection (within anime)" }
+        else:
+            return { tier: PROTECTED, reason: "Gap protection (cross-anime chain: "
+                   + getChainDescription(file) + ")" }
 
     // ── Tier 0: superseded revision ──
     if hasNewerLocalRevision(file.eid, file.version):
@@ -981,11 +985,11 @@ function isLocked(file):
     return isHighestRatedFileForEpisode(file.lid, file.eid)
 
 function isHighestRatedFileForEpisode(lid, eid):
-    // Find all local files for this episode, rank by quality score
+    // Find all local files for this episode, rank by rating criteria (see Q12 for definition)
     files = getLocalFilesForEpisode(eid)
     if files.isEmpty():
         return false
-    bestFile = files.sortByQualityScore(DESC).first()
+    bestFile = files.sortByRatingCriteria(DESC).first()  // Q12: criteria TBD
     return bestFile.lid == lid
 
 function lockReason(file):
@@ -1002,8 +1006,8 @@ function lockReason(file):
 
 | Scenario | Behavior |
 |----------|----------|
-| Locked episode has 3 files (v1, v2, v3) | Only v3 (highest rated) is protected. v1 and v2 are eligible for deletion as duplicates. |
-| New file arrives for locked episode that is higher quality | New file becomes the "highest rated" and is now protected. The previously protected file becomes eligible. |
+| Locked episode has 3 files (ep05-480p.avi, ep05-720p.mkv, ep05-1080p.mkv) | Only ep05-1080p.mkv (highest-rated per Q12) is protected. The other two are eligible for deletion as duplicates. |
+| New file arrives for locked episode that is higher-rated | New file becomes the "highest-rated" and is now protected. The previously protected file becomes eligible. |
 | User locks anime, then unlocks a single episode within it | Episode remains locked via anime lock. To unlock one episode, user must unlock the anime and lock remaining episodes individually — or we add an "exclude episode" feature later. |
 | File is the only copy, episode is not locked, anime is not locked | Protected by gap check OR by "only copy of unwatched episode" rule. Lock is not needed. |
 | User locks anime that has no files yet | Lock is stored in `deletion_locks`. When files are added, the highest-rated file per episode is protected. |
@@ -1312,7 +1316,7 @@ CREATE INDEX idx_deletion_history_type ON deletion_history(deletion_type);
 - `user_avsb`: deleted via user A vs B choice
 - `manual`: deleted via manual user action (context menu delete)
 
-**Retention limit**: Maximum 5000 entries. When a new entry is added and the count exceeds 5000, the oldest entry is deleted. This prevents unbounded database growth while keeping a substantial audit trail.
+**Retention limit**: Maximum 5000 entries. When a new entry is added and the count exceeds 5000, the oldest entries beyond the limit are deleted in a batch. This prevents unbounded database growth while keeping a substantial audit trail.
 
 ### UI: Deletion History Groupbox
 
@@ -1354,7 +1358,7 @@ signals:
     void entryAdded(int historyId);
 
 private:
-    void pruneOldest();  // DELETE FROM deletion_history WHERE id NOT IN (SELECT id FROM deletion_history ORDER BY deleted_at DESC LIMIT 5000)
+    void pruneOldest();  // DELETE FROM deletion_history WHERE id IN (SELECT id FROM deletion_history ORDER BY deleted_at ASC LIMIT MAX(0, (SELECT COUNT(*) FROM deletion_history) - 5000))
 };
 ```
 
@@ -1390,12 +1394,12 @@ struct DeletionHistoryEntry {
 | Q2 | Lock reason / notes | **Simple on/off**: no reason field, no notes |
 | Q3 | Min A vs B choices before autonomy | **50** (conservative; even 1000 could produce wrong decisions, so this is an acknowledged arbitrary value) |
 | Q4 | Deletion tab layout | **Vertical groupboxes**: Current Choice + Weights (top), Queue (middle), History (bottom). No sub-tabs. |
-| Q5 | Anime with no session | **Under review**: four approaches analyzed (default 0.0, default 0.5, exclude, use mylist state). Recommending 0.5 (neutral midpoint). |
+| Q5 | Anime with no session | **Default to 0.5** (neutral midpoint): no-session anime is neither favored nor penalized by view_percentage. Other factors still contribute. |
 | Q6 | A vs B during playback | **No popups ever**: all deletion interaction stays in Deletion tab. Tray icon blinks when choice is pending. User opens tab at their convenience. |
 | Q7 | Weight reset | **Yes, with double warning**: two confirmation dialogs before resetting all weights to 0 |
 | Q8 | History retention | **5000 entries max**: oldest entries pruned when limit exceeded |
 | Q9 | Procedural deletion notifications | **No notifications**: history is the record. No popups, no toasts, no system notifications (user has notifications silenced). |
-| Q10 | Lock + new files | **Lock keeps 1 highest-rated file per episode**: new files for locked episodes are covered by the lock, but only the highest-quality file is protected. Duplicates of locked episodes are still eligible for deletion. |
+| Q10 | Lock + new files | **Lock keeps 1 highest-rated file per episode**: new files for locked episodes are covered by the lock, but only the highest-rated file is protected. Duplicates of locked episodes are still eligible for deletion. |
 
 ---
 
