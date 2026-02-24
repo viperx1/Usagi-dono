@@ -764,11 +764,8 @@ void MyListCardManager::clearAllCards()
     m_animeNeedingMetadata.clear();
     m_animeNeedingPoster.clear();
     m_animePicnames.clear();
-    // Note: NOT clearing m_animeMetadataRequested to prevent re-requesting
-    
-    // Dispatch dedupe is per active load pass; reset it when cards are fully cleared.
-    QMutexLocker globalLocker(&s_metadataDispatchMutex);
-    s_metadataDispatchInFlight.clear();
+    // Note: NOT clearing m_animeMetadataRequested or global in-flight dispatch set
+    // to prevent duplicate metadata requests during rapid rebuild/reload cycles.
 }
 
 AnimeCard* MyListCardManager::getCard(int aid)
