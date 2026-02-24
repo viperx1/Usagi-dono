@@ -10,6 +10,7 @@
 | 2026-02-24T02:54:29Z | Issue #995 queue/emit diagnostics | Added AniDB logs for ANIME packet queue success/failure (with AID+tag), 230 ANIME re-request queue with AID+tag, and `notifyAnimeUpdated` emit with AID+tag. | Pending CI rerun evidence; intended to reveal whether duplicate count comes from re-request/emit path. |
 | 2026-02-24T12:41:41Z | Issue #996 build fix | Fixed compile errors in `AniDBApi::Mylist(int)` where new debug logs incorrectly referenced undefined `aid`; switched logs to correct `lid` and `MYLIST` wording. | Build-failure root cause addressed (compile error on multiple test targets). |
 | 2026-02-24T12:52:35Z | Issue #997 request sequence tracing | Added monotonic request sequence IDs to `MyListCardManager::requestAnimeMetadata` logs and propagated them through local dedupe/global dedupe/dispatch/return logs. | Pending CI rerun evidence; intended to prove whether duplicate count comes from two independent request entries or downstream duplicate handling. |
+| 2026-02-24T13:04:40Z | Issue #998 chain-preload boundary diagnostics | Added chain-preload start/no-op logs and per-missing-AID `alreadyRequested` trace to confirm whether second request path originates from chain-preload discovery vs other caller. | Pending CI rerun evidence. |
 
 ## Current hypothesis
 

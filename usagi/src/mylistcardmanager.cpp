@@ -2192,6 +2192,9 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
 
 void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& baseAids)
 {
+    LOG(QString("[MyListCardManager] preloadRelationDataForChainExpansion start: manager=%1 baseAids=%2")
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(baseAids.size()));
     // Collect all related anime IDs (prequels/sequels) that might be discovered during chain building
     QSet<int> relatedAids;
     
@@ -2228,6 +2231,7 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     }
     
     if (aidsToLoad.isEmpty()) {
+        LOG("[MyListCardManager] preloadRelationDataForChainExpansion: no additional related AIDs to load");
         return;
     }
     
@@ -2274,6 +2278,18 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
         // Avoid re-requesting here to prevent duplicate request signals during chain building.
         LOG(QString("[MyListCardManager] Chain preload found %1 related anime still missing in local DB/cache; deferring to preloadCardCreationData() request path")
             .arg(missingAids.size()));
+        QHash<int, bool> requestStateByAid;
+        {
+            QMutexLocker locker(&m_mutex);
+            for (int aid : std::as_const(missingAids)) {
+                requestStateByAid.insert(aid, m_animeMetadataRequested.contains(aid));
+            }
+        }
+        for (int aid : std::as_const(missingAids)) {
+            LOG(QString("[MyListCardManager] Chain preload missing aid=%1 alreadyRequested=%2")
+                .arg(aid)
+                .arg(requestStateByAid.value(aid, false) ? "true" : "false"));
+        }
     }
 }
 
