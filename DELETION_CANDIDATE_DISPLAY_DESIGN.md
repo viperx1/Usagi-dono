@@ -206,10 +206,10 @@ The deletion system design involves many interacting parts. To cut through the c
 ### Q1: What gets deleted without asking?
 **Answer: Only things with objectively better replacements.**
 - Superseded file revisions (v1 when v2 exists locally)
-- Lower-quality duplicate (480p XviD when 1080p HEVC exists for same episode)
-- Language mismatch when a matching alternative exists locally
+- Lower-quality duplicate when a strictly better file exists for the same episode (based on resolution, codec generation, and bitrate relative to resolution)
+- Language mismatch when a better-matching alternative exists locally (based on the user's configured preferred audio and subtitle languages)
 
-These are **procedural** — no scoring, no user input needed. If a strictly better local alternative exists, the inferior file can go.
+These are **procedural** — no scoring, no user input needed. The criteria are deterministic rules based on technical metadata and user-configured language preferences.
 
 ### Q2: How do we decide between files that DON'T have a clearly better replacement?
 **Answer: Ask the user, pairwise: "A or B?"**
@@ -383,16 +383,23 @@ Each factor weight starts at 0 and moves up or down with each choice. The adjust
 ```
 For each factor F that differs between the kept file (K) and the deleted file (D):
 
-  direction = sign(F(K) - F(D))
+  diff = F(K) - F(D)
+  if abs(diff) < MIN_FACTOR_DIFFERENCE:  // e.g., 0.01
+      continue  // Factors that are nearly equal teach us nothing
+
+  direction = sign(diff)
   // +1 if the kept file scores higher on this factor
   // -1 if the kept file scores lower on this factor
 
-  weight[F] += learningRate * direction
+  weight[F] += LEARNING_RATE * direction
 
-  // learningRate = 0.1 (small, so learning is gradual)
+  // LEARNING_RATE = 0.1 (tunable parameter)
+  // MIN_FACTOR_DIFFERENCE = 0.01 (tunable parameter)
 ```
 
-**Intuition**: If the user consistently keeps files with higher anime ratings, the weight for "anime rating" gradually becomes positive and large. If the user consistently ignores codec quality (keeping old codecs over new ones), the weight for "codec quality" stays near zero or goes negative.
+**Why direction-only, not magnitude-weighted**: A magnitude-weighted formula (`weight[F] += rate * diff`) would let a single large difference dominate the update. The direction-only approach treats each choice as one "vote" per factor. This makes learning more stable: 10 consistent choices in the same direction move a weight by 1.0 regardless of how extreme any individual comparison was. If magnitude-weighting proves beneficial in practice, it can be added later.
+
+**Why 0.1 learning rate**: At 0.1, it takes ~10 consistent choices in the same direction to move a factor weight by 1.0. With 6 factors and assuming each choice updates 3-4 of them, the system needs ~20-30 total choices before weights stabilize. This is a tunable parameter stored in settings; it can be adjusted if the system learns too slowly or too aggressively.
 
 ### Factor Definitions (Learnable)
 
@@ -400,7 +407,7 @@ These are the factors whose weights are learned through A vs B choices. Each fac
 
 | Factor | How it's computed | Range | Higher = |
 |--------|------------------|-------|----------|
-| `anime_rating` | AniDB rating / 1000 | 0.0 – 1.0 | Better rated |
+| `anime_rating` | AniDB rating × 100 (integer 0–1000, e.g., 875 = 8.75) / 1000 | 0.0 – 1.0 | Better rated |
 | `episode_distance` | 1.0 - (abs(distance) / maxDistance) | 0.0 – 1.0 | Closer to current |
 | `file_size` | 1.0 - (sizeBytes / maxSizeBytes) | 0.0 – 1.0 | Smaller file |
 | `group_status` | active=1.0, stalled=0.5, disbanded=0.0 | 0.0 – 1.0 | More active group |
@@ -1257,7 +1264,7 @@ function onUserChoice(kept, deleted):
 
     for each factor F:
         diff = keptFactors[F] - deletedFactors[F]
-        if abs(diff) > 0.01:  // Only learn from factors that differ
+        if abs(diff) > MIN_FACTOR_DIFFERENCE:  // Only learn from factors that meaningfully differ
             direction = sign(diff)
             adjustWeight(F, LEARNING_RATE * direction)
 
