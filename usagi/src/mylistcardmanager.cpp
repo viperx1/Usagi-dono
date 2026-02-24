@@ -1721,7 +1721,7 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
         if (reason.isEmpty()) {
             LOG(QString("[MyListCardManager] Requesting metadata for anime %1").arg(aid));
         } else {
-            LOG(QString("[MyListCardManager] Requesting metadata for anime %1 (reason: %2)").arg(aid, reason));
+            LOG(QString("[MyListCardManager] Requesting metadata for anime %1 (reason: %2)").arg(aid).arg(reason));
         }
         adbapi->Anime(aid);
     }
