@@ -309,6 +309,9 @@ Window::Window()
 //	adbapi->SetUsername(settings->value("username").toString());
 //	adbapi->SetPassword(settings->value("password").toString());
 	
+	// Initialize UI pointers to nullptr before any signal connections
+	logOutput = nullptr;
+	
 	// Initialize notification tracking
 	expectedNotificationsToCheck = 0;
 	notificationsCheckedWithoutExport = 0;
@@ -481,14 +484,6 @@ Window::Window()
     connect(hasherThreadPool, &HasherThreadPool::notifyPartsDone, hasherCoordinator, &HasherCoordinator::onProgressUpdate);
     connect(hasherThreadPool, &HasherThreadPool::notifyFileHashed, hasherCoordinator, &HasherCoordinator::onFileHashed);
     connect(hasherThreadPool, &HasherThreadPool::finished, hasherCoordinator, &HasherCoordinator::onHashingFinished);
-    
-    // Connect AniDBApi signals
-    connect(this, SIGNAL(notifyStopHasher()), adbapi, SLOT(getNotifyStopHasher()));
-    connect(adbapi, SIGNAL(notifyLogAppend(QString)), this, SLOT(getNotifyLogAppend(QString)));
-	connect(adbapi, SIGNAL(notifyMylistAdd(QString,int)), this, SLOT(getNotifyMylistAdd(QString,int)));
-	
-	// Connect unified Logger to log tab using modern Qt5+ syntax for type safety
-	connect(Logger::instance(), &Logger::logMessage, this, &Window::getNotifyLogAppend);
 
     // page mylist (card view only)
     mylistSortAscending = false;  // Default to descending (newest first for aired date)
@@ -2114,6 +2109,9 @@ bool unknown_files_::event(QEvent *e)
 
 void Window::getNotifyLogAppend(QString str)
 {
+	if (!logOutput) {
+		return;
+	}
 	QTime t;
 	t = t.currentTime();
 	QString a;
