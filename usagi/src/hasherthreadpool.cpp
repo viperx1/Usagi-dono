@@ -5,7 +5,7 @@
 #include <algorithm>
 
 HasherThreadPool::HasherThreadPool(int maxThreads, QObject *parent)
-    : QObject(parent), maxThreads(0), nextThreadId(0), activeThreads(0), finishedThreads(0), isStarted(false), isStopping(false)
+    : QObject(parent), maxThreads(0), nextThreadId(0), activeThreads(0), finishedThreads(0), isStarted(false), isStopping(false), noMoreFiles(false)
 {
     // Determine optimal maximum number of threads
     if (maxThreads <= 0)
@@ -41,6 +41,11 @@ bool HasherThreadPool::addFile(const QString &filePath)
     // Empty file path signals completion
     if (filePath.isEmpty())
     {
+        {
+            QMutexLocker locker(&requestMutex);
+            noMoreFiles = true;
+        }
+        
         // Signal ALL workers waiting in the request queue that there are no more files
         QVector<HasherThread*> waitingWorkers;
         {
@@ -95,6 +100,7 @@ void HasherThreadPool::start(int fileCount)
     QMutexLocker locker(&mutex);
     isStarted = true;
     isStopping = false;
+    noMoreFiles = false;
     activeThreads = 0;
     finishedThreads = 0;
     
@@ -207,6 +213,10 @@ void HasherThreadPool::onThreadRequestNextFile()
     if (requestingWorker != nullptr)
     {
         QMutexLocker locker(&requestMutex);
+        if (noMoreFiles) {
+            requestingWorker->addFile(QString());
+            return;
+        }
         requestQueue.enqueue(requestingWorker);
     }
     

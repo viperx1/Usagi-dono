@@ -3,6 +3,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTemporaryFile>
+#include <QDir>
 #include "../usagi/src/watchsessionmanager.h"
 
 class TestWatchSessionManager : public QObject
@@ -48,6 +49,7 @@ private slots:
     
     // Sequential deletion with API confirmation test
     void testSequentialDeletionWithApiConfirmation();
+    void testMissingDuplicateFileDoesNotBypassGapProtection();
     
     // Rating tests
     void testFileRatingWithoutRating();
@@ -99,6 +101,7 @@ void TestWatchSessionManager::initTestCase()
            "fid INTEGER, "
            "aid INTEGER, "
            "eid INTEGER, "
+           "viewed INTEGER DEFAULT 0, "
            "local_watched INTEGER DEFAULT 0, "
            "local_file INTEGER"
            ")");
@@ -113,6 +116,9 @@ void TestWatchSessionManager::initTestCase()
     q.exec("CREATE TABLE IF NOT EXISTS anime ("
            "aid INTEGER PRIMARY KEY, "
            "name_romaji TEXT, "
+           "nameromaji TEXT, "
+           "nameenglish TEXT, "
+           "namekanji TEXT, "
            "relaidlist TEXT, "
            "relaidtype TEXT, "
            "is_hidden INTEGER DEFAULT 0, "
@@ -624,6 +630,87 @@ void TestWatchSessionManager::testSequentialDeletionWithApiConfirmation()
         // 5. Only after receiving the MYLISTADD API response (code 311)
         //    should the next deletion be triggered
     }
+}
+
+void TestWatchSessionManager::testMissingDuplicateFileDoesNotBypassGapProtection()
+{
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    
+    // Reset baseline fixture for this focused scenario
+    q.exec("DELETE FROM mylist");
+    q.exec("DELETE FROM episode");
+    q.exec("DELETE FROM anime");
+    q.exec("DELETE FROM local_files");
+    q.exec("DELETE FROM file");
+    
+    // Minimal anime + episodes
+    // Populate both columns because test schema preserves legacy name_romaji while
+    // deletion query reads production-style nameromaji.
+    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, nameromaji) VALUES (10, 'Gap Test', 'Gap Test')"));
+    QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1001, '1')"));
+    QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1002, '2')"));
+    QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1003, '3')"));
+    
+    QTemporaryFile ep1File;
+    QTemporaryFile ep2File;
+    QTemporaryFile ep3File;
+    QVERIFY(ep1File.open());
+    QVERIFY(ep2File.open());
+    QVERIFY(ep3File.open());
+    
+    // Episode 1 local file
+    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (1, ?, 'ep1.mkv')");
+    q.addBindValue(ep1File.fileName());
+    QVERIFY(q.exec());
+    
+    // Episode 2 real local file (deletion candidate)
+    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (2, ?, 'ep2.mkv')");
+    q.addBindValue(ep2File.fileName());
+    QVERIFY(q.exec());
+    
+    // Episode 2 duplicate entry points to a missing file
+    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (3, ?, 'ep2_missing.mkv')");
+    q.addBindValue(QDir::tempPath() + "/usagi_missing_duplicate_file.mkv");
+    QVERIFY(q.exec());
+    
+    // Episode 3 local file
+    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (4, ?, 'ep3.mkv')");
+    q.addBindValue(ep3File.fileName());
+    QVERIFY(q.exec());
+    
+    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8001, 10, 1001, 1000, 'ep1.mkv')"));
+    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8002, 10, 1002, 1000, 'ep2.mkv')"));
+    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8003, 10, 1002, 1000, 'ep2_missing.mkv')"));
+    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8004, 10, 1003, 1000, 'ep3.mkv')"));
+    
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7001, 8001, 10, 1001, 0, 0, 1)"));
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7002, 8002, 10, 1002, 0, 1, 2)"));
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7003, 8003, 10, 1002, 0, 0, 3)"));
+    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7004, 8004, 10, 1003, 0, 0, 4)"));
+    
+    manager->setAutoMarkDeletionEnabled(true);
+    manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
+    manager->setDeletionThresholdValue(999999.0);
+    
+    QSignalSpy deletionSpy(manager, &WatchSessionManager::deleteFileRequested);
+    
+    bool deleted = manager->deleteNextEligibleFile(true);
+    QVERIFY(deleted);
+    QVERIFY(deletionSpy.count() >= 1);
+    
+    bool requestedDeletionFor7002 = false;
+    for (int i = 0; i < deletionSpy.count(); ++i) {
+        QList<QVariant> signalArgs = deletionSpy.at(i);
+        int requestedLid = signalArgs.at(0).toInt();
+        bool deleteFromDisk = signalArgs.at(1).toBool();
+        if (requestedLid == 7002 && deleteFromDisk) {
+            requestedDeletionFor7002 = true;
+            break;
+        }
+    }
+    
+    QVERIFY(!requestedDeletionFor7002);
 }
 
 void TestWatchSessionManager::testFileRatingWithoutRating()

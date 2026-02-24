@@ -13,9 +13,18 @@
 #include <QNetworkRequest>
 #include <algorithm>
 #include <numeric>
+#include <atomic>
 
 // External references
 extern myAniDBApi *adbapi;
+
+namespace {
+QMutex s_metadataDispatchMutex;
+QSet<int> s_metadataDispatchInFlight;
+std::atomic<quint64> s_metadataRequestSequence{0};
+std::atomic<quint64> s_setAnimeIdListSequence{0};
+std::atomic<quint64> s_buildChainsFromCacheSequence{0};
+}
 
 MyListCardManager::MyListCardManager(QObject *parent)
     : QObject(parent)
@@ -30,6 +39,9 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
+    LOG(QString("[MyListCardManager] Constructed manager instance=%1 adbapi=%2")
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(reinterpret_cast<quintptr>(adbapi), 0, 16));
     // Initialize network manager for poster downloads
     m_networkManager = new QNetworkAccessManager(this);
     connect(m_networkManager, &QNetworkAccessManager::finished,
@@ -83,6 +95,13 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 
 void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
 {
+    const quint64 setListSeq = ++s_setAnimeIdListSequence;
+    LOG(QString("[MyListCardManager] setAnimeIdList[%1] enter: manager=%2 aids=%3 chainModeEnabled=%4")
+        .arg(setListSeq)
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(aids.size())
+        .arg(chainModeEnabled ? "true" : "false"));
+    
     QList<int> finalAnimeIds;
     
     {
@@ -111,8 +130,6 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
                 
                 // Filter chains to only include those with at least one anime from the input list
                 // IMPORTANT: Never modify m_chainList - it's the master list from cache
-                QSet<int> inputAidSet(aids.begin(), aids.end());
-                
                 // Build a map of which chain each input anime belongs to
                 // This preserves the order of input anime
                 QMap<int, int> inputAidToChainIdx;
@@ -198,6 +215,11 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
     if (m_virtualLayout) {
         m_virtualLayout->setItemCount(finalAnimeIds.size());
     }
+    
+    LOG(QString("[MyListCardManager] setAnimeIdList[%1] exit: finalAnimeIds=%2 chainModeEnabled=%3")
+        .arg(setListSeq)
+        .arg(finalAnimeIds.size())
+        .arg(chainModeEnabled ? "true" : "false"));
 }
 
 QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& aids) const
@@ -662,7 +684,7 @@ void MyListCardManager::updateSeriesChainConnections(bool chainModeEnabled)
 {
     QMutexLocker locker(&m_mutex);
     
-    for (AnimeCard* card : m_cards) {
+    for (AnimeCard* card : std::as_const(m_cards)) {
         if (card) {
             card->setSeriesChainInfo(0, 0);
         }
@@ -761,7 +783,8 @@ void MyListCardManager::clearAllCards()
     m_animeNeedingMetadata.clear();
     m_animeNeedingPoster.clear();
     m_animePicnames.clear();
-    // Note: NOT clearing m_animeMetadataRequested to prevent re-requesting
+    // Note: NOT clearing m_animeMetadataRequested or global in-flight dispatch set
+    // to prevent duplicate metadata requests during rapid rebuild/reload cycles.
 }
 
 AnimeCard* MyListCardManager::getCard(int aid)
@@ -1060,11 +1083,20 @@ void MyListCardManager::onAnimeUpdated(int aid)
     
     // Hide warning only if both metadata and poster are no longer needed
     bool stillNeedsData = m_animeNeedingPoster.contains(aid);
+    
+    {
+        QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        LOG(QString("[MyListCardManager] onAnimeUpdated: removing aid=%1 from global in-flight set (currentSize=%2)")
+            .arg(aid)
+            .arg(s_metadataDispatchInFlight.size()));
+        s_metadataDispatchInFlight.remove(aid);
+    }
     locker.unlock();
     
     if (card && !stillNeedsData) {
         card->setNeedsFetch(false);
     }
+    
 }
 
 void MyListCardManager::onFetchDataRequested(int aid)
@@ -1110,9 +1142,8 @@ void MyListCardManager::onFetchDataRequested(int aid)
     
     bool requestedAnything = false;
     
-    // Request metadata if needed and not already requested
+    // Request metadata if not already requested (requestAnimeMetadata handles deduplication)
     if (!m_animeMetadataRequested.contains(aid)) {
-        m_animeMetadataRequested.insert(aid);
         needsMetadata = true;
         requestedAnything = true;
         LOG(QString("[MyListCardManager] Will request anime metadata for aid=%1").arg(aid));
@@ -1127,7 +1158,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
         locker.unlock();
         
         if (needsMetadata) {
-            requestAnimeMetadata(aid);
+            requestAnimeMetadata(aid, "fetch-data-request: metadata missing");
         }
         if (needsPoster) {
             downloadPoster(aid, picname);
@@ -1135,7 +1166,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
     } else {
         locker.unlock();
         if (needsMetadata) {
-            requestAnimeMetadata(aid);
+            requestAnimeMetadata(aid, "fetch-data-request: metadata missing");
         }
     }
     
@@ -1387,7 +1418,7 @@ AnimeCard* MyListCardManager::createCard(int aid)
     if (!data.posterData.isEmpty()) {
         // Defer poster loading to avoid blocking
         QByteArray posterDataCopy = data.posterData; // Copy for lambda capture
-        QMetaObject::invokeMethod(this, [this, card, posterDataCopy]() {
+        QMetaObject::invokeMethod(this, [card, posterDataCopy]() {
             QPixmap poster;
             if (poster.loadFromData(posterDataCopy)) {
                 card->setPoster(poster);
@@ -1717,11 +1748,73 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
     }
 }
 
-void MyListCardManager::requestAnimeMetadata(int aid)
+void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
 {
-    if (adbapi) {
-        LOG(QString("[MyListCardManager] Requesting metadata for anime %1").arg(aid));
-        adbapi->Anime(aid);
+    const quint64 requestSeq = ++s_metadataRequestSequence;
+    
+    if (!adbapi) {
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] aborted: adbapi=null, manager=%2, aid=%3")
+            .arg(requestSeq)
+            .arg(reinterpret_cast<quintptr>(this), 0, 16)
+            .arg(aid));
+        return;
+    }
+    
+    LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] enter: manager=%2 adbapi=%3 aid=%4 reason=%5")
+        .arg(requestSeq)
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(reinterpret_cast<quintptr>(adbapi), 0, 16)
+        .arg(aid)
+        .arg(reason.isEmpty() ? QString("<none>") : reason));
+    
+    {
+        QMutexLocker locker(&m_mutex);
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] state before local dedupe: aid=%2, requestedContains=%3, requestedSize=%4")
+            .arg(requestSeq)
+            .arg(aid)
+            .arg(m_animeMetadataRequested.contains(aid) ? "true" : "false")
+            .arg(m_animeMetadataRequested.size()));
+        if (m_animeMetadataRequested.contains(aid)) {
+            if (reason.isEmpty()) {
+                LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] local dedupe hit for anime %2 - skipping duplicate request").arg(requestSeq).arg(aid));
+            } else {
+                LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] local dedupe hit for anime %2 - skipping duplicate request (reason: %3)").arg(requestSeq).arg(aid).arg(reason));
+            }
+            return;
+        }
+        m_animeMetadataRequested.insert(aid);
+    }
+    
+    {
+        QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] state before global dedupe: aid=%2, inFlightContains=%3, inFlightSize=%4")
+            .arg(requestSeq)
+            .arg(aid)
+            .arg(s_metadataDispatchInFlight.contains(aid) ? "true" : "false")
+            .arg(s_metadataDispatchInFlight.size()));
+        if (s_metadataDispatchInFlight.contains(aid)) {
+            QString reasonSuffix = reason.isEmpty() ? QString() : QString(" (reason: %1)").arg(reason);
+            LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] global dedupe hit for anime %2 - skipping duplicate dispatch%3")
+                .arg(requestSeq)
+                .arg(aid)
+                .arg(reasonSuffix));
+            return;
+        }
+        s_metadataDispatchInFlight.insert(aid);
+    }
+    
+    if (reason.isEmpty()) {
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] dispatching metadata request for anime %2").arg(requestSeq).arg(aid));
+    } else {
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] dispatching metadata request for anime %2 (reason: %3)").arg(requestSeq).arg(aid).arg(reason));
+    }
+    QString animeTag = adbapi->Anime(aid);
+    LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] dispatched Anime(%2), returned tag=%3")
+        .arg(requestSeq)
+        .arg(aid)
+        .arg(animeTag.isEmpty() ? QString("<empty>") : animeTag));
+    if (animeTag.startsWith("DUPLICATE_ANIME_AID_")) {
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] observed AniDB duplicate-block marker for aid=%2").arg(requestSeq).arg(aid));
     }
 }
 
@@ -2055,7 +2148,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         // Calculate lastPlayed as the maximum timestamp from all episodes
         qint64 maxLastPlayed = 0;
         if (!data.episodes.isEmpty()) {
-            QList<EpisodeCacheEntry>::const_iterator maxIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+            QList<EpisodeCacheEntry>::const_iterator maxIt = std::max_element(data.episodes.cbegin(), data.episodes.cend(),
                 [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
                     return a.lastPlayed < b.lastPlayed;
                 });
@@ -2066,7 +2159,7 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
         // Calculate recentEpisodeAirDate as the maximum air date from all episodes
         qint64 maxAirDate = 0;
         if (!data.episodes.isEmpty()) {
-            QList<EpisodeCacheEntry>::const_iterator maxAirIt = std::max_element(data.episodes.begin(), data.episodes.end(),
+            QList<EpisodeCacheEntry>::const_iterator maxAirIt = std::max_element(data.episodes.cbegin(), data.episodes.cend(),
                 [](const EpisodeCacheEntry& a, const EpisodeCacheEntry& b) {
                     return a.airDate < b.airDate;
                 });
@@ -2112,6 +2205,9 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
 
 void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& baseAids)
 {
+    LOG(QString("[MyListCardManager] preloadRelationDataForChainExpansion start: manager=%1 baseAids=%2")
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(baseAids.size()));
     // Collect all related anime IDs (prequels/sequels) that might be discovered during chain building
     QSet<int> relatedAids;
     
@@ -2148,6 +2244,7 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
     }
     
     if (aidsToLoad.isEmpty()) {
+        LOG("[MyListCardManager] preloadRelationDataForChainExpansion: no additional related AIDs to load");
         return;
     }
     
@@ -2163,23 +2260,80 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
         return;
     }
     
-    QString query = QString("SELECT aid, relaidlist, relaidtype FROM anime WHERE aid IN (%1)").arg(aidsList);
+    QString query = QString("SELECT a.aid, a.nameromaji, a.nameenglish, a.eptotal, "
+                            "at.title as anime_title, "
+                            "a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+                            "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted, "
+                            "a.relaidlist, a.relaidtype "
+                            "FROM anime a "
+                            "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 AND at.language = 'x-jat' "
+                            "WHERE a.aid IN (%1)").arg(aidsList);
     QSqlQuery q(db);
+    QSet<int> loadedAids;
     
     if (q.exec(query)) {
         QMutexLocker locker(&m_mutex);
         while (q.next()) {
             int aid = q.value(0).toInt();
-            CardCreationData data;
-            data.setRelations(q.value(1).toString(), q.value(2).toString());
-            data.hasData = false;  // Mark as partial data (only relations loaded)
-            m_cardCreationDataCache[aid] = data;
+            loadedAids.insert(aid);
+            CardCreationData& data = m_cardCreationDataCache[aid];
+            data.nameRomaji = q.value(1).toString();
+            data.nameEnglish = q.value(2).toString();
+            data.eptotal = q.value(3).toInt();
+            data.animeTitle = q.value(4).toString();
+            data.typeName = q.value(5).toString();
+            data.startDate = q.value(6).toString();
+            data.endDate = q.value(7).toString();
+            data.picname = q.value(8).toString();
+            data.posterData = q.value(9).toByteArray();
+            data.category = q.value(10).toString();
+            data.rating = q.value(11).toString();
+            data.tagNameList = q.value(12).toString();
+            data.tagIdList = q.value(13).toString();
+            data.tagWeightList = q.value(14).toString();
+            data.isHidden = q.value(15).toInt() == 1;
+            data.is18Restricted = q.value(16).toInt() == 1;
+            data.setRelations(q.value(17).toString(), q.value(18).toString());
+            data.hasData = true;
+        }
+    }
+    
+    QList<int> missingAids;
+    {
+        QMutexLocker locker(&m_mutex);
+        for (int aid : aidsToLoad) {
+            if (!loadedAids.contains(aid)) {
+                missingAids.append(aid);
+            }
+        }
+    }
+    
+    if (!missingAids.isEmpty()) {
+        // Metadata requests for missing related anime are handled during preloadCardCreationData.
+        // Avoid re-requesting here to prevent duplicate request signals during chain building.
+        LOG(QString("[MyListCardManager] Chain preload found %1 related anime still missing in local DB/cache; deferring to preloadCardCreationData() request path")
+            .arg(missingAids.size()));
+        QHash<int, bool> requestStateByAid;
+        {
+            QMutexLocker locker(&m_mutex);
+            for (int aid : std::as_const(missingAids)) {
+                requestStateByAid.insert(aid, m_animeMetadataRequested.contains(aid));
+            }
+        }
+        for (int aid : std::as_const(missingAids)) {
+            LOG(QString("[MyListCardManager] Chain preload missing aid=%1 alreadyRequested=%2")
+                .arg(aid)
+                .arg(requestStateByAid.value(aid, false) ? "true" : "false"));
         }
     }
 }
 
 void MyListCardManager::buildChainsFromCache()
 {
+    const quint64 buildSeq = ++s_buildChainsFromCacheSequence;
+    LOG(QString("[MyListCardManager] buildChainsFromCache[%1] enter: manager=%2")
+        .arg(buildSeq)
+        .arg(reinterpret_cast<quintptr>(this), 0, 16));
     {
         QMutexLocker locker(&m_mutex);
         
@@ -2196,6 +2350,8 @@ void MyListCardManager::buildChainsFromCache()
             if (changePercent < 10.0) {
                 LOG(QString("[MyListCardManager] Chains already built from %1 anime, cache has %2 anime (%.1f%% change), skipping rebuild")
                     .arg(m_lastChainBuildAnimeCount).arg(currentCacheSize).arg(changePercent));
+                LOG(QString("[MyListCardManager] buildChainsFromCache[%1] exit: skipped rebuild")
+                    .arg(buildSeq));
                 // Ensure data is marked ready even when skipping rebuild
                 // (this handles case where preloadCardCreationData was called again after chains were built)
                 if (!m_dataReady) {
@@ -2240,6 +2396,8 @@ void MyListCardManager::buildChainsFromCache()
     if (allCachedAids.isEmpty()) {
         QMutexLocker locker(&m_mutex);
         LOG("[MyListCardManager] buildChainsFromCache: No anime in cache, skipping chain building");
+        LOG(QString("[MyListCardManager] buildChainsFromCache[%1] exit: no anime in cache")
+            .arg(buildSeq));
         m_chainsBuilt = false;
         m_chainBuildInProgress = false;
         m_dataReady = true;  // Set data ready even if no chains (no anime to display)
@@ -2275,7 +2433,8 @@ void MyListCardManager::buildChainsFromCache()
         m_dataReady = true;  // Mark ALL data as ready (preload + chain build complete)
         m_lastChainBuildAnimeCount = m_cardCreationDataCache.size();  // Track cache size used for this build
         
-        LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
+        LOG(QString("[MyListCardManager] buildChainsFromCache[%1] exit: chains=%2 totalAnime=%3")
+            .arg(buildSeq)
             .arg(m_chainList.size())
             .arg(m_aidToChainIndex.size()));
     } // Release mutex before waking threads

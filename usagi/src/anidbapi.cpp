@@ -11,11 +11,20 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMutex>
+#include <QSet>
+#include <QHash>
 
 // Global pointer to the AniDB API instance
 // This is initialized by the application (window.cpp) or tests
 // Core library files can use this via extern declaration in anidbapi.h
 myAniDBApi *adbapi = nullptr;
+
+namespace {
+QMutex s_animeRequestMutex;
+QHash<int, qint64> s_animeRequestInFlight;
+constexpr qint64 ANIME_REQUEST_INFLIGHT_TIMEOUT_SECS = 300;
+}
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 	: m_settings()  // Initialize ApplicationSettings (will set database later)
@@ -1084,7 +1093,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					QSqlQuery reRequestQuery(db);
 					if (reRequestQuery.exec(q))
 					{
-						Logger::log("[AniDB Response] 230 ANIME - Re-request queued successfully", __FILE__, __LINE__);
+						Logger::log(QString("[AniDB Response] 230 ANIME - Re-request queued successfully for AID %1 (tag=%2)")
+							.arg(aid)
+							.arg(Tag), __FILE__, __LINE__);
 					}
 					else
 					{
@@ -1100,10 +1111,18 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Store all anime data to database
 			if(!aid.isEmpty())
 			{
+				{
+					QMutexLocker animeRequestLocker(&s_animeRequestMutex);
+					Logger::log(QString("[AniDB API] Clearing in-flight ANIME guard for AID %1 on 230 response (beforeSize=%2)")
+						.arg(aid).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
+					s_animeRequestInFlight.remove(aid.toInt());
+				}
 				animeInfo.setAnimeId(aid.toInt());  // Ensure aid is set
 				storeAnimeData(animeInfo);
 				Logger::log("[AniDB Response] 230 ANIME metadata saved to database - AID: " + aid + " Type: " + animeInfo.type(), __FILE__, __LINE__);
 				// Emit signal to notify UI that anime data was updated
+				Logger::log(QString("[AniDB Response] 230 ANIME emitting notifyAnimeUpdated for AID %1 (tag=%2)")
+					.arg(aid).arg(Tag), __FILE__, __LINE__);
 				emit notifyAnimeUpdated(aid.toInt());
 			}
 		}
@@ -2123,7 +2142,16 @@ QString AniDBApi::Mylist(int lid)
 	}
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
-	query.exec(q);
+	if(query.exec(q))
+	{
+		Logger::log(QString("[AniDB API] Queued MYLIST packet for LID %1 with tag=%2")
+			.arg(lid).arg(GetTag(msg)), __FILE__, __LINE__);
+	}
+	else
+	{
+		Logger::log(QString("[AniDB API] Failed to queue MYLIST packet for LID %1: %2")
+			.arg(lid).arg(query.lastError().text()), __FILE__, __LINE__);
+	}
 	return GetTag(msg);
 }
 
@@ -2657,6 +2685,33 @@ QString AniDBApi::Anime(int aid)
 	}
 	
 	// Request anime information by anime ID
+	{
+		QMutexLocker animeRequestLocker(&s_animeRequestMutex);
+		const qint64 now = QDateTime::currentSecsSinceEpoch();
+		
+		// Remove stale in-flight entries to avoid permanently blocking retries
+		for (auto it = s_animeRequestInFlight.begin(); it != s_animeRequestInFlight.end(); ) {
+			if ((now - it.value()) >= ANIME_REQUEST_INFLIGHT_TIMEOUT_SECS) {
+				Logger::log(QString("[AniDB API] Expiring stale in-flight ANIME request guard for AID %1 (age=%2s)")
+					.arg(it.key()).arg(now - it.value()), __FILE__, __LINE__);
+				it = s_animeRequestInFlight.erase(it);
+			} else {
+				++it;
+			}
+		}
+		
+		if(s_animeRequestInFlight.contains(aid))
+		{
+			const qint64 age = now - s_animeRequestInFlight.value(aid);
+			Logger::log(QString("[AniDB API] Duplicate ANIME request blocked for AID %1 (already in-flight, age=%2s, inFlightSize=%3)")
+				.arg(aid).arg(age).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
+			return QString("DUPLICATE_ANIME_AID_%1").arg(aid);
+		}
+		s_animeRequestInFlight.insert(aid, now);
+		Logger::log(QString("[AniDB API] Marked AID %1 as in-flight for ANIME request (inFlightSize=%2)")
+			.arg(aid).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
+	}
+	
 	if(SID.length() == 0 || LoginStatus() == 0)
 	{
 		Auth();

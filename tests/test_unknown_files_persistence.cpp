@@ -124,6 +124,10 @@ void TestUnknownFilesPersistence::testUnboundFilesQueryExcludesBoundFiles()
     
     QSqlQuery query(db);
     
+    // Keep test independent from execution order: ensure file 1 is already bound
+    query.prepare("UPDATE `local_files` SET `status` = 2, `binding_status` = 1 WHERE `id` = 1");
+    QVERIFY(query.exec());
+    
     // Query unbound files (same as production getUnboundFiles)
     query.prepare("SELECT `id`, `path`, `filename`, `ed2k_hash`, `status`, `binding_status` "
                   "FROM `local_files` "

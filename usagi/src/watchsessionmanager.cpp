@@ -1796,7 +1796,8 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     // Parse episode number from epno string using shared static regex
     QRegularExpressionMatch match = s_epnoNumericRegex.match(epnoStr);
     if (!match.hasMatch()) {
-        return false;  // Can't parse episode number
+        // Be conservative: if we can't determine episode continuity, avoid deleting.
+        return true;
     }
     int epno = match.captured(0).toInt();
     
@@ -1805,18 +1806,21 @@ bool WatchSessionManager::wouldCreateGap(int lid, const QSet<int>& deletedEpisod
     // so it cannot create a gap
     QSqlQuery fileCountQuery(db);
     fileCountQuery.prepare(
-        "SELECT COUNT(*) FROM mylist m "
+        "SELECT m.lid, lf.path FROM mylist m "
         "JOIN local_files lf ON m.local_file = lf.id "
-        "WHERE m.eid = ? AND lf.path IS NOT NULL AND lf.path != ''"
+        "WHERE m.eid = ? AND m.lid != ? AND lf.path IS NOT NULL AND lf.path != ''"
     );
     fileCountQuery.addBindValue(eid);
+    fileCountQuery.addBindValue(lid);
     
-    if (fileCountQuery.exec() && fileCountQuery.next()) {
-        int fileCount = fileCountQuery.value(0).toInt();
-        if (fileCount > 1) {
-            // There are other files for this episode, so deleting this file
-            // won't remove the episode and thus cannot create a gap
-            return false;
+    if (fileCountQuery.exec()) {
+        while (fileCountQuery.next()) {
+            QFileInfo otherFile(fileCountQuery.value(1).toString());
+            if (otherFile.exists() && otherFile.isFile()) {
+                // Another real file exists for this episode, so deleting this file
+                // won't remove the episode and thus cannot create a gap
+                return false;
+            }
         }
     }
     
