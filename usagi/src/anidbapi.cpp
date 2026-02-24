@@ -1111,6 +1111,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			{
 				{
 					QMutexLocker animeRequestLocker(&s_animeRequestMutex);
+					Logger::log(QString("[AniDB API] Clearing in-flight ANIME guard for AID %1 on 230 response (beforeSize=%2)")
+						.arg(aid).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
 					s_animeRequestInFlight.remove(aid.toInt());
 				}
 				animeInfo.setAnimeId(aid.toInt());  // Ensure aid is set
@@ -2687,10 +2689,14 @@ QString AniDBApi::Anime(int aid)
 		
 		if(s_animeRequestInFlight.contains(aid))
 		{
-			Logger::log(QString("[AniDB API] Duplicate ANIME request blocked for AID %1 (already in-flight)").arg(aid), __FILE__, __LINE__);
+			const qint64 age = now - s_animeRequestInFlight.value(aid);
+			Logger::log(QString("[AniDB API] Duplicate ANIME request blocked for AID %1 (already in-flight, age=%2s, inFlightSize=%3)")
+				.arg(aid).arg(age).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
 			return QString("DUPLICATE_ANIME_AID_%1").arg(aid);
 		}
 		s_animeRequestInFlight.insert(aid, now);
+		Logger::log(QString("[AniDB API] Marked AID %1 as in-flight for ANIME request (inFlightSize=%2)")
+			.arg(aid).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
 	}
 	
 	if(SID.length() == 0 || LoginStatus() == 0)
