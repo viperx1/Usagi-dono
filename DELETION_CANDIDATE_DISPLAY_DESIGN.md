@@ -1141,9 +1141,10 @@ function classifyFile(file):
     return { tier: PROTECTED, reason: protectionReason(file) }
 
 function prefLabel(prefWeight):
+    // Only annotate non-neutral preferences to avoid noise on the majority of files.
     if prefWeight < 0: return " [−]"
     if prefWeight > 0: return " [+]"
-    return ""
+    return ""  // Neutral: no annotation needed
 ```
 ```
 
