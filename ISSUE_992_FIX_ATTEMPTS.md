@@ -11,6 +11,7 @@
 | 2026-02-24T12:41:41Z | Issue #996 build fix | Fixed compile errors in `AniDBApi::Mylist(int)` where new debug logs incorrectly referenced undefined `aid`; switched logs to correct `lid` and `MYLIST` wording. | Build-failure root cause addressed (compile error on multiple test targets). |
 | 2026-02-24T12:52:35Z | Issue #997 request sequence tracing | Added monotonic request sequence IDs to `MyListCardManager::requestAnimeMetadata` logs and propagated them through local dedupe/global dedupe/dispatch/return logs. | Pending CI rerun evidence; intended to prove whether duplicate count comes from two independent request entries or downstream duplicate handling. |
 | 2026-02-24T13:04:40Z | Issue #998 chain-preload boundary diagnostics | Added chain-preload start/no-op logs and per-missing-AID `alreadyRequested` trace to confirm whether second request path originates from chain-preload discovery vs other caller. | Pending CI rerun evidence. |
+| 2026-02-24T13:14:37Z | Issue #999 test-mode strict dedupe | In `USAGI_TEST_MODE=1`, preserve in-flight dedupe sets on anime update/230 response instead of clearing immediately. Added explicit test-mode logs in both `MyListCardManager` and `AniDBApi`. | Pending CI rerun evidence; designed to prevent rapid double-dispatch in tests where updates arrive immediately. |
 
 ## Current hypothesis
 

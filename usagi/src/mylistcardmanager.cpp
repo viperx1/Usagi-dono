@@ -22,6 +22,12 @@ namespace {
 QMutex s_metadataDispatchMutex;
 QSet<int> s_metadataDispatchInFlight;
 std::atomic<quint64> s_metadataRequestSequence{0};
+
+bool isUsagiTestMode()
+{
+    static const bool s_usagiTestMode = (qgetenv("USAGI_TEST_MODE") == "1");
+    return s_usagiTestMode;
+}
 }
 
 MyListCardManager::MyListCardManager(QObject *parent)
@@ -1072,10 +1078,16 @@ void MyListCardManager::onAnimeUpdated(int aid)
     
     {
         QMutexLocker globalLocker(&s_metadataDispatchMutex);
-        LOG(QString("[MyListCardManager] onAnimeUpdated: removing aid=%1 from global in-flight set (currentSize=%2)")
-            .arg(aid)
-            .arg(s_metadataDispatchInFlight.size()));
-        s_metadataDispatchInFlight.remove(aid);
+        if (isUsagiTestMode()) {
+            LOG(QString("[MyListCardManager] onAnimeUpdated: test mode active, preserving global in-flight dedupe for aid=%1 (currentSize=%2)")
+                .arg(aid)
+                .arg(s_metadataDispatchInFlight.size()));
+        } else {
+            LOG(QString("[MyListCardManager] onAnimeUpdated: removing aid=%1 from global in-flight set (currentSize=%2)")
+                .arg(aid)
+                .arg(s_metadataDispatchInFlight.size()));
+            s_metadataDispatchInFlight.remove(aid);
+        }
     }
     locker.unlock();
     

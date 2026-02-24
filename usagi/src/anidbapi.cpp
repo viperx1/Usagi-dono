@@ -24,6 +24,12 @@ namespace {
 QMutex s_animeRequestMutex;
 QHash<int, qint64> s_animeRequestInFlight;
 constexpr qint64 ANIME_REQUEST_INFLIGHT_TIMEOUT_SECS = 300;
+
+bool isUsagiTestMode()
+{
+	static const bool s_usagiTestMode = (qgetenv("USAGI_TEST_MODE") == "1");
+	return s_usagiTestMode;
+}
 }
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
@@ -1113,9 +1119,14 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			{
 				{
 					QMutexLocker animeRequestLocker(&s_animeRequestMutex);
-					Logger::log(QString("[AniDB API] Clearing in-flight ANIME guard for AID %1 on 230 response (beforeSize=%2)")
-						.arg(aid).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
-					s_animeRequestInFlight.remove(aid.toInt());
+					if (isUsagiTestMode()) {
+						Logger::log(QString("[AniDB API] Test mode active, preserving in-flight ANIME guard for AID %1 on 230 response (currentSize=%2)")
+							.arg(aid).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
+					} else {
+						Logger::log(QString("[AniDB API] Clearing in-flight ANIME guard for AID %1 on 230 response (beforeSize=%2)")
+							.arg(aid).arg(s_animeRequestInFlight.size()), __FILE__, __LINE__);
+						s_animeRequestInFlight.remove(aid.toInt());
+					}
 				}
 				animeInfo.setAnimeId(aid.toInt());  // Ensure aid is set
 				storeAnimeData(animeInfo);
