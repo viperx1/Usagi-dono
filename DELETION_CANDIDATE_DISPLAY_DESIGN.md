@@ -348,3 +348,345 @@ This format makes every scoring decision transparent and gives the user the info
 1. Understand why a file was chosen
 2. Decide whether the scoring weights need tuning
 3. Take manual action to protect specific files
+
+---
+
+# Alternative: Procedural Deletion Logic (replacing the scoring system)
+
+## Why Consider a Procedural Alternative
+
+The scoring system combines 17 weighted factors into a single integer. This has fundamental problems:
+
+1. **Weight interactions are opaque.** A file that is unwatched (+50) but far away (-47) and has an ancient codec (-30) ends up at -27. The user cannot easily predict which combination of factors will tip a file into the danger zone because the weights were chosen by the developer, not derived from user priorities.
+
+2. **Tuning is trial-and-error.** If the system deletes a file the user wanted to keep, the only recourse is to adjust one or more of the 17 constants — but changing one weight affects the relative ranking of every other file in the collection.
+
+3. **No clear "why".** Even with a score breakdown tooltip, the user sees a list of numbers that add up to a total. They still have to mentally reason about "which of these factors was the decisive one."
+
+4. **False precision.** Assigning +20 to "active group" vs. +15 to "high rating" implies a precision that does not exist. These numbers were not derived from empirical data.
+
+A procedural approach replaces the single numeric score with a series of explicit rules that mirror how a human would think about the decision: "first delete duplicates, then delete watched episodes far from my current position, then delete low-quality files..." Each rule has a clear, explainable purpose.
+
+---
+
+## Design: Tiered Priority Cascade
+
+Instead of calculating a score, files are classified into **deletion tiers** using a fixed sequence of rules. Files in a lower tier are always deleted before any file in a higher tier. Within each tier, files are ordered by a simple, single-dimension sort (e.g., distance from current episode).
+
+### Tier Definitions
+
+```
+Tier 0 — UNCONDITIONAL DELETE (always safe to remove)
+  Rule: File has a newer local revision for the same episode.
+  Sort: Oldest revision first.
+  Reason: Superseded files serve no purpose.
+
+Tier 1 — WATCHED, FAR, NO ACTIVE SESSION
+  Rule: File is watched AND the anime has no active watch session
+        AND the file is not in an anime the user explicitly protected.
+  Sort: Largest file size first (reclaim space fastest).
+  Reason: Completed viewing, no ongoing interest.
+
+Tier 2 — WATCHED, FAR FROM CURRENT POSITION
+  Rule: File is watched AND distance from current episode > aheadBuffer
+        AND anime HAS an active session.
+  Sort: Distance from current episode descending (farthest first).
+  Reason: Already viewed; unlikely to re-watch soon.
+
+Tier 3 — UNWATCHED, LOW QUALITY DUPLICATE
+  Rule: File is unwatched AND another file for the same episode exists
+        with higher quality/resolution AND that other file is also local.
+  Sort: Lower quality first.
+  Reason: Better version is available locally.
+
+Tier 4 — UNWATCHED, FAR BEHIND CURRENT POSITION
+  Rule: File is unwatched AND episode number < current episode - aheadBuffer
+        (i.e., the user has already passed this episode).
+  Sort: Distance behind current episode descending.
+  Reason: User likely skipped or no longer needs these.
+
+Tier 5 — PREFERENCE MISMATCH
+  Rule: File does not match preferred audio language
+        AND does not match preferred subtitle language
+        AND another file for the same episode exists that does match.
+  Sort: Least-matching first (no audio match + no sub match before just no sub match).
+  Reason: User has a better-fitting version available.
+
+── PROTECTION BOUNDARY ──
+Files below this line are never auto-deleted.
+
+Tier 6+ — PROTECTED (never auto-deleted)
+  - Unwatched files in or ahead of the current position
+  - Files in the ahead buffer
+  - Only copy of an unwatched episode
+  - Files the user explicitly protected
+```
+
+### Tier Assignment Pseudocode
+
+```
+function assignDeletionTier(file):
+
+    // ── Absolute protections (cannot be overridden) ──
+    if file.isExplicitlyProtected:
+        return PROTECTED
+
+    if wouldCreateGap(file):
+        return PROTECTED
+
+    // ── Tier 0: superseded revisions ──
+    if hasNewerLocalRevision(file.episodeId, file.version):
+        return Tier 0, sortKey = file.version  // oldest first
+
+    // ── Tier 1: watched, no active session ──
+    if file.isWatched AND NOT hasActiveSession(file.animeId):
+        return Tier 1, sortKey = -file.sizeBytes  // largest first
+
+    // ── Gather context for remaining tiers ──
+    session = findActiveSessionInSeriesChain(file.animeId)
+    if session exists:
+        distance = file.totalEpisodePosition - session.currentTotalPosition
+    else:
+        distance = MAX_INT  // no session → treat as infinitely far
+
+    // ── Tier 2: watched, far from current ──
+    if file.isWatched AND distance > aheadBuffer:
+        return Tier 2, sortKey = -abs(distance)  // farthest first
+
+    // ── Tier 3: unwatched low-quality duplicate ──
+    if NOT file.isWatched AND hasBetterLocalDuplicate(file):
+        return Tier 3, sortKey = file.qualityScore  // worst quality first
+
+    // ── Tier 4: unwatched, far behind ──
+    if NOT file.isWatched AND distance < -aheadBuffer:
+        return Tier 4, sortKey = distance  // most behind first
+
+    // ── Tier 5: preference mismatch with better alternative ──
+    if NOT matchesPreferredAudio(file) AND NOT matchesPreferredSub(file):
+        if hasBetterLanguageAlternative(file):
+            return Tier 5, sortKey = 0
+
+    // ── Everything else is protected ──
+    return PROTECTED
+```
+
+### Deletion Selection
+
+```
+function selectNextFileToDelete():
+    if NOT isDeletionNeeded():
+        return null
+
+    candidates = getAllLocalFiles()
+    for each file in candidates:
+        file.tier, file.sortKey = assignDeletionTier(file)
+
+    // Remove protected files
+    candidates = candidates.filter(c => c.tier != PROTECTED)
+
+    // Sort: tier ascending, then sortKey ascending within tier
+    candidates.sort(by: tier ASC, sortKey ASC)
+
+    // Return the first candidate (lowest tier, best sort position)
+    if candidates is not empty:
+        return candidates[0]
+    return null
+```
+
+---
+
+## Gap Protection (unchanged)
+
+The gap protection logic (`wouldCreateGap()`) works identically in the procedural model. It is applied as an absolute protection before any tier assignment: if deleting a file would leave episodes on both sides without that episode, the file is classified as PROTECTED regardless of any other factor.
+
+---
+
+## Comparison: Scoring vs. Procedural
+
+| Aspect | Scoring System | Procedural Cascade |
+|--------|---------------|-------------------|
+| **Decision transparency** | Shows a number; user must interpret which factors dominated | Shows a tier name and a single reason; immediately clear |
+| **Predictability** | Score depends on all 17 factors interacting; hard to predict ranking changes when one factor changes | Tier depends on 1-3 conditions; user can reason "if I watch this episode, it moves from Tier 6 to Tier 2" |
+| **Tuning** | Change one of 17 weights; affects every file globally | Reorder tiers or adjust tier conditions; localized impact |
+| **Edge cases** | Unlikely edge cases hidden by additive math — e.g., enough small bonuses can override a major penalty | Each tier's conditions are explicit; edge cases are visible in the rule definitions |
+| **Expressiveness** | Can represent fine-grained relative priorities (score 47 vs. 48) | Coarser; files in the same tier are distinguished only by the sort key |
+| **New factors** | Add a constant and a `score +=` line | Add a new tier or add a condition to an existing tier; must decide its position in the cascade |
+| **UI display** | Score breakdown table with 17 rows | Single tier label + reason string + sort position within tier |
+| **Granularity within tier** | N/A (single dimension) | Limited to one sort key per tier; cannot express complex intra-tier ordering without splitting into sub-tiers |
+| **Risk of "wrong" deletions** | Possible through unintuitive weight interactions | Possible through wrong tier ordering, but each mistake is isolated and easy to diagnose |
+| **Code complexity** | One method with 17 `score +=` blocks | One method with 6 if/else blocks; simpler per-block but more branching |
+| **Testability** | Assert exact score value; fragile if weights change | Assert tier assignment; stable across weight changes since there are no weights |
+
+---
+
+## UI Display for Procedural Approach
+
+The procedural model simplifies the UI significantly because each file has a single, human-readable reason for its classification:
+
+### Card-Level Display
+```
+Ep 1 - Intro
+  \ v1 480p XviD [Group] 🔴 Superseded (v2 exists locally)
+  \ v2 1080p HEVC [Group] 🟢 Protected (unwatched, in buffer)
+Ep 5 - Journey
+  \ v1 720p [Group]       🟡 Watched, 12 eps from current
+```
+
+No score numbers needed. The tier name and reason are the complete explanation.
+
+### Sidebar Display
+```
+┌─────────────────────────┐
+│ ▼ Deletion Queue        │
+│   Space: 42 / 500 GB    │
+│   Threshold: 50 GB      │
+│                         │
+│   ── Will delete next ──│
+│   1. show-01.avi        │
+│      Superseded (v2)    │
+│      [Protect]          │
+│   2. anime-12.mkv       │
+│      Watched, no session│
+│      2.4 GB             │
+│      [Protect]          │
+│   3. anime-03.mkv       │
+│      Watched, 47 eps    │
+│      from current       │
+│      [Protect]          │
+└─────────────────────────┘
+```
+
+### Detail Dialog
+```
+File: show-01.avi
+Anime: Show A | Episode: 1 | Group: SubGroup
+────────────────────────────────────────────
+Status: Tier 0 — SUPERSEDED REVISION
+Reason: Version 2 exists locally for this episode.
+────────────────────────────────────────────
+Queue position: #1 (first to be deleted)
+Gap protection: Not applicable (other file exists)
+────────────────────────────────────────────
+To keep this file: [Protect] or delete the v2 file.
+```
+
+vs. the scoring system's equivalent:
+```
+File: show-01.avi
+Score: -1947
+  Base: 50, Revision: -2000, Watched: -5, Distance: +8, ...
+```
+
+The procedural version answers "why is this file being deleted?" in one line. The scoring version answers "what is this file's numeric rank?" — which requires further interpretation.
+
+---
+
+## Handling Cases Where Scoring Outperforms Procedural
+
+The main scenario where scoring is better is **fine-grained intra-tier ordering**. For example, within Tier 2 (watched, far from current), the scoring system would also factor in codec age, bitrate, and group status to decide between two files at the same distance. The procedural model sorts only by distance.
+
+### Mitigation: Secondary Sort Keys
+
+Each tier can define a secondary sort as a tiebreaker:
+
+```
+Tier 2 — WATCHED, FAR FROM CURRENT POSITION
+  Primary sort: distance descending
+  Tiebreaker: file size descending (reclaim more space first)
+
+Tier 4 — UNWATCHED, FAR BEHIND
+  Primary sort: distance behind descending
+  Tiebreaker: quality ascending (delete worst quality first)
+```
+
+This keeps the model procedural (no additive scoring) while allowing two-level ordering within each tier. Adding more tiebreakers is possible but should be avoided — if a tier needs complex intra-ordering, it is better to split it into two tiers.
+
+---
+
+## Implementation Classes
+
+The procedural approach maps cleanly to new classes while replacing the current scoring logic:
+
+### DeletionTier (enum)
+```
+enum class DeletionTier {
+    SupersededRevision = 0,    // Tier 0
+    WatchedNoSession = 1,      // Tier 1
+    WatchedFarFromCurrent = 2, // Tier 2
+    UnwatchedLowQualDupe = 3,  // Tier 3
+    UnwatchedFarBehind = 4,    // Tier 4
+    PreferenceMismatch = 5,    // Tier 5
+    Protected = 100            // Never deleted
+};
+```
+
+### DeletionCandidate (struct)
+```
+struct DeletionCandidate {
+    int lid;
+    int aid;
+    DeletionTier tier;
+    QString reason;       // Human-readable: "Superseded (v2 exists)"
+    QString filePath;
+    QString animeName;
+    qint64 sortKey;       // Tier-specific ordering value
+    bool gapProtected;
+};
+```
+
+### DeletionClassifier (new class — replaces calculateDeletionScore)
+Single responsibility: takes a file and returns its `DeletionTier` + reason.
+```
+class DeletionClassifier {
+public:
+    DeletionCandidate classify(int lid) const;
+private:
+    bool hasNewerLocalRevision(int eid, int version) const;
+    bool hasBetterLocalDuplicate(int lid) const;
+    bool hasBetterLanguageAlternative(int lid) const;
+    // ...uses existing WatchSessionManager helpers for context
+};
+```
+
+### DeletionQueue (new class — replaces deleteNextEligibleFile loop)
+Single responsibility: maintains the ordered queue of candidates.
+```
+class DeletionQueue {
+public:
+    void rebuild();                          // Re-classify all files
+    const DeletionCandidate* next() const;   // First non-protected candidate
+    QList<DeletionCandidate> topN(int n) const; // For sidebar display
+    void protect(int lid);                   // Move file to Protected tier
+    void unprotect(int lid);                 // Re-classify file
+private:
+    QList<DeletionCandidate> m_candidates;   // Sorted by tier, then sortKey
+    QSet<int> m_explicitlyProtected;         // User overrides
+};
+```
+
+This separation means:
+- `DeletionClassifier` can be unit-tested by providing mock database state and asserting tier assignments.
+- `DeletionQueue` can be tested independently from the classifier.
+- The UI (sidebar, card indicators) only needs to read from `DeletionQueue::topN()`.
+- `WatchSessionManager` delegates to `DeletionQueue::next()` instead of implementing its own candidate loop.
+
+---
+
+## Migration Path
+
+The procedural system can coexist with the scoring system during development:
+
+1. **Phase 1**: Implement `DeletionClassifier` and `DeletionQueue` alongside the existing scoring code. Add a setting to switch between them ("Deletion strategy: Scoring / Procedural").
+2. **Phase 2**: Wire the UI (sidebar, card indicators from the visualization options above) to the `DeletionQueue` API. Since the queue exposes tier+reason instead of a score, the UI naturally shows human-readable explanations.
+3. **Phase 3**: Once the procedural system is validated, remove the scoring constants and `calculateDeletionScore()` method. The `DeletionClassifier` becomes the single source of truth.
+
+---
+
+## Summary: When to Prefer Each Approach
+
+| Use Scoring If... | Use Procedural If... |
+|--------------------|----------------------|
+| You need fine-grained relative ordering across all factors simultaneously | You need each deletion decision to be explainable in one sentence |
+| The weight values will be empirically tuned (e.g., via user feedback or A/B testing) | The rules should be immediately intuitive without tuning |
+| New factors are added frequently and should blend smoothly with existing ones | New rules have clear priority relative to existing ones |
+| The UI will show numeric scores and breakdowns | The UI will show tier names and reason strings |
