@@ -6,6 +6,7 @@
 | 2026-02-24T01:48:43Z | API-level in-flight dedupe | Added `AniDBApi::Anime(aid)` in-flight dedupe and stale-timeout cleanup in `anidbapi.cpp`; clear in-flight on `230 ANIME`. | Did not resolve issue #992 failures (based on issue logs). |
 | 2026-02-24T01:56:40Z | Add deeper in-flight diagnostics | Added detailed AniDB logs for in-flight insert, duplicate-block age/size, and clear-on-230 with set size. | Pending CI rerun evidence. |
 | 2026-02-24T02:04:16Z | Issue #993 follow-up diagnostics | Added manager-level log of `AniDBApi::Anime(aid)` returned tag and explicit marker detection for duplicate-block return values. | Pending CI rerun evidence. |
+| 2026-02-24T02:11:00Z | Issue #994 identity diagnostics | Added `MyListCardManager` instance/adbapi pointer identity logs on construction and at request entry, including adbapi-null abort logging. | Pending CI rerun evidence; intended to confirm whether duplicate requests come from multiple manager instances. |
 
 ## Current hypothesis
 

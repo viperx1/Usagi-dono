@@ -35,6 +35,9 @@ MyListCardManager::MyListCardManager(QObject *parent)
     , m_networkManager(nullptr)
     , m_initialLoadComplete(false)
 {
+    LOG(QString("[MyListCardManager] Constructed manager instance=%1 adbapi=%2")
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(reinterpret_cast<quintptr>(adbapi), 0, 16));
     // Initialize network manager for poster downloads
     m_networkManager = new QNetworkAccessManager(this);
     connect(m_networkManager, &QNetworkAccessManager::finished,
@@ -1733,10 +1736,15 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
 void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
 {
     if (!adbapi) {
+        LOG(QString("[MyListCardManager] requestAnimeMetadata aborted: adbapi=null, manager=%1, aid=%2")
+            .arg(reinterpret_cast<quintptr>(this), 0, 16)
+            .arg(aid));
         return;
     }
     
-    LOG(QString("[MyListCardManager] requestAnimeMetadata enter: aid=%1, reason=%2")
+    LOG(QString("[MyListCardManager] requestAnimeMetadata enter: manager=%1 adbapi=%2 aid=%3 reason=%4")
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(reinterpret_cast<quintptr>(adbapi), 0, 16)
         .arg(aid)
         .arg(reason.isEmpty() ? QString("<none>") : reason));
     
