@@ -417,6 +417,7 @@ private:
     QSet<int> m_episodesNeedingData;
     QSet<int> m_animeNeedingMetadata;
     QSet<int> m_animeMetadataRequested;
+    QSet<int> m_animeMetadataDispatched;
     QSet<int> m_animeNeedingPoster;
     QMap<int, QString> m_animePicnames;
     QMap<QNetworkReply*, int> m_posterDownloadRequests;
