@@ -697,3 +697,561 @@ The procedural system can coexist with the scoring system during development:
 | The weight values will be empirically tuned (e.g., via user feedback or A/B testing) | The rules should be immediately intuitive without tuning |
 | New factors are added frequently and should blend smoothly with existing ones | New rules have clear priority relative to existing ones |
 | The UI will show numeric scores and breakdowns | The UI will show tier names and reason strings |
+
+---
+
+# Hybrid Approach: Procedural Tiers + Intra-Tier Scoring + Manual Locks
+
+## Motivation
+
+The pure scoring system is hard to reason about (17 interacting weights). The pure procedural system is easy to reason about but loses the fine-grained ordering that scoring provides within a tier — when two watched files are both far from the current position, codec quality and bitrate matter for picking which one to delete first, and a single sort key cannot capture that.
+
+The hybrid approach uses **procedural rules for tier assignment** (the "why") and **scoring for intra-tier ordering** (the "which one first"). Manual locks give the user a hard override that no algorithm can bypass.
+
+---
+
+## Manual Lock Mechanism
+
+### What Can Be Locked
+
+| Lock Target | Effect | Granularity |
+|-------------|--------|-------------|
+| **Anime lock** | All files for this anime are protected from auto-deletion | Entire anime (all episodes, all files) |
+| **Episode lock** | All files for this specific episode are protected | Single episode (all its files) |
+
+Locks are explicit user actions — they are not inferred or computed. A locked item stays locked until the user unlocks it.
+
+### Database Schema
+
+```sql
+-- New column on mylist table (per-file, but set via anime or episode scope)
+ALTER TABLE mylist ADD COLUMN deletion_locked INTEGER DEFAULT 0;
+-- 0 = not locked, 1 = locked at episode level, 2 = locked at anime level
+
+-- Separate table for anime-level locks (applied to all current and future files)
+CREATE TABLE deletion_locks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    aid INTEGER,              -- Non-null for anime lock
+    eid INTEGER,              -- Non-null for episode lock
+    locked_at INTEGER,        -- Unix timestamp
+    reason TEXT,              -- Optional user note: "rewatching", "seeding", etc.
+    UNIQUE(aid, eid)
+);
+CREATE INDEX idx_deletion_locks_aid ON deletion_locks(aid);
+CREATE INDEX idx_deletion_locks_eid ON deletion_locks(eid);
+```
+
+Using a separate `deletion_locks` table rather than a column on `mylist` because:
+- Anime-level locks apply to files that do not yet exist in mylist (future downloads).
+- The lock is a user intent, not a file property — it belongs in its own table.
+- The `mylist.deletion_locked` column is a denormalized cache for fast lookups during deletion candidate selection; it is updated whenever the `deletion_locks` table changes.
+
+### Lock Propagation
+
+When the user locks an **anime**:
+1. Insert row into `deletion_locks` with `aid = X, eid = NULL`.
+2. Update all existing mylist rows: `UPDATE mylist SET deletion_locked = 2 WHERE aid = X`.
+3. Any future file added to this anime inherits `deletion_locked = 2`.
+
+When the user locks an **episode**:
+1. Insert row into `deletion_locks` with `aid = NULL, eid = Y`.
+2. Update matching mylist rows: `UPDATE mylist SET deletion_locked = 1 WHERE eid = Y`.
+3. Any future file added to this episode inherits `deletion_locked = 1`.
+
+When the user unlocks:
+1. Remove the `deletion_locks` row.
+2. Recalculate `deletion_locked` for affected mylist rows (an episode might still be locked via an anime-level lock).
+
+### UI for Locking
+
+**Anime Card — Card-Level Context Menu:**
+```
+Right-click on card header:
+  ┌───────────────────────────┐
+  │ Fetch data                │
+  │ Hide / Unhide             │
+  │ ─────────────────────────── 
+  │ 🔒 Lock anime (keep all) │  ← NEW
+  │ 🔓 Unlock anime          │  ← NEW (shown when locked)
+  └───────────────────────────┘
+```
+
+**Anime Card — Episode Context Menu:**
+```
+Right-click on episode row:
+  ┌─────────────────────────────────┐
+  │ Start session from here         │
+  │ Mark episode as watched         │
+  │ ───────────────────────────────── 
+  │ 🔒 Lock episode (keep files)   │  ← NEW
+  │ 🔓 Unlock episode              │  ← NEW (shown when locked)
+  └─────────────────────────────────┘
+```
+
+**Visual Indicators:**
+```
+┌──────────────────────────────────┐
+│ Poster       │ 🔒 Title          │  ← lock icon in title when anime is locked
+│              │ Type: TV          │
+├──────────────────────────────────┤
+│ 🔒 Ep 1 - Intro                 │  ← lock icon on locked episodes
+│   \ v1 1080p HEVC [Group]       │
+│ Ep 2 - Adventure                │  ← no icon = not locked
+│   \ v1 720p AVC [Group]         │
+└──────────────────────────────────┘
+```
+
+---
+
+## Hybrid Tier Definitions
+
+The tiers use procedural rules for classification. Locks are the highest-priority protection. Within each deletable tier, a **reduced scoring formula** orders candidates — but only using factors relevant to that tier, not all 17.
+
+```
+── ABSOLUTE PROTECTIONS (checked first, in order) ──
+
+Lock Check:
+  Rule: File's anime or episode has an active lock in deletion_locks.
+  Result: PROTECTED. No further evaluation.
+
+Gap Check:
+  Rule: Deleting this file would create a gap in the episode sequence
+        (episodes exist both before and after, no other file covers this episode).
+  Result: PROTECTED. No further evaluation.
+
+── DELETION TIERS ──
+
+Tier 0 — SUPERSEDED REVISION
+  Rule: A newer local revision exists for the same episode.
+  Intra-tier score:
+    - file version (oldest first)
+    - file size descending (free more space)
+  Reason: "Superseded by v{N}"
+
+Tier 1 — WATCHED, NO ACTIVE SESSION
+  Rule: File is watched AND anime has no active watch session.
+  Intra-tier score:
+    + anime rating (delete low-rated first)
+    + file size descending (free more space)
+    + codec age (delete ancient codecs first)
+  Reason: "Watched, no active session"
+
+Tier 2 — WATCHED, FAR FROM CURRENT
+  Rule: File is watched AND anime has active session
+        AND distance from current > aheadBuffer.
+  Intra-tier score:
+    + distance from current (farthest first)
+    + codec age
+    + bitrate deviation
+  Reason: "Watched, {N} episodes from current"
+
+Tier 3 — UNWATCHED LOW-QUALITY DUPLICATE
+  Rule: File is unwatched AND another local file for the same episode
+        has strictly higher quality/resolution.
+  Intra-tier score:
+    + quality gap (biggest quality difference first)
+    + bitrate deviation
+  Reason: "Lower quality duplicate (better version available)"
+
+Tier 4 — UNWATCHED, FAR BEHIND CURRENT
+  Rule: File is unwatched AND episode is behind current position
+        by more than aheadBuffer.
+  Intra-tier score:
+    + distance behind (most behind first)
+    + quality (lower quality first)
+  Reason: "Unwatched, {N} episodes behind current"
+
+Tier 5 — PREFERENCE MISMATCH WITH ALTERNATIVE
+  Rule: File does not match audio AND/OR subtitle preferences
+        AND a better-matching local alternative exists for the same episode.
+  Intra-tier score:
+    + mismatch severity (no audio + no sub > no sub only)
+    + quality (lower quality first among mismatches)
+  Reason: "Language mismatch (better alternative available)"
+
+── PROTECTION BOUNDARY ──
+
+Everything else — PROTECTED
+  - Unwatched episodes at or ahead of current position
+  - Episodes within the ahead buffer
+  - Only local copy of an episode with no better alternative
+  - Manually locked anime or episodes
+```
+
+### Why Scoring Inside Tiers Works Better Than Pure Procedural
+
+In the pure procedural model, Tier 2 sorts only by distance. If two files are equidistant (e.g., episode 5 and episode 45 are both 20 episodes from current), the system has no way to prefer the XviD encode over the HEVC encode without splitting into sub-tiers.
+
+With intra-tier scoring, each tier uses a **small, focused score** built from 2-4 factors relevant to that tier's context. This avoids the 17-factor soup of the full scoring system while still providing meaningful ordering.
+
+### Tier Assignment + Intra-Tier Score Pseudocode
+
+```
+function classifyFile(file):
+
+    // ── Absolute protections ──
+    if isLocked(file.aid, file.eid):
+        return { tier: PROTECTED, reason: lockReason(file) }
+
+    if wouldCreateGap(file):
+        return { tier: PROTECTED, reason: "Gap protection" }
+
+    // ── Tier 0 ──
+    if hasNewerLocalRevision(file.eid, file.version):
+        newerVersion = getNewestLocalVersion(file.eid)
+        score = file.version * 1000 - file.sizeBytes / (1024*1024)
+        return { tier: 0, score: score,
+                 reason: "Superseded by v" + newerVersion }
+
+    isWatched = file.viewed > 0 OR file.localWatched > 0
+
+    // ── Tier 1 ──
+    if isWatched AND NOT hasActiveSession(file.aid):
+        score = 0
+        score -= animeRating(file.aid) / 100   // lower rating → lower score → delete first
+        score -= file.sizeBytes / (1024*1024*1024)  // larger file → lower score → delete first
+        score -= codecAgePenalty(file)           // ancient codec → lower score
+        return { tier: 1, score: score,
+                 reason: "Watched, no active session" }
+
+    // ── Gather session context ──
+    session = findActiveWatchSession(file.aid)
+    distance = NO_SESSION
+    if session:
+        distance = file.totalEpisodePosition - session.currentTotalPosition
+
+    // ── Tier 2 ──
+    if isWatched AND distance != NO_SESSION AND abs(distance) > aheadBuffer:
+        score = -abs(distance) * 100            // farthest first
+        score -= codecAgePenalty(file)
+        score -= bitrateDeviation(file)
+        return { tier: 2, score: score,
+                 reason: "Watched, " + abs(distance) + " eps from current" }
+
+    // ── Tier 3 ──
+    if NOT isWatched:
+        betterDupe = findBetterLocalDuplicate(file)
+        if betterDupe:
+            qualityGap = betterDupe.qualityScore - file.qualityScore
+            score = -qualityGap * 100 - bitrateDeviation(file)
+            return { tier: 3, score: score,
+                     reason: "Lower quality duplicate" }
+
+    // ── Tier 4 ──
+    if NOT isWatched AND distance != NO_SESSION AND distance < -aheadBuffer:
+        score = distance * 100                  // most behind first (distance is negative)
+        score += qualityScore(file)             // lower quality → delete first
+        return { tier: 4, score: score,
+                 reason: "Unwatched, " + abs(distance) + " eps behind current" }
+
+    // ── Tier 5 ──
+    audioMatch = matchesPreferredAudio(file)
+    subMatch = matchesPreferredSub(file)
+    if (NOT audioMatch OR NOT subMatch) AND hasBetterLanguageAlternative(file):
+        mismatchSeverity = 0
+        if NOT audioMatch: mismatchSeverity += 2
+        if NOT subMatch: mismatchSeverity += 1
+        score = -mismatchSeverity * 1000 + qualityScore(file)
+        return { tier: 5, score: score,
+                 reason: "Language mismatch" }
+
+    // ── Protected ──
+    return { tier: PROTECTED, reason: protectionReason(file) }
+```
+
+### Deletion Selection
+
+```
+function selectNextFileToDelete():
+    if NOT isDeletionNeeded():
+        return null
+
+    candidates = []
+    for each file in getAllLocalFiles():
+        result = classifyFile(file)
+        if result.tier != PROTECTED:
+            candidates.append(result)
+
+    // Primary sort: tier ascending. Secondary sort: score ascending within tier.
+    candidates.sort(by: tier ASC, score ASC)
+
+    if candidates is not empty:
+        return candidates[0]
+    return null
+```
+
+---
+
+## Lock Interaction with Deletion
+
+### Lock Hierarchy
+
+```
+Anime lock (deletion_locks.aid = X, eid = NULL)
+  └── Protects ALL episodes and ALL files for anime X
+       └── Including episodes/files added after the lock was set
+
+Episode lock (deletion_locks.aid = NULL, eid = Y)
+  └── Protects ALL files for episode Y
+       └── Including files added after the lock was set
+```
+
+An anime lock implies all its episodes are locked. If an anime is locked and the user also locks a specific episode, the episode lock is redundant but harmless. Unlocking the anime does NOT remove explicit episode locks — they are independent.
+
+### Lock Resolution for a File
+
+```
+function isLocked(aid, eid):
+    // Check anime-level lock first (covers everything)
+    if EXISTS in deletion_locks WHERE aid = :aid AND eid IS NULL:
+        return true
+
+    // Check episode-level lock
+    if EXISTS in deletion_locks WHERE eid = :eid:
+        return true
+
+    return false
+
+function lockReason(file):
+    if EXISTS in deletion_locks WHERE aid = file.aid AND eid IS NULL:
+        lock = query(...)
+        reason = "Anime locked"
+        if lock.reason is not empty:
+            reason += " (" + lock.reason + ")"
+        return reason
+
+    if EXISTS in deletion_locks WHERE eid = file.eid:
+        lock = query(...)
+        reason = "Episode locked"
+        if lock.reason is not empty:
+            reason += " (" + lock.reason + ")"
+        return reason
+
+    return ""
+```
+
+### Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| User locks anime, then unlocks a single episode within it | Episode remains locked via anime lock. To unlock one episode, user must unlock the anime and lock remaining episodes individually — or we add an "exclude episode" feature later. |
+| File is the only copy, episode is not locked, anime is not locked | Protected by gap check OR by "only copy of unwatched episode" rule. Lock is not needed. |
+| User locks anime that has no files yet | Lock is stored in `deletion_locks`. When files are added, they inherit `deletion_locked = 2` via the propagation logic. |
+| User deletes a file manually (context menu) while it is locked | Manual deletion bypasses auto-deletion locks. Locks only protect against the automatic deletion system. The UI should show a confirmation: "This file is locked against auto-deletion. Delete anyway?" |
+| Disk space is critically low and all remaining files are locked | System logs a warning and does not delete. The user must manually unlock files or free space by other means. |
+
+---
+
+## Comparison: All Three Approaches
+
+| Aspect | Pure Scoring | Pure Procedural | Hybrid + Locks |
+|--------|-------------|----------------|----------------|
+| **Tier assignment** | N/A (single score) | Procedural rules | Procedural rules |
+| **Intra-tier ordering** | N/A (global score) | Single sort key | Focused scoring (2-4 factors per tier) |
+| **User override** | None | Per-file protect | Anime lock + episode lock |
+| **"Why this file?"** | Score breakdown (17 rows) | Tier name + reason | Tier name + reason + intra-tier rank |
+| **Lock persistence** | N/A | Runtime only | Database-persisted; survives restart |
+| **New file handling** | Scored on arrival | Classified on arrival | Classified on arrival; inherits locks |
+| **UI complexity** | Score numbers + breakdown | Tier labels + reasons | Tier labels + reasons + lock icons + lock context menus |
+| **Code complexity** | 1 method, 17 score lines | 1 method, 6 tier blocks | 1 classifier method + 1 lock table + propagation |
+| **Edge case safety** | Weights may cancel out unpredictably | Tiers are absolute | Tiers are absolute + locks are absolute |
+
+---
+
+## UI for Hybrid Approach
+
+### Card Display with Locks and Tier Info
+
+```
+┌──────────────────────────────────┐
+│ Poster       │ 🔒 Show A         │  ← anime is locked
+│              │ Type: TV          │
+│              │ Rating: 8.76      │
+├──────────────────────────────────┤
+│ 🔒 Ep 1 - Intro                 │  ← locked via anime
+│   \ v1 1080p HEVC [Group]       │     no deletion indicator needed
+│ 🔒 Ep 2 - Adventure             │
+│   \ v1 720p AVC [Group]         │
+└──────────────────────────────────┘
+
+┌──────────────────────────────────┐
+│ Poster       │ Anime B           │  ← not locked
+│              │ Type: TV          │
+├──────────────────────────────────┤
+│ 🔒 Ep 1 - Special               │  ← episode locked individually
+│   \ v1 1080p HEVC [Group]       │
+│ Ep 2 - Start                    │
+│   \ v1 480p XviD [OldGrp] 🔴   │  Tier 2: Watched, 30 eps away
+│   \ v2 1080p HEVC [NewGrp] 🟢  │  Protected (unwatched, in buffer)
+│ Ep 3 - Continue                 │
+│   \ v1 720p [Group]       🟡   │  Tier 4: Unwatched, 5 eps behind
+└──────────────────────────────────┘
+```
+
+### Sidebar Deletion Queue with Lock Info
+
+```
+┌─────────────────────────────┐
+│ ▼ Deletion Queue            │
+│   Space: 42 / 500 GB        │
+│   Threshold: 50 GB          │
+│   Locked: 3 anime, 2 eps    │
+│                             │
+│   ── Next to delete ──      │
+│   1. old-ep01.avi           │
+│      Tier 0: Superseded     │
+│      v2 exists locally      │
+│      [🔒 Lock ep] [🔒 Lock] │
+│   2. show-ep30.mkv          │
+│      Tier 2: Watched, 30eps │
+│      Score: -3012           │
+│      [🔒 Lock ep] [🔒 Lock] │
+│   3. dub-ep05.mkv           │
+│      Tier 5: Lang mismatch  │
+│      JP audio version avail │
+│      [🔒 Lock ep] [🔒 Lock] │
+└─────────────────────────────┘
+```
+
+### Detail Dialog with Lock Controls
+
+```
+File: show-ep30.mkv
+Anime: Show B | Episode: 30 | Group: SubGroup
+──────────────────────────────────────────────
+Classification: Tier 2 — WATCHED, FAR FROM CURRENT
+Reason: Watched, 30 episodes from current position.
+
+Intra-tier ranking: #2 of 15 files in Tier 2
+  Distance:          30 eps  (most distant → delete first)
+  Codec:             H.264   (no penalty)
+  Bitrate deviation: 12%     (close to expected)
+──────────────────────────────────────────────
+Lock status: Not locked
+  [🔒 Lock this episode]  [🔒 Lock entire anime]
+──────────────────────────────────────────────
+Gap protection: No (episodes 29 and 31 have files)
+Queue position: #2 overall
+```
+
+---
+
+## Implementation Classes (Hybrid)
+
+### DeletionLock (value type)
+```
+struct DeletionLock {
+    int id;             // deletion_locks.id
+    int aid;            // 0 if episode-level lock
+    int eid;            // 0 if anime-level lock
+    qint64 lockedAt;    // Unix timestamp
+    QString reason;     // User-provided note
+};
+```
+
+### DeletionLockManager (new class)
+Single responsibility: CRUD operations on the `deletion_locks` table + propagation to `mylist.deletion_locked`.
+```
+class DeletionLockManager {
+public:
+    void lockAnime(int aid, const QString &reason);
+    void unlockAnime(int aid);
+    void lockEpisode(int eid, const QString &reason);
+    void unlockEpisode(int eid);
+
+    bool isAnimeLocked(int aid) const;
+    bool isEpisodeLocked(int eid) const;
+    bool isFileLocked(int lid) const;       // Checks both anime and episode locks
+    DeletionLock getLock(int aid, int eid) const;
+
+    QList<DeletionLock> allLocks() const;
+    int lockedAnimeCount() const;
+    int lockedEpisodeCount() const;
+
+signals:
+    void lockChanged(int aid, int eid, bool locked);
+
+private:
+    void propagateToMylist(int aid, int eid, int lockValue);
+    void recalculateMylistLocks(int aid);   // After unlock, recheck remaining locks
+};
+```
+
+### HybridDeletionClassifier (new class)
+Single responsibility: assigns tier + intra-tier score to a file.
+```
+class HybridDeletionClassifier {
+public:
+    explicit HybridDeletionClassifier(
+        const DeletionLockManager &lockManager,
+        const WatchSessionManager &sessionManager);
+
+    DeletionCandidate classify(int lid) const;
+
+private:
+    int calculateTier0Score(int lid) const;  // Superseded revision ordering
+    int calculateTier1Score(int lid) const;  // Watched, no session ordering
+    int calculateTier2Score(int lid) const;  // Watched, far from current ordering
+    int calculateTier3Score(int lid) const;  // Low-quality duplicate ordering
+    int calculateTier4Score(int lid) const;  // Unwatched, far behind ordering
+    int calculateTier5Score(int lid) const;  // Preference mismatch ordering
+
+    const DeletionLockManager &m_lockManager;
+    const WatchSessionManager &m_sessionManager;
+};
+```
+
+### DeletionQueue (extended from procedural design)
+```
+class DeletionQueue {
+public:
+    explicit DeletionQueue(
+        HybridDeletionClassifier &classifier,
+        DeletionLockManager &lockManager);
+
+    void rebuild();
+    const DeletionCandidate* next() const;
+    QList<DeletionCandidate> topN(int n) const;
+
+    // Lock actions (delegates to DeletionLockManager + rebuilds queue)
+    void lockAnime(int aid, const QString &reason);
+    void unlockAnime(int aid);
+    void lockEpisode(int eid, const QString &reason);
+    void unlockEpisode(int eid);
+
+private:
+    QList<DeletionCandidate> m_candidates;
+    HybridDeletionClassifier &m_classifier;
+    DeletionLockManager &m_lockManager;
+};
+```
+
+### DeletionCandidate (extended)
+```
+struct DeletionCandidate {
+    int lid;
+    int aid;
+    int eid;
+    int tier;                  // 0-5 or PROTECTED
+    int intraTierScore;        // Scoring within the tier
+    QString reason;            // "Watched, 30 eps from current"
+    QString filePath;
+    QString animeName;
+    QString episodeLabel;      // "Ep 30 - Title"
+    bool gapProtected;
+    bool locked;               // True if anime or episode is locked
+    QString lockReason;        // "Anime locked (rewatching)"
+};
+```
+
+---
+
+## Migration Path (Hybrid)
+
+1. **Phase 1 — Lock infrastructure**: Add `deletion_locks` table + `mylist.deletion_locked` column. Implement `DeletionLockManager`. Add lock/unlock to anime card and episode context menus. No changes to deletion logic yet — locks are stored but not enforced.
+
+2. **Phase 2 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. Add setting: "Deletion strategy: Scoring / Hybrid". When hybrid is selected, `deleteNextEligibleFile()` uses `HybridDeletionClassifier` instead of `calculateDeletionScore()`. Locks are enforced as absolute protection.
+
+3. **Phase 3 — UI integration**: Wire sidebar deletion queue and card indicators to `DeletionQueue`. Show tier + reason + lock status. Lock/unlock buttons in sidebar and detail dialog.
+
+4. **Phase 4 — Remove pure scoring**: Once hybrid is validated, remove `calculateDeletionScore()` and all `SCORE_*` constants. `HybridDeletionClassifier` becomes the sole deletion decision maker.
