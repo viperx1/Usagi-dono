@@ -758,10 +758,6 @@ void MyListCardManager::clearAllCards()
     m_episodesNeedingData.clear();
     m_animeNeedingMetadata.clear();
     m_animeNeedingPoster.clear();
-    // Clear dispatch-level dedupe because clearAllCards() starts a new load cycle.
-    // Keep m_animeMetadataRequested untouched below to preserve existing behavior
-    // that avoids immediate re-request loops across quick UI refreshes.
-    m_animeMetadataDispatched.clear();
     m_animePicnames.clear();
     // Note: NOT clearing m_animeMetadataRequested to prevent re-requesting
 }
@@ -1058,7 +1054,6 @@ void MyListCardManager::onAnimeUpdated(int aid)
     // Remove from tracking
     QMutexLocker locker(&m_mutex);
     m_animeNeedingMetadata.remove(aid);
-    m_animeMetadataDispatched.remove(aid);
     AnimeCard *card = m_cards.value(aid, nullptr);
     
     // Hide warning only if both metadata and poster are no longer needed
@@ -1728,15 +1723,15 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
     
     {
         QMutexLocker locker(&m_mutex);
-        if (m_animeMetadataDispatched.contains(aid)) {
+        if (m_animeMetadataRequested.contains(aid)) {
             if (reason.isEmpty()) {
-                LOG(QString("[MyListCardManager] Metadata request for anime %1 already dispatched - skipping duplicate request").arg(aid));
+                LOG(QString("[MyListCardManager] Metadata request for anime %1 already requested - skipping duplicate request").arg(aid));
             } else {
-                LOG(QString("[MyListCardManager] Metadata request for anime %1 already dispatched - skipping duplicate request (reason: %2)").arg(aid).arg(reason));
+                LOG(QString("[MyListCardManager] Metadata request for anime %1 already requested - skipping duplicate request (reason: %2)").arg(aid).arg(reason));
             }
             return;
         }
-        m_animeMetadataDispatched.insert(aid);
+        m_animeMetadataRequested.insert(aid);
     }
     
     if (reason.isEmpty()) {
