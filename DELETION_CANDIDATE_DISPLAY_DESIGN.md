@@ -36,62 +36,42 @@ Lower score = higher deletion priority.
 
 ---
 
-## Option 1: Inline Indicators on Anime Cards (Embedded in MyList)
+## Option 1: Lock Icons on Anime Cards (Embedded in MyList)
 
 ### Description
-Add visual markers directly to the episode/file tree within each `AnimeCard`. Files that are deletion candidates get a colored indicator (icon, background highlight, or badge) next to the file entry in the episode tree. The score and breakdown are shown in the tooltip or on click.
+Add the 🔒 lock icon to the anime card title and episode rows when a lock is active. No per-file risk indicators — the card stays clean. Lock/unlock is done via context menus (right-click on card header or episode row).
 
 ### Mockup
 ```
 ┌──────────────────────────────────┐
-│ Poster       │ Title             │
+│ Poster       │ 🔒 Title          │  ← lock icon only when anime is locked
 │              │ Type: TV          │
 │              │ Rating: 8.76      │
-│              │ 🟢 Safe (score 95)│  ← card-level summary
 ├──────────────────────────────────┤
-│ ▶ Ep 1 - Intro                  │
-│   \ v1 1080p HEVC [Group] 🟢   │  ← green = safe
-│ ▶ Ep 2 - Adventure              │
-│   \ v1 720p AVC [Group]  🟡    │  ← yellow = at risk
-│ ▶ Ep 3 - Battle                 │
-│   \ v1 480p XviD [Group] 🔴    │  ← red = deletion imminent
-│   \ v2 1080p HEVC [Group] 🟢   │  ← green = newer version safe
+│ 🔒 Ep 1 - Intro                 │  ← lock icon on locked episodes
+│   \ v1 1080p HEVC [Group]       │
+│ Ep 2 - Adventure                │  ← no icon = not locked
+│   \ v1 720p AVC [Group]         │
+│ Ep 3 - Battle                   │
+│   \ v1 480p XviD [Group]        │
+│   \ v2 1080p HEVC [Group]       │
 └──────────────────────────────────┘
-
-Tooltip on 🔴:
-  Score: -42
-  ────────────────
-  Base:                        50
-  Already watched:             -5
-  Distance (47 eps away):    -47
-  Codec: XviD (ancient):     -30   expected: HEVC/AV1
-  Quality: low (score 20):   -35   expected: ≥60
-  Audio: Japanese:           +30   matches preferred
-  Subtitle: none:            -20   preferred: English
-  ────────────────
-  Gap protected: No
 ```
 
 ### Pros
 - **Zero navigation cost**: visible right where the user already looks at their collection
-- **Per-file granularity**: shows exactly which files are at risk, not just which anime
-- **Contextual**: user sees the deletion risk alongside episode info, watch state, and quality metadata that are already displayed
-- **Low UI disruption**: reuses existing episode tree widget; only adds an icon column or background color
-- **Tooltip provides detail on demand**: score breakdown without cluttering the card
+- **Low UI disruption**: only adds a 🔒 icon when lock is active; card stays clean otherwise
+- **Contextual**: user sees the lock status alongside episode info, watch state, and quality metadata
 
 ### Cons
-- **Visual noise**: adds color/icons to every file row even when user is not thinking about deletion
-- **Limited space**: anime cards are 600×450px; adding another column to the tree compresses existing info
-- **Mixed concerns**: the card's primary purpose is episode browsing and playback; deletion info may feel out of place
-- **Filtering difficulty**: no easy way to see "all files at risk" across the entire collection
-- **Performance**: recalculating scores for all visible files on every card refresh could add overhead in the virtual flow layout
+- **No deletion info on cards**: user must switch to the Deletion tab to see what will be deleted next
+- **Lock-only**: cards show lock state but not deletion priority or reason
 
 ### Implementation Complexity
-**Low-Medium**. Requires:
-- New column or icon in `AnimeCard::addEpisode()` file items
-- Score calculation call per file in `MyListCardManager::loadEpisodesForCardFromCache()`
-- Tooltip builder for score breakdown
-- Color thresholds (green/yellow/red) configurable in settings
+**Low**. Requires:
+- 🔒 icon in card title when anime is locked
+- 🔒 icon on episode rows when episode is locked
+- Context menu entries for lock/unlock on card header and episode rows
 
 ---
 
@@ -151,18 +131,18 @@ Add a new top-level tab (alongside MyList, Hasher, Settings, etc.) that shows a 
 
 ## Recommended Approach: Option 1 + Option 2 Combined
 
-Option 1 (inline indicators on cards) provides contextual, per-file risk visibility without navigation cost. Option 2 (dedicated tab) provides collection-wide overview, bulk operations, and detailed analysis. They complement each other:
+Option 1 (lock icons on cards) provides at-a-glance lock visibility without navigation cost. Option 2 (dedicated tab) provides collection-wide overview, A vs B learning, deletion queue, and history. They complement each other:
 
-- **Option 1** answers: "Is this specific file safe?" — visible while browsing the collection.
-- **Option 2** answers: "What will be deleted next across everything?" — visible when managing disk space.
+- **Option 1** answers: "Is this anime/episode locked?" — visible while browsing the collection.
+- **Option 2** answers: "What will be deleted next? What was deleted before? What has the system learned?" — visible when managing disk space.
 
 ### Implementation Plan
 
 **Phase 1 — Deletion Tab** (Option 2):
-The tab is the primary workspace for understanding and controlling deletion behavior. It shows the full ranked candidate list, A vs B prompts, learned weight visualization, lock controls, and space metrics. This is where the user teaches the system.
+The tab is the primary workspace for understanding and controlling deletion behavior. It shows the full ranked candidate list, A vs B prompts, learned weight visualization, deletion history, and space metrics. This is where the user teaches the system.
 
-**Phase 2 — Inline Card Indicators** (Option 1):
-Add per-file colored risk icons (🟢🟡🔴) to the episode tree in anime cards. Tooltip shows the tier + reason. Clicking the icon navigates to the file's entry in the Deletion tab for full details. This provides at-a-glance awareness without leaving MyList.
+**Phase 2 — Lock Icons on Cards** (Option 1):
+Add 🔒 lock icon to anime card titles and episode rows when a lock is active. Lock/unlock via context menus (right-click on card header or episode row). No per-file risk indicators — cards stay clean.
 
 ---
 
@@ -412,9 +392,11 @@ These are the factors whose weights are learned through A vs B choices. Each fac
 | `file_size` | 1.0 - (sizeBytes / maxSizeBytes) | 0.0 – 1.0 | Smaller file |
 | `group_status` | active=1.0, stalled=0.5, disbanded=0.0 | 0.0 – 1.0 | More active group |
 | `watch_recency` | days since last watched, normalized | 0.0 – 1.0 | Watched more recently |
-| `session_active` | 1.0 if anime has active session, else 0.0 | 0 or 1 | Has active session |
+| `view_percentage` | watched episodes / total episodes for the anime's session | 0.0 – 1.0 | More of the anime has been watched |
 
 Note: Technical factors (codec, bitrate, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
+
+**Why `view_percentage` instead of `session_active`**: A binary "has active session" flag is unreliable because sessions are started automatically when any episode is played — even briefly to check quality. A user who watched 1 of 500 episodes is very different from a user who watched 480 of 500. The view percentage (watched/total in the session) captures actual engagement: a session at 95% means the user is nearly done and those files are dispensable; a session at 2% means the user just started (or just checked) and the files should be treated with lower confidence.
 
 ### How Factor Weights Produce a Score
 
@@ -536,7 +518,7 @@ The Deletion tab (Option 2) hosts the A vs B prompt when the system needs input:
 │   File size           +0.31     ██████░░░░  (moderate)           │
 │   Group status        +0.08     ██░░░░░░░░  (weak)              │
 │   Watch recency       -0.05     █░░░░░░░░░  (negligible)        │
-│   Active session      +0.55     █████████░  (strong)             │
+│   View percentage     +0.55     █████████░  (strong)             │
 │                                                                  │
 │ ── Deletion Queue (autonomous) ───────────────────────────────── │
 │                                                                  │
@@ -559,7 +541,7 @@ The A vs B learning system works alongside — not instead of — the procedural
 | Mechanism | Scope | Behavior |
 |-----------|-------|----------|
 | **Lock (🔒)** | Absolute protection | File is never auto-deleted or presented in A vs B |
-| **Procedural tiers (T0-T5)** | Deterministic deletions | Files with objectively better replacements are deleted autonomously |
+| **Procedural tiers (T0-T2)** | Deterministic deletions | Files with objectively better replacements are deleted autonomously |
 | **A vs B choices** | Preference learning | Only invoked for files where no procedural rule applies and learned scores are close |
 | **Learned weights** | Autonomous preference deletions | Once weights are trained, most non-procedural deletions happen automatically |
 
@@ -567,362 +549,7 @@ A locked file never appears in A vs B. A procedurally-deletable file (superseded
 
 ---
 
-## Why Consider a Procedural Alternative
-
-The scoring system combines 17 weighted factors into a single integer. This has fundamental problems:
-
-1. **Weight interactions are opaque.** A file that is unwatched (+50) but far away (-47) and has an ancient codec (-30) ends up at -27. The user cannot easily predict which combination of factors will tip a file into the danger zone because the weights were chosen by the developer, not derived from user priorities.
-
-2. **Tuning is trial-and-error.** If the system deletes a file the user wanted to keep, the only recourse is to adjust one or more of the 17 constants — but changing one weight affects the relative ranking of every other file in the collection.
-
-3. **No clear "why".** Even with a score breakdown tooltip, the user sees a list of numbers that add up to a total. They still have to mentally reason about "which of these factors was the decisive one."
-
-4. **False precision.** Assigning +20 to "active group" vs. +15 to "high rating" implies a precision that does not exist. These numbers were not derived from empirical data.
-
-A procedural approach replaces the single numeric score with a series of explicit rules that mirror how a human would think about the decision: "first delete duplicates, then delete watched episodes far from my current position, then delete low-quality files..." Each rule has a clear, explainable purpose.
-
----
-
-## Design: Tiered Priority Cascade
-
-Instead of calculating a score, files are classified into **deletion tiers** using a fixed sequence of rules. Files in a lower tier are always deleted before any file in a higher tier. Within each tier, files are ordered by a simple, single-dimension sort (e.g., distance from current episode).
-
-### Tier Definitions
-
-```
-Tier 0 — UNCONDITIONAL DELETE (always safe to remove)
-  Rule: File has a newer local revision for the same episode.
-  Sort: Oldest revision first.
-  Reason template: "Superseded by v{N} — this file: v{M} {res} {codec}, newer: v{N} {res} {codec}"
-  Example: "Superseded by v2 — this file: v1 480p XviD, newer: v2 1080p HEVC"
-
-Tier 1 — WATCHED, FAR, NO ACTIVE SESSION
-  Rule: File is watched AND the anime has no active watch session
-        AND the file is not in an anime the user explicitly protected.
-  Sort: Largest file size first (reclaim space fastest).
-  Reason template: "Watched, no active session — {codec}, {fileSize}, rating {rating}"
-  Example: "Watched, no active session — XviD, 2.4 GB, rating 5.20"
-
-Tier 2 — WATCHED, FAR FROM CURRENT POSITION
-  Rule: File is watched AND distance from current episode > aheadBuffer
-        AND anime HAS an active session.
-  Sort: Distance from current episode descending (farthest first).
-  Reason template: "Watched, {N} eps from current — ep {fileEp} → current ep {curEp}, {codec}, bitrate {actual}kbps (expected {expected}kbps)"
-  Example: "Watched, 30 eps from current — ep 2 → current ep 32, H.264, bitrate 850kbps (expected 1200kbps)"
-
-Tier 3 — UNWATCHED, LOW QUALITY DUPLICATE
-  Rule: File is unwatched AND another file for the same episode exists
-        with higher quality/resolution AND that other file is also local.
-  Sort: Lower quality first.
-  Reason template: "Lower quality duplicate — this file: {res} {codec} {bitrate}kbps, better: {res} {codec} {bitrate}kbps"
-  Example: "Lower quality duplicate — this file: 480p XviD 600kbps, better: 1080p HEVC 1500kbps"
-
-Tier 4 — UNWATCHED, FAR BEHIND CURRENT POSITION
-  Rule: File is unwatched AND episode number < current episode - aheadBuffer
-        (i.e., the user has already passed this episode).
-  Sort: Distance behind current episode descending.
-  Reason template: "Unwatched, {N} eps behind current — ep {fileEp} → current ep {curEp}, quality {qualityTier}"
-  Example: "Unwatched, 15 eps behind current — ep 3 → current ep 18, quality low"
-
-Tier 5 — PREFERENCE MISMATCH
-  Rule: File does not match preferred audio language
-        AND does not match preferred subtitle language
-        AND another file for the same episode exists that does match.
-  Sort: Least-matching first (no audio match + no sub match before just no sub match).
-  Reason template: "Language mismatch — audio: {fileAudio} (preferred: {prefAudio}), sub: {fileSub} (preferred: {prefSub}); alternative has {altAudio}/{altSub}"
-  Example: "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
-
-── PROTECTION BOUNDARY ──
-Files below this line are never auto-deleted.
-
-Tier 6+ — PROTECTED (never auto-deleted)
-  - Unwatched files in or ahead of the current position
-  - Files in the ahead buffer
-  - Only copy of an unwatched episode
-  - Files the user explicitly protected
-```
-
-### Tier Assignment Pseudocode
-
-```
-function assignDeletionTier(file):
-
-    // ── Absolute protections (cannot be overridden) ──
-    if file.isExplicitlyProtected:
-        return PROTECTED
-
-    if wouldCreateGap(file):
-        return PROTECTED
-
-    // ── Tier 0: superseded revisions ──
-    if hasNewerLocalRevision(file.episodeId, file.version):
-        return Tier 0, sortKey = file.version  // oldest first
-
-    // ── Tier 1: watched, no active session ──
-    if file.isWatched AND NOT hasActiveSession(file.animeId):
-        return Tier 1, sortKey = -file.sizeBytes  // largest first
-
-    // ── Gather context for remaining tiers ──
-    session = findActiveWatchSession(file.animeId)
-    if session exists:
-        distance = file.totalEpisodePosition - session.currentTotalPosition
-    else:
-        distance = NO_SESSION  // sentinel; file already handled by Tier 1
-
-    // ── Tier 2: watched, far from current ──
-    if file.isWatched AND distance > aheadBuffer:
-        return Tier 2, sortKey = -abs(distance)  // farthest first
-
-    // ── Tier 3: unwatched low-quality duplicate ──
-    if NOT file.isWatched AND hasBetterLocalDuplicate(file):
-        return Tier 3, sortKey = file.qualityScore  // worst quality first
-
-    // ── Tier 4: unwatched, far behind ──
-    if NOT file.isWatched AND distance < -aheadBuffer:
-        return Tier 4, sortKey = distance  // most behind first
-
-    // ── Tier 5: preference mismatch with better alternative ──
-    // sortKey: 0 = neither audio nor sub match, 1 = only sub mismatch
-    if NOT matchesPreferredAudio(file) AND NOT matchesPreferredSub(file):
-        if hasBetterLanguageAlternative(file):
-            return Tier 5, sortKey = 0  // worst match — delete first
-    if NOT matchesPreferredSub(file) AND matchesPreferredAudio(file):
-        if hasBetterLanguageAlternative(file):
-            return Tier 5, sortKey = 1  // partial match — delete after full mismatches
-
-    // ── Everything else is protected ──
-    return PROTECTED
-```
-
-### Deletion Selection
-
-```
-function selectNextFileToDelete():
-    if NOT isDeletionNeeded():
-        return null
-
-    candidates = getAllLocalFiles()
-    for each file in candidates:
-        file.tier, file.sortKey = assignDeletionTier(file)
-
-    // Remove protected files
-    candidates = candidates.filter(c => c.tier != PROTECTED)
-
-    // Sort: tier ascending, then sortKey ascending within tier.
-    // Each tier's sortKey is pre-computed so that ascending order
-    // produces the intended deletion priority (e.g., Tier 1 uses
-    // -sizeBytes so that the largest file sorts first).
-    candidates.sort(by: tier ASC, sortKey ASC)
-
-    // Return the first candidate (lowest tier, best sort position)
-    if candidates is not empty:
-        return candidates[0]
-    return null
-```
-
----
-
-## Gap Protection (unchanged)
-
-The gap protection logic (`wouldCreateGap()`) works identically in the procedural model. It is applied as an absolute protection before any tier assignment: if deleting a file would leave episodes on both sides without that episode, the file is classified as PROTECTED regardless of any other factor.
-
----
-
-## Comparison: Scoring vs. Procedural
-
-| Aspect | Scoring System | Procedural Cascade |
-|--------|---------------|-------------------|
-| **Decision transparency** | Shows a number; user must interpret which factors dominated | Shows a tier name and a single reason; immediately clear |
-| **Predictability** | Score depends on all 17 factors interacting; hard to predict ranking changes when one factor changes | Tier depends on 1-3 conditions; user can reason "if I watch this episode, it moves from Tier 6 to Tier 2" |
-| **Tuning** | Change one of 17 weights; affects every file globally | Reorder tiers or adjust tier conditions; localized impact |
-| **Edge cases** | Unlikely edge cases hidden by additive math — e.g., enough small bonuses can override a major penalty | Each tier's conditions are explicit; edge cases are visible in the rule definitions |
-| **Expressiveness** | Can represent fine-grained relative priorities (score 47 vs. 48) | Coarser; files in the same tier are distinguished only by the sort key |
-| **New factors** | Add a constant and a `score +=` line | Add a new tier or add a condition to an existing tier; must decide its position in the cascade |
-| **UI display** | Score breakdown table with 17 rows | Single tier label + reason string + sort position within tier |
-| **Granularity within tier** | N/A (single dimension) | Limited to one sort key per tier; cannot express complex intra-tier ordering without splitting into sub-tiers |
-| **Risk of "wrong" deletions** | Possible through unintuitive weight interactions | Possible through wrong tier ordering, but each mistake is isolated and easy to diagnose |
-| **Code complexity** | One method with 17 `score +=` blocks | One method with 6 if/else blocks; simpler per-block but more branching |
-| **Testability** | Assert exact score value; fragile if weights change | Assert tier assignment; stable across weight changes since there are no weights |
-
----
-
-## UI Display for Procedural Approach
-
-The procedural model simplifies the UI significantly because each file has a single, human-readable reason for its classification:
-
-### Card-Level Display
-```
-Ep 1 - Intro
-  \ v1 480p XviD [Group] 🔴 Superseded (v2 exists locally)
-  \ v2 1080p HEVC [Group] 🟢 Protected (unwatched, in buffer)
-Ep 5 - Journey
-  \ v1 720p [Group]       🟡 Watched, 12 eps from current (ep 5 → current ep 17)
-```
-
-No score numbers needed. The tier name and reason are the complete explanation.
-
-### Sidebar Display
-```
-┌─────────────────────────┐
-│ ▼ Deletion Queue        │
-│   Space: 42 / 500 GB    │
-│   Threshold: 50 GB      │
-│                         │
-│   ── Will delete next ──│
-│   1. show-01.avi        │
-│      Superseded (v1→v2) │
-│      [Protect]          │
-│   2. anime-12.mkv       │
-│      Watched, no session│
-│      2.4 GB · XviD      │
-│      [Protect]          │
-│   3. anime-03.mkv       │
-│      Watched, 47 eps    │
-│      from current       │
-│      (ep 3 → cur ep 50) │
-│      [Protect]          │
-└─────────────────────────┘
-```
-
-### Detail Dialog
-```
-File: show-01.avi
-Anime: Show A | Episode: 1 | Group: SubGroup
-────────────────────────────────────────────
-Status: Tier 0 — SUPERSEDED REVISION
-Reason: This file is v1; v2 exists locally for the same episode.
-        v1 480p XviD → v2 1080p HEVC
-────────────────────────────────────────────
-Queue position: #1 (first to be deleted)
-Gap protection: Not applicable (other file exists)
-────────────────────────────────────────────
-To keep this file: [Protect] or delete the v2 file.
-```
-
-vs. the scoring system's equivalent:
-```
-File: show-01.avi
-Score: -1947
-  Base: 50, Revision: -2000, Watched: -5, Distance: +8, ...
-```
-
-The procedural version answers "why is this file being deleted?" in one line. The scoring version answers "what is this file's numeric rank?" — which requires further interpretation.
-
----
-
-## Handling Cases Where Scoring Outperforms Procedural
-
-The main scenario where scoring is better is **fine-grained intra-tier ordering**. For example, within Tier 2 (watched, far from current), the scoring system would also factor in codec age, bitrate, and group status to decide between two files at the same distance. The procedural model sorts only by distance.
-
-### Mitigation: Secondary Sort Keys
-
-Each tier can define a secondary sort as a tiebreaker:
-
-```
-Tier 2 — WATCHED, FAR FROM CURRENT POSITION
-  Primary sort: distance descending
-  Tiebreaker: file size descending (reclaim more space first)
-
-Tier 4 — UNWATCHED, FAR BEHIND
-  Primary sort: distance behind descending
-  Tiebreaker: quality ascending (delete worst quality first)
-```
-
-This keeps the model procedural (no additive scoring) while allowing two-level ordering within each tier. Adding more tiebreakers is possible but should be avoided — if a tier needs complex intra-ordering, it is better to split it into two tiers.
-
----
-
-## Implementation Classes
-
-The procedural approach maps cleanly to new classes while replacing the current scoring logic:
-
-### DeletionTier (enum)
-```
-enum class DeletionTier {
-    SupersededRevision = 0,    // Tier 0: procedural
-    LowQualityDuplicate = 1,   // Tier 1: procedural
-    LanguageMismatch = 2,      // Tier 2: procedural
-    LearnedPreference = 3,     // Tier 3: A vs B learned scoring
-    Protected = 100            // Never deleted
-};
-```
-
-### DeletionCandidate (struct)
-```
-struct DeletionCandidate {
-    int lid;
-    int aid;
-    DeletionTier tier;
-    QString reason;       // Human-readable with actual values:
-                          // "Superseded by v2 — this file: v1 480p XviD, newer: v2 1080p HEVC"
-                          // "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
-    QString filePath;
-    QString animeName;
-    qint64 sortKey;       // Tier-specific ordering value
-    bool gapProtected;
-};
-```
-
-### DeletionClassifier (new class — replaces calculateDeletionScore)
-Single responsibility: takes a file and returns its `DeletionTier` + reason.
-```
-class DeletionClassifier {
-public:
-    DeletionCandidate classify(int lid) const;
-private:
-    bool hasNewerLocalRevision(int eid, int version) const;
-    bool hasBetterLocalDuplicate(int lid) const;
-    bool hasBetterLanguageAlternative(int lid) const;
-    // ...uses existing WatchSessionManager helpers for context
-};
-```
-
-### DeletionQueue (new class — replaces deleteNextEligibleFile loop)
-Single responsibility: maintains the ordered queue of candidates.
-```
-class DeletionQueue {
-public:
-    void rebuild();                          // Re-classify all files
-    const DeletionCandidate* next() const;   // First non-protected candidate
-    QList<DeletionCandidate> topN(int n) const; // For sidebar display
-    void protect(int lid);                   // Move file to Protected tier
-    void unprotect(int lid);                 // Re-classify file
-private:
-    QList<DeletionCandidate> m_candidates;   // Sorted by tier, then sortKey
-    QSet<int> m_explicitlyProtected;         // User overrides
-};
-```
-
-This separation means:
-- `DeletionClassifier` can be unit-tested by providing mock database state and asserting tier assignments.
-- `DeletionQueue` can be tested independently from the classifier.
-- The UI (sidebar, card indicators) only needs to read from `DeletionQueue::topN()`.
-- `WatchSessionManager` delegates to `DeletionQueue::next()` instead of implementing its own candidate loop.
-
----
-
-## Migration Path
-
-The procedural system can coexist with the scoring system during development:
-
-1. **Phase 1**: Implement `DeletionClassifier` and `DeletionQueue` alongside the existing scoring code. Add a setting to switch between them ("Deletion strategy: Scoring / Procedural").
-2. **Phase 2**: Wire the UI (sidebar, card indicators from the visualization options above) to the `DeletionQueue` API. Since the queue exposes tier+reason instead of a score, the UI naturally shows human-readable explanations.
-3. **Phase 3**: Once the procedural system is validated, remove the scoring constants and `calculateDeletionScore()` method. The `DeletionClassifier` becomes the single source of truth.
-
----
-
-## Summary: When to Prefer Each Approach
-
-| Use Scoring If... | Use Procedural If... |
-|--------------------|----------------------|
-| You need fine-grained relative ordering across all factors simultaneously | You need each deletion decision to be explainable in one sentence |
-| The weight values will be empirically tuned (e.g., via user feedback or A/B testing) | The rules should be immediately intuitive without tuning |
-| New factors are added frequently and should blend smoothly with existing ones | New rules have clear priority relative to existing ones |
-| The UI will show numeric scores and breakdowns | The UI will show tier names and reason strings |
-
----
-
-# Hybrid Approach: Procedural Tiers + Intra-Tier Scoring + Manual Locks
+# Hybrid Approach: Procedural Tiers + A vs B Learning + Manual Locks
 
 ## Motivation
 
@@ -1334,27 +961,29 @@ function lockReason(file):
 
 ---
 
-## Comparison: All Three Approaches
+## Comparison: Why Hybrid Was Chosen (vs. alternatives considered)
 
-| Aspect | Pure Scoring | Pure Procedural | Hybrid + A vs B Learning |
+| Aspect | Pure Scoring (current) | Pure Procedural (considered) | **Hybrid + A vs B Learning (chosen)** |
 |--------|-------------|----------------|--------------------------|
 | **Tier assignment** | N/A (single score) | Procedural rules | Procedural rules (T0-T2) |
 | **Non-procedural ordering** | N/A (global score) | Single sort key | Learned factor weights from user A vs B choices |
-| **User override** | None | Per-file protect | Anime lock + episode lock |
+| **User override** | None | Per-file protect | Anime lock + episode lock (context menu) |
 | **User input** | None (developer-set weights) | None | A vs B pairwise choices that train the system |
 | **Cold start** | Hardcoded weights (may be wrong) | Hardcoded tier order | All weights at 0; learns from user |
 | **"Why this file?"** | Score breakdown (17 rows) | Tier name + reason | Tier name + reason OR learned score with top contributing factors |
 | **Lock persistence** | N/A | Runtime only | Database-persisted; survives restart |
-| **New file handling** | Scored on arrival | Classified on arrival | Classified on arrival; inherits locks |
-| **UI complexity** | Score numbers + breakdown | Tier labels + reasons | Tier labels + A vs B prompt + weight visualization |
-| **Code complexity** | 1 method, 17 score lines | 1 method, 6 tier blocks | 1 classifier + 1 learner + A vs B dialog |
+| **History** | None | None | Full deletion history (all types, searchable, auditable) |
+| **UI complexity** | Score numbers + breakdown | Tier labels + reasons | Tier labels + A vs B prompt + weight visualization + history |
+| **Code complexity** | 1 method, 17 score lines | 1 method, 6 tier blocks | 1 classifier + 1 learner + A vs B dialog + history manager |
 | **Edge case safety** | Weights may cancel out unpredictably | Tiers are absolute | Tiers are absolute + locks are absolute + learning is gradual |
 
 ---
 
 ## UI for Hybrid Approach
 
-### Card Display with Locks and Tier Info
+### Card Display with Lock Icons
+
+Cards only show the 🔒 icon when a lock is active. No per-file risk indicators.
 
 ```
 ┌──────────────────────────────────┐
@@ -1363,25 +992,26 @@ function lockReason(file):
 │              │ Rating: 8.76      │
 ├──────────────────────────────────┤
 │ 🔒 Ep 1 - Intro                 │  ← locked via anime
-│   \ v1 1080p HEVC [Group]       │     no deletion indicator needed
+│   \ v1 1080p HEVC [Group]       │
 │ 🔒 Ep 2 - Adventure             │
 │   \ v1 720p AVC [Group]         │
 └──────────────────────────────────┘
 
-┌───────────────────────────────────────────────────────┐
-│ Poster       │ Anime B                                │
-│              │ Type: TV                               │
-├───────────────────────────────────────────────────────┤
-│ 🔒 Ep 1 - Special                                    │
-│   \ v1 1080p HEVC [Group]                            │
-│ Ep 2 - Start                                         │
-│   \ v1 480p XviD [OldGrp] 🔴  T0: Superseded by v2  │
-│   \ v2 1080p HEVC [NewGrp] 🟢  Protected (in buffer) │
-│ Ep 3 - Continue                                      │
-│   \ v1 720p [Group]       🟡  Score: 0.23            │
-│        (rating +0.18, distance -0.12, size +0.17)     │
-└───────────────────────────────────────────────────────┘
+┌──────────────────────────────────┐
+│ Poster       │ Anime B           │  ← no lock icon = not locked
+│              │ Type: TV          │
+├──────────────────────────────────┤
+│ 🔒 Ep 1 - Special               │  ← episode-level lock
+│   \ v1 1080p HEVC [Group]       │
+│ Ep 2 - Start                    │  ← not locked, no icon
+│   \ v1 480p XviD [OldGrp]      │
+│   \ v2 1080p HEVC [NewGrp]     │
+│ Ep 3 - Continue                 │
+│   \ v1 720p [Group]            │
+└──────────────────────────────────┘
 ```
+
+Lock/unlock is done via right-click context menus on the card header (anime-level) or episode rows (episode-level). See [UI for Locking](#ui-for-locking) above.
 
 ### Sidebar Deletion Queue
 
@@ -1396,23 +1026,19 @@ function lockReason(file):
 │   ── Auto-delete (procedural) ──       │
 │   1. old-ep01.avi                      │
 │      T0: Superseded by v2              │
-│      [🔒 Lock ep] [🔒 Lock anime]      │
 │   2. dub-ep05.mkv                      │
 │      T2: Language mismatch             │
 │      audio: Italian (pref: Japanese)   │
-│      [🔒 Lock ep] [🔒 Lock anime]      │
 │                                        │
 │   ── Learned (may need A vs B) ──      │
 │   3. show-ep30.mkv                     │
 │      Score: 0.23                       │
-│      [🔒 Lock ep] [🔒 Lock anime]      │
 │   4. naruto-003.mkv                    │
 │      Score: 0.31                       │
-│      [🔒 Lock ep] [🔒 Lock anime]      │
 └────────────────────────────────────────┘
 ```
 
-### Detail Dialog with Lock Controls
+### Detail Dialog
 
 ```
 File: show-ep30.mkv
@@ -1426,11 +1052,9 @@ Factor contributions:
   episode_distance:   -0.12  (30 eps away → normalized 0.40, weight +0.15)
   file_size:          +0.17  (420 MB → normalized 0.79, weight +0.31)
   group_status:       +0.04  (active → 1.0, weight +0.08)
-  session_active:     +0.00  (yes → 1.0, weight -0.05)
+  view_percentage:    +0.00  (96% → normalized 0.96, weight -0.05)
 ──────────────────────────────────────────────
 Lock status: Not locked
-  [🔒 Lock this episode]  [🔒 Lock entire anime]
-──────────────────────────────────────────────
 Gap protection: No (episodes 29 and 31 have files)
 Queue position: #3 overall
 ```
@@ -1602,6 +1226,181 @@ struct DeletionCandidate {
 
 3. **Phase 3 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. Procedural tiers (0-2) handle deterministic cases. Tier 3 uses learned weights. When too few choices have been made, always present A vs B. `deleteNextEligibleFile()` delegates to `HybridDeletionClassifier`.
 
-4. **Phase 4 — UI integration**: Wire Deletion tab (Option 2) with A vs B prompt, learned weights display, and deletion queue. Wire inline card indicators (Option 1) with tier + reason. Lock controls accessible from both tab and cards.
+4. **Phase 4 — UI integration**: Wire Deletion tab with A vs B prompt, learned weights display, deletion queue, and deletion history. Add 🔒 lock icons to anime cards (title + episode rows) when locks are active. Lock/unlock accessible via context menus on card headers and episode rows.
 
 5. **Phase 5 — Remove pure scoring**: Once the learning system has been validated, remove `calculateDeletionScore()` and all `SCORE_*` constants. `HybridDeletionClassifier` becomes the sole deletion decision maker.
+
+---
+
+## Deletion History
+
+### Purpose
+
+The Deletion tab includes a full history of all deletions — both autonomous (procedural and learned) and user-directed (A vs B choices). This lets the user:
+1. **Review past decisions**: see exactly which files were deleted, when, and why.
+2. **Spot bad patterns**: if the system keeps deleting files from an anime the user cares about, the pattern is visible.
+3. **Reverse learning mistakes**: if an early A vs B choice was wrong, the user can see it and make correcting choices going forward.
+4. **Audit space reclamation**: see how much space was freed over time.
+
+### Database Schema
+
+The `deletion_choices` table already stores A vs B user choices (see above). A separate table stores ALL deletions:
+
+```sql
+-- Full deletion history (every file ever auto-deleted or user-deleted)
+CREATE TABLE deletion_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lid INTEGER,                      -- lid of the deleted file
+    aid INTEGER,                      -- anime ID
+    eid INTEGER,                      -- episode ID
+    file_path TEXT,                   -- path at time of deletion (file is gone, path is archived)
+    anime_name TEXT,                  -- anime name at time of deletion
+    episode_label TEXT,               -- "Ep 30 - Title" at time of deletion
+    file_size INTEGER,                -- file size in bytes at time of deletion
+    tier INTEGER,                     -- tier at time of deletion (0-3)
+    reason TEXT,                      -- full reason string at time of deletion
+    learned_score REAL,               -- learned score (tier 3 only; NULL for procedural)
+    deletion_type TEXT,               -- 'procedural', 'learned_auto', 'user_avsb', 'manual'
+    space_before INTEGER,             -- total used space before deletion (bytes)
+    space_after INTEGER,              -- total used space after deletion (bytes)
+    deleted_at INTEGER                -- Unix timestamp
+);
+CREATE INDEX idx_deletion_history_time ON deletion_history(deleted_at);
+CREATE INDEX idx_deletion_history_aid ON deletion_history(aid);
+CREATE INDEX idx_deletion_history_type ON deletion_history(deletion_type);
+```
+
+**`deletion_type` values**:
+- `procedural`: auto-deleted via tier 0-2 (superseded, duplicate, language mismatch)
+- `learned_auto`: auto-deleted via tier 3 (system was confident enough to act autonomously)
+- `user_avsb`: deleted via user A vs B choice
+- `manual`: deleted via manual user action (context menu delete)
+
+### UI: History Sub-Tab in Deletion Tab
+
+```
+[Hasher] [MyList] [Deletion] [Settings] [Log]
+                      ▲ active
+
+┌──────────────────────────────────────────────────────────────────┐
+│ [Queue] [A vs B] [Weights] [History]                             │
+│                                  ▲ active                        │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│ Deletion History                                 Total freed: 234 GB │
+│ Filter: [All ▾] [All types ▾] [Date range ▾]                    │
+│                                                                  │
+│ Date         File              Anime       Type       Reason     Size  │
+│ ────────────────────────────────────────────────────────────────────── │
+│ 2026-02-24   dbz-045.mkv       Dragon Ball  user_avsb  Score 0.23 1.8GB│
+│ 2026-02-24   naruto-003.mkv    Naruto       learned    Score 0.31 420MB│
+│ 2026-02-23   show-01-v1.avi    Show A       procedural Superseded  2.4GB│
+│ 2026-02-23   dub-ep05.mkv      Anime C      procedural Lang match  620MB│
+│ 2026-02-22   old-movie.avi     Movie D      manual     User delete 4.1GB│
+│ ...                                                                     │
+│                                                                  │
+│ ── Selected: dbz-045.mkv ─────────────────────────────────────── │
+│ Deleted: 2026-02-24 14:32 UTC                                    │
+│ Type: User A vs B choice                                         │
+│ Tier: 3 — LEARNED PREFERENCE                                    │
+│ Score: 0.23                                                      │
+│ Reason: Score: 0.23 — rating: +0.18, distance: -0.12, size: +0.17│
+│ Space freed: 1.8 GB (42 GB → 40.2 GB)                           │
+│ A vs B context: Kept naruto-ep03.mkv (Score: 0.31)               │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### History Features
+
+| Feature | Description |
+|---------|-------------|
+| **Filter by anime** | Show only deletions for a specific anime |
+| **Filter by type** | Show only procedural / learned / user / manual deletions |
+| **Filter by date** | Show deletions in a date range |
+| **Sort** | By date (default), size, anime, tier |
+| **Detail panel** | Click a row to see full reason string, tier, score, and A vs B context if applicable |
+| **Space summary** | Total space freed, per-type breakdown, space freed per week/month |
+
+### DeletionHistoryManager (new class)
+
+```
+class DeletionHistoryManager {
+public:
+    // Record a deletion
+    void recordDeletion(int lid, int tier, const QString &reason,
+                        double learnedScore, const QString &deletionType,
+                        qint64 spaceBefore, qint64 spaceAfter);
+
+    // Query history
+    QList<DeletionHistoryEntry> allEntries(int limit = 100, int offset = 0) const;
+    QList<DeletionHistoryEntry> entriesForAnime(int aid) const;
+    QList<DeletionHistoryEntry> entriesByType(const QString &type) const;
+    QList<DeletionHistoryEntry> entriesInRange(qint64 fromTs, qint64 toTs) const;
+
+    // Statistics
+    qint64 totalSpaceFreed() const;
+    QMap<QString, qint64> spaceFreedByType() const;  // type → bytes
+    int totalDeletions() const;
+
+signals:
+    void entryAdded(int historyId);
+};
+```
+
+### DeletionHistoryEntry (value type)
+
+```
+struct DeletionHistoryEntry {
+    int id;
+    int lid;
+    int aid;
+    int eid;
+    QString filePath;
+    QString animeName;
+    QString episodeLabel;
+    qint64 fileSize;
+    int tier;
+    QString reason;
+    double learnedScore;       // -1.0 if not applicable (procedural tiers)
+    QString deletionType;      // "procedural", "learned_auto", "user_avsb", "manual"
+    qint64 spaceBefore;
+    qint64 spaceAfter;
+    qint64 deletedAt;          // Unix timestamp
+};
+```
+
+---
+
+## Open Questions for Clarification
+
+The following questions need user input before implementation can proceed:
+
+### Q1: Gap protection scope
+Currently, gap protection prevents deleting a file if it would create a hole in the episode sequence. Should gap protection also consider **cross-anime** continuity (e.g., a sequel's episode 1 should not be deleted if the prequel's final episode is present)?
+
+### Q2: Lock reason / notes
+Should locks support optional user notes (e.g., "rewatching", "seeding")? Or is a simple on/off lock sufficient?
+
+### Q3: Minimum A vs B choices before autonomous deletion
+The design proposes ~20 choices before the system starts making autonomous learned-tier decisions. Is 20 about right, or should it be configurable? Too few = premature autonomy; too many = annoying prompts.
+
+### Q4: Deletion tab sub-tab layout
+The Deletion tab would have sub-tabs: [Queue], [A vs B], [Weights], [History]. Is this grouping right? Or should the A vs B prompt be a modal dialog that appears on top of the main app when a choice is needed?
+
+### Q5: Handling anime with no session
+For the `view_percentage` factor — if an anime has no active session (user never played any episode), should view percentage default to 0 (treat as fully unwatched) or be excluded from the learned score entirely?
+
+### Q6: Should the system auto-pause A vs B prompts during playback?
+If the user is watching an episode and space pressure triggers a deletion need, should the A vs B prompt wait until playback ends? Or should it appear immediately?
+
+### Q7: Learned weight reset
+Should the user be able to reset all learned weights to 0 and start over? This would be useful if their preferences change significantly (e.g., they start collecting a new genre).
+
+### Q8: History retention period
+Should deletion history be kept indefinitely, or pruned after a certain period (e.g., 1 year)? Indefinite history grows the database but provides full audit trail.
+
+### Q9: Should autonomous procedural deletions require notification?
+When the system auto-deletes a superseded revision or language-mismatch file, should it show a notification/toast? Or just log it silently?
+
+### Q10: Episode-level lock without anime-level lock — what about new files?
+If the user locks episode 5 of Anime X, and a new file arrives for episode 5 — should it be automatically locked? (Current design says yes — the lock is on the episode, not the file.)
