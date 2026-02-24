@@ -30,7 +30,7 @@ Each file starts at score 50 and is adjusted by:
 | Bitrate deviation | -10 to -40 | Only with multiple files per episode |
 | Codec age | +10 / -15 / -30 | Modern, old, or ancient codec |
 
-Gap protection prevents deleting files that would create holes in episode sequences. Gap protection is **cross-anime**: it considers prequel/sequel chains (via `AnimeChain` relation data). Only **adjacent anime** in the chain are checked — e.g., if the user has Inuyasha → Final Act → Yashahime, gap protection checks Inuyasha↔Final Act and Final Act↔Yashahime boundaries, not Inuyasha↔Yashahime directly. See Q13 for discussion of deeper chain traversal.
+Gap protection prevents deleting files that would create holes in episode sequences. Gap protection is **cross-anime**: it considers prequel/sequel chains (via `AnimeChain` relation data) and **spans across the entire series** — e.g., if the user has Inuyasha → Final Act → Yashahime → Yashahime S2, gap protection checks all chain boundaries (Inuyasha↔Final Act, Final Act↔Yashahime, Yashahime↔S2). Deleting the last episode of Inuyasha when the first episode of Final Act exists would create a cross-series gap.
 
 Lower score = higher deletion priority.
 
@@ -64,7 +64,7 @@ Add the 🔒 lock icon to the anime card title and episode rows when a lock is a
 - **Contextual**: user sees the lock status alongside episode info, watch state, and quality metadata
 
 ### Cons
-- **No deletion info on cards**: user must switch to the Deletion tab to see what will be deleted next
+- **No deletion info on cards**: user must switch to the Current Choice tab to see what will be deleted next
 - **Lock-only**: cards show lock state but not deletion priority or reason
 
 ### Implementation Complexity
@@ -75,14 +75,14 @@ Add the 🔒 lock icon to the anime card title and episode rows when a lock is a
 
 ---
 
-## Option 2: Dedicated "Deletion" Tab
+## Option 2: Dedicated "Current Choice" Tab
 
 ### Description
 Add a new top-level tab (alongside MyList, Hasher, Settings, etc.) that shows a sorted table of all files ranked by deletion score. This tab is the single place for reviewing, overriding, and understanding deletion decisions.
 
 ### Mockup
 ```
-[Hasher] [MyList] [Deletion] [Settings] [Log]
+[Hasher] [MyList] [Current Choice] [Settings] [Log]
                       ▲ active
 
 ┌──────────────────────────────────────────────────────────┐
@@ -138,7 +138,7 @@ Option 1 (lock icons on cards) provides at-a-glance lock visibility without navi
 
 ### Implementation Plan
 
-**Phase 1 — Deletion Tab** (Option 2):
+**Phase 1 — Current Choice Tab** (Option 2):
 The tab is the primary workspace for understanding and controlling deletion behavior. It shows the full ranked candidate list, A vs B prompts, learned weight visualization, deletion history, and space metrics. This is where the user teaches the system.
 
 **Phase 2 — Lock Icons on Cards** (Option 1):
@@ -440,9 +440,9 @@ With all weights at 0, every file gets score 0 — effectively random ordering. 
 ### When to Request A vs B vs. Autonomous Delete
 
 A vs B choices are never presented as popups. When user input is needed, the system:
-1. Loads the A vs B pair into the "Current Choice" groupbox in the Deletion tab.
+1. Loads the A vs B pair into the "A vs B" groupbox in the Current Choice tab.
 2. Signals the tray icon to blink/change (badge).
-3. Waits until the user opens the Deletion tab and makes a choice.
+3. Waits until the user opens the Current Choice tab and makes a choice.
 4. If space pressure is critical and no choice has been made, the system **does not** force a deletion — it waits.
 
 ```
@@ -458,13 +458,13 @@ function handleDeletionNeeded():
 
     // If factor weights are undertrained (< 50 choices made), always request choice.
     if totalChoicesMade < MIN_CHOICES:
-        queueAvsBChoice(top2[0], top2[1])  // Loads into Current Choice, signals tray icon
+        queueAvsBChoice(top2[0], top2[1])  // Loads into A vs B, signals tray icon
         return
 
     // If the top two candidates are very close in learned score, request choice.
     scoreDiff = abs(top2[0].learnedScore - top2[1].learnedScore)
     if scoreDiff < CONFIDENCE_THRESHOLD:
-        queueAvsBChoice(top2[0], top2[1])  // Loads into Current Choice, signals tray icon
+        queueAvsBChoice(top2[0], top2[1])  // Loads into A vs B, signals tray icon
         return
 
     // Otherwise, delete autonomously.
@@ -501,28 +501,28 @@ CREATE TABLE deletion_choices (
 CREATE INDEX idx_deletion_choices_time ON deletion_choices(chosen_at);
 ```
 
-### UI: Deletion Tab Layout
+### UI: Current Choice Tab Layout
 
-The Deletion tab uses a vertical layout with groupboxes — **no sub-tabs**. The layout is:
+The Current Choice tab uses a vertical layout with groupboxes — **no sub-tabs**. The layout is:
 
-1. **Current Choice** (top-left) + **Weights** (top-right) — side by side
+1. **A vs B** (top-left) + **Weights** (top-right) — side by side
 2. **Queue** (middle, full width)
 3. **History** (bottom, full width)
 
-Selecting an entry from Queue or History loads its details in the Current Choice groupbox.
+Selecting an entry from Queue or History loads its details in the A vs B groupbox.
 
-All A vs B interaction happens **inside the Deletion tab only** — no popup dialogs, no modal windows. When the system needs user input, the tray icon blinks/changes to signal that a choice is pending. The user opens the Deletion tab at their convenience.
+All A vs B interaction happens **inside the Current Choice tab only** — no popup dialogs, no modal windows. When the system needs user input, the tray icon shows a red exclamation mark (❗) on its right half to signal that a choice is pending. The user opens the Current Choice tab at their convenience.
 
 ```
-[Hasher] [MyList] [Deletion] [Settings] [Log]
-                      ▲ active
+[Hasher] [MyList] [Current Choice] [Settings] [Log]
+                           ▲ active
 
 ┌──────────────────────────────────────────────────────────────────┐
 │ Deletion Management                         Space: 42 / 500 GB  │
 │ Threshold: 50 GB │ Mode: Auto │ [▶ Run Now] [⏸ Pause]          │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│ ┌─ Current Choice ─────────────────┐┌─ Learned Weights ────────┐│
+│ ┌─ A vs B ────────────────────────────┐┌─ Learned Weights ────────┐│
 │ │                                   ││                          ││
 │ │ ⚡ Choice needed                   ││ Choices: 50 (trained)    ││
 │ │                                   ││                          ││
@@ -567,12 +567,12 @@ All A vs B interaction happens **inside the Deletion tab only** — no popup dia
 │ │ 2026-02-23   dub-ep05.mkv      Anime C      procedural 620MB ││
 │ │ ...                                                            ││
 │ │                                                                ││
-│ │ Click entry to load details in Current Choice.                 ││
+│ │ Click entry to load details in A vs B.                        ││
 │ └────────────────────────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Tray icon behavior**: When the system needs an A vs B choice, the tray icon blinks or changes (e.g., adds a small badge). No popups, no notifications, no toasts — the user opens the Deletion tab when convenient. If space pressure is critical and no choice has been made, the system waits (no autonomous deletion for under-trained learned tier).
+**Tray icon behavior**: When the system needs an A vs B choice, the tray icon shows a red exclamation mark (❗) on its right half. No popups, no notifications, no toasts — the user opens the Current Choice tab when convenient. If space pressure is critical and no choice has been made, the system waits (no autonomous deletion for under-trained learned tier).
 
 ### Integration with Procedural Tiers and Locks
 
@@ -582,10 +582,10 @@ The A vs B learning system works alongside — not instead of — the procedural
 |-----------|-------|----------|
 | **Lock (🔒)** | Protect highest-rated file | Locked episode/anime keeps 1 best file; duplicates still eligible for deletion and A vs B |
 | **Procedural tiers (T0-T2)** | Deterministic deletions | Files with objectively better replacements are deleted autonomously |
-| **A vs B choices** | Preference learning | User makes choices in the Deletion tab when convenient; tray icon signals pending choice |
+| **A vs B choices** | Preference learning | User makes choices in the Current Choice tab when convenient; tray icon signals pending choice |
 | **Learned weights** | Autonomous preference deletions | Once weights are trained (50+ choices), most non-procedural deletions happen automatically |
 
-The highest-rated file of a locked episode never appears in A vs B and is never auto-deleted. Lower-rated duplicates of locked episodes ARE eligible for deletion — the lock ensures at least 1 file remains, not that all files are preserved. A procedurally-deletable file (superseded, duplicate, language mismatch) is deleted without asking. The A vs B prompt only appears in the Deletion tab for genuinely ambiguous cases — and over time, those cases become rarer as the weights converge.
+The highest-rated file of a locked episode never appears in A vs B and is never auto-deleted. Lower-rated duplicates of locked episodes ARE eligible for deletion — the lock ensures at least 1 file remains, not that all files are preserved. A procedurally-deletable file (superseded, duplicate, language mismatch) is deleted without asking. The A vs B prompt only appears in the Current Choice tab for genuinely ambiguous cases — and over time, those cases become rarer as the weights converge.
 
 ---
 
@@ -989,7 +989,7 @@ function isHighestRatedFileForEpisode(lid, eid):
     files = getLocalFilesForEpisode(eid)
     if files.isEmpty():
         return false
-    bestFile = files.sortByRatingCriteria(DESC).first()  // Q12: criteria TBD
+    bestFile = files.sortByRatingCriteria(DESC).first()  // Q12: language match first (audio > sub), then full composite score
     return bestFile.lid == lid
 
 function lockReason(file):
@@ -1070,14 +1070,14 @@ Lock/unlock is done via right-click context menus on the card header (anime-leve
 
 ### Sidebar Deletion Queue
 
-**Removed**: The sidebar queue was replaced by the Queue groupbox in the Deletion tab (see [Deletion Tab Layout](#ui-deletion-tab-layout) above). All deletion information is consolidated in the Deletion tab.
+**Removed**: The sidebar queue was replaced by the Queue groupbox in the Current Choice tab (see [Current Choice Tab Layout](#ui-current-choice-tab-layout) above). All deletion information is consolidated in the Current Choice tab.
 
-### Detail View (in Current Choice groupbox)
+### Detail View (in A vs B groupbox)
 
-When a queue or history entry is selected, its details appear in the Current Choice groupbox at the top of the Deletion tab:
+When a queue or history entry is selected, its details appear in the A vs B groupbox at the top of the Current Choice tab:
 
 ```
-┌─ Current Choice ──────────────────────────────────────────────┐
+┌─ A vs B ──────────────────────────────────────────────────────┐
 │                                                                │
 │ File: show-ep30.mkv                                            │
 │ Anime: Show B | Episode: 30 | Group: SubGroup                 │
@@ -1185,7 +1185,7 @@ public:
     // Process a user A vs B choice
     void recordChoice(int keptLid, int deletedLid);
 
-    // Reset all weights to 0 and clear choice history.
+    // Reset all weights to 0 and clear choice history (full clean slate).
     // UI must show double confirmation before calling this.
     void resetAllWeights();
 
@@ -1266,7 +1266,7 @@ struct DeletionCandidate {
 
 3. **Phase 3 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. Procedural tiers (0-2) handle deterministic cases. Tier 3 uses learned weights. When too few choices have been made, always present A vs B. `deleteNextEligibleFile()` delegates to `HybridDeletionClassifier`.
 
-4. **Phase 4 — UI integration**: Wire Deletion tab with A vs B prompt, learned weights display, deletion queue, and deletion history. Add 🔒 lock icons to anime cards (title + episode rows) when locks are active. Lock/unlock accessible via context menus on card headers and episode rows.
+4. **Phase 4 — UI integration**: Wire Current Choice tab with A vs B prompt, learned weights display, deletion queue, and deletion history. Add 🔒 lock icons to anime cards (title + episode rows) when locks are active. Lock/unlock accessible via context menus on card headers and episode rows.
 
 5. **Phase 5 — Remove pure scoring**: Once the learning system has been validated, remove `calculateDeletionScore()` and all `SCORE_*` constants. `HybridDeletionClassifier` becomes the sole deletion decision maker.
 
@@ -1276,7 +1276,7 @@ struct DeletionCandidate {
 
 ### Purpose
 
-The Deletion tab includes a full history of all deletions — both autonomous (procedural and learned) and user-directed (A vs B choices). This lets the user:
+The Current Choice tab includes a full history of all deletions — both autonomous (procedural and learned) and user-directed (A vs B choices). This lets the user:
 1. **Review past decisions**: see exactly which files were deleted, when, and why.
 2. **Spot bad patterns**: if the system keeps deleting files from an anime the user cares about, the pattern is visible.
 3. **Reverse learning mistakes**: if an early A vs B choice was wrong, the user can see it and make correcting choices going forward.
@@ -1320,7 +1320,7 @@ CREATE INDEX idx_deletion_history_type ON deletion_history(deletion_type);
 
 ### UI: Deletion History Groupbox
 
-The History groupbox is at the bottom of the Deletion tab. Clicking a history entry loads its details in the Current Choice groupbox at the top. See the [Deletion Tab Layout](#ui-deletion-tab-layout) mockup above.
+The History groupbox is at the bottom of the Current Choice tab. Clicking a history entry loads its details in the A vs B groupbox at the top. See the [Current Choice Tab Layout](#ui-current-choice-tab-layout) mockup above.
 
 ### History Features
 
@@ -1329,7 +1329,7 @@ The History groupbox is at the bottom of the Deletion tab. Clicking a history en
 | **Filter by anime** | Show only deletions for a specific anime |
 | **Filter by type** | Show only procedural / learned / user / manual deletions |
 | **Sort** | By date (default), size, anime, tier |
-| **Click to view** | Click a row to load full details in the Current Choice groupbox |
+| **Click to view** | Click a row to load full details in the A vs B groupbox |
 | **Space summary** | Total space freed shown in groupbox header |
 | **Retention** | Oldest entries pruned beyond 5000 |
 
@@ -1390,41 +1390,48 @@ struct DeletionHistoryEntry {
 
 | # | Question | Decision |
 |---|----------|----------|
-| Q1 | Gap protection scope | **Cross-anime**: uses `AnimeChain` prequel/sequel relations to prevent gaps across series |
+| Q1 | Gap protection scope | **Cross-anime, full chain**: uses `AnimeChain` prequel/sequel relations to prevent gaps across the entire series chain |
 | Q2 | Lock reason / notes | **Simple on/off**: no reason field, no notes |
 | Q3 | Min A vs B choices before autonomy | **50** (conservative; even 1000 could produce wrong decisions, so this is an acknowledged arbitrary value) |
-| Q4 | Deletion tab layout | **Vertical groupboxes**: Current Choice + Weights (top), Queue (middle), History (bottom). No sub-tabs. |
+| Q4 | Current Choice tab layout | **Vertical groupboxes**: A vs B + Weights (top), Queue (middle), History (bottom). No sub-tabs. |
 | Q5 | Anime with no session | **Default to 0.5** (neutral midpoint): no-session anime is neither favored nor penalized by view_percentage. Other factors still contribute. |
-| Q6 | A vs B during playback | **No popups ever**: all deletion interaction stays in Deletion tab. Tray icon blinks when choice is pending. User opens tab at their convenience. |
-| Q7 | Weight reset | **Yes, with double warning**: two confirmation dialogs before resetting all weights to 0 |
+| Q6 | A vs B during playback | **No popups ever**: all deletion interaction stays in Current Choice tab. Tray icon shows red ❗ when choice is pending. User opens tab at their convenience. |
+| Q7 | Weight reset | **Yes, with double warning**: two confirmation dialogs before resetting all weights to 0 AND clearing the A vs B choice history (full clean slate) |
 | Q8 | History retention | **5000 entries max**: oldest entries pruned when limit exceeded |
 | Q9 | Procedural deletion notifications | **No notifications**: history is the record. No popups, no toasts, no system notifications (user has notifications silenced). |
 | Q10 | Lock + new files | **Lock keeps 1 highest-rated file per episode**: new files for locked episodes are covered by the lock, but only the highest-rated file is protected. Duplicates of locked episodes are still eligible for deletion. |
+| Q11 | No-session anime default | **Approach B (default to 0.5)**: neutral midpoint, so no-session anime is neither favored nor penalized by view_percentage |
+| Q12 | "Highest-rated file" criteria for locks | **Option C (full composite score) with language as top priority**: use the full scoring system to pick the "best" file, but prioritize language match above all other factors. A file matching preferred audio is always ranked higher than one that doesn't, regardless of quality score. |
+| Q13 | Cross-anime gap protection depth | **Full chain**: gap protection spans the entire prequel→sequel chain, not just adjacent entries. All chain boundaries are checked. |
+| Q14 | Weight reset scope | **Full clean slate**: reset all weights to 0 AND clear the A vs B choice history (`deletion_choices` table). Double warning required. |
+| Q15 | Tray icon badge | **Red exclamation mark (❗) on icon's right half**: no blink, no number badge, no color change — just a static red ❗ overlay on the right side of the tray icon when a choice is pending. |
 
 ---
 
 ## Follow-Up Questions
 
-### Q11: No-session anime default — which approach?
-Four approaches were analyzed for handling `view_percentage` when an anime has no active session (see [Factor Definitions](#factor-definitions-learnable) above). The recommendation is **Approach B (default to 0.5)** — neutral midpoint, so no-session anime is neither favored nor penalized. Do you agree, or prefer a different approach?
+All previous questions (Q1-Q15) have been resolved. See the Resolved Design Decisions table above for the full list.
 
-### Q12: "Highest-rated file" criteria for locks
-Lock protects the "highest-rated" file per episode. What determines "highest rated"?
-- **Option A**: Quality score only (resolution × codec × bitrate) — purely technical
-- **Option B**: Quality score + language match — prefers the file that is both highest quality AND matches preferred audio/sub
-- **Option C**: The file with the lowest deletion score from the hybrid system — uses the full scoring system to pick the "best" file
+### Q16: "Highest-rated" sort criteria — language priority details
+Q12 resolved to Option C (full composite score) with language as top priority. This means the `sortByRatingCriteria()` function should use: **language match first** (preferred audio > preferred sub), **then** full deletion score as secondary sort. Concretely: among all local files for an episode, the one that matches preferred audio AND subtitle AND has the best composite score is "highest rated." But what if no file matches both audio and subtitle? Should the system prefer audio-only match over sub-only match? Or should it fall back purely to composite score? The current assumption is: audio match > sub match > composite score. Please confirm.
 
-### Q13: Cross-anime gap protection — how deep?
-`AnimeChain` tracks prequel→sequel chains. If the user has Inuyasha (144) → Inuyasha Final Act (6716) → Yashahime (15546) → Yashahime S2 (16141), should gap protection span the entire chain? For example: if the user has episodes 1-167 of Inuyasha and episode 1 of Final Act, does gap protection prevent deleting Inuyasha ep 167 (because it would "gap" relative to Final Act ep 1)?
+### Q17: A vs B with only one candidate in Tier 3
+When space is needed and only one file exists in Tier 3 (all others are protected or procedurally deleted), should the system:
+- **A**: Delete it autonomously (it's the only option)
+- **B**: Still show it in the A vs B groupbox as a single-file confirmation ("Delete this file? [Yes] [Skip]")
+- **C**: Wait until a second candidate becomes available
 
-### Q14: Weight reset scope
-When the user resets weights, should the A vs B choice history (`deletion_choices` table) also be cleared? Options:
-- **A**: Reset weights only — choice history preserved for potential future retraining
-- **B**: Reset weights AND clear choice history — full clean slate
-- **C**: Reset weights, archive choice history to a separate table — audit trail preserved but doesn't influence new weights
+### Q18: Queue behavior when space is sufficient
+When disk usage is below the deletion threshold, should the Current Choice tab:
+- **A**: Show an empty queue with "No deletions needed"
+- **B**: Still show the ranked list of what WOULD be deleted if space were needed (preview mode)
+- **C**: Show the queue but grayed out / disabled
 
-### Q15: Tray icon badge — what information?
-The tray icon blinks when a choice is pending. Should it show any additional info?
-- **A**: Just blink/change — no text
-- **B**: Small number badge (e.g., "3" for 3 pending choices)
-- **C**: Color change only (normal → orange when pending)
+### Q19: Cross-anime gap — chain direction
+Gap protection spans the entire series chain. When checking if deleting a file creates a gap, should the system check both directions (prequels and sequels) or only forward (sequels)? Example: if the user has Final Act ep 1-26 and Yashahime ep 1, should deleting Final Act ep 26 be protected because of Yashahime ep 1 (forward gap)? And should deleting Final Act ep 1 be protected because of Inuyasha ep 167 (backward gap)?
+
+### Q20: Red exclamation mark — clear condition
+The tray icon shows ❗ when a choice is pending. When should it be cleared?
+- **A**: Immediately when the user opens the Current Choice tab (even if they don't make a choice)
+- **B**: Only when the user makes a choice (Delete A / Delete B) or clicks Skip
+- **C**: Only when there are no more pending choices in the queue
