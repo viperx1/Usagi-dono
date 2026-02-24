@@ -353,7 +353,7 @@ void TestHiddenCardSorting::testHiddenCardsWithinChainKeepRelationOrder()
     };
     
     // Create a chain: 100 (visible) -> 101 (hidden) -> 102 (hidden) -> 103 (visible)
-    // After orderChain reversal: 103 (visible) -> 102 (hidden) -> 101 (hidden) -> 100 (visible)
+    // After orderChain: 100 (visible) -> 101 (hidden) -> 102 (hidden) -> 103 (visible)
     AnimeChain mixedChain(100, lookup);
     mixedChain.expand(lookup);
     
@@ -367,14 +367,14 @@ void TestHiddenCardSorting::testHiddenCardsWithinChainKeepRelationOrder()
     QList<int> chainAnimeIds = mixedChain.getAnimeIds();
     QCOMPARE(chainAnimeIds.size(), 4);
     
-    // Verify the chain is ordered by relation (sequel->prequel), NOT by hidden status
-    // Expected order (reversed): 103 -> 102 -> 101 -> 100
-    QVERIFY2(chainAnimeIds.indexOf(103) < chainAnimeIds.indexOf(102), 
-             "103 (visible) comes before 102 (hidden) - relation order preserved");
-    QVERIFY2(chainAnimeIds.indexOf(102) < chainAnimeIds.indexOf(101), 
-             "102 (hidden) comes before 101 (hidden) - relation order preserved");
-    QVERIFY2(chainAnimeIds.indexOf(101) < chainAnimeIds.indexOf(100), 
-             "101 (hidden) comes before 100 (visible) - relation order preserved");
+    // Verify the chain is ordered by relation (prequel->sequel), NOT by hidden status
+    // Expected order: 100 -> 101 -> 102 -> 103
+    QVERIFY2(chainAnimeIds.indexOf(100) < chainAnimeIds.indexOf(101), 
+             "100 (visible) comes before 101 (hidden) - relation order preserved");
+    QVERIFY2(chainAnimeIds.indexOf(101) < chainAnimeIds.indexOf(102), 
+             "101 (hidden) comes before 102 (hidden) - relation order preserved");
+    QVERIFY2(chainAnimeIds.indexOf(102) < chainAnimeIds.indexOf(103), 
+             "102 (hidden) comes before 103 (visible) - relation order preserved");
     
     // This chain has visible anime (100 and 103), so it should be sorted normally (not moved to end)
     // when compared with a fully hidden chain
