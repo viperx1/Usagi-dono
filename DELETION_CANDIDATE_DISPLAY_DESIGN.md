@@ -1181,7 +1181,8 @@ signals:
 
 private:
     void propagateToMylist(int aid, int eid, int lockValue);
-    void recalculateMylistLocks(int aid, int eid);  // After unlock, recheck remaining locks for affected rows
+    void recalculateMylistLocksForAnime(int aid);    // After anime unlock
+    void recalculateMylistLocksForEpisode(int eid);  // After episode unlock
 };
 ```
 
