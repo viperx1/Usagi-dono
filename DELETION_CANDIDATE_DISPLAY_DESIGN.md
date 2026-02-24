@@ -1246,9 +1246,9 @@ public:
         DeletionLockManager &lockManager,
         FactorWeightLearner &learner);
 
-    void rebuild();                     // Classifies ALL local files (no limit)
+    void rebuild();                     // Classifies ALL local files: populates m_candidates (T0-T3) and m_lockedFiles
     const DeletionCandidate* next() const;
-    QList<DeletionCandidate> allCandidates() const;  // Full list: deletable + locked files
+    QList<DeletionCandidate> allCandidates() const;  // Returns m_candidates + m_lockedFiles combined; locked entries have locked=true in DeletionCandidate
 
     // Returns true if A vs B prompt is needed for the top candidate
     bool needsUserChoice() const;
@@ -1265,8 +1265,10 @@ public:
     void recordChoice(int keptLid, int deletedLid);
 
 private:
-    QList<DeletionCandidate> m_candidates;      // Deletable candidates (T0-T3), sorted
+    QList<DeletionCandidate> m_candidates;      // Deletable candidates (T0-T3), sorted by tier+score
     QList<DeletionCandidate> m_lockedFiles;      // Locked files shown for visibility (Q21)
+    // Invariant: m_candidates and m_lockedFiles are disjoint (no file in both).
+    // rebuild() is the sole method that populates both lists from scratch.
     HybridDeletionClassifier &m_classifier;
     DeletionLockManager &m_lockManager;
     FactorWeightLearner &m_learner;
