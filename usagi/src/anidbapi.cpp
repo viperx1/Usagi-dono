@@ -13,6 +13,7 @@
 #include <QFileInfo>
 #include <QMutex>
 #include <QSet>
+#include <QHash>
 
 // Global pointer to the AniDB API instance
 // This is initialized by the application (window.cpp) or tests
@@ -21,7 +22,8 @@ myAniDBApi *adbapi = nullptr;
 
 namespace {
 QMutex s_animeRequestMutex;
-QSet<int> s_animeRequestInFlight;
+QHash<int, qint64> s_animeRequestInFlight;
+constexpr qint64 ANIME_REQUEST_INFLIGHT_TIMEOUT_SECS = 300;
 }
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
@@ -2670,12 +2672,25 @@ QString AniDBApi::Anime(int aid)
 	// Request anime information by anime ID
 	{
 		QMutexLocker animeRequestLocker(&s_animeRequestMutex);
+		const qint64 now = QDateTime::currentSecsSinceEpoch();
+		
+		// Remove stale in-flight entries to avoid permanently blocking retries
+		for (auto it = s_animeRequestInFlight.begin(); it != s_animeRequestInFlight.end(); ) {
+			if ((now - it.value()) >= ANIME_REQUEST_INFLIGHT_TIMEOUT_SECS) {
+				Logger::log(QString("[AniDB API] Expiring stale in-flight ANIME request guard for AID %1 (age=%2s)")
+					.arg(it.key()).arg(now - it.value()), __FILE__, __LINE__);
+				it = s_animeRequestInFlight.erase(it);
+			} else {
+				++it;
+			}
+		}
+		
 		if(s_animeRequestInFlight.contains(aid))
 		{
 			Logger::log(QString("[AniDB API] Duplicate ANIME request blocked for AID %1 (already in-flight)").arg(aid), __FILE__, __LINE__);
-			return GetTag("");
+			return QString("DUPLICATE_ANIME_AID_%1").arg(aid);
 		}
-		s_animeRequestInFlight.insert(aid);
+		s_animeRequestInFlight.insert(aid, now);
 	}
 	
 	if(SID.length() == 0 || LoginStatus() == 0)
