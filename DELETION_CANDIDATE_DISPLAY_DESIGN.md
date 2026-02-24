@@ -61,13 +61,13 @@ Add visual markers directly to the episode/file tree within each `AnimeCard`. Fi
 Tooltip on 🔴:
   Score: -42
   ────────────────
-  Base:               50
-  Already watched:    -5
-  Distance (47 eps): -47
-  Ancient codec:     -30
-  Low quality:       -35
-  Preferred audio:   +30
-  Not preferred sub: -20
+  Base:                        50
+  Already watched:             -5
+  Distance (47 eps away):    -47
+  Codec: XviD (ancient):     -30   expected: HEVC/AV1
+  Quality: low (score 20):   -35   expected: ≥60
+  Audio: Japanese:           +30   matches preferred
+  Subtitle: none:            -20   preferred: English
   ────────────────
   Gap protected: No
 ```
@@ -325,22 +325,22 @@ For any UI element that shows score details, the following information should be
 ```
 File: show-01.avi
 Anime: Show A | Episode: 1 | Group: SubGroup
-──────────────────────────────────────
-Factor                        Score
-──────────────────────────────────────
+──────────────────────────────────────────────────────────
+Factor                        Score   Actual → Expected
+──────────────────────────────────────────────────────────
 Base score                      +50
-Watch status (watched)           -5
-Distance (47 episodes away)     -47
-Codec (XviD — ancient)          -30
-Quality (low)                   -35
-Audio (Japanese — preferred)    +30
-Subtitle (none — not preferred) -20
-Anime rating (5.2 — low)       -15
-Group status (disbanded)        -25
-──────────────────────────────────────
+Watch status (watched)           -5   viewed
+Distance (47 episodes away)     -47   ep 1 → current ep 48
+Codec (XviD — ancient)          -30   XviD → HEVC/AV1
+Quality (low)                   -35   score 20 → ≥60
+Audio (Japanese — preferred)    +30   Japanese = preferred
+Subtitle (none — not preferred) -20   none → English
+Anime rating (5.2 — low)       -15   520 → ≥800
+Group status (disbanded)        -25   disbanded → active
+──────────────────────────────────────────────────────────
 Total                           -97
 Gap protection: No
-──────────────────────────────────────
+──────────────────────────────────────────────────────────
 ⚡ This file is #3 in deletion queue
 ```
 
@@ -379,38 +379,44 @@ Instead of calculating a score, files are classified into **deletion tiers** usi
 Tier 0 — UNCONDITIONAL DELETE (always safe to remove)
   Rule: File has a newer local revision for the same episode.
   Sort: Oldest revision first.
-  Reason: Superseded files serve no purpose.
+  Reason template: "Superseded by v{N} — this file: v{M} {res} {codec}, newer: v{N} {res} {codec}"
+  Example: "Superseded by v2 — this file: v1 480p XviD, newer: v2 1080p HEVC"
 
 Tier 1 — WATCHED, FAR, NO ACTIVE SESSION
   Rule: File is watched AND the anime has no active watch session
         AND the file is not in an anime the user explicitly protected.
   Sort: Largest file size first (reclaim space fastest).
-  Reason: Completed viewing, no ongoing interest.
+  Reason template: "Watched, no active session — {codec}, {fileSize}, rating {rating}"
+  Example: "Watched, no active session — XviD, 2.4 GB, rating 5.20"
 
 Tier 2 — WATCHED, FAR FROM CURRENT POSITION
   Rule: File is watched AND distance from current episode > aheadBuffer
         AND anime HAS an active session.
   Sort: Distance from current episode descending (farthest first).
-  Reason: Already viewed; unlikely to re-watch soon.
+  Reason template: "Watched, {N} eps from current — ep {fileEp} → current ep {curEp}, {codec}, bitrate {actual}kbps (expected {expected}kbps)"
+  Example: "Watched, 30 eps from current — ep 2 → current ep 32, H.264, bitrate 850kbps (expected 1200kbps)"
 
 Tier 3 — UNWATCHED, LOW QUALITY DUPLICATE
   Rule: File is unwatched AND another file for the same episode exists
         with higher quality/resolution AND that other file is also local.
   Sort: Lower quality first.
-  Reason: Better version is available locally.
+  Reason template: "Lower quality duplicate — this file: {res} {codec} {bitrate}kbps, better: {res} {codec} {bitrate}kbps"
+  Example: "Lower quality duplicate — this file: 480p XviD 600kbps, better: 1080p HEVC 1500kbps"
 
 Tier 4 — UNWATCHED, FAR BEHIND CURRENT POSITION
   Rule: File is unwatched AND episode number < current episode - aheadBuffer
         (i.e., the user has already passed this episode).
   Sort: Distance behind current episode descending.
-  Reason: User likely skipped or no longer needs these.
+  Reason template: "Unwatched, {N} eps behind current — ep {fileEp} → current ep {curEp}, quality {qualityTier}"
+  Example: "Unwatched, 15 eps behind current — ep 3 → current ep 18, quality low"
 
 Tier 5 — PREFERENCE MISMATCH
   Rule: File does not match preferred audio language
         AND does not match preferred subtitle language
         AND another file for the same episode exists that does match.
   Sort: Least-matching first (no audio match + no sub match before just no sub match).
-  Reason: User has a better-fitting version available.
+  Reason template: "Language mismatch — audio: {fileAudio} (preferred: {prefAudio}), sub: {fileSub} (preferred: {prefSub}); alternative has {altAudio}/{altSub}"
+  Example: "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
 
 ── PROTECTION BOUNDARY ──
 Files below this line are never auto-deleted.
@@ -536,7 +542,7 @@ Ep 1 - Intro
   \ v1 480p XviD [Group] 🔴 Superseded (v2 exists locally)
   \ v2 1080p HEVC [Group] 🟢 Protected (unwatched, in buffer)
 Ep 5 - Journey
-  \ v1 720p [Group]       🟡 Watched, 12 eps from current
+  \ v1 720p [Group]       🟡 Watched, 12 eps from current (ep 5 → current ep 17)
 ```
 
 No score numbers needed. The tier name and reason are the complete explanation.
@@ -550,15 +556,16 @@ No score numbers needed. The tier name and reason are the complete explanation.
 │                         │
 │   ── Will delete next ──│
 │   1. show-01.avi        │
-│      Superseded (v2)    │
+│      Superseded (v1→v2) │
 │      [Protect]          │
 │   2. anime-12.mkv       │
 │      Watched, no session│
-│      2.4 GB             │
+│      2.4 GB · XviD      │
 │      [Protect]          │
 │   3. anime-03.mkv       │
 │      Watched, 47 eps    │
 │      from current       │
+│      (ep 3 → cur ep 50) │
 │      [Protect]          │
 └─────────────────────────┘
 ```
@@ -569,7 +576,8 @@ File: show-01.avi
 Anime: Show A | Episode: 1 | Group: SubGroup
 ────────────────────────────────────────────
 Status: Tier 0 — SUPERSEDED REVISION
-Reason: Version 2 exists locally for this episode.
+Reason: This file is v1; v2 exists locally for the same episode.
+        v1 480p XviD → v2 1080p HEVC
 ────────────────────────────────────────────
 Queue position: #1 (first to be deleted)
 Gap protection: Not applicable (other file exists)
@@ -633,7 +641,9 @@ struct DeletionCandidate {
     int lid;
     int aid;
     DeletionTier tier;
-    QString reason;       // Human-readable: "Superseded (v2 exists)"
+    QString reason;       // Human-readable with actual values:
+                          // "Superseded by v2 — this file: v1 480p XviD, newer: v2 1080p HEVC"
+                          // "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
     QString filePath;
     QString animeName;
     qint64 sortKey;       // Tier-specific ordering value
@@ -831,7 +841,8 @@ Tier 0 — SUPERSEDED REVISION
   Intra-tier score:
     - file version (oldest first)
     - file size descending (free more space)
-  Reason: "Superseded by v{N}"
+  Reason: "Superseded by v{N} — this file: v{M} {resolution} {codec}, newer: v{N} {resolution} {codec}"
+  Example: "Superseded by v2 — this file: v1 480p XviD, newer: v2 1080p HEVC"
 
 Tier 1 — WATCHED, NO ACTIVE SESSION
   Rule: File is watched AND anime has no active watch session.
@@ -839,7 +850,8 @@ Tier 1 — WATCHED, NO ACTIVE SESSION
     + anime rating (delete low-rated first)
     + file size descending (free more space)
     + codec age (delete ancient codecs first)
-  Reason: "Watched, no active session"
+  Reason: "Watched, no active session — {codec}, {fileSize}, rating {rating}"
+  Example: "Watched, no active session — XviD, 2.4 GB, rating 5.20"
 
 Tier 2 — WATCHED, FAR FROM CURRENT
   Rule: File is watched AND anime has active session
@@ -848,7 +860,8 @@ Tier 2 — WATCHED, FAR FROM CURRENT
     + distance from current (farthest first)
     + codec age
     + bitrate deviation
-  Reason: "Watched, {N} episodes from current"
+  Reason: "Watched, {N} eps from current — ep {fileEp} → current ep {curEp}, {codec}, bitrate {actual}kbps (expected {expected}kbps)"
+  Example: "Watched, 30 eps from current — ep 2 → current ep 32, H.264, bitrate 850kbps (expected 1200kbps)"
 
 Tier 3 — UNWATCHED LOW-QUALITY DUPLICATE
   Rule: File is unwatched AND another local file for the same episode
@@ -856,7 +869,8 @@ Tier 3 — UNWATCHED LOW-QUALITY DUPLICATE
   Intra-tier score:
     + quality gap (biggest quality difference first)
     + bitrate deviation
-  Reason: "Lower quality duplicate (better version available)"
+  Reason: "Lower quality duplicate — this file: {resolution} {codec} {bitrate}kbps, better: {resolution} {codec} {bitrate}kbps"
+  Example: "Lower quality duplicate — this file: 480p XviD 600kbps, better: 1080p HEVC 1500kbps"
 
 Tier 4 — UNWATCHED, FAR BEHIND CURRENT
   Rule: File is unwatched AND episode is behind current position
@@ -864,7 +878,8 @@ Tier 4 — UNWATCHED, FAR BEHIND CURRENT
   Intra-tier score:
     + distance behind (most behind first)
     + quality (lower quality first)
-  Reason: "Unwatched, {N} episodes behind current"
+  Reason: "Unwatched, {N} eps behind current — ep {fileEp} → current ep {curEp}, quality {qualityTier}"
+  Example: "Unwatched, 15 eps behind current — ep 3 → current ep 18, quality low"
 
 Tier 5 — PREFERENCE MISMATCH WITH ALTERNATIVE
   Rule: File does not match audio AND/OR subtitle preferences
@@ -872,7 +887,8 @@ Tier 5 — PREFERENCE MISMATCH WITH ALTERNATIVE
   Intra-tier score:
     + mismatch severity (no audio + no sub > no sub only)
     + quality (lower quality first among mismatches)
-  Reason: "Language mismatch (better alternative available)"
+  Reason: "Language mismatch — audio: {fileAudio} (preferred: {prefAudio}), sub: {fileSub} (preferred: {prefSub}); alternative has {altAudio}/{altSub}"
+  Example: "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
 
 ── PROTECTION BOUNDARY ──
 
@@ -903,21 +919,26 @@ function classifyFile(file):
 
     // ── Tier 0 ──
     if hasNewerLocalRevision(file.eid, file.version):
-        newerVersion = getNewestLocalVersion(file.eid)
+        newer = getNewestLocalRevision(file.eid)
         score = file.version * 1000 - file.sizeBytes / (1024*1024)
         return { tier: 0, score: score,
-                 reason: "Superseded by v" + newerVersion }
+                 reason: "Superseded by v" + newer.version
+                       + " — this file: v" + file.version + " " + file.resolution + " " + file.codec
+                       + ", newer: v" + newer.version + " " + newer.resolution + " " + newer.codec }
 
     isWatched = file.viewed > 0 OR file.localWatched > 0
 
     // ── Tier 1 ──
     if isWatched AND NOT hasActiveSession(file.aid):
+        rating = animeRating(file.aid)
         score = 0
-        score -= animeRating(file.aid) / 100   // lower rating → lower score → delete first
-        score -= file.sizeBytes / (1024*1024*1024)  // larger file → lower score → delete first
-        score -= codecAgePenalty(file)           // ancient codec → lower score
+        score -= rating / 100
+        score -= file.sizeBytes / (1024*1024*1024)
+        score -= codecAgePenalty(file)
         return { tier: 1, score: score,
-                 reason: "Watched, no active session" }
+                 reason: "Watched, no active session"
+                       + " — " + file.codec + ", " + formatSize(file.sizeBytes)
+                       + ", rating " + formatRating(rating) }
 
     // ── Gather session context ──
     session = findActiveWatchSession(file.aid)
@@ -930,8 +951,13 @@ function classifyFile(file):
         score = -abs(distance) * 100            // farthest first
         score -= codecAgePenalty(file)
         score -= bitrateDeviation(file)
+        expectedBitrate = calculateExpectedBitrate(file.resolution, file.codec)
         return { tier: 2, score: score,
-                 reason: "Watched, " + abs(distance) + " eps from current" }
+                 reason: "Watched, " + abs(distance) + " eps from current"
+                       + " — ep " + file.episodeNumber + " → current ep " + session.currentEpisode
+                       + ", " + file.codec
+                       + ", bitrate " + file.bitrate + "kbps"
+                       + " (expected " + expectedBitrate + "kbps)" }
 
     // ── Tier 3 ──
     if NOT isWatched:
@@ -940,25 +966,36 @@ function classifyFile(file):
             qualityGap = betterDupe.qualityScore - file.qualityScore
             score = -qualityGap * 100 - bitrateDeviation(file)
             return { tier: 3, score: score,
-                     reason: "Lower quality duplicate" }
+                     reason: "Lower quality duplicate"
+                           + " — this file: " + file.resolution + " " + file.codec + " " + file.bitrate + "kbps"
+                           + ", better: " + betterDupe.resolution + " " + betterDupe.codec + " " + betterDupe.bitrate + "kbps" }
 
     // ── Tier 4 ──
     if NOT isWatched AND distance != NO_SESSION AND distance < -aheadBuffer:
         score = distance * 100                  // most behind first (distance is negative)
         score += qualityScore(file)             // lower quality → delete first
         return { tier: 4, score: score,
-                 reason: "Unwatched, " + abs(distance) + " eps behind current" }
+                 reason: "Unwatched, " + abs(distance) + " eps behind current"
+                       + " — ep " + file.episodeNumber + " → current ep " + session.currentEpisode
+                       + ", quality " + qualityTierLabel(file) }
 
     // ── Tier 5 ──
     audioMatch = matchesPreferredAudio(file)
     subMatch = matchesPreferredSub(file)
     if (NOT audioMatch OR NOT subMatch) AND hasBetterLanguageAlternative(file):
+        alt = getBetterLanguageAlternative(file)
         mismatchSeverity = 0
         if NOT audioMatch: mismatchSeverity += 2
         if NOT subMatch: mismatchSeverity += 1
         score = -mismatchSeverity * 1000 + qualityScore(file)
+        reasonParts = []
+        if NOT audioMatch:
+            reasonParts.append("audio: " + file.audioLang + " (preferred: " + preferredAudioLang + ")")
+        if NOT subMatch:
+            reasonParts.append("sub: " + file.subLang + " (preferred: " + preferredSubLang + ")")
         return { tier: 5, score: score,
-                 reason: "Language mismatch" }
+                 reason: "Language mismatch — " + reasonParts.join(", ")
+                       + "; alternative has " + alt.audioLang + "/" + alt.subLang }
 
     // ── Protected ──
     return { tier: PROTECTED, reason: protectionReason(file) }
@@ -1079,43 +1116,47 @@ function lockReason(file):
 │   \ v1 720p AVC [Group]         │
 └──────────────────────────────────┘
 
-┌──────────────────────────────────┐
-│ Poster       │ Anime B           │  ← not locked
-│              │ Type: TV          │
-├──────────────────────────────────┤
-│ 🔒 Ep 1 - Special               │  ← episode locked individually
-│   \ v1 1080p HEVC [Group]       │
-│ Ep 2 - Start                    │
-│   \ v1 480p XviD [OldGrp] 🔴   │  Tier 2: Watched, 30 eps away
-│   \ v2 1080p HEVC [NewGrp] 🟢  │  Protected (unwatched, in buffer)
-│ Ep 3 - Continue                 │
-│   \ v1 720p [Group]       🟡   │  Tier 4: Unwatched, 5 eps behind
-└──────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│ Poster       │ Anime B                                │
+│              │ Type: TV                               │
+├───────────────────────────────────────────────────────┤
+│ 🔒 Ep 1 - Special                                    │
+│   \ v1 1080p HEVC [Group]                            │
+│ Ep 2 - Start                                         │
+│   \ v1 480p XviD [OldGrp] 🔴  Watched, 30 eps       │
+│        (ep 2 → cur ep 32, XviD, 600kbps exp 1200)    │
+│   \ v2 1080p HEVC [NewGrp] 🟢  Protected (in buffer) │
+│ Ep 3 - Continue                                      │
+│   \ v1 720p [Group]       🟡  Unwatched, 5 eps       │
+│        behind (ep 3 → cur ep 8, quality medium)       │
+└───────────────────────────────────────────────────────┘
 ```
 
 ### Sidebar Deletion Queue with Lock Info
 
 ```
-┌─────────────────────────────┐
-│ ▼ Deletion Queue            │
-│   Space: 42 / 500 GB        │
-│   Threshold: 50 GB          │
-│   Locked: 3 anime, 2 eps    │
-│                             │
-│   ── Next to delete ──      │
-│   1. old-ep01.avi           │
-│      Tier 0: Superseded     │
-│      v2 exists locally      │
-│      [🔒 Lock ep] [🔒 Lock anime] │
-│   2. show-ep30.mkv          │
-│      Tier 2: Watched, 30eps │
-│      Score: -3012           │
-│      [🔒 Lock ep] [🔒 Lock anime] │
-│   3. dub-ep05.mkv           │
-│      Tier 5: Lang mismatch  │
-│      JP audio version avail │
-│      [🔒 Lock ep] [🔒 Lock anime] │
-└─────────────────────────────┘
+┌────────────────────────────────────────┐
+│ ▼ Deletion Queue                       │
+│   Space: 42 / 500 GB                   │
+│   Threshold: 50 GB                     │
+│   Locked: 3 anime, 2 eps              │
+│                                        │
+│   ── Next to delete ──                 │
+│   1. old-ep01.avi                      │
+│      Tier 0: Superseded by v2          │
+│      v1 480p XviD → v2 1080p HEVC     │
+│      [🔒 Lock ep] [🔒 Lock anime]      │
+│   2. show-ep30.mkv                     │
+│      Tier 2: Watched, 30 eps           │
+│      ep 2 → cur ep 32, H.264          │
+│      850kbps (exp 1200kbps)            │
+│      [🔒 Lock ep] [🔒 Lock anime]      │
+│   3. dub-ep05.mkv                      │
+│      Tier 5: Language mismatch         │
+│      audio: Italian (pref: Japanese)   │
+│      alt has Japanese/English          │
+│      [🔒 Lock ep] [🔒 Lock anime]      │
+└────────────────────────────────────────┘
 ```
 
 ### Detail Dialog with Lock Controls
@@ -1126,11 +1167,12 @@ Anime: Show B | Episode: 30 | Group: SubGroup
 ──────────────────────────────────────────────
 Classification: Tier 2 — WATCHED, FAR FROM CURRENT
 Reason: Watched, 30 episodes from current position.
+        ep 2 → current ep 32
 
 Intra-tier ranking: #2 of 15 files in Tier 2
-  Distance:          30 eps  (most distant → delete first)
-  Codec:             H.264   (no penalty)
-  Bitrate deviation: 12%     (close to expected)
+  Distance:          30 eps  (ep 2 → current ep 32)
+  Codec:             H.264   (no penalty; modern codecs: HEVC, AV1)
+  Bitrate:           850 kbps (expected 1200 kbps for 720p H.264, deviation 29%)
 ──────────────────────────────────────────────
 Lock status: Not locked
   [🔒 Lock this episode]  [🔒 Lock entire anime]
@@ -1243,7 +1285,9 @@ struct DeletionCandidate {
     int eid;
     int tier;                  // 0-5 or PROTECTED
     int intraTierScore;        // Scoring within the tier
-    QString reason;            // "Watched, 30 eps from current"
+    QString reason;            // Full reason with actual values:
+                               // "Watched, 30 eps from current — ep 2 → current ep 32, H.264, bitrate 850kbps (expected 1200kbps)"
+                               // "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
     QString filePath;
     QString animeName;
     QString episodeLabel;      // "Ep 30 - Title"
