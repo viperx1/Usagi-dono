@@ -9,6 +9,7 @@
 | 2026-02-24T02:11:00Z | Issue #994 identity diagnostics | Added `MyListCardManager` instance/adbapi pointer identity logs on construction and at request entry, including adbapi-null abort logging. | Pending CI rerun evidence; intended to confirm whether duplicate requests come from multiple manager instances. |
 | 2026-02-24T02:54:29Z | Issue #995 queue/emit diagnostics | Added AniDB logs for ANIME packet queue success/failure (with AID+tag), 230 ANIME re-request queue with AID+tag, and `notifyAnimeUpdated` emit with AID+tag. | Pending CI rerun evidence; intended to reveal whether duplicate count comes from re-request/emit path. |
 | 2026-02-24T12:41:41Z | Issue #996 build fix | Fixed compile errors in `AniDBApi::Mylist(int)` where new debug logs incorrectly referenced undefined `aid`; switched logs to correct `lid` and `MYLIST` wording. | Build-failure root cause addressed (compile error on multiple test targets). |
+| 2026-02-24T12:52:35Z | Issue #997 request sequence tracing | Added monotonic request sequence IDs to `MyListCardManager::requestAnimeMetadata` logs and propagated them through local dedupe/global dedupe/dispatch/return logs. | Pending CI rerun evidence; intended to prove whether duplicate count comes from two independent request entries or downstream duplicate handling. |
 
 ## Current hypothesis
 

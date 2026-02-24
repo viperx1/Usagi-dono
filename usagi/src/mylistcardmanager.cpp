@@ -13,6 +13,7 @@
 #include <QNetworkRequest>
 #include <algorithm>
 #include <numeric>
+#include <atomic>
 
 // External references
 extern myAniDBApi *adbapi;
@@ -20,6 +21,7 @@ extern myAniDBApi *adbapi;
 namespace {
 QMutex s_metadataDispatchMutex;
 QSet<int> s_metadataDispatchInFlight;
+std::atomic<quint64> s_metadataRequestSequence{0};
 }
 
 MyListCardManager::MyListCardManager(QObject *parent)
@@ -1735,14 +1737,18 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
 
 void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
 {
+    const quint64 requestSeq = ++s_metadataRequestSequence;
+    
     if (!adbapi) {
-        LOG(QString("[MyListCardManager] requestAnimeMetadata aborted: adbapi=null, manager=%1, aid=%2")
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] aborted: adbapi=null, manager=%2, aid=%3")
+            .arg(requestSeq)
             .arg(reinterpret_cast<quintptr>(this), 0, 16)
             .arg(aid));
         return;
     }
     
-    LOG(QString("[MyListCardManager] requestAnimeMetadata enter: manager=%1 adbapi=%2 aid=%3 reason=%4")
+    LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] enter: manager=%2 adbapi=%3 aid=%4 reason=%5")
+        .arg(requestSeq)
         .arg(reinterpret_cast<quintptr>(this), 0, 16)
         .arg(reinterpret_cast<quintptr>(adbapi), 0, 16)
         .arg(aid)
@@ -1750,15 +1756,16 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
     
     {
         QMutexLocker locker(&m_mutex);
-        LOG(QString("[MyListCardManager] requestAnimeMetadata state before local dedupe: aid=%1, requestedContains=%2, requestedSize=%3")
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] state before local dedupe: aid=%2, requestedContains=%3, requestedSize=%4")
+            .arg(requestSeq)
             .arg(aid)
             .arg(m_animeMetadataRequested.contains(aid) ? "true" : "false")
             .arg(m_animeMetadataRequested.size()));
         if (m_animeMetadataRequested.contains(aid)) {
             if (reason.isEmpty()) {
-                LOG(QString("[MyListCardManager] Metadata request for anime %1 already requested - skipping duplicate request").arg(aid));
+                LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] local dedupe hit for anime %2 - skipping duplicate request").arg(requestSeq).arg(aid));
             } else {
-                LOG(QString("[MyListCardManager] Metadata request for anime %1 already requested - skipping duplicate request (reason: %2)").arg(aid).arg(reason));
+                LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] local dedupe hit for anime %2 - skipping duplicate request (reason: %3)").arg(requestSeq).arg(aid).arg(reason));
             }
             return;
         }
@@ -1767,13 +1774,15 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
     
     {
         QMutexLocker globalLocker(&s_metadataDispatchMutex);
-        LOG(QString("[MyListCardManager] requestAnimeMetadata state before global dedupe: aid=%1, inFlightContains=%2, inFlightSize=%3")
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] state before global dedupe: aid=%2, inFlightContains=%3, inFlightSize=%4")
+            .arg(requestSeq)
             .arg(aid)
             .arg(s_metadataDispatchInFlight.contains(aid) ? "true" : "false")
             .arg(s_metadataDispatchInFlight.size()));
         if (s_metadataDispatchInFlight.contains(aid)) {
             QString reasonSuffix = reason.isEmpty() ? QString() : QString(" (reason: %1)").arg(reason);
-            LOG(QString("[MyListCardManager] Global metadata dispatch dedupe hit for anime %1 - skipping duplicate dispatch%2")
+            LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] global dedupe hit for anime %2 - skipping duplicate dispatch%3")
+                .arg(requestSeq)
                 .arg(aid)
                 .arg(reasonSuffix));
             return;
@@ -1782,14 +1791,17 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
     }
     
     if (reason.isEmpty()) {
-        LOG(QString("[MyListCardManager] Requesting metadata for anime %1").arg(aid));
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] dispatching metadata request for anime %2").arg(requestSeq).arg(aid));
     } else {
-        LOG(QString("[MyListCardManager] Requesting metadata for anime %1 (reason: %2)").arg(aid).arg(reason));
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] dispatching metadata request for anime %2 (reason: %3)").arg(requestSeq).arg(aid).arg(reason));
     }
     QString animeTag = adbapi->Anime(aid);
-    LOG(QString("[MyListCardManager] requestAnimeMetadata dispatched Anime(%1), returned tag=%2").arg(aid).arg(animeTag.isEmpty() ? QString("<empty>") : animeTag));
+    LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] dispatched Anime(%2), returned tag=%3")
+        .arg(requestSeq)
+        .arg(aid)
+        .arg(animeTag.isEmpty() ? QString("<empty>") : animeTag));
     if (animeTag.startsWith("DUPLICATE_ANIME_AID_")) {
-        LOG(QString("[MyListCardManager] requestAnimeMetadata observed AniDB duplicate-block marker for aid=%1").arg(aid));
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] observed AniDB duplicate-block marker for aid=%2").arg(requestSeq).arg(aid));
     }
 }
 
