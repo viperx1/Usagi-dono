@@ -1306,7 +1306,7 @@ CREATE INDEX idx_deletion_history_type ON deletion_history(deletion_type);
 │ Score: 0.23                                                      │
 │ Reason: Score: 0.23 — rating: +0.18, distance: -0.12, size: +0.17│
 │ Space freed: 1.8 GB (42 GB → 40.2 GB)                           │
-│ A vs B context: Kept naruto-ep03.mkv (Score: 0.31)               │
+│ A vs B context: Kept naruto-003.mkv (Score: 0.31)               │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
