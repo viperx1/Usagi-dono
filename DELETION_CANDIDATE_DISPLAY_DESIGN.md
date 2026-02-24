@@ -443,11 +443,11 @@ function assignDeletionTier(file):
         return Tier 1, sortKey = -file.sizeBytes  // largest first
 
     // ── Gather context for remaining tiers ──
-    session = findActiveSessionInSeriesChain(file.animeId)
+    session = findActiveWatchSession(file.animeId)
     if session exists:
         distance = file.totalEpisodePosition - session.currentTotalPosition
     else:
-        distance = MAX_INT  // no session → treat as infinitely far
+        distance = NO_SESSION  // sentinel; file already handled by Tier 1
 
     // ── Tier 2: watched, far from current ──
     if file.isWatched AND distance > aheadBuffer:
@@ -462,9 +462,13 @@ function assignDeletionTier(file):
         return Tier 4, sortKey = distance  // most behind first
 
     // ── Tier 5: preference mismatch with better alternative ──
+    // sortKey: 0 = neither audio nor sub match, 1 = only sub mismatch
     if NOT matchesPreferredAudio(file) AND NOT matchesPreferredSub(file):
         if hasBetterLanguageAlternative(file):
-            return Tier 5, sortKey = 0
+            return Tier 5, sortKey = 0  // worst match — delete first
+    if NOT matchesPreferredSub(file) AND matchesPreferredAudio(file):
+        if hasBetterLanguageAlternative(file):
+            return Tier 5, sortKey = 1  // partial match — delete after full mismatches
 
     // ── Everything else is protected ──
     return PROTECTED
@@ -484,7 +488,10 @@ function selectNextFileToDelete():
     // Remove protected files
     candidates = candidates.filter(c => c.tier != PROTECTED)
 
-    // Sort: tier ascending, then sortKey ascending within tier
+    // Sort: tier ascending, then sortKey ascending within tier.
+    // Each tier's sortKey is pre-computed so that ascending order
+    // produces the intended deletion priority (e.g., Tier 1 uses
+    // -sizeBytes so that the largest file sorts first).
     candidates.sort(by: tier ASC, sortKey ASC)
 
     // Return the first candidate (lowest tier, best sort position)
