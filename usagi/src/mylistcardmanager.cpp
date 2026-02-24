@@ -2260,7 +2260,14 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
         return;
     }
     
-    QString query = QString("SELECT aid, relaidlist, relaidtype FROM anime WHERE aid IN (%1)").arg(aidsList);
+    QString query = QString("SELECT a.aid, a.nameromaji, a.nameenglish, a.eptotal, "
+                            "at.title as anime_title, "
+                            "a.typename, a.startdate, a.enddate, a.picname, a.poster_image, a.category, "
+                            "a.rating, a.tag_name_list, a.tag_id_list, a.tag_weight_list, a.hidden, a.is_18_restricted, "
+                            "a.relaidlist, a.relaidtype "
+                            "FROM anime a "
+                            "LEFT JOIN anime_titles at ON a.aid = at.aid AND at.type = 1 AND at.language = 'x-jat' "
+                            "WHERE a.aid IN (%1)").arg(aidsList);
     QSqlQuery q(db);
     QSet<int> loadedAids;
     
@@ -2269,10 +2276,25 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
         while (q.next()) {
             int aid = q.value(0).toInt();
             loadedAids.insert(aid);
-            CardCreationData data;
-            data.setRelations(q.value(1).toString(), q.value(2).toString());
-            data.hasData = false;  // Mark as partial data (only relations loaded)
-            m_cardCreationDataCache[aid] = data;
+            CardCreationData& data = m_cardCreationDataCache[aid];
+            data.nameRomaji = q.value(1).toString();
+            data.nameEnglish = q.value(2).toString();
+            data.eptotal = q.value(3).toInt();
+            data.animeTitle = q.value(4).toString();
+            data.typeName = q.value(5).toString();
+            data.startDate = q.value(6).toString();
+            data.endDate = q.value(7).toString();
+            data.picname = q.value(8).toString();
+            data.posterData = q.value(9).toByteArray();
+            data.category = q.value(10).toString();
+            data.rating = q.value(11).toString();
+            data.tagNameList = q.value(12).toString();
+            data.tagIdList = q.value(13).toString();
+            data.tagWeightList = q.value(14).toString();
+            data.isHidden = q.value(15).toInt() == 1;
+            data.is18Restricted = q.value(16).toInt() == 1;
+            data.setRelations(q.value(17).toString(), q.value(18).toString());
+            data.hasData = true;
         }
     }
     
