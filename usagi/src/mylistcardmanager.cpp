@@ -1778,8 +1778,11 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
     } else {
         LOG(QString("[MyListCardManager] Requesting metadata for anime %1 (reason: %2)").arg(aid).arg(reason));
     }
-    adbapi->Anime(aid);
-    LOG(QString("[MyListCardManager] requestAnimeMetadata dispatched Anime(%1)").arg(aid));
+    QString animeTag = adbapi->Anime(aid);
+    LOG(QString("[MyListCardManager] requestAnimeMetadata dispatched Anime(%1), returned tag=%2").arg(aid).arg(animeTag.isEmpty() ? QString("<empty>") : animeTag));
+    if (animeTag.startsWith("DUPLICATE_ANIME_AID_")) {
+        LOG(QString("[MyListCardManager] requestAnimeMetadata observed AniDB duplicate-block marker for aid=%1").arg(aid));
+    }
 }
 
 void MyListCardManager::downloadPoster(int aid, const QString &picname)
