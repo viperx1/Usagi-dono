@@ -1125,7 +1125,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
         locker.unlock();
         
         if (needsMetadata) {
-            requestAnimeMetadata(aid);
+            requestAnimeMetadata(aid, "fetch-data-request: metadata missing");
         }
         if (needsPoster) {
             downloadPoster(aid, picname);
@@ -1133,7 +1133,7 @@ void MyListCardManager::onFetchDataRequested(int aid)
     } else {
         locker.unlock();
         if (needsMetadata) {
-            requestAnimeMetadata(aid);
+            requestAnimeMetadata(aid, "fetch-data-request: metadata missing");
         }
     }
     
@@ -1715,10 +1715,14 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
     }
 }
 
-void MyListCardManager::requestAnimeMetadata(int aid)
+void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
 {
     if (adbapi) {
-        LOG(QString("[MyListCardManager] Requesting metadata for anime %1").arg(aid));
+        if (reason.isEmpty()) {
+            LOG(QString("[MyListCardManager] Requesting metadata for anime %1").arg(aid));
+        } else {
+            LOG(QString("[MyListCardManager] Requesting metadata for anime %1 (reason: %2)").arg(aid, reason));
+        }
         adbapi->Anime(aid);
     }
 }
@@ -2184,13 +2188,15 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
             if (!loadedAids.contains(aid) && !m_animeMetadataRequested.contains(aid)) {
                 m_animeMetadataRequested.insert(aid);
                 missingAidsToRequest.append(aid);
+            } else if (!loadedAids.contains(aid) && m_animeMetadataRequested.contains(aid)) {
+                LOG(QString("[MyListCardManager] Related anime aid=%1 still missing from local DB/cache but metadata request already sent earlier").arg(aid));
             }
         }
     }
     
     for (int aid : std::as_const(missingAidsToRequest)) {
         LOG(QString("[MyListCardManager] Related anime aid=%1 missing from local cache/database, requesting metadata").arg(aid));
-        requestAnimeMetadata(aid);
+        requestAnimeMetadata(aid, "chain-preload: related anime missing");
     }
 }
 

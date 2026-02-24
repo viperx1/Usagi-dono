@@ -355,7 +355,7 @@ private:
     void loadEpisodesForCardFromCache(AnimeCard *card, int aid, const QList<EpisodeCacheEntry>& episodes);
     
     // Request missing anime metadata
-    void requestAnimeMetadata(int aid);
+    void requestAnimeMetadata(int aid, const QString& reason = QString());
     
     // Download poster for anime
     void downloadPoster(int aid, const QString &picname);
