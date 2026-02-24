@@ -159,7 +159,7 @@ Option 1 (inline indicators on cards) provides contextual, per-file risk visibil
 ### Implementation Plan
 
 **Phase 1 — Deletion Tab** (Option 2):
-The tab is the primary workspace for understanding and controlling deletion behavior. It shows the full ranked candidate list, per-title preferences, lock controls, and space metrics. This is where the user tunes the system.
+The tab is the primary workspace for understanding and controlling deletion behavior. It shows the full ranked candidate list, A vs B prompts, learned weight visualization, lock controls, and space metrics. This is where the user teaches the system.
 
 **Phase 2 — Inline Card Indicators** (Option 1):
 Add per-file colored risk icons (🟢🟡🔴) to the episode tree in anime cards. Tooltip shows the tier + reason. Clicking the icon navigates to the file's entry in the Deletion tab for full details. This provides at-a-glance awareness without leaving MyList.
@@ -196,6 +196,46 @@ This format makes every scoring decision transparent and gives the user the info
 1. Understand why a file was chosen
 2. Decide whether the scoring weights need tuning
 3. Take manual action to protect specific files
+
+---
+
+# Key Decision Questions
+
+The deletion system design involves many interacting parts. To cut through the complexity, here are the fundamental questions that need answers:
+
+### Q1: What gets deleted without asking?
+**Answer: Only things with objectively better replacements.**
+- Superseded file revisions (v1 when v2 exists locally)
+- Lower-quality duplicate (480p XviD when 1080p HEVC exists for same episode)
+- Language mismatch when a matching alternative exists locally
+
+These are **procedural** — no scoring, no user input needed. If a strictly better local alternative exists, the inferior file can go.
+
+### Q2: How do we decide between files that DON'T have a clearly better replacement?
+**Answer: Ask the user, pairwise: "A or B?"**
+
+When the system needs to free space and the remaining candidates are all "legitimate" files (different anime, different episodes, no duplicates), there is no objectively correct answer. The user must choose.
+
+### Q3: How does the system learn from user choices?
+**Answer: Each A vs B choice adjusts the weights of individual factors.**
+
+When the user picks "keep A, delete B," the system looks at which factors differ between A and B and adjusts the weight of each differing factor. Over time, the weights converge on the user's actual priorities.
+
+### Q4: What happens before the system has learned anything?
+**Answer: All factor weights start at 0. Early choices are essentially random — and that's okay.**
+
+The system presents A vs B pairs anyway. The user's early choices build the weight profile. After ~20-30 choices, the system starts making sensible autonomous decisions.
+
+### Q5: Can the user override the system?
+**Answer: Yes — locks prevent auto-deletion; A vs B choices always take priority over autonomous decisions.**
+
+### Q6: What about distance from current episode?
+**Answer: Use size-weighted distance (episode distance × file size).**
+
+A 2GB file 10 episodes away is a bigger space opportunity than a 200MB file 30 episodes away.
+
+### Q7: Do factor weights apply globally or per-anime?
+**Answer: Globally.** The weights represent the user's general priorities (e.g., "I care more about anime rating than codec quality"). Per-anime preferences emerge naturally because each anime has different factor values.
 
 ---
 
@@ -285,136 +325,177 @@ The current system calculates distance as episode count: "this file is 47 episod
 | **Size-weighted distance** | `abs(fileEp - currentEp) * file.sizeBytes` | Prioritizes freeing space from large files that are also far away. A 2GB file 10 eps away ranks higher than a 200MB file 30 eps away. |
 | **Pure size** | `file.sizeBytes` | Ignores content position entirely. Maximizes space reclaimed per deletion but may delete nearby files. |
 
-**Recommendation**: Use **size-weighted distance** as the intra-tier sort within distance-based tiers (Tier 2 and Tier 4). This means:
-- Within "watched, far from current": delete the largest-and-farthest first.
-- Within "unwatched, far behind": delete the largest-and-farthest-behind first.
+**Recommendation**: Use **size-weighted distance** as one of the learnable factors. This means:
+- Within distance-based scenarios: delete the largest-and-farthest first.
+- File size and episode distance combine naturally into a single metric.
 
 This is better than pure episode count because it maximizes space reclaimed from files the user is unlikely to need, and better than pure size because it still respects content proximity.
 
 ---
 
-## Per-Title Preference Scoring
+## Pairwise Comparison Learning System (A vs B)
 
 ### The Core Idea
 
-Since technical factors and language requirements are handled by rules, the only remaining question is: **when the system needs to delete, which anime's files should go first?**
+Technical factors and language requirements are handled by procedural rules. The remaining question is: **when the system needs to delete and no objective winner exists, which file should go?**
 
-This is inherently subjective. The user must tell the system which titles they care about. We provide a simple per-title preference interface:
-
-### Per-Title Controls
-
-Each anime in the collection gets three controls:
+Instead of asking the user to assign abstract scores or like/dislike tags, the system presents a **concrete pairwise choice** before each non-trivial deletion:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Title                              Preference    Deletion   │
-├─────────────────────────────────────────────────────────────┤
-│ Dragon Ball Z                      [−] [·] [+]   [DEL]     │
-│ Pokemon                            [−] [·] [+]   [DEL]     │
-│ Naruto Shippuden                   [−] [·] [+]   [ · ]     │
-│ One Piece                          [−] [·] [+]   [ · ]     │
-│ Attack on Titan                    [−] [·] [+]   [ · ]     │
-│ Cowboy Bebop                       [−] [·] [+]   [ · ]     │
-└─────────────────────────────────────────────────────────────┘
-
-[−] = Deprioritize (more likely to be deleted)
-[·] = Neutral (default — no preference expressed)
-[+] = Prioritize (less likely to be deleted)
-[DEL] = Marked for deletion
+┌──────────────────────────────────────────────────────────────┐
+│ Space needed: 2.1 GB to reach threshold                      │
+│                                                              │
+│ Which file should be deleted?                                │
+│                                                              │
+│   [A] naruto-ep03.mkv              [B] dbz-ep45.mkv         │
+│   ────────────────────              ────────────────────     │
+│   Naruto Shippuden                  Dragon Ball Z            │
+│   Episode 3                         Episode 45               │
+│   720p H.264, 420 MB                1080p HEVC, 1.8 GB      │
+│   Watched, 47 eps from current      Watched, 12 eps from cur│
+│   Rating: 8.2                       Rating: 7.8              │
+│   Group: Active                     Group: Disbanded         │
+│                                                              │
+│           [ Delete A ]    [ Delete B ]    [ Skip ]           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### What Each Control Means
+The user picks one. The system deletes it AND learns from the choice.
 
-| Control | Effect | Behavior |
-|---------|--------|----------|
-| **[+] Prioritize** | Files from this anime get a positive preference score | Files are less likely to be chosen for deletion. Within any deletion tier, files from [+] anime sort toward the "safe" end. |
-| **[·] Neutral** | Default — no explicit preference | Files are ordered purely by the technical/procedural factors. |
-| **[−] Deprioritize** | Files from this anime get a negative preference score | Files are more likely to be chosen for deletion. Within any deletion tier, files from [−] anime sort toward the "delete first" end. |
-| **[DEL] Mark for deletion** | Anime is flagged for cleanup | See analysis below — this control needs careful semantics. |
+### What the System Learns from Each Choice
 
-### How Preference Integrates with Tiers
+When the user picks "Delete B" (keep A), the system examines which factors differ between A and B and adjusts the weight of each factor accordingly.
 
-Preference does NOT change which tier a file is assigned to. Tiers are determined by objective conditions (superseded, watched+far, unwatched+behind, etc.). Preference only affects **intra-tier ordering**:
+**Example:** User picks "Delete B" (keep Naruto ep3, delete DBZ ep45)
+
+| Factor | File A (kept) | File B (deleted) | Diff direction | Weight adjustment |
+|--------|--------------|-----------------|----------------|-------------------|
+| Anime rating | 8.2 | 7.8 | A > B | +δ for rating weight (user kept the higher-rated file) |
+| Episode distance | 47 eps | 12 eps | A > B (farther) | −δ for distance weight (user kept the farther file → distance matters less) |
+| File size | 420 MB | 1.8 GB | A < B | +δ for size weight (user deleted the larger file → size matters) |
+| Resolution | 720p | 1080p | A < B | −δ for quality weight (user kept the lower-quality file → quality matters less here) |
+| Group status | Active | Disbanded | A > B | +δ for group weight (user kept the active-group file) |
+
+Each factor weight starts at 0 and moves up or down with each choice. The adjustment δ is small (e.g., 0.1) so no single choice dominates.
+
+### The Learning Formula
 
 ```
-Example: Tier 2 (Watched, far from current) contains 10 files.
+For each factor F that differs between the kept file (K) and the deleted file (D):
 
-Without preference:
-  Sorted by: size-weighted distance (farthest+largest first)
+  direction = sign(F(K) - F(D))
+  // +1 if the kept file scores higher on this factor
+  // -1 if the kept file scores lower on this factor
 
-With preference:
-  Sorted by: preference ASC, then size-weighted distance
-  - Files from [−] anime sort first (deleted earlier)
-  - Files from [·] anime sort in the middle
-  - Files from [+] anime sort last (deleted later, if at all)
+  weight[F] += learningRate * direction
+
+  // learningRate = 0.1 (small, so learning is gradual)
 ```
 
-This means:
-- A [+] anime's watched-far-away file is still in the "deletable" tier — but it will only be deleted after all [·] and [−] files in the same tier are gone.
-- A [−] anime's file is the first to go within its tier.
-- No preference can override tier boundaries: a [+] anime's superseded revision (Tier 0) is still deleted before any Tier 1 file, even from a [−] anime.
+**Intuition**: If the user consistently keeps files with higher anime ratings, the weight for "anime rating" gradually becomes positive and large. If the user consistently ignores codec quality (keeping old codecs over new ones), the weight for "codec quality" stays near zero or goes negative.
 
-### The [DEL] Button: Analysis
+### Factor Definitions (Learnable)
 
-The [DEL] button flags an anime for deletion. But what should it actually do?
+These are the factors whose weights are learned through A vs B choices. Each factor produces a normalized value for any file:
 
-#### Option A: Instant Deletion
-- **Behavior**: Immediately delete all local files for this anime. Mark the anime for automatic deletion of any future files.
-- **Pros**: Simple, immediate, unambiguous. User clicks DEL and the files are gone.
-- **Cons**: Destructive and irreversible. User might click by accident. No opportunity to reconsider. If the user has partially watched the anime, they lose their progress without warning.
+| Factor | How it's computed | Range | Higher = |
+|--------|------------------|-------|----------|
+| `anime_rating` | AniDB rating / 1000 | 0.0 – 1.0 | Better rated |
+| `episode_distance` | 1.0 - (abs(distance) / maxDistance) | 0.0 – 1.0 | Closer to current |
+| `file_size` | 1.0 - (sizeBytes / maxSizeBytes) | 0.0 – 1.0 | Smaller file |
+| `group_status` | active=1.0, stalled=0.5, disbanded=0.0 | 0.0 – 1.0 | More active group |
+| `watch_recency` | days since last watched, normalized | 0.0 – 1.0 | Watched more recently |
+| `session_active` | 1.0 if anime has active session, else 0.0 | 0 or 1 | Has active session |
 
-#### Option B: Mark as Preferred for Deletion
-- **Behavior**: Move all files for this anime to the highest-priority deletion tier (effectively Tier -1). Files are deleted first when space is needed, but not immediately.
-- **Pros**: Non-destructive — files stay until space is needed. User can undo by removing the [DEL] flag. Graceful — the system still respects gap protection and locks. Consistent with the rest of the preference system (it's just the strongest form of [−]).
-- **Cons**: Less satisfying — user clicked "delete" but files are still there. May be confusing: "I said delete it, why is it still here?" Requires space pressure to actually trigger deletion.
+Note: Technical factors (codec, bitrate, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
 
-#### Option C: Hybrid — Immediate with Confirmation + Persistent Flag
-- **Behavior**: 
-  1. Show a confirmation dialog: "Delete all N files for [Anime]? This will free X GB. Files will be removed from disk."
-  2. If confirmed, delete all local files immediately.
-  3. Set a persistent flag so that any future files added for this anime are automatically placed in the highest-priority deletion tier (deleted first when space is needed).
-- **Pros**: Immediate result (user gets their space back now). Persistent effect (future files auto-cleaned). Confirmation prevents accidents. Clear semantics: "I don't want this anime on disk."
-- **Cons**: Most complex to implement. Two behaviors in one button (immediate delete + future preference).
+### How Factor Weights Produce a Score
 
-#### Recommendation: Option C (Hybrid)
+Once the system has non-zero weights, it can compute an autonomous deletion score:
 
-Option C best matches user intent. When a user clicks [DEL] on an anime, they mean "I don't want this taking up space." That means:
-1. Delete existing files now (with confirmation).
-2. If new files arrive later (e.g., from an ongoing download queue), delete them as soon as space is needed.
+```
+function deletionScore(file):
+    score = 0
+    for each factor F:
+        score += weight[F] * normalizedValue(F, file)
+    return score
 
-The confirmation dialog prevents accidents. The persistent flag prevents the anime from accumulating files again.
+// Lower score = more likely to be deleted
+// Higher score = more likely to be kept
+```
 
-### Database Schema for Per-Title Preferences
+With all weights at 0, every file gets score 0 — effectively random ordering. As weights emerge from user choices, files start ranking meaningfully.
+
+### Cold Start: All Weights at 0
+
+| Phase | Behavior |
+|-------|----------|
+| **First ~10 deletions** | System has no learned weights. Every A vs B pair is essentially random. User must pick manually each time. Each pick teaches the system. |
+| **~10-30 deletions** | Weights are emerging but noisy. The system starts proposing "better" A vs B pairs (pairing files where the expected winner is ambiguous, to maximize learning). Autonomous deletions are still not reliable. |
+| **~30+ deletions** | Weights have stabilized. The system can autonomously select deletion candidates that align with user preferences. A vs B prompts become rare — only shown when two candidates are very close in score. |
+| **Ongoing** | Every autonomous deletion is implicitly confirmed (user didn't intervene). Occasionally, the system shows an A vs B to refine or verify weights, especially when new anime are added. |
+
+### When to Show A vs B vs. Autonomous Delete
+
+```
+function handleDeletionNeeded():
+    candidates = classifyAndRank(allLocalFiles)
+    top2 = candidates[0], candidates[1]
+
+    // If the top candidate is from a procedural tier (superseded, duplicate, language mismatch),
+    // delete it autonomously — no A vs B needed.
+    if top2[0].tier <= PROCEDURAL_TIER_MAX:
+        delete(top2[0])
+        return
+
+    // If factor weights are undertrained (< MIN_CHOICES made), always ask.
+    if totalChoicesMade < MIN_CHOICES:
+        showAvsB(top2[0], top2[1])
+        return
+
+    // If the top two candidates are very close in learned score, ask.
+    scoreDiff = abs(top2[0].learnedScore - top2[1].learnedScore)
+    if scoreDiff < CONFIDENCE_THRESHOLD:
+        showAvsB(top2[0], top2[1])
+        return
+
+    // Otherwise, delete autonomously.
+    delete(top2[0])
+```
+
+### The [Skip] Button
+
+When the user clicks [Skip] on an A vs B prompt:
+- Neither file is deleted.
+- No weight adjustment happens.
+- The system remembers this pair was skipped and does not re-present it immediately.
+- Deletion is deferred until space pressure increases or the user manually triggers it.
+
+### Database Schema for Learned Weights
 
 ```sql
-CREATE TABLE anime_deletion_preference (
-    aid INTEGER PRIMARY KEY,
-    preference INTEGER DEFAULT 0,    -- -1 = deprioritize, 0 = neutral, +1 = prioritize
-    marked_for_deletion INTEGER DEFAULT 0,  -- 1 = DEL flag active
-    updated_at INTEGER               -- Unix timestamp of last change
+-- Factor weights learned from user A vs B choices
+CREATE TABLE deletion_factor_weights (
+    factor TEXT PRIMARY KEY,           -- 'anime_rating', 'episode_distance', etc.
+    weight REAL DEFAULT 0.0,           -- Current learned weight
+    total_adjustments INTEGER DEFAULT 0 -- How many times this weight was adjusted
 );
-CREATE INDEX idx_anime_del_pref ON anime_deletion_preference(preference);
-CREATE INDEX idx_anime_del_marked ON anime_deletion_preference(marked_for_deletion);
+
+-- History of A vs B choices (for analysis and potential retraining)
+CREATE TABLE deletion_choices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kept_lid INTEGER,                  -- lid of the file the user chose to keep
+    deleted_lid INTEGER,               -- lid of the file the user chose to delete
+    kept_factors TEXT,                  -- JSON: {"anime_rating": 0.82, "episode_distance": 0.12, ...}
+    deleted_factors TEXT,               -- JSON: {"anime_rating": 0.78, "episode_distance": 0.88, ...}
+    chosen_at INTEGER                  -- Unix timestamp
+);
+CREATE INDEX idx_deletion_choices_time ON deletion_choices(chosen_at);
 ```
 
-### How [DEL]-Marked Anime Interacts with Tiers
+### UI: A vs B in the Deletion Tab
 
-Files from [DEL]-marked anime are classified as a new pseudo-tier:
-
-```
-Tier -1 — MARKED FOR DELETION
-  Rule: Anime has marked_for_deletion = 1 in anime_deletion_preference.
-  Sort: Largest file first (maximize space reclaimed).
-  Behavior: Deleted before any other tier when space is needed.
-  Note: This is separate from the initial immediate deletion.
-        It catches files that arrive after the [DEL] button was pressed.
-```
-
-This tier sits above Tier 0 (superseded revisions) because the user has explicitly said "I don't want this anime." It is the strongest automated deletion signal short of a manual file delete.
-
-### UI: Per-Title Preferences in the Deletion Tab
-
-The Deletion tab (Option 2) is the natural home for per-title preference controls:
+The Deletion tab (Option 2) hosts the A vs B prompt when the system needs input:
 
 ```
 [Hasher] [MyList] [Deletion] [Settings] [Log]
@@ -425,51 +506,57 @@ The Deletion tab (Option 2) is the natural home for per-title preference control
 │ Threshold: 50 GB │ Mode: Auto │ [▶ Run Now] [⏸ Pause]          │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│ ── Per-Title Preferences ─────────────────────────────────────── │
+│ ⚡ Space pressure: need to free 8 GB                             │
 │                                                                  │
-│   Title                              Pref      DEL   Files  Size│
-│   ────────────────────────────────────────────────────────────── │
-│   Dragon Ball Z                   [−][·][+]   [DEL]   148  62GB │
-│   Pokemon                         [−][·][+]   [DEL]   312  95GB │
-│   Naruto Shippuden                [−][·][+]   [ · ]    89  34GB │
-│   One Piece                       [−][·][+]   [ · ]   245  78GB │
-│   Attack on Titan                 [−][·][+]   [ · ]    24   9GB │
-│   Cowboy Bebop                    [−][·][+]   [ · ]    26   8GB │
+│ ── Your choice needed ────────────────────────────────────────── │
 │                                                                  │
-│ ── Deletion Queue ────────────────────────────────────────────── │
+│   [A] naruto-ep03.mkv              [B] dbz-ep45.mkv             │
+│   ────────────────────              ────────────────────         │
+│   Naruto Shippuden                  Dragon Ball Z                │
+│   Episode 3 · 720p H.264           Episode 45 · 1080p HEVC      │
+│   420 MB · Watched                  1.8 GB · Watched             │
+│   47 eps from current               12 eps from current          │
+│   Rating: 8.2 · Group: Active      Rating: 7.8 · Group: Disbanded│
+│                                                                  │
+│         [ Delete A ]    [ Delete B ]    [ Skip ]                 │
+│                                                                  │
+│ ── Learned Weights (30 choices made) ─────────────────────────── │
+│                                                                  │
+│   Factor              Weight    Confidence                       │
+│   ─────────────────────────────────────────                      │
+│   Anime rating        +0.42     ████████░░  (strong)             │
+│   Episode distance    +0.15     ████░░░░░░  (moderate)           │
+│   File size           +0.31     ██████░░░░  (moderate)           │
+│   Group status        +0.08     ██░░░░░░░░  (weak)              │
+│   Watch recency       -0.05     █░░░░░░░░░  (negligible)        │
+│   Active session      +0.55     █████████░  (strong)             │
+│                                                                  │
+│ ── Deletion Queue (autonomous) ───────────────────────────────── │
 │                                                                  │
 │   #  File              Anime           Tier    Reason            │
 │   ─────────────────────────────────────────────────────────────  │
-│   1  dbz-ep01-v1.avi   Dragon Ball Z   T0     Superseded (v2)   │
-│   2  poke-234.mkv      Pokemon [DEL]   T-1    Marked for del    │
-│   3  naruto-003.mkv    Naruto [−]      T2     Watched, 47 eps   │
-│   4  op-045.mkv        One Piece       T2     Watched, 30 eps   │
+│   1  show-01-v1.avi    Show A          T0     Superseded (v2)    │
+│   2  dub-ep05.mkv      Anime C         T5     Lang mismatch      │
+│   3  naruto-003.mkv    Naruto           —     Score: 0.23        │
+│   4  dbz-045.mkv       Dragon Ball Z    —     Score: 0.31        │
 │                                                                  │
-│ ── Score Breakdown (selected: naruto-003.mkv) ────────────────── │
-│   Tier: 2 — WATCHED, FAR FROM CURRENT                           │
-│   Reason: Watched, 47 eps from current — ep 3 → current ep 50   │
-│   Intra-tier factors:                                            │
-│     Size-weighted distance: 47 eps × 420MB = 19.7 GB·eps        │
-│     Codec: H.264 (no penalty)                                    │
-│     Preference: [−] deprioritized (sorts earlier in tier)        │
-│   Gap protection: No                                             │
-│   Queue position: #3 overall                                     │
+│   Items 1-2 will be deleted autonomously (procedural).           │
+│   Items 3-4 require your choice (learned scores too close).      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### Integration with Existing Locks
+### Integration with Procedural Tiers and Locks
 
-Per-title preferences and locks serve different purposes:
+The A vs B learning system works alongside — not instead of — the procedural tier system:
 
-| Mechanism | Purpose | Scope | Strength |
-|-----------|---------|-------|----------|
-| **Lock (🔒)** | "Never auto-delete this" | Anime or episode | Absolute — overrides everything |
-| **[+] Prioritize** | "Delete this later than others" | Anime | Relative — affects intra-tier sort only |
-| **[·] Neutral** | "No preference" | Anime | Default |
-| **[−] Deprioritize** | "Delete this sooner than others" | Anime | Relative — affects intra-tier sort only |
-| **[DEL] Mark** | "I don't want this" | Anime | Creates Tier -1; immediate delete + future auto-cleanup |
+| Mechanism | Scope | Behavior |
+|-----------|-------|----------|
+| **Lock (🔒)** | Absolute protection | File is never auto-deleted or presented in A vs B |
+| **Procedural tiers (T0-T5)** | Deterministic deletions | Files with objectively better replacements are deleted autonomously |
+| **A vs B choices** | Preference learning | Only invoked for files where no procedural rule applies and learned scores are close |
+| **Learned weights** | Autonomous preference deletions | Once weights are trained, most non-procedural deletions happen automatically |
 
-A locked anime cannot be [DEL]-marked (the lock overrides). If the user wants to [DEL] a locked anime, they must unlock it first — the UI shows: "This anime is locked. Unlock it to mark for deletion."
+A locked file never appears in A vs B. A procedurally-deletable file (superseded, duplicate, language mismatch) is deleted without asking. The A vs B prompt only appears for genuinely ambiguous cases — and over time, those cases become rarer as the weights converge.
 
 ---
 
@@ -745,13 +832,10 @@ The procedural approach maps cleanly to new classes while replacing the current 
 ### DeletionTier (enum)
 ```
 enum class DeletionTier {
-    MarkedForDeletion = -1,    // Tier -1: user explicitly marked via [DEL]
-    SupersededRevision = 0,    // Tier 0
-    WatchedNoSession = 1,      // Tier 1
-    WatchedFarFromCurrent = 2, // Tier 2
-    UnwatchedLowQualDupe = 3,  // Tier 3
-    UnwatchedFarBehind = 4,    // Tier 4
-    PreferenceMismatch = 5,    // Tier 5
+    SupersededRevision = 0,    // Tier 0: procedural
+    LowQualityDuplicate = 1,   // Tier 1: procedural
+    LanguageMismatch = 2,      // Tier 2: procedural
+    LearnedPreference = 3,     // Tier 3: A vs B learned scoring
     Protected = 100            // Never deleted
 };
 ```
@@ -941,7 +1025,7 @@ Right-click on episode row:
 
 ## Hybrid Tier Definitions
 
-The tiers use procedural rules for classification. Locks are the highest-priority protection. Per-title preferences ([+]/[−]/[DEL]) affect intra-tier ordering. Within each deletable tier, a **reduced scoring formula** orders candidates — using factors relevant to that tier plus the anime's preference weight.
+The tiers use procedural rules for classification. Locks are the highest-priority protection. Within each deletable tier, files are ordered by the **learned factor weights** from A vs B choices. Procedural tiers handle deterministic cases; the learned scoring handles everything else.
 
 ```
 ── ABSOLUTE PROTECTIONS (checked first, in order) ──
@@ -955,71 +1039,40 @@ Gap Check:
         (episodes exist both before and after, no other file covers this episode).
   Result: PROTECTED. No further evaluation.
 
-── DELETION TIERS ──
-
-Tier -1 — MARKED FOR DELETION
-  Rule: Anime has marked_for_deletion = 1 in anime_deletion_preference.
-  Intra-tier sort:
-    - file size descending (maximize space reclaimed per deletion)
-  Reason: "Marked for deletion — {fileSize}"
-  Example: "Marked for deletion — 2.4 GB"
-  Note: This tier catches files that arrive AFTER the initial [DEL] confirmation.
-        The [DEL] button itself triggers immediate deletion of existing files.
+── PROCEDURAL DELETION TIERS (deterministic, no scoring needed) ──
 
 Tier 0 — SUPERSEDED REVISION
   Rule: A newer local revision exists for the same episode.
-  Intra-tier sort:
-    - file version (oldest first)
-    - file size descending (free more space)
+  Sort: Oldest revision first, then largest file first.
   Reason: "Superseded by v{N} — this file: v{M} {resolution} {codec}, newer: v{N} {resolution} {codec}"
   Example: "Superseded by v2 — this file: v1 480p XviD, newer: v2 1080p HEVC"
 
-Tier 1 — WATCHED, NO ACTIVE SESSION
-  Rule: File is watched AND anime has no active watch session.
-  Intra-tier sort:
-    + preference ([−] first, [·] middle, [+] last)
-    + file size descending (free more space)
-    + codec age (delete ancient codecs first)
-  Reason: "Watched, no active session — {codec}, {fileSize}, rating {rating}"
-  Example: "Watched, no active session — XviD, 2.4 GB, rating 5.20"
-
-Tier 2 — WATCHED, FAR FROM CURRENT
-  Rule: File is watched AND anime has active session
-        AND distance from current > aheadBuffer.
-  Intra-tier sort:
-    + preference ([−] first, [·] middle, [+] last)
-    + size-weighted distance: abs(distance) × file.sizeBytes (largest×farthest first)
-    + codec age
-  Reason: "Watched, {N} eps from current — ep {fileEp} → current ep {curEp}, {codec}, {fileSize}, distance×size = {sizeWeightedDistance}"
-  Example: "Watched, 30 eps from current — ep 2 → current ep 32, H.264, 420MB, distance×size = 12.3 GB·eps"
-
-Tier 3 — UNWATCHED LOW-QUALITY DUPLICATE
+Tier 1 — UNWATCHED LOW-QUALITY DUPLICATE
   Rule: File is unwatched AND another local file for the same episode
         has strictly higher quality/resolution.
-  Intra-tier sort:
-    + quality gap (biggest quality difference first)
-    + bitrate deviation
+  Sort: Largest quality gap first.
   Reason: "Lower quality duplicate — this file: {resolution} {codec} {bitrate}kbps, better: {resolution} {codec} {bitrate}kbps"
   Example: "Lower quality duplicate — this file: 480p XviD 600kbps, better: 1080p HEVC 1500kbps"
 
-Tier 4 — UNWATCHED, FAR BEHIND CURRENT
-  Rule: File is unwatched AND episode is behind current position
-        by more than aheadBuffer.
-  Intra-tier sort:
-    + preference ([−] first, [·] middle, [+] last)
-    + size-weighted distance: abs(distance) × file.sizeBytes (largest×farthest first)
-    + quality (lower quality first)
-  Reason: "Unwatched, {N} eps behind current — ep {fileEp} → current ep {curEp}, quality {qualityTier}, {fileSize}"
-  Example: "Unwatched, 15 eps behind current — ep 3 → current ep 18, quality low, 620MB"
-
-Tier 5 — PREFERENCE MISMATCH WITH ALTERNATIVE
+Tier 2 — LANGUAGE MISMATCH WITH ALTERNATIVE
   Rule: File does not match audio AND/OR subtitle preferences
         AND a better-matching local alternative exists for the same episode.
-  Intra-tier sort:
-    + mismatch severity (no audio + no sub > no sub only)
-    + quality (lower quality first among mismatches)
+  Sort: Mismatch severity (no audio + no sub > no sub only).
   Reason: "Language mismatch — audio: {fileAudio} (preferred: {prefAudio}), sub: {fileSub} (preferred: {prefSub}); alternative has {altAudio}/{altSub}"
   Example: "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
+
+── LEARNED DELETION TIER (A vs B scoring) ──
+
+Tier 3 — LEARNED PREFERENCE
+  Rule: File does not fall into any procedural tier AND is not protected.
+        Includes: watched files far from current, watched files with no session,
+        unwatched files far behind current, etc.
+  Sort: Learned deletion score (from factor weights trained by A vs B choices).
+        Lower score = deleted first.
+  A vs B: When the top two candidates in this tier have close scores
+          (below confidence threshold), present pairwise choice to user.
+  Reason: "Score: {learnedScore} — rating {rating}, distance {distance}, size {size}"
+  Example: "Score: 0.23 — rating 8.2, 47 eps from current, 420 MB"
 
 ── PROTECTION BOUNDARY ──
 
@@ -1030,13 +1083,15 @@ Everything else — PROTECTED
   - Manually locked anime or episodes
 ```
 
-### Why Scoring Inside Tiers Works Better Than Pure Procedural
+### Why A vs B Learning Works Better Than Fixed Weights
 
-In the pure procedural model, Tier 2 sorts only by distance. If two files are equidistant (e.g., episode 5 and episode 45 are both 20 episodes from current), the system has no way to prefer the XviD encode over the HEVC encode without splitting into sub-tiers.
+In the pure procedural model, intra-tier ordering uses fixed sort keys (distance, size). In the original scoring model, 17 hardcoded weights interact unpredictably.
 
-With intra-tier scoring, each tier uses a **small, focused score** built from 2-4 factors relevant to that tier's context. This avoids the 17-factor soup of the full scoring system while still providing meaningful ordering.
+With A vs B learning, the weights for subjective factors are **derived from actual user behavior**. The user never needs to assign abstract numbers — they just answer "which of these two files should go?" and the system figures out what matters to them. Early choices are random; later choices become increasingly aligned with user priorities.
 
-### Tier Assignment + Intra-Tier Score Pseudocode
+The procedural tiers (0-2) remain deterministic: superseded revisions, low-quality duplicates, and language mismatches need no learning. The A vs B system only activates for Tier 3 — files where no objective rule can decide.
+
+### Tier Assignment + Learned Score Pseudocode
 
 ```
 function classifyFile(file):
@@ -1048,13 +1103,6 @@ function classifyFile(file):
     if wouldCreateGap(file):
         return { tier: PROTECTED, reason: "Gap protection" }
 
-    // ── Tier -1: user marked for deletion ──
-    pref = getAnimePreference(file.aid)  // from anime_deletion_preference
-    if pref.markedForDeletion:
-        score = -file.sizeBytes  // largest first
-        return { tier: -1, score: score,
-                 reason: "Marked for deletion — " + formatSize(file.sizeBytes) }
-
     // ── Tier 0: superseded revision ──
     if hasNewerLocalRevision(file.eid, file.version):
         newer = getNewestLocalRevision(file.eid)
@@ -1064,62 +1112,18 @@ function classifyFile(file):
                        + " — this file: v" + file.version + " " + file.resolution + " " + file.codec
                        + ", newer: v" + newer.version + " " + newer.resolution + " " + newer.codec }
 
-    isWatched = file.viewed > 0 OR file.localWatched > 0
-    prefWeight = pref.preference  // -1, 0, or +1
-
-    // ── Tier 1: watched, no active session ──
-    if isWatched AND NOT hasActiveSession(file.aid):
-        score = prefWeight * 10000        // preference is primary sort
-        score -= file.sizeBytes / (1024*1024*1024)
-        score -= codecAgePenalty(file)
-        return { tier: 1, score: score,
-                 reason: "Watched, no active session"
-                       + " — " + file.codec + ", " + formatSize(file.sizeBytes)
-                       + prefLabel(prefWeight) }
-
-    // ── Gather session context ──
-    session = findActiveWatchSession(file.aid)
-    distance = NO_SESSION
-    if session:
-        distance = file.totalEpisodePosition - session.currentTotalPosition
-
-    // ── Tier 2: watched, far from current ──
-    if isWatched AND distance != NO_SESSION AND abs(distance) > aheadBuffer:
-        sizeWeightedDist = abs(distance) * file.sizeBytes
-        score = prefWeight * 10000        // preference is primary sort
-        score -= sizeWeightedDist / (1024*1024*1024)  // largest×farthest first
-        score -= codecAgePenalty(file)
-        return { tier: 2, score: score,
-                 reason: "Watched, " + abs(distance) + " eps from current"
-                       + " — ep " + file.episodeNumber + " → current ep " + session.currentEpisode
-                       + ", " + file.codec + ", " + formatSize(file.sizeBytes)
-                       + ", distance×size = " + formatSizeWeighted(sizeWeightedDist)
-                       + prefLabel(prefWeight) }
-
-    // ── Tier 3: unwatched low-quality duplicate ──
-    if NOT isWatched:
+    // ── Tier 1: unwatched low-quality duplicate ──
+    if NOT (file.viewed > 0 OR file.localWatched > 0):
         betterDupe = findBetterLocalDuplicate(file)
         if betterDupe:
             qualityGap = betterDupe.qualityScore - file.qualityScore
-            score = -qualityGap * 100 - bitrateDeviation(file)
-            return { tier: 3, score: score,
+            score = -qualityGap * 100
+            return { tier: 1, score: score,
                      reason: "Lower quality duplicate"
                            + " — this file: " + file.resolution + " " + file.codec + " " + file.bitrate + "kbps"
                            + ", better: " + betterDupe.resolution + " " + betterDupe.codec + " " + betterDupe.bitrate + "kbps" }
 
-    // ── Tier 4: unwatched, far behind current ──
-    if NOT isWatched AND distance != NO_SESSION AND distance < -aheadBuffer:
-        sizeWeightedDist = abs(distance) * file.sizeBytes
-        score = prefWeight * 10000        // preference is primary sort
-        score -= sizeWeightedDist / (1024*1024*1024)  // largest×farthest first
-        score += qualityScore(file)
-        return { tier: 4, score: score,
-                 reason: "Unwatched, " + abs(distance) + " eps behind current"
-                       + " — ep " + file.episodeNumber + " → current ep " + session.currentEpisode
-                       + ", quality " + qualityTierLabel(file) + ", " + formatSize(file.sizeBytes)
-                       + prefLabel(prefWeight) }
-
-    // ── Tier 5: preference mismatch ──
+    // ── Tier 2: language mismatch with better alternative ──
     audioMatch = matchesPreferredAudio(file)
     subMatch = matchesPreferredSub(file)
     if (NOT audioMatch OR NOT subMatch) AND hasBetterLanguageAlternative(file):
@@ -1127,33 +1131,86 @@ function classifyFile(file):
         mismatchSeverity = 0
         if NOT audioMatch: mismatchSeverity += 2
         if NOT subMatch: mismatchSeverity += 1
-        score = -mismatchSeverity * 1000 + qualityScore(file)
+        score = -mismatchSeverity * 1000
         reasonParts = []
         if NOT audioMatch:
             reasonParts.append("audio: " + file.audioLang + " (preferred: " + preferredAudioLang + ")")
         if NOT subMatch:
             reasonParts.append("sub: " + file.subLang + " (preferred: " + preferredSubLang + ")")
-        return { tier: 5, score: score,
+        return { tier: 2, score: score,
                  reason: "Language mismatch — " + reasonParts.join(", ")
                        + "; alternative has " + alt.audioLang + "/" + alt.subLang }
+
+    // ── Tier 3: learned preference (A vs B scoring) ──
+    // This tier covers all non-procedural candidates:
+    //   - Watched files far from current
+    //   - Watched files with no active session
+    //   - Unwatched files far behind current
+    //   - Any other non-protected file
+    if isEligibleForDeletion(file):
+        score = computeLearnedScore(file)
+        return { tier: 3, score: score,
+                 reason: formatLearnedReason(file, score) }
 
     // ── Protected ──
     return { tier: PROTECTED, reason: protectionReason(file) }
 
-function prefLabel(prefWeight):
-    // Only annotate non-neutral preferences to avoid noise on the majority of files.
-    if prefWeight < 0: return " [−]"
-    if prefWeight > 0: return " [+]"
-    return ""  // Neutral: no annotation needed
-```
+function isEligibleForDeletion(file):
+    // File must be in a position where deletion makes sense
+    isWatched = file.viewed > 0 OR file.localWatched > 0
+    session = findActiveWatchSession(file.aid)
+    distance = NO_SESSION
+    if session:
+        distance = file.totalEpisodePosition - session.currentTotalPosition
+
+    // Watched, no active session → eligible
+    if isWatched AND NOT session:
+        return true
+
+    // Watched, far from current → eligible
+    if isWatched AND distance != NO_SESSION AND abs(distance) > aheadBuffer:
+        return true
+
+    // Unwatched, far behind current → eligible
+    if NOT isWatched AND distance != NO_SESSION AND distance < -aheadBuffer:
+        return true
+
+    return false
+
+function computeLearnedScore(file):
+    // Compute score from learned factor weights
+    score = 0
+    weights = getLearnedWeights()  // from deletion_factor_weights table
+    factors = normalizeFactors(file)
+
+    for each factor F in factors:
+        score += weights[F] * factors[F]
+
+    return score
+
+function formatLearnedReason(file, score):
+    weights = getLearnedWeights()
+    factors = normalizeFactors(file)
+
+    // Show top 3 contributing factors
+    contributions = []
+    for each factor F:
+        contributions.append({ factor: F, contribution: weights[F] * factors[F] })
+    contributions.sort(by: abs(contribution) DESC)
+    top3 = contributions[0..2]
+
+    reason = "Score: " + format(score, 2)
+    for each c in top3:
+        reason += ", " + c.factor + ": " + format(c.contribution, 2)
+    return reason
 ```
 
-### Deletion Selection
+### A vs B Selection and Learning
 
 ```
-function selectNextFileToDelete():
+function handleDeletionNeeded():
     if NOT isDeletionNeeded():
-        return null
+        return
 
     candidates = []
     for each file in getAllLocalFiles():
@@ -1161,12 +1218,51 @@ function selectNextFileToDelete():
         if result.tier != PROTECTED:
             candidates.append(result)
 
-    // Primary sort: tier ascending. Secondary sort: score ascending within tier.
     candidates.sort(by: tier ASC, score ASC)
 
-    if candidates is not empty:
-        return candidates[0]
-    return null
+    if candidates is empty:
+        return
+
+    top = candidates[0]
+
+    // Procedural tiers (0-2): delete autonomously
+    if top.tier <= 2:
+        delete(top)
+        return
+
+    // Learned tier (3): may need A vs B
+    totalChoices = countTotalChoices()  // from deletion_choices table
+    if totalChoices < MIN_CHOICES_BEFORE_AUTONOMOUS:  // e.g., 20
+        // Not enough training data — always ask
+        showAvsBPrompt(candidates[0], candidates[1])
+        return
+
+    // Enough training — check confidence
+    if candidates.length >= 2:
+        scoreDiff = abs(candidates[0].score - candidates[1].score)
+        if scoreDiff < CONFIDENCE_THRESHOLD:  // e.g., 0.1
+            showAvsBPrompt(candidates[0], candidates[1])
+            return
+
+    // High confidence — delete autonomously
+    delete(top)
+
+function onUserChoice(kept, deleted):
+    // Delete the chosen file
+    deleteFile(deleted)
+
+    // Learn from the choice
+    keptFactors = normalizeFactors(kept)
+    deletedFactors = normalizeFactors(deleted)
+
+    for each factor F:
+        diff = keptFactors[F] - deletedFactors[F]
+        if abs(diff) > 0.01:  // Only learn from factors that differ
+            direction = sign(diff)
+            adjustWeight(F, LEARNING_RATE * direction)
+
+    // Store choice for history
+    storeChoice(kept.lid, deleted.lid, keptFactors, deletedFactors)
 ```
 
 ---
@@ -1233,17 +1329,19 @@ function lockReason(file):
 
 ## Comparison: All Three Approaches
 
-| Aspect | Pure Scoring | Pure Procedural | Hybrid + Locks |
-|--------|-------------|----------------|----------------|
-| **Tier assignment** | N/A (single score) | Procedural rules | Procedural rules |
-| **Intra-tier ordering** | N/A (global score) | Single sort key | Focused scoring (2-4 factors per tier) |
+| Aspect | Pure Scoring | Pure Procedural | Hybrid + A vs B Learning |
+|--------|-------------|----------------|--------------------------|
+| **Tier assignment** | N/A (single score) | Procedural rules | Procedural rules (T0-T2) |
+| **Non-procedural ordering** | N/A (global score) | Single sort key | Learned factor weights from user A vs B choices |
 | **User override** | None | Per-file protect | Anime lock + episode lock |
-| **"Why this file?"** | Score breakdown (17 rows) | Tier name + reason | Tier name + reason + intra-tier rank |
+| **User input** | None (developer-set weights) | None | A vs B pairwise choices that train the system |
+| **Cold start** | Hardcoded weights (may be wrong) | Hardcoded tier order | All weights at 0; learns from user |
+| **"Why this file?"** | Score breakdown (17 rows) | Tier name + reason | Tier name + reason OR learned score with top contributing factors |
 | **Lock persistence** | N/A | Runtime only | Database-persisted; survives restart |
 | **New file handling** | Scored on arrival | Classified on arrival | Classified on arrival; inherits locks |
-| **UI complexity** | Score numbers + breakdown | Tier labels + reasons | Tier labels + reasons + lock icons + lock context menus |
-| **Code complexity** | 1 method, 17 score lines | 1 method, 6 tier blocks | 1 classifier method + 1 lock table + propagation |
-| **Edge case safety** | Weights may cancel out unpredictably | Tiers are absolute | Tiers are absolute + locks are absolute |
+| **UI complexity** | Score numbers + breakdown | Tier labels + reasons | Tier labels + A vs B prompt + weight visualization |
+| **Code complexity** | 1 method, 17 score lines | 1 method, 6 tier blocks | 1 classifier + 1 learner + A vs B dialog |
+| **Edge case safety** | Weights may cancel out unpredictably | Tiers are absolute | Tiers are absolute + locks are absolute + learning is gradual |
 
 ---
 
@@ -1270,16 +1368,15 @@ function lockReason(file):
 │ 🔒 Ep 1 - Special                                    │
 │   \ v1 1080p HEVC [Group]                            │
 │ Ep 2 - Start                                         │
-│   \ v1 480p XviD [OldGrp] 🔴  Watched, 30 eps       │
-│        (ep 2 → cur ep 32, XviD, 600kbps expected 1200)│
+│   \ v1 480p XviD [OldGrp] 🔴  T0: Superseded by v2  │
 │   \ v2 1080p HEVC [NewGrp] 🟢  Protected (in buffer) │
 │ Ep 3 - Continue                                      │
-│   \ v1 720p [Group]       🟡  Unwatched, 5 eps       │
-│        behind (ep 3 → cur ep 8, quality medium)       │
+│   \ v1 720p [Group]       🟡  Score: 0.23            │
+│        (rating +0.18, distance -0.12, size +0.17)     │
 └───────────────────────────────────────────────────────┘
 ```
 
-### Sidebar Deletion Queue with Lock Info
+### Sidebar Deletion Queue
 
 ```
 ┌────────────────────────────────────────┐
@@ -1287,21 +1384,23 @@ function lockReason(file):
 │   Space: 42 / 500 GB                   │
 │   Threshold: 50 GB                     │
 │   Locked: 3 anime, 2 eps              │
+│   Choices made: 34 (trained)           │
 │                                        │
-│   ── Next to delete ──                 │
+│   ── Auto-delete (procedural) ──       │
 │   1. old-ep01.avi                      │
-│      Tier 0: Superseded by v2          │
-│      v1 480p XviD → v2 1080p HEVC     │
+│      T0: Superseded by v2              │
 │      [🔒 Lock ep] [🔒 Lock anime]      │
-│   2. show-ep30.mkv                     │
-│      Tier 2: Watched, 30 eps           │
-│      ep 2 → cur ep 32, H.264          │
-│      850kbps (expected 1200kbps)        │
-│      [🔒 Lock ep] [🔒 Lock anime]      │
-│   3. dub-ep05.mkv                      │
-│      Tier 5: Language mismatch         │
+│   2. dub-ep05.mkv                      │
+│      T2: Language mismatch             │
 │      audio: Italian (pref: Japanese)   │
-│      alt has Japanese/English          │
+│      [🔒 Lock ep] [🔒 Lock anime]      │
+│                                        │
+│   ── Learned (may need A vs B) ──      │
+│   3. show-ep30.mkv                     │
+│      Score: 0.23                       │
+│      [🔒 Lock ep] [🔒 Lock anime]      │
+│   4. naruto-003.mkv                    │
+│      Score: 0.31                       │
 │      [🔒 Lock ep] [🔒 Lock anime]      │
 └────────────────────────────────────────┘
 ```
@@ -1312,20 +1411,21 @@ function lockReason(file):
 File: show-ep30.mkv
 Anime: Show B | Episode: 30 | Group: SubGroup
 ──────────────────────────────────────────────
-Classification: Tier 2 — WATCHED, FAR FROM CURRENT
-Reason: Watched, 30 episodes from current position.
-        ep 2 → current ep 32
+Classification: Tier 3 — LEARNED PREFERENCE
+Learned score: 0.23 (lower = deleted sooner)
 
-Intra-tier ranking: #2 of 15 files in Tier 2
-  Distance:          30 eps  (ep 2 → current ep 32)
-  Codec:             H.264   (no penalty; modern codecs: HEVC, AV1)
-  Bitrate:           850 kbps (expected 1200 kbps for 720p H.264, deviation 29%)
+Factor contributions:
+  anime_rating:       +0.18  (8.76 → normalized 0.88, weight +0.42)
+  episode_distance:   -0.12  (30 eps away → normalized 0.40, weight +0.15)
+  file_size:          +0.17  (420 MB → normalized 0.79, weight +0.31)
+  group_status:       +0.04  (active → 1.0, weight +0.08)
+  session_active:     +0.00  (yes → 1.0, weight -0.05)
 ──────────────────────────────────────────────
 Lock status: Not locked
   [🔒 Lock this episode]  [🔒 Lock entire anime]
 ──────────────────────────────────────────────
 Gap protection: No (episodes 29 and 31 have files)
-Queue position: #2 overall
+Queue position: #3 overall
 ```
 
 ---
@@ -1376,68 +1476,76 @@ private:
 ```
 
 ### HybridDeletionClassifier (new class)
-Single responsibility: assigns tier + intra-tier score to a file, incorporating per-title preferences.
+Single responsibility: assigns tier + score to a file. Uses procedural rules for tiers 0-2, learned weights for tier 3.
 ```
 class HybridDeletionClassifier {
 public:
     explicit HybridDeletionClassifier(
         const DeletionLockManager &lockManager,
-        const AnimePreferenceManager &preferenceManager,
+        const FactorWeightLearner &learner,
         const WatchSessionManager &sessionManager);
 
     DeletionCandidate classify(int lid) const;
 
 private:
-    int calculateTierNeg1Score(int lid) const; // Marked-for-deletion ordering
     int calculateTier0Score(int lid) const;    // Superseded revision ordering
-    int calculateTier1Score(int lid) const;    // Watched, no session ordering
-    int calculateTier2Score(int lid) const;    // Watched, far from current ordering
-    int calculateTier3Score(int lid) const;    // Low-quality duplicate ordering
-    int calculateTier4Score(int lid) const;    // Unwatched, far behind ordering
-    int calculateTier5Score(int lid) const;    // Preference mismatch ordering
+    int calculateTier1Score(int lid) const;    // Low-quality duplicate ordering
+    int calculateTier2Score(int lid) const;    // Language mismatch ordering
+    double calculateLearnedScore(int lid) const; // Learned factor weights
 
     const DeletionLockManager &m_lockManager;
-    const AnimePreferenceManager &m_preferenceManager;
+    const FactorWeightLearner &m_learner;
     const WatchSessionManager &m_sessionManager;
 };
 ```
 
-### AnimePreferenceManager (new class)
-Single responsibility: CRUD operations on the `anime_deletion_preference` table.
+### FactorWeightLearner (new class)
+Single responsibility: manages learned factor weights and processes A vs B choices.
 ```
-class AnimePreferenceManager {
+class FactorWeightLearner {
 public:
-    int getPreference(int aid) const;              // -1, 0, or +1
-    void setPreference(int aid, int preference);   // -1, 0, or +1
-    bool isMarkedForDeletion(int aid) const;
-    void markForDeletion(int aid);                 // Sets flag + triggers immediate delete (with confirmation)
-    void unmarkForDeletion(int aid);
+    // Factor weight access
+    double getWeight(const QString &factor) const;
+    QMap<QString, double> allWeights() const;
+    int totalChoicesMade() const;
+    bool isTrained() const;           // totalChoicesMade >= MIN_CHOICES
 
-    QList<int> markedAnimeIds() const;             // All aids with marked_for_deletion = 1
-    QMap<int, int> allPreferences() const;         // aid → preference, cached for queue rebuilds
+    // Compute learned score for a file
+    double computeScore(int lid) const;
+    QMap<QString, double> normalizeFactors(int lid) const;
+
+    // Process a user A vs B choice
+    void recordChoice(int keptLid, int deletedLid);
+
+    // Confidence: how far apart are the top two candidates' scores
+    double scoreDifference(int lid1, int lid2) const;
 
 signals:
-    void preferenceChanged(int aid, int preference);
-    void markedForDeletion(int aid);
+    void weightsUpdated();
 
 private:
-    QMap<int, int> m_preferenceCache;              // aid → preference
-    QSet<int> m_markedCache;                       // aids marked for deletion
+    void adjustWeight(const QString &factor, double delta);
+    QMap<QString, double> m_weights;   // Loaded from deletion_factor_weights
+    double m_learningRate = 0.1;
 };
 ```
 
-### DeletionQueue (extended from procedural design)
+### DeletionQueue (updated)
 ```
 class DeletionQueue {
 public:
     explicit DeletionQueue(
         HybridDeletionClassifier &classifier,
         DeletionLockManager &lockManager,
-        AnimePreferenceManager &preferenceManager);
+        FactorWeightLearner &learner);
 
     void rebuild();
     const DeletionCandidate* next() const;
     QList<DeletionCandidate> topN(int n) const;
+
+    // Returns true if A vs B prompt is needed for the top candidate
+    bool needsUserChoice() const;
+    QPair<DeletionCandidate, DeletionCandidate> getAvsBPair() const;
 
     // Lock actions (delegates to DeletionLockManager + rebuilds queue)
     void lockAnime(int aid, const QString &reason);
@@ -1445,16 +1553,14 @@ public:
     void lockEpisode(int eid, const QString &reason);
     void unlockEpisode(int eid);
 
-    // Preference actions (delegates to AnimePreferenceManager + rebuilds queue)
-    void setPreference(int aid, int preference);
-    void markForDeletion(int aid);
-    void unmarkForDeletion(int aid);
+    // A vs B choice (delegates to FactorWeightLearner + rebuilds queue)
+    void recordChoice(int keptLid, int deletedLid);
 
 private:
     QList<DeletionCandidate> m_candidates;
     HybridDeletionClassifier &m_classifier;
     DeletionLockManager &m_lockManager;
-    AnimePreferenceManager &m_preferenceManager;
+    FactorWeightLearner &m_learner;
 };
 ```
 
@@ -1464,13 +1570,12 @@ struct DeletionCandidate {
     int lid;
     int aid;
     int eid;
-    int tier;                  // -1 to 5 or PROTECTED
-    int intraTierScore;        // Scoring within the tier
-    int animePreference;       // -1, 0, or +1 from anime_deletion_preference
-    bool markedForDeletion;    // True if anime has [DEL] flag
+    int tier;                  // 0-3 or PROTECTED
+    double learnedScore;       // From factor weights (tier 3 only; 0.0 for procedural tiers)
+    QMap<QString, double> factorValues;  // Normalized factor values for this file
     QString reason;            // Full reason with actual values:
-                               // "Watched, 30 eps from current — ep 2 → current ep 32, H.264, 420MB, distance×size = 12.3 GB·eps [−]"
-                               // "Marked for deletion — 2.4 GB"
+                               // "Superseded by v2 — this file: v1 480p XviD, newer: v2 1080p HEVC"
+                               // "Score: 0.23 — rating: +0.18, distance: -0.12, size: +0.17"
     QString filePath;
     QString animeName;
     QString episodeLabel;      // "Ep 30 - Title"
@@ -1482,14 +1587,14 @@ struct DeletionCandidate {
 
 ---
 
-## Migration Path (Hybrid)
+## Migration Path
 
 1. **Phase 1 — Lock infrastructure**: Add `deletion_locks` table + `mylist.deletion_locked` column. Implement `DeletionLockManager`. Add lock/unlock to anime card and episode context menus. No changes to deletion logic yet — locks are stored but not enforced.
 
-2. **Phase 2 — Per-title preferences**: Add `anime_deletion_preference` table. Implement `AnimePreferenceManager`. Add [+]/[−]/[DEL] controls to the Deletion tab (Option 2). Preferences are stored but not yet used in deletion decisions.
+2. **Phase 2 — A vs B learning infrastructure**: Add `deletion_factor_weights` and `deletion_choices` tables. Implement `FactorWeightLearner`. All weights start at 0.
 
-3. **Phase 3 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. The classifier uses locks (absolute protection), per-title preferences (intra-tier ordering), and size-weighted distance. When hybrid is selected, `deleteNextEligibleFile()` uses `HybridDeletionClassifier` instead of `calculateDeletionScore()`.
+3. **Phase 3 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. Procedural tiers (0-2) handle deterministic cases. Tier 3 uses learned weights. When too few choices have been made, always present A vs B. `deleteNextEligibleFile()` delegates to `HybridDeletionClassifier`.
 
-4. **Phase 4 — UI integration**: Wire Deletion tab and inline card indicators (Option 1) to `DeletionQueue`. Show tier + reason + preference + lock status. Lock/unlock and [+]/[−]/[DEL] controls accessible from both the tab and the cards.
+4. **Phase 4 — UI integration**: Wire Deletion tab (Option 2) with A vs B prompt, learned weights display, and deletion queue. Wire inline card indicators (Option 1) with tier + reason. Lock controls accessible from both tab and cards.
 
-5. **Phase 5 — Remove pure scoring**: Once hybrid is validated, remove `calculateDeletionScore()` and all `SCORE_*` constants. `HybridDeletionClassifier` becomes the sole deletion decision maker.
+5. **Phase 5 — Remove pure scoring**: Once the learning system has been validated, remove `calculateDeletionScore()` and all `SCORE_*` constants. `HybridDeletionClassifier` becomes the sole deletion decision maker.
