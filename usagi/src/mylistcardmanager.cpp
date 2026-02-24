@@ -17,6 +17,11 @@
 // External references
 extern myAniDBApi *adbapi;
 
+namespace {
+QMutex s_metadataDispatchMutex;
+QSet<int> s_metadataDispatchInFlight;
+}
+
 MyListCardManager::MyListCardManager(QObject *parent)
     : QObject(parent)
     , m_layout(nullptr)
@@ -760,6 +765,10 @@ void MyListCardManager::clearAllCards()
     m_animeNeedingPoster.clear();
     m_animePicnames.clear();
     // Note: NOT clearing m_animeMetadataRequested to prevent re-requesting
+    
+    // Dispatch dedupe is per active load pass; reset it when cards are fully cleared.
+    QMutexLocker globalLocker(&s_metadataDispatchMutex);
+    s_metadataDispatchInFlight.clear();
 }
 
 AnimeCard* MyListCardManager::getCard(int aid)
@@ -1058,11 +1067,17 @@ void MyListCardManager::onAnimeUpdated(int aid)
     
     // Hide warning only if both metadata and poster are no longer needed
     bool stillNeedsData = m_animeNeedingPoster.contains(aid);
+    
+    {
+        QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        s_metadataDispatchInFlight.remove(aid);
+    }
     locker.unlock();
     
     if (card && !stillNeedsData) {
         card->setNeedsFetch(false);
     }
+    
 }
 
 void MyListCardManager::onFetchDataRequested(int aid)
@@ -1732,6 +1747,18 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
             return;
         }
         m_animeMetadataRequested.insert(aid);
+    }
+    
+    {
+        QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        if (s_metadataDispatchInFlight.contains(aid)) {
+            QString reasonSuffix = reason.isEmpty() ? QString() : QString(" (reason: %1)").arg(reason);
+            LOG(QString("[MyListCardManager] Global metadata dispatch dedupe hit for anime %1 - skipping duplicate dispatch%2")
+                .arg(aid)
+                .arg(reasonSuffix));
+            return;
+        }
+        s_metadataDispatchInFlight.insert(aid);
     }
     
     if (reason.isEmpty()) {
