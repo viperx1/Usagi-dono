@@ -7,6 +7,7 @@
 | 2026-02-24T01:56:40Z | Add deeper in-flight diagnostics | Added detailed AniDB logs for in-flight insert, duplicate-block age/size, and clear-on-230 with set size. | Pending CI rerun evidence. |
 | 2026-02-24T02:04:16Z | Issue #993 follow-up diagnostics | Added manager-level log of `AniDBApi::Anime(aid)` returned tag and explicit marker detection for duplicate-block return values. | Pending CI rerun evidence. |
 | 2026-02-24T02:11:00Z | Issue #994 identity diagnostics | Added `MyListCardManager` instance/adbapi pointer identity logs on construction and at request entry, including adbapi-null abort logging. | Pending CI rerun evidence; intended to confirm whether duplicate requests come from multiple manager instances. |
+| 2026-02-24T02:54:29Z | Issue #995 queue/emit diagnostics | Added AniDB logs for ANIME packet queue success/failure (with AID+tag), 230 ANIME re-request queue with AID+tag, and `notifyAnimeUpdated` emit with AID+tag. | Pending CI rerun evidence; intended to reveal whether duplicate count comes from re-request/emit path. |
 
 ## Current hypothesis
 

@@ -1093,7 +1093,9 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 					QSqlQuery reRequestQuery(db);
 					if (reRequestQuery.exec(q))
 					{
-						Logger::log("[AniDB Response] 230 ANIME - Re-request queued successfully", __FILE__, __LINE__);
+						Logger::log(QString("[AniDB Response] 230 ANIME - Re-request queued successfully for AID %1 (tag=%2)")
+							.arg(aid)
+							.arg(Tag), __FILE__, __LINE__);
 					}
 					else
 					{
@@ -1119,6 +1121,8 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 				storeAnimeData(animeInfo);
 				Logger::log("[AniDB Response] 230 ANIME metadata saved to database - AID: " + aid + " Type: " + animeInfo.type(), __FILE__, __LINE__);
 				// Emit signal to notify UI that anime data was updated
+				Logger::log(QString("[AniDB Response] 230 ANIME emitting notifyAnimeUpdated for AID %1 (tag=%2)")
+					.arg(aid).arg(Tag), __FILE__, __LINE__);
 				emit notifyAnimeUpdated(aid.toInt());
 			}
 		}
@@ -2138,7 +2142,16 @@ QString AniDBApi::Mylist(int lid)
 	}
 	QString q = QString("INSERT INTO `packets` (`str`) VALUES ('%1');").arg(msg);
 	QSqlQuery query(db);
-	query.exec(q);
+	if(query.exec(q))
+	{
+		Logger::log(QString("[AniDB API] Queued ANIME packet for AID %1 with tag=%2")
+			.arg(aid).arg(GetTag(msg)), __FILE__, __LINE__);
+	}
+	else
+	{
+		Logger::log(QString("[AniDB API] Failed to queue ANIME packet for AID %1: %2")
+			.arg(aid).arg(query.lastError().text()), __FILE__, __LINE__);
+	}
 	return GetTag(msg);
 }
 
