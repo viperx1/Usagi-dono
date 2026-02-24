@@ -11,11 +11,18 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMutex>
+#include <QSet>
 
 // Global pointer to the AniDB API instance
 // This is initialized by the application (window.cpp) or tests
 // Core library files can use this via extern declaration in anidbapi.h
 myAniDBApi *adbapi = nullptr;
+
+namespace {
+QMutex s_animeRequestMutex;
+QSet<int> s_animeRequestInFlight;
+}
 
 AniDBApi::AniDBApi(QString client_, int clientver_)
 	: m_settings()  // Initialize ApplicationSettings (will set database later)
@@ -1100,6 +1107,10 @@ QString AniDBApi::ParseMessage(QString Message, QString ReplyTo, QString ReplyTo
 			// Store all anime data to database
 			if(!aid.isEmpty())
 			{
+				{
+					QMutexLocker animeRequestLocker(&s_animeRequestMutex);
+					s_animeRequestInFlight.remove(aid.toInt());
+				}
 				animeInfo.setAnimeId(aid.toInt());  // Ensure aid is set
 				storeAnimeData(animeInfo);
 				Logger::log("[AniDB Response] 230 ANIME metadata saved to database - AID: " + aid + " Type: " + animeInfo.type(), __FILE__, __LINE__);
@@ -2657,6 +2668,16 @@ QString AniDBApi::Anime(int aid)
 	}
 	
 	// Request anime information by anime ID
+	{
+		QMutexLocker animeRequestLocker(&s_animeRequestMutex);
+		if(s_animeRequestInFlight.contains(aid))
+		{
+			Logger::log(QString("[AniDB API] Duplicate ANIME request blocked for AID %1 (already in-flight)").arg(aid), __FILE__, __LINE__);
+			return GetTag("");
+		}
+		s_animeRequestInFlight.insert(aid);
+	}
+	
 	if(SID.length() == 0 || LoginStatus() == 0)
 	{
 		Auth();
