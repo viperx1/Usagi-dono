@@ -149,172 +149,20 @@ Add a new top-level tab (alongside MyList, Hasher, Settings, etc.) that shows a 
 
 ---
 
-## Option 3: Filter/Sort Mode in Existing MyList Tab
+## Recommended Approach: Option 1 + Option 2 Combined
 
-### Description
-Add a "Deletion Risk" sort option and/or filter to the existing `MyListFilterSidebar`. When activated, cards are reordered by their worst file score (lowest first), and deletion indicators appear on cards. This reuses the existing card infrastructure.
+Option 1 (inline indicators on cards) provides contextual, per-file risk visibility without navigation cost. Option 2 (dedicated tab) provides collection-wide overview, bulk operations, and detailed analysis. They complement each other:
 
-### Mockup
-```
-Filter Sidebar:                    Cards (sorted by deletion risk):
-┌─────────────────┐    ┌─────────────────────────────────────┐
-│ Sort: Deletion ▼│    │ 🔴 Show A (score: -942)             │
-│                 │    │   Ep 1: v1 old.avi [-942] OLD REVN  │
-│ ☑ Show at-risk  │    │   Ep 1: v2 new.mkv [+65]            │
-│   only          │    ├─────────────────────────────────────┤
-│                 │    │ 🟡 Anime B (score: -72)              │
-│ Risk threshold: │    │   Ep 3: anime-03.mkv [-72]           │
-│ [====|====] 0   │    │     watched, far from current        │
-│                 │    ├─────────────────────────────────────┤
-│ Space: 42/500GB │    │ 🟢 Anime C (score: +95)             │
-│ Thresh: 50 GB   │    │   All files safe                     │
-└─────────────────┘    └─────────────────────────────────────┘
-```
+- **Option 1** answers: "Is this specific file safe?" — visible while browsing the collection.
+- **Option 2** answers: "What will be deleted next across everything?" — visible when managing disk space.
 
-### Pros
-- **Familiar UI**: reuses the card view and filter sidebar the user already knows
-- **Contextual**: deletion risk is shown alongside all other anime info on the card
-- **Filterable**: "show at-risk only" hides safe files and focuses attention on problems
-- **Low disruption**: only visible when the user explicitly activates the sort/filter
-- **Natural discovery**: appears alongside other sort options the user already uses
-- **Minimal new code**: extends existing `AnimeFilter` and `MyListFilterSidebar` classes
+### Implementation Plan
 
-### Cons
-- **Card-level granularity only**: sorting works at the anime level (worst file score), but the real issue is per-file
-- **Temporary view**: once the user switches sort back to name/rating, the deletion info disappears
-- **Limited detail space**: score breakdown needs to fit within the existing card layout
-- **Mixed metaphor**: MyList is for browsing the collection; adding "deletion mode" overloads its purpose
-- **Score calculation on sort**: needs to compute scores for all anime to sort, which could be slow for large collections
+**Phase 1 — Deletion Tab** (Option 2):
+The tab is the primary workspace for understanding and controlling deletion behavior. It shows the full ranked candidate list, per-title preferences, lock controls, and space metrics. This is where the user tunes the system.
 
-### Implementation Complexity
-**Low-Medium**. Requires:
-- New sort option in `MyListFilterSidebar` ("Deletion Risk")
-- New filter checkbox ("At-risk files only")
-- Per-anime worst-score calculation in `AnimeFilter`
-- Conditional deletion indicators on `AnimeCard` when sort mode is active
-- Space/threshold display in sidebar
-
----
-
-## Option 4: Notification/Warning Overlay on Cards
-
-### Description
-Only show deletion warnings when the system is approaching the deletion threshold or when auto-deletion is enabled. Cards with at-risk files get a dismissible warning banner. This is event-driven rather than always-visible.
-
-### Mockup
-```
-┌──────────────────────────────────┐
-│ ⚠ 3 files at risk of deletion   │  ← warning banner (card top)
-│ Space: 42 GB / Threshold: 50 GB │
-├──────────────────────────────────┤
-│ Poster       │ Title             │
-│              │ Type: TV          │
-│              │ ...               │
-├──────────────────────────────────┤
-│ Ep 1 - Intro                    │
-│   \ v1 480p XviD ⚠ Score: -45  │  ← only at-risk files marked
-│ Ep 2 - Adventure                │
-│   \ v1 1080p HEVC              │  ← safe files unmarked
-└──────────────────────────────────┘
-```
-
-### Pros
-- **Non-intrusive**: no visual noise when disk space is plentiful; warnings only appear when relevant
-- **Urgency-appropriate**: warnings scale with actual deletion proximity
-- **Action-oriented**: banner can include "Protect" / "Review" buttons for immediate action
-- **Minimal cognitive load**: user only sees deletion info when it matters
-- **Existing pattern**: the card already has a warning label (`m_warningLabel`) for missing metadata; this extends that concept
-
-### Cons
-- **Reactive only**: user cannot proactively review what would be deleted before space gets low
-- **Threshold dependency**: if threshold is set very low, warnings may appear too late
-- **Limited overview**: no way to see all at-risk files across the collection at once
-- **Transient**: warnings disappear when space is freed, losing the tuning context
-- **Incomplete picture**: doesn't help the user understand and tune the scoring weights
-
-### Implementation Complexity
-**Low**. Requires:
-- Threshold proximity check on card refresh
-- Conditional warning banner on `AnimeCard`
-- Score calculation only for files approaching deletion
-- Reuse of existing `m_warningLabel` pattern
-
----
-
-## Option 5: Hybrid — Inline Indicators + Sidebar Summary Panel
-
-### Description
-Combine Options 1 and 3: add per-file risk indicators to the anime cards (always-visible but subtle), and add a collapsible "Deletion Summary" section to the filter sidebar showing aggregate stats and the next N files to be deleted.
-
-### Mockup
-```
-Filter Sidebar:                          Cards:
-┌─────────────────────┐    ┌───────────────────────────────┐
-│ ▼ Deletion Summary  │    │ Poster │ Title                │
-│   Space: 42/500 GB  │    │        │ ...                  │
-│   Threshold: 50 GB  │    ├───────────────────────────────┤
-│   Auto-delete: ON   │    │ Ep 1 - Intro                 │
-│                     │    │   \ v1 1080p [Group] 🟢      │
-│   Next to delete:   │    │ Ep 2 - Battle                │
-│   1. show-01.avi    │    │   \ v1 720p [Group]  🟡      │
-│      Score: -942    │    │ Ep 3 - End                   │
-│      [Protect]      │    │   \ v1 480p [Group]  🔴      │
-│   2. anime-03.mkv   │    └───────────────────────────────┘
-│      Score: -72     │
-│      [Protect]      │
-│   3. movie.mp4      │
-│      Score: -45     │
-│      [Protect]      │
-│                     │
-│   [View all →]      │  ← opens detailed dialog/panel
-│                     │
-│ ▶ Status Filters    │
-│ ▶ Type Filters      │
-│ ▶ Sort Options      │
-└─────────────────────┘
-```
-
-### Pros
-- **Best of both worlds**: per-file indicators give contextual awareness; sidebar gives collection-wide overview
-- **Always accessible**: sidebar is visible alongside cards without switching tabs
-- **Progressive disclosure**: subtle icons for glanceability, sidebar for quick review, expand for full details
-- **Actionable**: "Protect" buttons in sidebar let user intervene quickly on the most at-risk files
-- **Space-efficient**: sidebar section collapses when not needed; icons are tiny
-- **Integrates naturally**: the filter sidebar already has grouped sections; deletion summary fits the pattern
-
-### Cons
-- **Dual maintenance**: both card indicators and sidebar summary need to stay in sync
-- **Sidebar space**: the filter sidebar is already populated; adding another section could require scrolling
-- **Complexity**: two separate display mechanisms to implement and keep consistent
-- **Score recalculation**: both indicators and sidebar need up-to-date scores; potential for inconsistency if not carefully managed
-
-### Implementation Complexity
-**Medium**. Requires:
-- Per-file risk indicator in `AnimeCard::addEpisode()` (same as Option 1)
-- New collapsible group in `MyListFilterSidebar` with `QListWidget` for top candidates
-- Score cache in `WatchSessionManager` to avoid duplicate calculations
-- Signal/slot connection between sidebar actions and card updates
-
----
-
-## Recommendation
-
-**Option 5 (Hybrid)** provides the best balance of visibility and detail. However, it can be implemented incrementally:
-
-### Phase 1: Sidebar Summary Panel (from Option 3/5)
-Add a "Deletion Queue" collapsible section to `MyListFilterSidebar` showing:
-- Current disk space vs. threshold
-- Auto-deletion status (enabled/disabled)
-- Top 5-10 files sorted by deletion priority with score, anime name, episode, and primary reason
-- "Protect" action per file
-
-This gives immediate collection-wide visibility with minimal UI disruption. It naturally fits the sidebar pattern and provides the most critical missing information: **what will be deleted next and why**.
-
-### Phase 2: Inline Card Indicators (from Option 1/5)
-Add per-file colored risk icons (🟢🟡🔴) to the episode tree in anime cards. Tooltip shows score breakdown. This is only visible when the card is expanded, keeping it unobtrusive.
-
-### Phase 3: Score Breakdown Dialog
-Add a detailed score breakdown dialog accessible from both the sidebar (click on a candidate) and the card (click on risk icon). Shows all scoring factors with values, explains gap protection, and allows per-file protection overrides.
+**Phase 2 — Inline Card Indicators** (Option 1):
+Add per-file colored risk icons (🟢🟡🔴) to the episode tree in anime cards. Tooltip shows the tier + reason. Clicking the icon navigates to the file's entry in the Deletion tab for full details. This provides at-a-glance awareness without leaving MyList.
 
 ---
 
@@ -351,7 +199,279 @@ This format makes every scoring decision transparent and gives the user the info
 
 ---
 
-# Alternative: Procedural Deletion Logic (replacing the scoring system)
+# Deep Analysis: Three Categories of Deletion Factors
+
+## Overview
+
+The current scoring system treats all 17 factors uniformly — each one adds or subtracts from a single integer. But these factors fall into three fundamentally different categories that should be handled differently:
+
+| Category | Examples | Nature | Decision Method |
+|----------|----------|--------|-----------------|
+| **Technical** | Codec, bitrate, resolution, file version | Objective, measurable | Deterministic rules (no scoring needed) |
+| **User Requirements** | Audio language, subtitle language | Fixed constraints (user speaks limited languages) | Hard filter (match/reject, no scoring needed) |
+| **Preferences** | Which anime to keep, episode distance, rating | Subjective, elastic, per-title | Requires scoring + user input |
+
+The key insight: **technical factors and user requirements can be resolved with straightforward procedural logic**. Only the preference category genuinely needs a scoring system — and even then, the score should be informed by explicit per-title user preferences rather than inferred from metadata.
+
+---
+
+## Category 1: Technical Factors (Deterministic)
+
+These factors have objectively correct answers. They do not need scoring; they can be resolved with simple rules.
+
+### File Version / Revision
+- **Rule**: If a newer local revision exists for the same episode, the older one is always deletable.
+- **No scoring needed**: v1 is always inferior to v2 when both are local. This is Tier 0 in the procedural model.
+
+### Video Quality (Resolution + Codec + Bitrate)
+- **Rule**: When multiple local files exist for the same episode, the one with lower quality is always the deletion candidate.
+- **Quality is a composite**: resolution (480p < 720p < 1080p), codec (XviD < H.264 < HEVC < AV1), bitrate (relative to expected for resolution+codec).
+- **No scoring needed**: `qualityScore(file) = resolutionScore + codecScore + bitrateNormalized` produces a single number that can be directly compared. The lower-quality file is always the candidate.
+- **Edge case**: Two files with the same quality but different codecs (e.g., HEVC 720p vs AV1 720p) — compare codec efficiency to break the tie.
+
+### File Size (for same quality)
+- **Rule**: When two files have the same quality, prefer to delete the larger one (it wastes more space for the same content).
+- **No scoring needed**: direct comparison of `file.sizeBytes`.
+
+These factors are resolved **before** any scoring happens. They are used to:
+1. Identify unconditionally deletable files (superseded revisions, low-quality duplicates).
+2. Break ties when two files cover the same episode.
+
+---
+
+## Category 2: User Requirements (Hard Constraints)
+
+These factors have a fixed, limited set of acceptable values. Users speak a small number of languages; this does not vary by anime or change dynamically.
+
+### Audio Language
+- **Constraint**: User has a ranked list of preferred audio languages (e.g., [Japanese, English]).
+- **Rule**: If a file's audio does not match any preferred language AND a local alternative with matching audio exists for the same episode → the non-matching file is deletable.
+- **No scoring needed**: This is a match/reject filter, not a relative weight. A file in Italian when the user only speaks Japanese and English is always the candidate if a Japanese version exists.
+- **Note**: If no matching alternative exists locally, the non-matching file is kept (it is the only copy).
+
+### Subtitle Language
+- **Constraint**: Same as audio — ranked list of preferred subtitle languages.
+- **Rule**: Same logic. Non-matching subtitle when a matching alternative exists locally → deletable.
+- **Combined with audio**: Audio mismatch is worse than subtitle-only mismatch (user cannot understand the content at all vs. can understand but without subtitles).
+
+### Why These Are Not "Scoring" Factors
+
+The current system assigns +30 for matching audio and -40 for non-matching. This implies that matching audio is somehow "worth" 30 points — a meaningless number. In reality, either the user can understand the file or they cannot. A file in a language the user does not speak should only be kept if no alternative exists. This is binary, not weighted.
+
+---
+
+## Category 3: Preferences (Requires Scoring + User Input)
+
+These are the factors that **cannot be resolved by deterministic rules**. They involve subjective user preferences about which anime and episodes to prioritize. This is where a scoring system is genuinely needed — but the score should incorporate explicit user input, not just inferred metadata.
+
+### The Problem with Current Preference Factors
+
+The current system uses anime rating, release group status, and hidden card state as proxies for user preference. But:
+- **Anime rating** (AniDB community rating) does not reflect the individual user's attachment to the series.
+- **Release group status** (active/stalled/disbanded) is a proxy for future updates, not user preference.
+- **Hidden card** is a UI display choice, not a deletion preference.
+
+A user might have a poorly-rated anime they love (guilty pleasure) or a highly-rated anime they have no interest in finishing. The scoring system cannot know this without explicit user input.
+
+### Episode Distance: Episode Count vs. File Size
+
+The current system calculates distance as episode count: "this file is 47 episodes away from the current position." But episode count treats all files equally regardless of size.
+
+**Size-weighted distance** would calculate: "this file's distance, weighted by its size contribution, means deleting it frees more space per unit of 'content distance'."
+
+| Metric | Formula | Behavior |
+|--------|---------|----------|
+| **Episode distance** | `abs(fileEp - currentEp)` | Treats a 200MB episode the same as a 2GB episode. Optimizes for "content I'm unlikely to watch." |
+| **Size-weighted distance** | `abs(fileEp - currentEp) * file.sizeBytes` | Prioritizes freeing space from large files that are also far away. A 2GB file 10 eps away ranks higher than a 200MB file 30 eps away. |
+| **Pure size** | `file.sizeBytes` | Ignores content position entirely. Maximizes space reclaimed per deletion but may delete nearby files. |
+
+**Recommendation**: Use **size-weighted distance** as the intra-tier sort within distance-based tiers (Tier 2 and Tier 4). This means:
+- Within "watched, far from current": delete the largest-and-farthest first.
+- Within "unwatched, far behind": delete the largest-and-farthest-behind first.
+
+This is better than pure episode count because it maximizes space reclaimed from files the user is unlikely to need, and better than pure size because it still respects content proximity.
+
+---
+
+## Per-Title Preference Scoring
+
+### The Core Idea
+
+Since technical factors and language requirements are handled by rules, the only remaining question is: **when the system needs to delete, which anime's files should go first?**
+
+This is inherently subjective. The user must tell the system which titles they care about. We provide a simple per-title preference interface:
+
+### Per-Title Controls
+
+Each anime in the collection gets three controls:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Title                              Preference    Deletion   │
+├─────────────────────────────────────────────────────────────┤
+│ Dragon Ball Z                      [−] [·] [+]   [DEL]     │
+│ Pokemon                            [−] [·] [+]   [DEL]     │
+│ Naruto Shippuden                   [−] [·] [+]   [ · ]     │
+│ One Piece                          [−] [·] [+]   [ · ]     │
+│ Attack on Titan                    [−] [·] [+]   [ · ]     │
+│ Cowboy Bebop                       [−] [·] [+]   [ · ]     │
+└─────────────────────────────────────────────────────────────┘
+
+[−] = Deprioritize (more likely to be deleted)
+[·] = Neutral (default — no preference expressed)
+[+] = Prioritize (less likely to be deleted)
+[DEL] = Marked for deletion
+```
+
+### What Each Control Means
+
+| Control | Effect | Behavior |
+|---------|--------|----------|
+| **[+] Prioritize** | Files from this anime get a positive preference score | Files are less likely to be chosen for deletion. Within any deletion tier, files from [+] anime sort toward the "safe" end. |
+| **[·] Neutral** | Default — no explicit preference | Files are ordered purely by the technical/procedural factors. |
+| **[−] Deprioritize** | Files from this anime get a negative preference score | Files are more likely to be chosen for deletion. Within any deletion tier, files from [−] anime sort toward the "delete first" end. |
+| **[DEL] Mark for deletion** | Anime is flagged for cleanup | See analysis below — this control needs careful semantics. |
+
+### How Preference Integrates with Tiers
+
+Preference does NOT change which tier a file is assigned to. Tiers are determined by objective conditions (superseded, watched+far, unwatched+behind, etc.). Preference only affects **intra-tier ordering**:
+
+```
+Example: Tier 2 (Watched, far from current) contains 10 files.
+
+Without preference:
+  Sorted by: size-weighted distance (farthest+largest first)
+
+With preference:
+  Sorted by: preference ASC, then size-weighted distance
+  - Files from [−] anime sort first (deleted earlier)
+  - Files from [·] anime sort in the middle
+  - Files from [+] anime sort last (deleted later, if at all)
+```
+
+This means:
+- A [+] anime's watched-far-away file is still in the "deletable" tier — but it will only be deleted after all [·] and [−] files in the same tier are gone.
+- A [−] anime's file is the first to go within its tier.
+- No preference can override tier boundaries: a [+] anime's superseded revision (Tier 0) is still deleted before any Tier 1 file, even from a [−] anime.
+
+### The [DEL] Button: Analysis
+
+The [DEL] button flags an anime for deletion. But what should it actually do?
+
+#### Option A: Instant Deletion
+- **Behavior**: Immediately delete all local files for this anime. Mark the anime for automatic deletion of any future files.
+- **Pros**: Simple, immediate, unambiguous. User clicks DEL and the files are gone.
+- **Cons**: Destructive and irreversible. User might click by accident. No opportunity to reconsider. If the user has partially watched the anime, they lose their progress without warning.
+
+#### Option B: Mark as Preferred for Deletion
+- **Behavior**: Move all files for this anime to the highest-priority deletion tier (effectively Tier -1). Files are deleted first when space is needed, but not immediately.
+- **Pros**: Non-destructive — files stay until space is needed. User can undo by removing the [DEL] flag. Graceful — the system still respects gap protection and locks. Consistent with the rest of the preference system (it's just the strongest form of [−]).
+- **Cons**: Less satisfying — user clicked "delete" but files are still there. May be confusing: "I said delete it, why is it still here?" Requires space pressure to actually trigger deletion.
+
+#### Option C: Hybrid — Immediate with Confirmation + Persistent Flag
+- **Behavior**: 
+  1. Show a confirmation dialog: "Delete all N files for [Anime]? This will free X GB. Files will be removed from disk."
+  2. If confirmed, delete all local files immediately.
+  3. Set a persistent flag so that any future files added for this anime are automatically placed in the highest-priority deletion tier (deleted first when space is needed).
+- **Pros**: Immediate result (user gets their space back now). Persistent effect (future files auto-cleaned). Confirmation prevents accidents. Clear semantics: "I don't want this anime on disk."
+- **Cons**: Most complex to implement. Two behaviors in one button (immediate delete + future preference).
+
+#### Recommendation: Option C (Hybrid)
+
+Option C best matches user intent. When a user clicks [DEL] on an anime, they mean "I don't want this taking up space." That means:
+1. Delete existing files now (with confirmation).
+2. If new files arrive later (e.g., from an ongoing download queue), delete them as soon as space is needed.
+
+The confirmation dialog prevents accidents. The persistent flag prevents the anime from accumulating files again.
+
+### Database Schema for Per-Title Preferences
+
+```sql
+CREATE TABLE anime_deletion_preference (
+    aid INTEGER PRIMARY KEY,
+    preference INTEGER DEFAULT 0,    -- -1 = deprioritize, 0 = neutral, +1 = prioritize
+    marked_for_deletion INTEGER DEFAULT 0,  -- 1 = DEL flag active
+    updated_at INTEGER               -- Unix timestamp of last change
+);
+CREATE INDEX idx_anime_del_pref ON anime_deletion_preference(preference);
+CREATE INDEX idx_anime_del_marked ON anime_deletion_preference(marked_for_deletion);
+```
+
+### How [DEL]-Marked Anime Interacts with Tiers
+
+Files from [DEL]-marked anime are classified as a new pseudo-tier:
+
+```
+Tier -1 — MARKED FOR DELETION
+  Rule: Anime has marked_for_deletion = 1 in anime_deletion_preference.
+  Sort: Largest file first (maximize space reclaimed).
+  Behavior: Deleted before any other tier when space is needed.
+  Note: This is separate from the initial immediate deletion.
+        It catches files that arrive after the [DEL] button was pressed.
+```
+
+This tier sits above Tier 0 (superseded revisions) because the user has explicitly said "I don't want this anime." It is the strongest automated deletion signal short of a manual file delete.
+
+### UI: Per-Title Preferences in the Deletion Tab
+
+The Deletion tab (Option 2) is the natural home for per-title preference controls:
+
+```
+[Hasher] [MyList] [Deletion] [Settings] [Log]
+                      ▲ active
+
+┌──────────────────────────────────────────────────────────────────┐
+│ Deletion Management                         Space: 42 / 500 GB  │
+│ Threshold: 50 GB │ Mode: Auto │ [▶ Run Now] [⏸ Pause]          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│ ── Per-Title Preferences ─────────────────────────────────────── │
+│                                                                  │
+│   Title                              Pref      DEL   Files  Size│
+│   ────────────────────────────────────────────────────────────── │
+│   Dragon Ball Z                   [−][·][+]   [DEL]   148  62GB │
+│   Pokemon                         [−][·][+]   [DEL]   312  95GB │
+│   Naruto Shippuden                [−][·][+]   [ · ]    89  34GB │
+│   One Piece                       [−][·][+]   [ · ]   245  78GB │
+│   Attack on Titan                 [−][·][+]   [ · ]    24   9GB │
+│   Cowboy Bebop                    [−][·][+]   [ · ]    26   8GB │
+│                                                                  │
+│ ── Deletion Queue ────────────────────────────────────────────── │
+│                                                                  │
+│   #  File              Anime           Tier    Reason            │
+│   ─────────────────────────────────────────────────────────────  │
+│   1  dbz-ep01-v1.avi   Dragon Ball Z   T0     Superseded (v2)   │
+│   2  poke-234.mkv      Pokemon [DEL]   T-1    Marked for del    │
+│   3  naruto-003.mkv    Naruto [−]      T2     Watched, 47 eps   │
+│   4  op-045.mkv        One Piece       T2     Watched, 30 eps   │
+│                                                                  │
+│ ── Score Breakdown (selected: naruto-003.mkv) ────────────────── │
+│   Tier: 2 — WATCHED, FAR FROM CURRENT                           │
+│   Reason: Watched, 47 eps from current — ep 3 → current ep 50   │
+│   Intra-tier factors:                                            │
+│     Size-weighted distance: 47 eps × 420MB = 19.7 GB·eps        │
+│     Codec: H.264 (no penalty)                                    │
+│     Preference: [−] deprioritized (sorts earlier in tier)        │
+│   Gap protection: No                                             │
+│   Queue position: #3 overall                                     │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Integration with Existing Locks
+
+Per-title preferences and locks serve different purposes:
+
+| Mechanism | Purpose | Scope | Strength |
+|-----------|---------|-------|----------|
+| **Lock (🔒)** | "Never auto-delete this" | Anime or episode | Absolute — overrides everything |
+| **[+] Prioritize** | "Delete this later than others" | Anime | Relative — affects intra-tier sort only |
+| **[·] Neutral** | "No preference" | Anime | Default |
+| **[−] Deprioritize** | "Delete this sooner than others" | Anime | Relative — affects intra-tier sort only |
+| **[DEL] Mark** | "I don't want this" | Anime | Creates Tier -1; immediate delete + future auto-cleanup |
+
+A locked anime cannot be [DEL]-marked (the lock overrides). If the user wants to [DEL] a locked anime, they must unlock it first — the UI shows: "This anime is locked. Unlock it to mark for deletion."
+
+---
 
 ## Why Consider a Procedural Alternative
 
@@ -625,6 +745,7 @@ The procedural approach maps cleanly to new classes while replacing the current 
 ### DeletionTier (enum)
 ```
 enum class DeletionTier {
+    MarkedForDeletion = -1,    // Tier -1: user explicitly marked via [DEL]
     SupersededRevision = 0,    // Tier 0
     WatchedNoSession = 1,      // Tier 1
     WatchedFarFromCurrent = 2, // Tier 2
@@ -820,7 +941,7 @@ Right-click on episode row:
 
 ## Hybrid Tier Definitions
 
-The tiers use procedural rules for classification. Locks are the highest-priority protection. Within each deletable tier, a **reduced scoring formula** orders candidates — but only using factors relevant to that tier, not all 17.
+The tiers use procedural rules for classification. Locks are the highest-priority protection. Per-title preferences ([+]/[−]/[DEL]) affect intra-tier ordering. Within each deletable tier, a **reduced scoring formula** orders candidates — using factors relevant to that tier plus the anime's preference weight.
 
 ```
 ── ABSOLUTE PROTECTIONS (checked first, in order) ──
@@ -836,9 +957,18 @@ Gap Check:
 
 ── DELETION TIERS ──
 
+Tier -1 — MARKED FOR DELETION
+  Rule: Anime has marked_for_deletion = 1 in anime_deletion_preference.
+  Intra-tier sort:
+    - file size descending (maximize space reclaimed per deletion)
+  Reason: "Marked for deletion — {fileSize}"
+  Example: "Marked for deletion — 2.4 GB"
+  Note: This tier catches files that arrive AFTER the initial [DEL] confirmation.
+        The [DEL] button itself triggers immediate deletion of existing files.
+
 Tier 0 — SUPERSEDED REVISION
   Rule: A newer local revision exists for the same episode.
-  Intra-tier score:
+  Intra-tier sort:
     - file version (oldest first)
     - file size descending (free more space)
   Reason: "Superseded by v{N} — this file: v{M} {resolution} {codec}, newer: v{N} {resolution} {codec}"
@@ -846,8 +976,8 @@ Tier 0 — SUPERSEDED REVISION
 
 Tier 1 — WATCHED, NO ACTIVE SESSION
   Rule: File is watched AND anime has no active watch session.
-  Intra-tier score:
-    + anime rating (delete low-rated first)
+  Intra-tier sort:
+    + preference ([−] first, [·] middle, [+] last)
     + file size descending (free more space)
     + codec age (delete ancient codecs first)
   Reason: "Watched, no active session — {codec}, {fileSize}, rating {rating}"
@@ -856,17 +986,17 @@ Tier 1 — WATCHED, NO ACTIVE SESSION
 Tier 2 — WATCHED, FAR FROM CURRENT
   Rule: File is watched AND anime has active session
         AND distance from current > aheadBuffer.
-  Intra-tier score:
-    + distance from current (farthest first)
+  Intra-tier sort:
+    + preference ([−] first, [·] middle, [+] last)
+    + size-weighted distance: abs(distance) × file.sizeBytes (largest×farthest first)
     + codec age
-    + bitrate deviation
-  Reason: "Watched, {N} eps from current — ep {fileEp} → current ep {curEp}, {codec}, bitrate {actual}kbps (expected {expected}kbps)"
-  Example: "Watched, 30 eps from current — ep 2 → current ep 32, H.264, bitrate 850kbps (expected 1200kbps)"
+  Reason: "Watched, {N} eps from current — ep {fileEp} → current ep {curEp}, {codec}, {fileSize}, distance×size = {sizeWeightedDistance}"
+  Example: "Watched, 30 eps from current — ep 2 → current ep 32, H.264, 420MB, distance×size = 12.3 GB·eps"
 
 Tier 3 — UNWATCHED LOW-QUALITY DUPLICATE
   Rule: File is unwatched AND another local file for the same episode
         has strictly higher quality/resolution.
-  Intra-tier score:
+  Intra-tier sort:
     + quality gap (biggest quality difference first)
     + bitrate deviation
   Reason: "Lower quality duplicate — this file: {resolution} {codec} {bitrate}kbps, better: {resolution} {codec} {bitrate}kbps"
@@ -875,16 +1005,17 @@ Tier 3 — UNWATCHED LOW-QUALITY DUPLICATE
 Tier 4 — UNWATCHED, FAR BEHIND CURRENT
   Rule: File is unwatched AND episode is behind current position
         by more than aheadBuffer.
-  Intra-tier score:
-    + distance behind (most behind first)
+  Intra-tier sort:
+    + preference ([−] first, [·] middle, [+] last)
+    + size-weighted distance: abs(distance) × file.sizeBytes (largest×farthest first)
     + quality (lower quality first)
-  Reason: "Unwatched, {N} eps behind current — ep {fileEp} → current ep {curEp}, quality {qualityTier}"
-  Example: "Unwatched, 15 eps behind current — ep 3 → current ep 18, quality low"
+  Reason: "Unwatched, {N} eps behind current — ep {fileEp} → current ep {curEp}, quality {qualityTier}, {fileSize}"
+  Example: "Unwatched, 15 eps behind current — ep 3 → current ep 18, quality low, 620MB"
 
 Tier 5 — PREFERENCE MISMATCH WITH ALTERNATIVE
   Rule: File does not match audio AND/OR subtitle preferences
         AND a better-matching local alternative exists for the same episode.
-  Intra-tier score:
+  Intra-tier sort:
     + mismatch severity (no audio + no sub > no sub only)
     + quality (lower quality first among mismatches)
   Reason: "Language mismatch — audio: {fileAudio} (preferred: {prefAudio}), sub: {fileSub} (preferred: {prefSub}); alternative has {altAudio}/{altSub}"
@@ -917,7 +1048,14 @@ function classifyFile(file):
     if wouldCreateGap(file):
         return { tier: PROTECTED, reason: "Gap protection" }
 
-    // ── Tier 0 ──
+    // ── Tier -1: user marked for deletion ──
+    pref = getAnimePreference(file.aid)  // from anime_deletion_preference
+    if pref.markedForDeletion:
+        score = -file.sizeBytes  // largest first
+        return { tier: -1, score: score,
+                 reason: "Marked for deletion — " + formatSize(file.sizeBytes) }
+
+    // ── Tier 0: superseded revision ──
     if hasNewerLocalRevision(file.eid, file.version):
         newer = getNewestLocalRevision(file.eid)
         score = file.version * 1000 - file.sizeBytes / (1024*1024)
@@ -927,18 +1065,17 @@ function classifyFile(file):
                        + ", newer: v" + newer.version + " " + newer.resolution + " " + newer.codec }
 
     isWatched = file.viewed > 0 OR file.localWatched > 0
+    prefWeight = pref.preference  // -1, 0, or +1
 
-    // ── Tier 1 ──
+    // ── Tier 1: watched, no active session ──
     if isWatched AND NOT hasActiveSession(file.aid):
-        rating = animeRating(file.aid)
-        score = 0
-        score -= rating / 100
+        score = prefWeight * 10000        // preference is primary sort
         score -= file.sizeBytes / (1024*1024*1024)
         score -= codecAgePenalty(file)
         return { tier: 1, score: score,
                  reason: "Watched, no active session"
                        + " — " + file.codec + ", " + formatSize(file.sizeBytes)
-                       + ", rating " + formatRating(rating) }
+                       + prefLabel(prefWeight) }
 
     // ── Gather session context ──
     session = findActiveWatchSession(file.aid)
@@ -946,20 +1083,20 @@ function classifyFile(file):
     if session:
         distance = file.totalEpisodePosition - session.currentTotalPosition
 
-    // ── Tier 2 ──
+    // ── Tier 2: watched, far from current ──
     if isWatched AND distance != NO_SESSION AND abs(distance) > aheadBuffer:
-        score = -abs(distance) * 100            // farthest first
+        sizeWeightedDist = abs(distance) * file.sizeBytes
+        score = prefWeight * 10000        // preference is primary sort
+        score -= sizeWeightedDist / (1024*1024*1024)  // largest×farthest first
         score -= codecAgePenalty(file)
-        score -= bitrateDeviation(file)
-        expectedBitrate = calculateExpectedBitrate(file.resolution, file.codec)
         return { tier: 2, score: score,
                  reason: "Watched, " + abs(distance) + " eps from current"
                        + " — ep " + file.episodeNumber + " → current ep " + session.currentEpisode
-                       + ", " + file.codec
-                       + ", bitrate " + file.bitrate + "kbps"
-                       + " (expected " + expectedBitrate + "kbps)" }
+                       + ", " + file.codec + ", " + formatSize(file.sizeBytes)
+                       + ", distance×size = " + formatSizeWeighted(sizeWeightedDist)
+                       + prefLabel(prefWeight) }
 
-    // ── Tier 3 ──
+    // ── Tier 3: unwatched low-quality duplicate ──
     if NOT isWatched:
         betterDupe = findBetterLocalDuplicate(file)
         if betterDupe:
@@ -970,16 +1107,19 @@ function classifyFile(file):
                            + " — this file: " + file.resolution + " " + file.codec + " " + file.bitrate + "kbps"
                            + ", better: " + betterDupe.resolution + " " + betterDupe.codec + " " + betterDupe.bitrate + "kbps" }
 
-    // ── Tier 4 ──
+    // ── Tier 4: unwatched, far behind current ──
     if NOT isWatched AND distance != NO_SESSION AND distance < -aheadBuffer:
-        score = distance * 100                  // most behind first (distance is negative)
-        score += qualityScore(file)             // lower quality → delete first
+        sizeWeightedDist = abs(distance) * file.sizeBytes
+        score = prefWeight * 10000        // preference is primary sort
+        score -= sizeWeightedDist / (1024*1024*1024)  // largest×farthest first
+        score += qualityScore(file)
         return { tier: 4, score: score,
                  reason: "Unwatched, " + abs(distance) + " eps behind current"
                        + " — ep " + file.episodeNumber + " → current ep " + session.currentEpisode
-                       + ", quality " + qualityTierLabel(file) }
+                       + ", quality " + qualityTierLabel(file) + ", " + formatSize(file.sizeBytes)
+                       + prefLabel(prefWeight) }
 
-    // ── Tier 5 ──
+    // ── Tier 5: preference mismatch ──
     audioMatch = matchesPreferredAudio(file)
     subMatch = matchesPreferredSub(file)
     if (NOT audioMatch OR NOT subMatch) AND hasBetterLanguageAlternative(file):
@@ -999,6 +1139,12 @@ function classifyFile(file):
 
     // ── Protected ──
     return { tier: PROTECTED, reason: protectionReason(file) }
+
+function prefLabel(prefWeight):
+    if prefWeight < 0: return " [−]"
+    if prefWeight > 0: return " [+]"
+    return ""
+```
 ```
 
 ### Deletion Selection
@@ -1229,26 +1375,53 @@ private:
 ```
 
 ### HybridDeletionClassifier (new class)
-Single responsibility: assigns tier + intra-tier score to a file.
+Single responsibility: assigns tier + intra-tier score to a file, incorporating per-title preferences.
 ```
 class HybridDeletionClassifier {
 public:
     explicit HybridDeletionClassifier(
         const DeletionLockManager &lockManager,
+        const AnimePreferenceManager &preferenceManager,
         const WatchSessionManager &sessionManager);
 
     DeletionCandidate classify(int lid) const;
 
 private:
-    int calculateTier0Score(int lid) const;  // Superseded revision ordering
-    int calculateTier1Score(int lid) const;  // Watched, no session ordering
-    int calculateTier2Score(int lid) const;  // Watched, far from current ordering
-    int calculateTier3Score(int lid) const;  // Low-quality duplicate ordering
-    int calculateTier4Score(int lid) const;  // Unwatched, far behind ordering
-    int calculateTier5Score(int lid) const;  // Preference mismatch ordering
+    int calculateTierNeg1Score(int lid) const; // Marked-for-deletion ordering
+    int calculateTier0Score(int lid) const;    // Superseded revision ordering
+    int calculateTier1Score(int lid) const;    // Watched, no session ordering
+    int calculateTier2Score(int lid) const;    // Watched, far from current ordering
+    int calculateTier3Score(int lid) const;    // Low-quality duplicate ordering
+    int calculateTier4Score(int lid) const;    // Unwatched, far behind ordering
+    int calculateTier5Score(int lid) const;    // Preference mismatch ordering
 
     const DeletionLockManager &m_lockManager;
+    const AnimePreferenceManager &m_preferenceManager;
     const WatchSessionManager &m_sessionManager;
+};
+```
+
+### AnimePreferenceManager (new class)
+Single responsibility: CRUD operations on the `anime_deletion_preference` table.
+```
+class AnimePreferenceManager {
+public:
+    int getPreference(int aid) const;              // -1, 0, or +1
+    void setPreference(int aid, int preference);   // -1, 0, or +1
+    bool isMarkedForDeletion(int aid) const;
+    void markForDeletion(int aid);                 // Sets flag + triggers immediate delete (with confirmation)
+    void unmarkForDeletion(int aid);
+
+    QList<int> markedAnimeIds() const;             // All aids with marked_for_deletion = 1
+    QMap<int, int> allPreferences() const;         // aid → preference, cached for queue rebuilds
+
+signals:
+    void preferenceChanged(int aid, int preference);
+    void markedForDeletion(int aid);
+
+private:
+    QMap<int, int> m_preferenceCache;              // aid → preference
+    QSet<int> m_markedCache;                       // aids marked for deletion
 };
 ```
 
@@ -1258,7 +1431,8 @@ class DeletionQueue {
 public:
     explicit DeletionQueue(
         HybridDeletionClassifier &classifier,
-        DeletionLockManager &lockManager);
+        DeletionLockManager &lockManager,
+        AnimePreferenceManager &preferenceManager);
 
     void rebuild();
     const DeletionCandidate* next() const;
@@ -1270,10 +1444,16 @@ public:
     void lockEpisode(int eid, const QString &reason);
     void unlockEpisode(int eid);
 
+    // Preference actions (delegates to AnimePreferenceManager + rebuilds queue)
+    void setPreference(int aid, int preference);
+    void markForDeletion(int aid);
+    void unmarkForDeletion(int aid);
+
 private:
     QList<DeletionCandidate> m_candidates;
     HybridDeletionClassifier &m_classifier;
     DeletionLockManager &m_lockManager;
+    AnimePreferenceManager &m_preferenceManager;
 };
 ```
 
@@ -1283,11 +1463,13 @@ struct DeletionCandidate {
     int lid;
     int aid;
     int eid;
-    int tier;                  // 0-5 or PROTECTED
+    int tier;                  // -1 to 5 or PROTECTED
     int intraTierScore;        // Scoring within the tier
+    int animePreference;       // -1, 0, or +1 from anime_deletion_preference
+    bool markedForDeletion;    // True if anime has [DEL] flag
     QString reason;            // Full reason with actual values:
-                               // "Watched, 30 eps from current — ep 2 → current ep 32, H.264, bitrate 850kbps (expected 1200kbps)"
-                               // "Language mismatch — audio: Italian (preferred: Japanese), sub: none (preferred: English); alternative has Japanese/English"
+                               // "Watched, 30 eps from current — ep 2 → current ep 32, H.264, 420MB, distance×size = 12.3 GB·eps [−]"
+                               // "Marked for deletion — 2.4 GB"
     QString filePath;
     QString animeName;
     QString episodeLabel;      // "Ep 30 - Title"
@@ -1303,8 +1485,10 @@ struct DeletionCandidate {
 
 1. **Phase 1 — Lock infrastructure**: Add `deletion_locks` table + `mylist.deletion_locked` column. Implement `DeletionLockManager`. Add lock/unlock to anime card and episode context menus. No changes to deletion logic yet — locks are stored but not enforced.
 
-2. **Phase 2 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. Add setting: "Deletion strategy: Scoring / Hybrid". When hybrid is selected, `deleteNextEligibleFile()` uses `HybridDeletionClassifier` instead of `calculateDeletionScore()`. Locks are enforced as absolute protection.
+2. **Phase 2 — Per-title preferences**: Add `anime_deletion_preference` table. Implement `AnimePreferenceManager`. Add [+]/[−]/[DEL] controls to the Deletion tab (Option 2). Preferences are stored but not yet used in deletion decisions.
 
-3. **Phase 3 — UI integration**: Wire sidebar deletion queue and card indicators to `DeletionQueue`. Show tier + reason + lock status. Lock/unlock buttons in sidebar and detail dialog.
+3. **Phase 3 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. The classifier uses locks (absolute protection), per-title preferences (intra-tier ordering), and size-weighted distance. When hybrid is selected, `deleteNextEligibleFile()` uses `HybridDeletionClassifier` instead of `calculateDeletionScore()`.
 
-4. **Phase 4 — Remove pure scoring**: Once hybrid is validated, remove `calculateDeletionScore()` and all `SCORE_*` constants. `HybridDeletionClassifier` becomes the sole deletion decision maker.
+4. **Phase 4 — UI integration**: Wire Deletion tab and inline card indicators (Option 1) to `DeletionQueue`. Show tier + reason + preference + lock status. Lock/unlock and [+]/[−]/[DEL] controls accessible from both the tab and the cards.
+
+5. **Phase 5 — Remove pure scoring**: Once hybrid is validated, remove `calculateDeletionScore()` and all `SCORE_*` constants. `HybridDeletionClassifier` becomes the sole deletion decision maker.
