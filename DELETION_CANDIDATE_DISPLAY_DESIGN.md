@@ -724,17 +724,22 @@ Locks are explicit user actions — they are not inferred or computed. A locked 
 ### Database Schema
 
 ```sql
--- New column on mylist table (per-file, but set via anime or episode scope)
+-- New column on mylist table — denormalized cache for fast lookups.
+-- Value reflects the highest-priority lock covering this file:
+--   0 = not locked
+--   1 = locked at episode level
+--   2 = locked at anime level (trumps episode-level)
+-- When both anime and episode locks exist for the same file, the value is 2.
 ALTER TABLE mylist ADD COLUMN deletion_locked INTEGER DEFAULT 0;
--- 0 = not locked, 1 = locked at episode level, 2 = locked at anime level
 
--- Separate table for anime-level locks (applied to all current and future files)
+-- Separate table for user-created locks (applied to all current and future files)
 CREATE TABLE deletion_locks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     aid INTEGER,              -- Non-null for anime lock
     eid INTEGER,              -- Non-null for episode lock
     locked_at INTEGER,        -- Unix timestamp
     reason TEXT,              -- Optional user note: "rewatching", "seeding", etc.
+    CHECK ((aid IS NOT NULL AND eid IS NULL) OR (aid IS NULL AND eid IS NOT NULL)),
     UNIQUE(aid, eid)
 );
 CREATE INDEX idx_deletion_locks_aid ON deletion_locks(aid);
@@ -755,8 +760,8 @@ When the user locks an **anime**:
 
 When the user locks an **episode**:
 1. Insert row into `deletion_locks` with `aid = NULL, eid = Y`.
-2. Update matching mylist rows: `UPDATE mylist SET deletion_locked = 1 WHERE eid = Y`.
-3. Any future file added to this episode inherits `deletion_locked = 1`.
+2. Update matching mylist rows, but only if not already covered by an anime lock: `UPDATE mylist SET deletion_locked = 1 WHERE eid = Y AND deletion_locked < 1`.
+3. Any future file added to this episode inherits `deletion_locked = 1` (or 2 if its anime is also locked).
 
 When the user unlocks:
 1. Remove the `deletion_locks` row.
@@ -1001,15 +1006,15 @@ An anime lock implies all its episodes are locked. If an anime is locked and the
 ### Lock Resolution for a File
 
 ```
+// Cache locked IDs at queue rebuild time to avoid per-file queries:
+//   m_lockedAnimeIds = SELECT aid FROM deletion_locks WHERE aid IS NOT NULL
+//   m_lockedEpisodeIds = SELECT eid FROM deletion_locks WHERE eid IS NOT NULL
+
 function isLocked(aid, eid):
-    // Check anime-level lock first (covers everything)
-    if EXISTS in deletion_locks WHERE aid = :aid AND eid IS NULL:
+    if aid in m_lockedAnimeIds:
         return true
-
-    // Check episode-level lock
-    if EXISTS in deletion_locks WHERE eid = :eid:
+    if eid in m_lockedEpisodeIds:
         return true
-
     return false
 
 function lockReason(file):
@@ -1101,15 +1106,15 @@ function lockReason(file):
 │   1. old-ep01.avi           │
 │      Tier 0: Superseded     │
 │      v2 exists locally      │
-│      [🔒 Lock ep] [🔒 Lock] │
+│      [🔒 Lock ep] [🔒 Lock anime] │
 │   2. show-ep30.mkv          │
 │      Tier 2: Watched, 30eps │
 │      Score: -3012           │
-│      [🔒 Lock ep] [🔒 Lock] │
+│      [🔒 Lock ep] [🔒 Lock anime] │
 │   3. dub-ep05.mkv           │
 │      Tier 5: Lang mismatch  │
 │      JP audio version avail │
-│      [🔒 Lock ep] [🔒 Lock] │
+│      [🔒 Lock ep] [🔒 Lock anime] │
 └─────────────────────────────┘
 ```
 
@@ -1142,10 +1147,13 @@ Queue position: #2 overall
 ```
 struct DeletionLock {
     int id;             // deletion_locks.id
-    int aid;            // 0 if episode-level lock
-    int eid;            // 0 if anime-level lock
+    int aid;            // -1 if episode-level lock (NULL in DB)
+    int eid;            // -1 if anime-level lock (NULL in DB)
     qint64 lockedAt;    // Unix timestamp
     QString reason;     // User-provided note
+
+    bool isAnimeLock() const { return aid > 0 && eid < 0; }
+    bool isEpisodeLock() const { return eid > 0 && aid < 0; }
 };
 ```
 
@@ -1173,7 +1181,7 @@ signals:
 
 private:
     void propagateToMylist(int aid, int eid, int lockValue);
-    void recalculateMylistLocks(int aid);   // After unlock, recheck remaining locks
+    void recalculateMylistLocks(int aid, int eid);  // After unlock, recheck remaining locks for affected rows
 };
 ```
 
