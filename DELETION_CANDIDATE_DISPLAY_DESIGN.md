@@ -333,7 +333,7 @@ Watch status (watched)           -5   viewed
 Distance (47 episodes away)     -47   ep 1 → current ep 48
 Codec (XviD — ancient)          -30   XviD → HEVC/AV1
 Quality (low)                   -35   score 20 → ≥60
-Audio (Japanese — preferred)    +30   Japanese = preferred
+Audio (Japanese — preferred)    +30   Japanese (matches preferred)
 Subtitle (none — not preferred) -20   none → English
 Anime rating (5.2 — low)       -15   520 → ≥800
 Group status (disbanded)        -25   disbanded → active
@@ -1124,7 +1124,7 @@ function lockReason(file):
 │   \ v1 1080p HEVC [Group]                            │
 │ Ep 2 - Start                                         │
 │   \ v1 480p XviD [OldGrp] 🔴  Watched, 30 eps       │
-│        (ep 2 → cur ep 32, XviD, 600kbps exp 1200)    │
+│        (ep 2 → cur ep 32, XviD, 600kbps expected 1200)│
 │   \ v2 1080p HEVC [NewGrp] 🟢  Protected (in buffer) │
 │ Ep 3 - Continue                                      │
 │   \ v1 720p [Group]       🟡  Unwatched, 5 eps       │
@@ -1149,7 +1149,7 @@ function lockReason(file):
 │   2. show-ep30.mkv                     │
 │      Tier 2: Watched, 30 eps           │
 │      ep 2 → cur ep 32, H.264          │
-│      850kbps (exp 1200kbps)            │
+│      850kbps (expected 1200kbps)        │
 │      [🔒 Lock ep] [🔒 Lock anime]      │
 │   3. dub-ep05.mkv                      │
 │      Tier 5: Language mismatch         │
