@@ -2144,13 +2144,13 @@ QString AniDBApi::Mylist(int lid)
 	QSqlQuery query(db);
 	if(query.exec(q))
 	{
-		Logger::log(QString("[AniDB API] Queued ANIME packet for AID %1 with tag=%2")
-			.arg(aid).arg(GetTag(msg)), __FILE__, __LINE__);
+		Logger::log(QString("[AniDB API] Queued MYLIST packet for LID %1 with tag=%2")
+			.arg(lid).arg(GetTag(msg)), __FILE__, __LINE__);
 	}
 	else
 	{
-		Logger::log(QString("[AniDB API] Failed to queue ANIME packet for AID %1: %2")
-			.arg(aid).arg(query.lastError().text()), __FILE__, __LINE__);
+		Logger::log(QString("[AniDB API] Failed to queue MYLIST packet for LID %1: %2")
+			.arg(lid).arg(query.lastError().text()), __FILE__, __LINE__);
 	}
 	return GetTag(msg);
 }
