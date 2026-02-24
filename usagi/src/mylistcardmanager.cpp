@@ -1070,6 +1070,9 @@ void MyListCardManager::onAnimeUpdated(int aid)
     
     {
         QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        LOG(QString("[MyListCardManager] onAnimeUpdated: removing aid=%1 from global in-flight set (currentSize=%2)")
+            .arg(aid)
+            .arg(s_metadataDispatchInFlight.size()));
         s_metadataDispatchInFlight.remove(aid);
     }
     locker.unlock();
@@ -1736,8 +1739,16 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
         return;
     }
     
+    LOG(QString("[MyListCardManager] requestAnimeMetadata enter: aid=%1, reason=%2")
+        .arg(aid)
+        .arg(reason.isEmpty() ? QString("<none>") : reason));
+    
     {
         QMutexLocker locker(&m_mutex);
+        LOG(QString("[MyListCardManager] requestAnimeMetadata state before local dedupe: aid=%1, requestedContains=%2, requestedSize=%3")
+            .arg(aid)
+            .arg(m_animeMetadataRequested.contains(aid) ? "true" : "false")
+            .arg(m_animeMetadataRequested.size()));
         if (m_animeMetadataRequested.contains(aid)) {
             if (reason.isEmpty()) {
                 LOG(QString("[MyListCardManager] Metadata request for anime %1 already requested - skipping duplicate request").arg(aid));
@@ -1751,6 +1762,10 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
     
     {
         QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        LOG(QString("[MyListCardManager] requestAnimeMetadata state before global dedupe: aid=%1, inFlightContains=%2, inFlightSize=%3")
+            .arg(aid)
+            .arg(s_metadataDispatchInFlight.contains(aid) ? "true" : "false")
+            .arg(s_metadataDispatchInFlight.size()));
         if (s_metadataDispatchInFlight.contains(aid)) {
             QString reasonSuffix = reason.isEmpty() ? QString() : QString(" (reason: %1)").arg(reason);
             LOG(QString("[MyListCardManager] Global metadata dispatch dedupe hit for anime %1 - skipping duplicate dispatch%2")
@@ -1767,6 +1782,7 @@ void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
         LOG(QString("[MyListCardManager] Requesting metadata for anime %1 (reason: %2)").arg(aid).arg(reason));
     }
     adbapi->Anime(aid);
+    LOG(QString("[MyListCardManager] requestAnimeMetadata dispatched Anime(%1)").arg(aid));
 }
 
 void MyListCardManager::downloadPoster(int aid, const QString &picname)
