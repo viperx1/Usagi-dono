@@ -22,6 +22,8 @@ namespace {
 QMutex s_metadataDispatchMutex;
 QSet<int> s_metadataDispatchInFlight;
 std::atomic<quint64> s_metadataRequestSequence{0};
+std::atomic<quint64> s_setAnimeIdListSequence{0};
+std::atomic<quint64> s_buildChainsFromCacheSequence{0};
 
 bool isUsagiTestMode()
 {
@@ -99,6 +101,13 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids)
 
 void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEnabled)
 {
+    const quint64 setListSeq = ++s_setAnimeIdListSequence;
+    LOG(QString("[MyListCardManager] setAnimeIdList[%1] enter: manager=%2 aids=%3 chainModeEnabled=%4")
+        .arg(setListSeq)
+        .arg(reinterpret_cast<quintptr>(this), 0, 16)
+        .arg(aids.size())
+        .arg(chainModeEnabled ? "true" : "false"));
+    
     QList<int> finalAnimeIds;
     
     {
@@ -212,6 +221,11 @@ void MyListCardManager::setAnimeIdList(const QList<int>& aids, bool chainModeEna
     if (m_virtualLayout) {
         m_virtualLayout->setItemCount(finalAnimeIds.size());
     }
+    
+    LOG(QString("[MyListCardManager] setAnimeIdList[%1] exit: finalAnimeIds=%2 chainModeEnabled=%3")
+        .arg(setListSeq)
+        .arg(finalAnimeIds.size())
+        .arg(chainModeEnabled ? "true" : "false"));
 }
 
 QList<AnimeChain> MyListCardManager::buildChainsFromAnimeIds(const QList<int>& aids) const
@@ -2307,6 +2321,10 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
 
 void MyListCardManager::buildChainsFromCache()
 {
+    const quint64 buildSeq = ++s_buildChainsFromCacheSequence;
+    LOG(QString("[MyListCardManager] buildChainsFromCache[%1] enter: manager=%2")
+        .arg(buildSeq)
+        .arg(reinterpret_cast<quintptr>(this), 0, 16));
     {
         QMutexLocker locker(&m_mutex);
         
@@ -2323,6 +2341,8 @@ void MyListCardManager::buildChainsFromCache()
             if (changePercent < 10.0) {
                 LOG(QString("[MyListCardManager] Chains already built from %1 anime, cache has %2 anime (%.1f%% change), skipping rebuild")
                     .arg(m_lastChainBuildAnimeCount).arg(currentCacheSize).arg(changePercent));
+                LOG(QString("[MyListCardManager] buildChainsFromCache[%1] exit: skipped rebuild")
+                    .arg(buildSeq));
                 // Ensure data is marked ready even when skipping rebuild
                 // (this handles case where preloadCardCreationData was called again after chains were built)
                 if (!m_dataReady) {
@@ -2367,6 +2387,8 @@ void MyListCardManager::buildChainsFromCache()
     if (allCachedAids.isEmpty()) {
         QMutexLocker locker(&m_mutex);
         LOG("[MyListCardManager] buildChainsFromCache: No anime in cache, skipping chain building");
+        LOG(QString("[MyListCardManager] buildChainsFromCache[%1] exit: no anime in cache")
+            .arg(buildSeq));
         m_chainsBuilt = false;
         m_chainBuildInProgress = false;
         m_dataReady = true;  // Set data ready even if no chains (no anime to display)
@@ -2402,7 +2424,8 @@ void MyListCardManager::buildChainsFromCache()
         m_dataReady = true;  // Mark ALL data as ready (preload + chain build complete)
         m_lastChainBuildAnimeCount = m_cardCreationDataCache.size();  // Track cache size used for this build
         
-        LOG(QString("[MyListCardManager] Built %1 chains from complete cache (contains %2 total anime)")
+        LOG(QString("[MyListCardManager] buildChainsFromCache[%1] exit: chains=%2 totalAnime=%3")
+            .arg(buildSeq)
             .arg(m_chainList.size())
             .arg(m_aidToChainIndex.size()));
     } // Release mutex before waking threads
