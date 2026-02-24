@@ -2181,22 +2181,21 @@ void MyListCardManager::preloadRelationDataForChainExpansion(const QList<int>& b
         }
     }
     
-    QList<int> missingAidsToRequest;
+    QList<int> missingAids;
     {
         QMutexLocker locker(&m_mutex);
         for (int aid : aidsToLoad) {
-            if (!loadedAids.contains(aid) && !m_animeMetadataRequested.contains(aid)) {
-                m_animeMetadataRequested.insert(aid);
-                missingAidsToRequest.append(aid);
-            } else if (!loadedAids.contains(aid) && m_animeMetadataRequested.contains(aid)) {
-                LOG(QString("[MyListCardManager] Related anime aid=%1 still missing from local DB/cache but metadata request already sent earlier").arg(aid));
+            if (!loadedAids.contains(aid)) {
+                missingAids.append(aid);
             }
         }
     }
     
-    for (int aid : std::as_const(missingAidsToRequest)) {
-        LOG(QString("[MyListCardManager] Related anime aid=%1 missing from local cache/database, requesting metadata").arg(aid));
-        requestAnimeMetadata(aid, "chain-preload: related anime missing");
+    if (!missingAids.isEmpty()) {
+        // Metadata requests for missing related anime are handled during preloadCardCreationData.
+        // Avoid re-requesting here to prevent duplicate request signals during chain building.
+        LOG(QString("[MyListCardManager] Chain preload found %1 related anime still missing in local DB/cache; deferring to preloadCardCreationData() request path")
+            .arg(missingAids.size()));
     }
 }
 
