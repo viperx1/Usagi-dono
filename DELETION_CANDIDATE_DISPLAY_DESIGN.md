@@ -32,6 +32,8 @@ Each file starts at score 50 and is adjusted by:
 
 Gap protection prevents deleting files that would create holes in episode sequences. Gap protection is **cross-anime, bidirectional**: it considers prequel/sequel chains (via `AnimeChain` relation data) in **both directions** (prequels and sequels) and **spans across the entire series** — e.g., if the user has Inuyasha → Final Act → Yashahime → Yashahime S2, gap protection checks all chain boundaries in both directions (Inuyasha↔Final Act, Final Act↔Yashahime, Yashahime↔S2). Deleting the last episode of Inuyasha when the first episode of Final Act exists would create a forward cross-series gap; deleting Final Act ep 1 when Inuyasha ep 167 exists would create a backward cross-series gap.
 
+**Existing code to reuse (Q23)**: The `AnimeChain` class (`animechain.h`) already handles chain building, expansion via `RelationLookupFunc`, ordering from prequel→sequel, and relation tracking (`m_relations` map of `aid → (prequel_aid, sequel_aid)`). The `wouldCreateGap()` method (`watchsessionmanager.cpp:1772-1896`) already handles intra-anime gap detection (checking if episodes exist both before and after the candidate). For cross-anime extension: `wouldCreateGap()` should be extended to find the `AnimeChain` containing the file's anime, then check boundary episodes between adjacent anime in the chain (last episode of predecessor ↔ first episode of successor). No new chain logic is needed — reuse `AnimeChain::getAnimeIds()` to walk the ordered chain and check boundary pairs.
+
 Lower score = higher deletion priority.
 
 ---
@@ -488,9 +490,11 @@ function handleDeletionNeeded():
 
 When the user clicks [Skip] on an A vs B prompt:
 - Neither file is deleted.
-- No weight adjustment happens.
+- **No weight adjustment happens** — Skip is purely "not now", never a learning signal.
 - The system remembers this pair was skipped and does not re-present it immediately.
 - Deletion is deferred until space pressure increases or the user manually triggers it.
+
+This applies equally to normal A vs B pairs and locked-peer contexts (Q17). When a single candidate is pitted against a locked file, the purpose is to **bring to the user's attention** that they might want to unlock something — not to train weights. The locked peer comparison is informational, not a learning opportunity.
 
 ### Database Schema for Learned Weights
 
@@ -565,8 +569,11 @@ All A vs B interaction happens **inside the Current Choice tab only** — no pop
 │ │ 2  dub-ep05.mkv      Anime C         T2     Lang mismatch    ││
 │ │ 3  naruto-003.mkv    Naruto          T3     Score: 0.23  ←   ││
 │ │ 4  dbz-045.mkv       Dragon Ball Z   T3     Score: 0.31  ←   ││
+│ │ 🔒 bleach-ep01.mkv   Bleach          —      Locked (anime)   ││
+│ │ 🔒 op-ep50.mkv       One Piece       —      Locked (episode) ││
 │ │                                                               ││
-│ │ Items 1-2: auto-delete (procedural). 3-4: loaded above.      ││
+│ │ Full list of all files. Items 1-2: auto-delete (procedural). ││
+│ │ 3-4: loaded above. 🔒: locked files shown for visibility.    ││
 │ └───────────────────────────────────────────────────────────────┘│
 │                                                                  │
 │ ┌─ Deletion History ────────────────────── Total freed: 234 GB ─┐│
@@ -585,7 +592,9 @@ All A vs B interaction happens **inside the Current Choice tab only** — no pop
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Tray icon behavior**: When disk usage hits the deletion threshold and user action is required (A vs B choice pending), the tray icon shows a red exclamation mark (❗) on its right half. The ❗ disappears when space drops below the threshold (deletions freed enough space). No popups, no notifications, no toasts — the user opens the Current Choice tab when convenient. If space pressure is critical and no choice has been made, the system waits (no autonomous deletion for under-trained learned tier).
+**Tray icon behavior**: When disk usage hits the deletion threshold and user action is required (A vs B choice pending), the tray icon shows a red exclamation mark (❗) on its right half. The ❗ disappears when space drops below the threshold (deletions freed enough space). No popups, no notifications, no toasts — the user opens the Current Choice tab when convenient. If space pressure is critical and no choice has been made, the system **waits indefinitely** — it never auto-deletes Tier 3 files without user input, regardless of how long the choice has been pending (Q25).
+
+**Preview mode**: When space is below the threshold (no space pressure), the queue still shows all ranked candidates (Q18/Q24). If the user makes an A vs B choice in this mode, the **file is actually deleted** — the user explicitly chose to delete it, and the system honors that choice. Weight adjustments are recorded as usual (Q22).
 
 ### Integration with Procedural Tiers and Locks
 
@@ -1237,9 +1246,9 @@ public:
         DeletionLockManager &lockManager,
         FactorWeightLearner &learner);
 
-    void rebuild();
+    void rebuild();                     // Classifies ALL local files (no limit)
     const DeletionCandidate* next() const;
-    QList<DeletionCandidate> topN(int n) const;
+    QList<DeletionCandidate> allCandidates() const;  // Full list: deletable + locked files
 
     // Returns true if A vs B prompt is needed for the top candidate
     bool needsUserChoice() const;
@@ -1251,11 +1260,13 @@ public:
     void lockEpisode(int eid);
     void unlockEpisode(int eid);
 
-    // A vs B choice (delegates to FactorWeightLearner + rebuilds queue)
+    // A vs B choice — always deletes the chosen file (even in preview mode)
+    // and records weight adjustment (Q22)
     void recordChoice(int keptLid, int deletedLid);
 
 private:
-    QList<DeletionCandidate> m_candidates;
+    QList<DeletionCandidate> m_candidates;      // Deletable candidates (T0-T3), sorted
+    QList<DeletionCandidate> m_lockedFiles;      // Locked files shown for visibility (Q21)
     HybridDeletionClassifier &m_classifier;
     DeletionLockManager &m_lockManager;
     FactorWeightLearner &m_learner;
@@ -1435,32 +1446,35 @@ struct DeletionHistoryEntry {
 | Q18 | Queue behavior when space is sufficient | **Always show ranked list**: the queue always shows what WOULD be deleted, even when space is below threshold. Users can still make A vs B choices to train weights proactively. |
 | Q19 | Cross-anime gap — chain direction | **Both directions**: check prequels AND sequels. Checking only one direction WILL create gaps. |
 | Q20 | Red ❗ clear condition | **Threshold-based**: ❗ appears when threshold is hit and user action is required; disappears when space is freed below threshold (deletions cleared enough space). |
+| Q21 | Single-candidate A vs B — locked peer learning | **Skip never affects weights** (same as all other Skips per [Skip] button rules). Locked peer is shown for **user awareness** — to bring attention that they might need to unlock something. The locked-peer comparison is informational, not a learning opportunity. |
+| Q22 | Preview mode A vs B — delete or just learn? | **Delete the file**: the user explicitly chose to delete it; honor the choice. Weight adjustment is recorded as usual. There is no "training-only" mode — every A vs B choice is real. |
+| Q23 | Gap protection — chain boundary definition | **Reuse existing code**: `AnimeChain` class handles chain building/expansion/relation tracking. `wouldCreateGap()` handles intra-anime gap detection. For cross-anime: extend `wouldCreateGap()` to use `AnimeChain::getAnimeIds()` to walk the ordered chain and check boundary episodes (last ep of predecessor ↔ first ep of successor) between adjacent anime. No new chain logic needed. |
+| Q24 | Queue size limit | **Full list, no limit**: existing score calculation already iterates all local files. The new `classifyFile()` will do the same. Queue shows every file (deletable + locked), scrollable. UI can use virtual scrolling for large collections if needed. |
+| Q25 | A vs B choice timeout | **Wait indefinitely**: never auto-delete Tier 3 without user input, no matter how long the choice has been pending. Tray icon ❗ stays visible. User opens Current Choice tab when ready. |
 
 ---
 
 ## Follow-Up Questions
 
-All previous questions (Q1-Q20) have been resolved. See the Resolved Design Decisions table above for the full list.
+All previous questions (Q1-Q25) have been resolved. See the Resolved Design Decisions table above for the full list.
 
-### Q21: Single-candidate A vs B — locked peer learning
-When a single Tier 3 candidate is pitted against a locked peer file for context (Q17), should the user's "Skip" choice (i.e., declining to delete) adjust factor weights? Keeping the candidate when its only comparison is a locked file means the user prefers to keep it — but it is compared against a protected file, not a true peer. Should the learning formula treat this as a normal A vs B choice, or should it be ignored for weight training?
+### Q26: Locked files in queue — display and interaction
+Locked files are now shown in the queue for visibility (Q21). When the user clicks a locked file in the queue, should the A vs B groupbox:
+- **A**: Show the locked file's details read-only (informational, no action buttons)
+- **B**: Show a prompt to unlock the file ("This file is locked. [Unlock] [Back]")
+- **C**: Show the locked file alongside its nearest unlocked candidate for comparison
 
-### Q22: Queue "preview mode" — A vs B training without deletion
-Q18 resolved that the queue always shows ranked candidates even when space is sufficient. If the user makes an A vs B choice in preview mode (no space pressure), should the chosen file actually be deleted, or only the weight adjustment recorded? Options:
-- **A**: Delete the file (user explicitly chose to delete it, honor the choice)
-- **B**: Don't delete, only record the weight adjustment (training mode — user is just teaching preferences)
-- **C**: Ask the user each time ("Also delete this file now? [Yes, delete] [No, just learn]")
+### Q27: Preview mode — visual distinction
+When space is below the threshold (no pressure), the queue still shows all candidates. Should there be a visual indicator in the UI that the system is in "preview" mode (no urgent deletions needed)? For example, a green "Space OK" badge replacing the red ❗, or just the absence of the ❗ is sufficient?
 
-### Q23: Bidirectional gap protection — chain boundary definition
-Q19 resolved to check both directions. For the cross-anime gap check at a chain boundary (e.g., Inuyasha↔Final Act), what exactly constitutes a "gap"? Options:
-- **A**: Only check the boundary episodes (last ep of predecessor ↔ first ep of successor). If a user has Inuyasha ep 167 and Final Act ep 1, deleting Inuyasha ep 167 creates a gap.
-- **B**: Check any episode in the boundary anime. If Inuyasha ep 100 exists and Final Act ep 1 exists, deleting Inuyasha ep 100 is protected even though eps 101-167 are already missing.
+### Q28: Cross-anime gap — missing intermediate anime
+In a chain like Inuyasha → Final Act → Yashahime, if the user has files for Inuyasha and Yashahime but **none** for Final Act, does the chain gap protection still apply between Inuyasha and Yashahime (treating them as connected through the missing intermediate)? Or is the gap only checked between anime that both have local files?
 
-### Q24: Queue size limit
-The queue shows all candidates ranked by tier and score. For large collections (thousands of files), this could be very long. Should there be a display limit (e.g., show top 100) or should it be unlimited with scrolling/pagination?
+### Q29: Queue sorting — locked files position
+Locked files are shown in the queue. Should they appear:
+- **A**: At the bottom, after all deletable candidates (separated by a visual divider)
+- **B**: In their natural position (sorted by what their tier/score would be if they weren't locked)
+- **C**: In a separate collapsible section
 
-### Q25: A vs B choice timeout
-If an A vs B choice has been pending in the Current Choice tab for an extended period (e.g., days) and disk space keeps growing, should the system:
-- **A**: Keep waiting indefinitely (never auto-delete from Tier 3 without user input)
-- **B**: After a configurable timeout, fall back to autonomous deletion if weights are trained (50+ choices)
-- **C**: Escalate the tray icon (e.g., flash the ❗) but still wait
+### Q30: Weight learning — factor value normalization
+The `normalizeFactors()` function maps raw values to 0-1 range. For episode distance, what should the normalization range be? Current anime can have 12 episodes (short series) or 900+ (long-running). Should distance be normalized per-anime (relative to total episodes) or globally (fixed range like 0-500)?
