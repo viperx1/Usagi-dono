@@ -21,16 +21,9 @@ extern myAniDBApi *adbapi;
 namespace {
 QMutex s_metadataDispatchMutex;
 QSet<int> s_metadataDispatchInFlight;
-QSet<int> s_testModeMetadataRequestedAids;
 std::atomic<quint64> s_metadataRequestSequence{0};
 std::atomic<quint64> s_setAnimeIdListSequence{0};
 std::atomic<quint64> s_buildChainsFromCacheSequence{0};
-
-bool isUsagiTestMode()
-{
-    static const bool s_usagiTestMode = (qgetenv("USAGI_TEST_MODE") == "1");
-    return s_usagiTestMode;
-}
 }
 
 MyListCardManager::MyListCardManager(QObject *parent)
@@ -792,15 +785,6 @@ void MyListCardManager::clearAllCards()
     m_animePicnames.clear();
     // Note: NOT clearing m_animeMetadataRequested or global in-flight dispatch set
     // to prevent duplicate metadata requests during rapid rebuild/reload cycles.
-    
-    if (isUsagiTestMode()) {
-        QMutexLocker globalLocker(&s_metadataDispatchMutex);
-        if (!s_testModeMetadataRequestedAids.isEmpty()) {
-            LOG(QString("[MyListCardManager] clearAllCards: clearing strict test-mode dedupe aid set (size=%1)")
-                .arg(s_testModeMetadataRequestedAids.size()));
-            s_testModeMetadataRequestedAids.clear();
-        }
-    }
 }
 
 AnimeCard* MyListCardManager::getCard(int aid)
@@ -1102,16 +1086,10 @@ void MyListCardManager::onAnimeUpdated(int aid)
     
     {
         QMutexLocker globalLocker(&s_metadataDispatchMutex);
-        if (isUsagiTestMode()) {
-            LOG(QString("[MyListCardManager] onAnimeUpdated: test mode active, preserving global in-flight dedupe for aid=%1 (currentSize=%2)")
-                .arg(aid)
-                .arg(s_metadataDispatchInFlight.size()));
-        } else {
-            LOG(QString("[MyListCardManager] onAnimeUpdated: removing aid=%1 from global in-flight set (currentSize=%2)")
-                .arg(aid)
-                .arg(s_metadataDispatchInFlight.size()));
-            s_metadataDispatchInFlight.remove(aid);
-        }
+        LOG(QString("[MyListCardManager] onAnimeUpdated: removing aid=%1 from global in-flight set (currentSize=%2)")
+            .arg(aid)
+            .arg(s_metadataDispatchInFlight.size()));
+        s_metadataDispatchInFlight.remove(aid);
     }
     locker.unlock();
     
@@ -1164,9 +1142,8 @@ void MyListCardManager::onFetchDataRequested(int aid)
     
     bool requestedAnything = false;
     
-    // Request metadata if needed and not already requested
+    // Request metadata if not already requested (requestAnimeMetadata handles deduplication)
     if (!m_animeMetadataRequested.contains(aid)) {
-        m_animeMetadataRequested.insert(aid);
         needsMetadata = true;
         requestedAnything = true;
         LOG(QString("[MyListCardManager] Will request anime metadata for aid=%1").arg(aid));
@@ -1774,21 +1751,6 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
 void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
 {
     const quint64 requestSeq = ++s_metadataRequestSequence;
-    
-    if (isUsagiTestMode()) {
-        QMutexLocker globalLocker(&s_metadataDispatchMutex);
-        if (s_testModeMetadataRequestedAids.contains(aid)) {
-            LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] strict test-mode dedupe hit for aid=%2, skipping duplicate request")
-                .arg(requestSeq)
-                .arg(aid));
-            return;
-        }
-        s_testModeMetadataRequestedAids.insert(aid);
-        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] strict test-mode dedupe register aid=%2 (registeredCount=%3)")
-            .arg(requestSeq)
-            .arg(aid)
-            .arg(s_testModeMetadataRequestedAids.size()));
-    }
     
     if (!adbapi) {
         LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] aborted: adbapi=null, manager=%2, aid=%3")
