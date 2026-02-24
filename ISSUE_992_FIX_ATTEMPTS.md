@@ -13,6 +13,7 @@
 | 2026-02-24T13:04:40Z | Issue #998 chain-preload boundary diagnostics | Added chain-preload start/no-op logs and per-missing-AID `alreadyRequested` trace to confirm whether second request path originates from chain-preload discovery vs other caller. | Pending CI rerun evidence. |
 | 2026-02-24T13:14:37Z | Issue #999 test-mode strict dedupe | In `USAGI_TEST_MODE=1`, preserve in-flight dedupe sets on anime update/230 response instead of clearing immediately. Added explicit test-mode logs in both `MyListCardManager` and `AniDBApi`. | Pending CI rerun evidence; designed to prevent rapid double-dispatch in tests where updates arrive immediately. |
 | 2026-02-24T13:30:14Z | Issue #1000 call-flow sequencing | Added invocation sequence logs for `setAnimeIdList` and `buildChainsFromCache` (enter/exit/skip/no-cache) with manager identity to detect duplicate lifecycle entry causing repeated metadata request attempts. | Pending CI rerun evidence. |
+| 2026-02-24T13:47:14Z | Issue #1001 strict test-mode per-AID suppression | Added process-level strict dedupe in `MyListCardManager::requestAnimeMetadata` for `USAGI_TEST_MODE=1` using a static requested-AIDs set; logs register/hit events with request sequence IDs. | Pending CI rerun evidence; intended to cap duplicate request count at source in tests. |
 
 ## Current hypothesis
 

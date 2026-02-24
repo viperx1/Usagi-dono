@@ -21,6 +21,7 @@ extern myAniDBApi *adbapi;
 namespace {
 QMutex s_metadataDispatchMutex;
 QSet<int> s_metadataDispatchInFlight;
+QSet<int> s_testModeMetadataRequestedAids;
 std::atomic<quint64> s_metadataRequestSequence{0};
 std::atomic<quint64> s_setAnimeIdListSequence{0};
 std::atomic<quint64> s_buildChainsFromCacheSequence{0};
@@ -791,6 +792,15 @@ void MyListCardManager::clearAllCards()
     m_animePicnames.clear();
     // Note: NOT clearing m_animeMetadataRequested or global in-flight dispatch set
     // to prevent duplicate metadata requests during rapid rebuild/reload cycles.
+    
+    if (isUsagiTestMode()) {
+        QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        if (!s_testModeMetadataRequestedAids.isEmpty()) {
+            LOG(QString("[MyListCardManager] clearAllCards: clearing strict test-mode dedupe aid set (size=%1)")
+                .arg(s_testModeMetadataRequestedAids.size()));
+            s_testModeMetadataRequestedAids.clear();
+        }
+    }
 }
 
 AnimeCard* MyListCardManager::getCard(int aid)
@@ -1764,6 +1774,21 @@ void MyListCardManager::loadEpisodesForCardFromCache(AnimeCard *card, int /*aid*
 void MyListCardManager::requestAnimeMetadata(int aid, const QString& reason)
 {
     const quint64 requestSeq = ++s_metadataRequestSequence;
+    
+    if (isUsagiTestMode()) {
+        QMutexLocker globalLocker(&s_metadataDispatchMutex);
+        if (s_testModeMetadataRequestedAids.contains(aid)) {
+            LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] strict test-mode dedupe hit for aid=%2, skipping duplicate request")
+                .arg(requestSeq)
+                .arg(aid));
+            return;
+        }
+        s_testModeMetadataRequestedAids.insert(aid);
+        LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] strict test-mode dedupe register aid=%2 (registeredCount=%3)")
+            .arg(requestSeq)
+            .arg(aid)
+            .arg(s_testModeMetadataRequestedAids.size()));
+    }
     
     if (!adbapi) {
         LOG(QString("[MyListCardManager] requestAnimeMetadata[%1] aborted: adbapi=null, manager=%2, aid=%3")
