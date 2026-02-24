@@ -922,8 +922,12 @@ function handleDeletionNeeded():
         delete(top)
         return
 
-    // Q17: Single Tier 3 candidate — show in A vs B, optionally pit against locked peer
-    if candidates.length == 1 OR (candidates.length >= 2 AND candidates[1].tier <= 2):
+    // Q17: Single Tier 3 candidate — show in A vs B, optionally pit against locked peer.
+    // Note: procedural candidates (tier 0-2) are auto-deleted above, so by this point
+    // only Tier 3 candidates remain. If only one Tier 3 candidate exists, pit it against
+    // a locked peer for context, or show as single-file confirmation.
+    tier3Candidates = candidates.filter(c => c.tier == 3)
+    if tier3Candidates.length == 1:
         lockedPeer = findLockedPeerForContext(candidates[0])
         if lockedPeer:
             queueAvsBChoice(candidates[0], lockedPeer, peerIsLocked: true)
@@ -1426,7 +1430,7 @@ struct DeletionHistoryEntry {
 | Q12 | "Highest-rated file" criteria for locks | **Option C (full composite score) with language as top priority**: subtitles first, then audio, then full composite score. Language always trumps quality. See Q16 for detailed sort order. |
 | Q13 | Cross-anime gap protection depth | **Full chain, both directions**: gap protection spans the entire prequel→sequel chain, checking both prequels and sequels. All chain boundaries are checked bidirectionally. |
 | Q14 | Weight reset scope | **Full clean slate**: reset all weights to 0 AND clear the A vs B choice history (`deletion_choices` table). Double warning required. |
-| Q16 | "Highest-rated" sort criteria — language priority | **Subtitles first, then audio, language always trumps quality**: `sortByRatingCriteria()` sorts by (1) subtitle match, (2) audio match, (3) composite quality score. A file with matching subtitles always ranks above one without, regardless of quality. |
+| Q16 | "Highest-rated" sort criteria — language priority | **Subtitles first, then audio, language always trumps quality**: `sortByRatingCriteria()` sorts by (1) subtitle match (yes/no), (2) audio match (yes/no), (3) composite quality score. A file matching both sub+audio ranks above sub-only, sub-only ranks above audio-only, audio-only ranks above no match. Within each language tier, composite quality breaks ties. |
 | Q17 | A vs B with only one Tier 3 candidate | **Show in A vs B groupbox**: pit candidate against a locked peer file for context (if one exists); otherwise show as single-file confirmation ("Delete this? [Yes] [Skip]"). The locked peer is shown read-only (cannot be deleted via this prompt). |
 | Q18 | Queue behavior when space is sufficient | **Always show ranked list**: the queue always shows what WOULD be deleted, even when space is below threshold. Users can still make A vs B choices to train weights proactively. |
 | Q19 | Cross-anime gap — chain direction | **Both directions**: check prequels AND sequels. Checking only one direction WILL create gaps. |
