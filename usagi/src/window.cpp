@@ -1123,6 +1123,45 @@ Window::Window()
         if (currentChoiceWidget && watchSessionManager) {
             currentChoiceWidget->setPreviewMode(!watchSessionManager->isDeletionNeeded());
         }
+        // Rebuild the queue after a file was deleted so the list stays current
+        if (deletionQueue) {
+            deletionQueue->rebuild();
+        }
+    });
+    
+    // Handle deletion cycle requests from WatchSessionManager.
+    // This replaces the old deleteNextEligibleFile() loop — DeletionQueue
+    // now picks the best candidate using HybridDeletionClassifier.
+    connect(watchSessionManager, &WatchSessionManager::deletionCycleRequested, this, [this]() {
+        if (!deletionQueue || !watchSessionManager) return;
+        
+        deletionQueue->rebuild();
+        
+        const DeletionCandidate *candidate = deletionQueue->next();
+        if (!candidate) {
+            LOG("[Window] Deletion cycle: no candidates in queue");
+            return;
+        }
+        
+        // Procedural tiers (0-2) are auto-deleted without user interaction
+        if (candidate->tier < DeletionTier::LEARNED_PREFERENCE) {
+            LOG(QString("[Window] Deletion cycle: auto-deleting procedural tier %1 candidate lid=%2 (%3)")
+                .arg(candidate->tier).arg(candidate->lid).arg(candidate->reason));
+            watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
+            return;
+        }
+        
+        // Tier 3 (learned preference): auto-delete if trained and confident, otherwise show A vs B
+        if (deletionQueue->needsUserChoice()) {
+            LOG("[Window] Deletion cycle: tier 3 needs user choice — presenting A vs B");
+            // The choiceNeeded signal was already emitted by rebuild()
+            return;
+        }
+        
+        // Trained and confident — auto-delete the top candidate
+        LOG(QString("[Window] Deletion cycle: auto-deleting learned tier 3 candidate lid=%1 (score=%2)")
+            .arg(candidate->lid).arg(candidate->learnedScore));
+        watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
     });
     
     

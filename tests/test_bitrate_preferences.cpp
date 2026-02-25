@@ -16,9 +16,7 @@ private slots:
     void testSetAndGetBitrate();
     void testSetAndGetResolution();
     void testCalculateExpectedBitrate();
-    void testCalculateBitrateScoreWithSingleFile();
-    void testCalculateBitrateScoreWithMultipleFiles();
-    void testCalculateBitrateScoreVariousDistances();
+    // calculateBitrateScore tests removed — method removed in Phase 5
 
 private:
     AniDBApi* api;
@@ -114,56 +112,7 @@ void TestBitratePreferences::testCalculateExpectedBitrate()
     QVERIFY(qAbs(bitrate1920x1080 - 3.5) < 0.01);
 }
 
-void TestBitratePreferences::testCalculateBitrateScoreWithSingleFile()
-{
-    // With only 1 file, penalty should always be 0 regardless of bitrate
-    api->setPreferredBitrate(3.5);
-    
-    // Test with perfect match
-    double score1 = watchManager->calculateBitrateScore(3500, "1080p", "H.264", 1);
-    QCOMPARE(score1, 0.0);
-    
-    // Test with very different bitrate
-    double score2 = watchManager->calculateBitrateScore(10000, "1080p", "H.264", 1);
-    QCOMPARE(score2, 0.0);
-    
-    // Test with very low bitrate
-    double score3 = watchManager->calculateBitrateScore(1000, "1080p", "H.264", 1);
-    QCOMPARE(score3, 0.0);
-}
-
-void TestBitratePreferences::testCalculateBitrateScoreWithMultipleFiles()
-{
-    // With multiple files, penalties should apply
-    api->setPreferredBitrate(3.5);
-    
-    // Test with perfect match (within 10% - no penalty)
-    double score1 = watchManager->calculateBitrateScore(3500, "1080p", "H.264", 2);
-    QCOMPARE(score1, 0.0);
-    
-    // Test with 5% difference (within 10% - no penalty)
-    double score2 = watchManager->calculateBitrateScore(3675, "1080p", "H.264", 2);
-    QCOMPARE(score2, 0.0);
-}
-
-void TestBitratePreferences::testCalculateBitrateScoreVariousDistances()
-{
-    api->setPreferredBitrate(3.5);
-    
-    // With all SCORE_* constants zeroed (design Phase 5), calculateBitrateScore
-    // always returns 0. HybridDeletionClassifier handles bitrate comparison.
-    double score1 = watchManager->calculateBitrateScore(4200, "1080p", "H.264", 2);
-    QCOMPARE(score1, 0.0);
-    
-    double score2 = watchManager->calculateBitrateScore(4900, "1080p", "H.264", 2);
-    QCOMPARE(score2, 0.0);
-    
-    double score3 = watchManager->calculateBitrateScore(5600, "1080p", "H.264", 2);
-    QCOMPARE(score3, 0.0);
-    
-    double score4 = watchManager->calculateBitrateScore(1400, "1080p", "H.264", 2);
-    QCOMPARE(score4, 0.0);
-}
+// calculateBitrateScore tests removed — method removed in Phase 5
 
 QTEST_MAIN(TestBitratePreferences)
 #include "test_bitrate_preferences.moc"

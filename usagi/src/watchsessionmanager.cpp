@@ -481,170 +481,6 @@ int WatchSessionManager::findPrequelAid(int aid, const QString& relationType) co
 
 // ========== File Marking ==========
 
-int WatchSessionManager::calculateDeletionScore(int lid) const
-{
-    // Base score - all files start at 0 (no bias; HybridDeletionClassifier is the decision maker)
-    int score = 0;
-    
-    int aid = getAnimeIdForFile(lid);
-    int episodeNumber = getEpisodeNumber(lid);
-    
-    // Check if card is hidden - hidden cards are more eligible for deletion
-    if (aid > 0 && isCardHidden(aid)) {
-        score += SCORE_HIDDEN_CARD;  // Negative, makes it more eligible for deletion
-    }
-    
-    // Check if file has been watched (from mylist viewed status)
-    // Watched files are more eligible for deletion than unwatched
-    QSqlDatabase db = QSqlDatabase::database();
-    if (db.isOpen()) {
-        QSqlQuery q(db);
-        q.prepare("SELECT viewed, local_watched FROM mylist WHERE lid = ?");
-        q.addBindValue(lid);
-        if (q.exec() && q.next()) {
-            int viewed = q.value(0).toInt();
-            int localWatched = q.value(1).toInt();
-            
-            // Files that have been watched (either server or locally) are more deletable
-            if (viewed > 0 || localWatched > 0) {
-                score += SCORE_ALREADY_WATCHED;  // Negative, more eligible for deletion
-            } else {
-                score += SCORE_NOT_WATCHED;  // Positive, less eligible for deletion
-            }
-        }
-    }
-    
-    // Apply file revision penalty - older revisions are more deletable
-    // Only applies when there are multiple local files for the same episode
-    int fileCount = getFileCountForEpisode(lid);
-    if (fileCount > 1) {
-        // Count how many local files for this episode have a higher version
-        int higherVersionCount = getHigherVersionFileCount(lid);
-        
-        // Apply penalty per local file with higher version
-        if (higherVersionCount > 0) {
-            score += higherVersionCount * SCORE_OLDER_REVISION;  // Negative, more eligible for deletion
-        }
-    }
-    
-    // Check language preferences (if settings are enabled)
-    bool hasAudioMatch = matchesPreferredAudioLanguage(lid);
-    bool hasSubtitleMatch = matchesPreferredSubtitleLanguage(lid);
-    
-    if (hasAudioMatch) {
-        score += SCORE_PREFERRED_AUDIO;  // Bonus for matching preferred audio
-    } else {
-        // Only apply penalty if we have audio language info but it doesn't match
-        QString audioLang = getFileAudioLanguage(lid);
-        if (!audioLang.isEmpty()) {
-            score += SCORE_NOT_PREFERRED_AUDIO;  // Penalty for not matching
-        }
-    }
-    
-    if (hasSubtitleMatch) {
-        score += SCORE_PREFERRED_SUBTITLE;  // Bonus for matching preferred subtitles
-    } else {
-        // Only apply penalty if we have subtitle language info but it doesn't match
-        QString subLang = getFileSubtitleLanguage(lid);
-        if (!subLang.isEmpty()) {
-            score += SCORE_NOT_PREFERRED_SUBTITLE;  // Penalty for not matching
-        }
-    }
-    
-    // Check quality (if preference is enabled)
-    // Quality is the file.quality field from AniDB (e.g., "very high", "high", "medium", "low")
-    // Reuse existing database connection instead of creating a new one
-    if (db.isOpen()) {
-        QSqlQuery q2(db);
-        q2.prepare("SELECT value FROM settings WHERE name = 'preferHighestQuality'");
-        if (q2.exec() && q2.next() && q2.value(0).toString() == "1") {
-            QString quality = getFileQuality(lid);
-            int qualityScore = getQualityScore(quality);
-            
-            // Compare with thresholds - files above threshold get bonus, below get penalty
-            if (qualityScore >= QUALITY_HIGH_THRESHOLD) {
-                score += SCORE_HIGHER_QUALITY;  // High quality
-            } else if (qualityScore < QUALITY_LOW_THRESHOLD) {
-                score += SCORE_LOWER_QUALITY;  // Low quality
-            }
-        }
-    }
-    
-    // Check anime rating
-    int rating = getFileRating(lid);
-    if (rating >= RATING_HIGH_THRESHOLD) {
-        score += SCORE_HIGH_RATING;  // Highly rated anime - keep longer
-    } else if (rating > 0 && rating < RATING_LOW_THRESHOLD) {
-        score += SCORE_LOW_RATING;  // Poorly rated anime - more eligible for deletion
-    }
-    
-    // Check group status
-    int gid = getFileGroupId(lid);
-    if (gid > 0) {
-        int groupStatus = getGroupStatus(gid);
-        if (groupStatus == 1) {  // Ongoing
-            score += SCORE_ACTIVE_GROUP;  // Active groups are preferred
-        } else if (groupStatus == 2) {  // Stalled
-            score += SCORE_STALLED_GROUP;  // Stalled groups get penalty
-        } else if (groupStatus == 3) {  // Disbanded
-            score += SCORE_DISBANDED_GROUP;  // Disbanded groups get larger penalty
-        }
-    }
-    
-    // Check bitrate distance from expected (only applies when multiple files exist)
-    int bitrate = getFileBitrate(lid);
-    QString resolution = getFileResolution(lid);
-    QString codec = getFileCodec(lid);
-    if (bitrate > 0 && !resolution.isEmpty() && fileCount > 1) {
-        double bitrateScore = calculateBitrateScore(bitrate, resolution, codec, fileCount);
-        score += static_cast<int>(bitrateScore);
-    }
-    
-    // Calculate distance-based scoring across the series chain
-    // Distance is the primary factor - episodes far from current position are more deletable
-    if (aid > 0) {
-        // Find active session across the series chain
-        // Returns (sessionAid, episodeOffsetForRequestedAnime, sessionEpisodeOffset)
-        auto sessionInfo = findActiveSessionInSeriesChain(aid);
-        int sessionAid = std::get<0>(sessionInfo);
-        int episodeOffset = std::get<1>(sessionInfo);  // Cumulative episode offset for this anime in the chain
-        int sessionOffset = std::get<2>(sessionInfo);  // Cumulative episode offset for session anime
-        
-        if (sessionAid > 0) {
-            // Active session is a factor (not the primary reason for scoring)
-            score += SCORE_ACTIVE_SESSION;
-            
-            int currentEp = getCurrentSessionEpisode(sessionAid);
-            
-            // Calculate total episode position in the series chain
-            // episodeOffset is the sum of all episodes in prequels before this anime
-            int totalEpisodePosition = episodeOffset + episodeNumber;
-            int currentTotalPosition = sessionOffset + currentEp;
-            
-            int distance = totalEpisodePosition - currentTotalPosition;
-            
-            // Use global ahead buffer (applies to all anime)
-            int aheadBuffer = m_aheadBuffer;
-            
-            // Episodes in the ahead buffer get bonus protection
-            if (distance >= 0 && distance <= aheadBuffer) {
-                score += SCORE_IN_AHEAD_BUFFER;
-            }
-            
-            // Distance penalty/bonus - episodes far from current are more deletable
-            // This is the primary scoring factor
-            score += distance * SCORE_DISTANCE_FACTOR;
-            
-            // Already watched in session gets penalty (more deletable)
-            if (m_sessions.contains(aid) && m_sessions[aid].isEpisodeWatched(episodeNumber)) {
-                score += SCORE_ALREADY_WATCHED;
-            }
-        }
-    }
-    
-    return score;
-}
-
 std::tuple<int, int, int> WatchSessionManager::findActiveSessionInSeriesChain(int aid) const
 {
     // Use the public getSeriesChain method to build the chain
@@ -724,119 +560,6 @@ bool WatchSessionManager::isDeletionNeeded() const
     return availableGB < threshold;
 }
 
-bool WatchSessionManager::deleteNextEligibleFile(bool deleteFromDisk)
-{
-    // Check if deletion is needed based on space threshold
-    if (!isDeletionNeeded()) {
-        LOG("[WatchSessionManager] deleteNextEligibleFile: Space above threshold, no deletion needed");
-        return false;
-    }
-    
-    QSqlDatabase db = QSqlDatabase::database();
-    if (!db.isOpen()) {
-        LOG("[WatchSessionManager] deleteNextEligibleFile: Database not open");
-        return false;
-    }
-    
-    // Get all local files with their scores
-    // Structure to hold candidate info: lid, score, path, anime_name
-    struct CandidateInfo {
-        int lid;
-        int score;
-        QString path;
-        QString animeName;
-    };
-    
-    QList<CandidateInfo> candidates;
-    
-    // Query mylist entries with local paths and anime names
-    QSqlQuery q(db);
-    bool querySuccess = q.exec(
-        "SELECT m.lid, lf.path, "
-        "COALESCE(NULLIF(a.nameromaji, ''), NULLIF(a.nameenglish, ''), NULLIF(a.namekanji, ''), '') as anime_name "
-        "FROM mylist m "
-        "JOIN local_files lf ON m.local_file = lf.id "
-        "LEFT JOIN anime a ON m.aid = a.aid "
-        "WHERE lf.path IS NOT NULL AND lf.path != ''");
-    
-    if (!querySuccess) {
-        LOG("[WatchSessionManager] deleteNextEligibleFile: Query failed");
-        return false;
-    }
-    
-    while (q.next()) {
-        CandidateInfo info;
-        info.lid = q.value(0).toInt();
-        info.path = q.value(1).toString();
-        info.animeName = q.value(2).toString();
-        
-        // Skip files that have failed deletion recently
-        if (m_failedDeletions.contains(info.lid)) {
-            continue;
-        }
-        
-        // Verify the file actually exists on disk
-        QFileInfo fileInfo(info.path);
-        if (!fileInfo.exists()) {
-            LOG(QString("[WatchSessionManager] File in database but missing on disk: %1 (lid=%2) - cleaning up status")
-                .arg(info.path).arg(info.lid));
-            cleanupMissingFileStatus(info.lid);
-            continue;
-        }
-        
-        // Verify it's actually a file (not a directory)
-        if (!fileInfo.isFile()) {
-            LOG(QString("[WatchSessionManager] Non-file entry found: %1 (lid=%2) - cleaning up status")
-                .arg(info.path).arg(info.lid));
-            cleanupMissingFileStatus(info.lid);
-            continue;
-        }
-        
-        info.score = calculateDeletionScore(info.lid);
-        candidates.append(info);
-    }
-    
-    if (candidates.isEmpty()) {
-        LOG("[WatchSessionManager] deleteNextEligibleFile: No eligible files found");
-        return false;
-    }
-    
-    // Sort by score (ascending - lowest score = highest deletion priority)
-    std::sort(candidates.begin(), candidates.end(),
-              [](const CandidateInfo& a, const CandidateInfo& b) {
-                  return a.score < b.score;
-              });
-    
-    // Find the first file that can be safely deleted (doesn't create a gap)
-    // Pass empty set because we evaluate gaps against current database state
-    QSet<int> emptyDeletedSet;
-    
-    for (const auto& candidate : candidates) {
-        // Check if deleting this file would create a gap
-        if (wouldCreateGap(candidate.lid, emptyDeletedSet)) {
-            LOG(QString("[WatchSessionManager] deleteNextEligibleFile: Skipping lid=%1 (anime=%2) - would create gap in series")
-                .arg(candidate.lid).arg(candidate.animeName));
-            continue;
-        }
-        
-        // Found a safe file to delete
-        QString fileName = QFileInfo(candidate.path).fileName();
-        LOG(QString("[WatchSessionManager] deleteNextEligibleFile: Deleting lid=%1, score=%2, anime=%3, file=%4")
-            .arg(candidate.lid)
-            .arg(candidate.score)
-            .arg(candidate.animeName, fileName));
-        
-        // Delete the file (this will trigger deleteFileRequested signal)
-        deleteFile(candidate.lid, deleteFromDisk);
-        return true;
-    }
-    
-    // No files can be safely deleted without creating gaps
-    LOG(QString("[WatchSessionManager] deleteNextEligibleFile: No safe files to delete from %1 candidates - all would create gaps")
-        .arg(candidates.size()));
-    return false;
-}
-
 bool WatchSessionManager::deleteFile(int lid, bool deleteFromDisk)
 {
     LOG(QString("[WatchSessionManager] deleteFile called for lid=%1, deleteFromDisk=%2").arg(lid).arg(deleteFromDisk));
@@ -897,45 +620,35 @@ void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
 {
     if (success) {
         LOG(QString("[WatchSessionManager] File deletion succeeded for lid=%1, aid=%2").arg(lid).arg(aid));
-        // Remove from failed deletions list if it was there
         m_failedDeletions.remove(lid);
         emit fileDeleted(lid, aid);
         
-        // Continue deleting if auto-deletion is enabled and space is still below threshold
+        // Request next deletion cycle via DeletionQueue (handled by Window)
         if (m_enableActualDeletion && isDeletionNeeded()) {
-            LOG("[WatchSessionManager] Space still below threshold after deletion, continuing with next file");
-            bool deletedNext = deleteNextEligibleFile(true);
-            if (!deletedNext) {
-                LOG("[WatchSessionManager] No more files available for deletion (space may still be below threshold)");
-            }
+            LOG("[WatchSessionManager] Space still below threshold after deletion, requesting next deletion cycle");
+            emit deletionCycleRequested();
         }
     } else {
-        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2 - attempting next file").arg(lid).arg(aid));
-        
-        // Add to failed deletions to avoid immediate retry
+        LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2").arg(lid).arg(aid));
         m_failedDeletions.insert(lid);
         
-        // Try the next file if auto-deletion is enabled
-        if (m_enableActualDeletion) {
-            bool deletedNext = deleteNextEligibleFile(true);
-            if (!deletedNext) {
-                LOG("[WatchSessionManager] No more files available for deletion after failure");
-            }
+        // Request next deletion cycle even after failure so DeletionQueue picks a different candidate
+        if (m_enableActualDeletion && isDeletionNeeded()) {
+            emit deletionCycleRequested();
         }
     }
 }
 
 void WatchSessionManager::autoMarkFilesForDeletion()
 {
-    // Simplified: Just trigger deletion if needed
-    // No marking - files are calculated on-demand
     if (!m_enableActualDeletion) {
         return;
     }
     
-    // Trigger deletion if space is below threshold
+    // Emit signal so Window can use DeletionQueue to pick the best candidate
     if (isDeletionNeeded()) {
-        deleteNextEligibleFile(true);
+        LOG("[WatchSessionManager] Space below threshold, requesting deletion cycle via DeletionQueue");
+        emit deletionCycleRequested();
     }
 }
 
@@ -1671,63 +1384,6 @@ double WatchSessionManager::calculateExpectedBitrate(const QString& resolution, 
     double expectedBitrate = resolutionScaled * codecEfficiency;
     
     return expectedBitrate;
-}
-
-double WatchSessionManager::calculateBitrateScore(double actualBitrate, const QString& resolution, const QString& codec, int fileCount) const
-{
-    // Only apply bitrate penalty when there are multiple files
-    if (fileCount <= 1) {
-        return 0.0;
-    }
-    
-    // Convert actualBitrate from Kbps to Mbps
-    double actualBitrateMbps = actualBitrate / 1000.0;
-    
-    // Calculate expected bitrate based on resolution and codec
-    double expectedBitrate = calculateExpectedBitrate(resolution, codec);
-    
-    // Calculate percentage difference from expected
-    double percentDiff = 0.0;
-    if (expectedBitrate > 0) {
-        percentDiff = std::abs((actualBitrateMbps - expectedBitrate) / expectedBitrate) * 100.0;
-    }
-    
-    // Apply penalty based on percentage difference
-    // 0-10% difference: no penalty
-    // 10-30% difference: -10 penalty
-    // 30-50% difference: -25 penalty
-    // 50%+ difference: -40 penalty
-    double penalty = 0.0;
-    if (percentDiff > 50.0) {
-        penalty = SCORE_BITRATE_FAR;
-    } else if (percentDiff > 30.0) {
-        penalty = SCORE_BITRATE_MODERATE;
-    } else if (percentDiff > 10.0) {
-        penalty = SCORE_BITRATE_CLOSE;
-    }
-    
-    // Add codec tier bonus/penalty
-    QString codecLower = codec.toLower().trimmed();
-    
-    // Tier 1 (Excellent): AV1, H.265/HEVC
-    if (codecLower.contains("hevc") || codecLower.contains("h265") || 
-        codecLower.contains("h.265") || codecLower.contains("x265") ||
-        codecLower.contains("av1") || codecLower.contains("av01")) {
-        penalty += SCORE_MODERN_CODEC;  // +10 bonus
-    }
-    // Tier 3 (Acceptable): MPEG-4, XviD, DivX
-    else if (codecLower.contains("xvid") || codecLower.contains("divx") || 
-             codecLower.contains("mpeg4")) {
-        penalty += SCORE_OLD_CODEC;  // -15 penalty
-    }
-    // Tier 4 (Poor): MPEG-2, H.263
-    else if (codecLower.contains("mpeg2") || codecLower.contains("mpeg-2") ||
-             codecLower.contains("h263") || codecLower.contains("h.263")) {
-        penalty += SCORE_ANCIENT_CODEC;  // -30 penalty
-    }
-    // Tier 2 (Good): H.264/AVC, VP9 - no bonus/penalty (neutral)
-    
-    return penalty;
 }
 
 bool WatchSessionManager::isLastFileForEpisode(int lid) const
