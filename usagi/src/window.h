@@ -221,6 +221,29 @@ private:
     bool m_deleteFromDisk;
 };
 
+// Worker for handling externally deleted files (detected by directory watcher).
+// Looks up mylist entries by file path and updates database records.
+class ExternalDeletionWorker : public QObject
+{
+    Q_OBJECT
+public:
+    explicit ExternalDeletionWorker(const QString &dbName, const QStringList &deletedPaths)
+        : m_dbName(dbName)
+        , m_deletedPaths(deletedPaths)
+    {
+    }
+
+signals:
+    void finished(const QList<FileDeletionResult> &results);
+
+public slots:
+    void doWork();
+
+private:
+    QString m_dbName;
+    QStringList m_deletedPaths;
+};
+
 class Window : public QWidget
 {
     Q_OBJECT
@@ -443,6 +466,7 @@ public slots:
     
     // Directory watcher slots
     void onWatcherNewFilesDetected(const QStringList &filePaths);
+    void onWatcherFilesDeleted(const QStringList &filePaths);
     
     // Playback slots
     void onMediaPlayerBrowseClicked();
