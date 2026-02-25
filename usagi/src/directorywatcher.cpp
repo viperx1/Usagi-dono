@@ -347,6 +347,8 @@ void DirectoryWatcher::loadProcessedFiles()
     }
     
     // Also load all other known files (any status) for deletion tracking
+    // Status 0=not hashed, 1=hashed but not checked by API
+    // These files are known to exist but not yet fully processed
     QSqlQuery knownQuery(db);
     bool knownQuerySuccess = knownQuery.exec("SELECT path FROM local_files WHERE status < 2");
     
