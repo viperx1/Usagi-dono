@@ -397,11 +397,11 @@ These are the factors whose weights are learned through A vs B choices. Each fac
 | `size_weighted_distance` | 1.0 - (abs(distance) × sizeBytes) / maxInSeries | 0.0 – 1.0 | Closer to current AND/OR smaller file. Normalized per-series: `maxInSeries = max(abs(distance) × sizeBytes)` across all files **within the same anime** (or relation chain if cross-anime). A 4K file far away gets a low value (highly deletable), a small file close by gets a high value (worth keeping). For anime in the same relation chain (Q37), distance is calculated by summing remaining episodes across chain boundaries (e.g., Naruto ep 100/220 to Shippuden ep 80: `(220-100) + 80 = 200`). `maxInSeries` is cached and recalculated lazily (Q36). See "Episode Distance: Episode Count vs. File Size" section and Q31 for math explanation. |
 | `group_status` | active=1.0, stalled=0.5, disbanded=0.0 | 0.0 – 1.0 | More active group |
 | `watch_recency` | days since last watched, normalized | 0.0 – 1.0 | Watched more recently |
-| `view_percentage` | watched episodes / total episodes for the anime's session | 0.0 – 1.0 | More of the anime has been watched |
+| `view_percentage` | watched episodes / total episodes for the chain's session (Q42: 1 session per chain) | 0.0 – 1.0 | More of the anime/chain has been watched |
 
 Note: `episode_distance` and `file_size` are no longer separate factors — they are combined into `size_weighted_distance`. This captures the insight that a 4GB 4K episode frees 20× more space than a 200MB 480p episode, so bitrate/size naturally factors into the distance metric. Normalization is **per-series** (Q31): `maxInSeries` is the largest `abs(distance) × sizeBytes` value among all files in the same anime (or relation chain for cross-anime distance within the chain). `maxInSeries` is cached per chain and invalidated lazily when files for any anime in the chain change (Q36). For cross-anime distance within a chain (Q37), episode distance is calculated by summing remaining episodes across chain boundaries: `remainingEpsInPredecessor + episodeOffsetInSuccessor`. Technical factors (codec, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
 
-**Why `view_percentage` instead of `session_active`**: A binary "has active session" flag is unreliable because sessions are started automatically when any episode is played — even briefly to check quality. A user who watched 1 of 500 episodes is very different from a user who watched 480 of 500. The view percentage (watched/total in the session) captures actual engagement: a session at 95% means the user is nearly done and those files are dispensable; a session at 2% means the user just started (or just checked) and the files should be treated with lower confidence.
+**Why `view_percentage` instead of `session_active`**: A binary "has active session" flag is unreliable because sessions are started automatically when any episode is played — even briefly to check quality. A user who watched 1 of 500 episodes is very different from a user who watched 480 of 500. The view percentage (watched/total in the session) captures actual engagement: a session at 95% means the user is nearly done and those files are dispensable; a session at 2% means the user just started (or just checked) and the files should be treated with lower confidence. Sessions are tracked **per chain** (Q42), not per anime — if the user has watched episodes in both Naruto and Shippuden, there is one session for the entire chain.
 
 **Handling anime with no session** (never played any episode):
 
@@ -892,7 +892,7 @@ function classifyFile(file):
 function isEligibleForDeletion(file):
     // File must be in a position where deletion makes sense
     isWatched = file.viewed > 0 OR file.localWatched > 0
-    session = findActiveWatchSession(file.aid)
+    session = findActiveWatchSession(file.chainId)  // Q42: 1 session per chain, not per anime
     distance = NO_SESSION
     if session:
         distance = file.totalEpisodePosition - session.currentTotalPosition
@@ -1057,7 +1057,7 @@ function isHighestRatedFileForEpisode(lid, eid):
     files = getLocalFilesForEpisode(eid)
     if files.isEmpty():
         return false
-    bestFile = files.sortByRatingCriteria(DESC).first()  // Q12+Q16+Q39: subtitle match ranked by settings order, then audio match by settings order, then composite quality score
+    bestFile = files.sortByRatingCriteria(DESC).first()  // Q12+Q16+Q39+Q43: best-matching preferred subtitle (only the single most-preferred track matters), then audio match by settings order, then composite quality score
     return bestFile.lid == lid
 
 function lockReason(file):
@@ -1371,6 +1371,7 @@ CREATE TABLE deletion_history (
     lid INTEGER,                      -- lid of the deleted file
     aid INTEGER,                      -- anime ID
     eid INTEGER,                      -- episode ID
+    replaced_by_lid INTEGER,          -- lid of the file that replaced this one (for procedural deletions; NULL for A vs B / manual)
     file_path TEXT,                   -- path at time of deletion (file is gone, path is archived)
     anime_name TEXT,                  -- anime name at time of deletion
     episode_label TEXT,               -- "Ep 30 - Title" at time of deletion
@@ -1398,7 +1399,7 @@ CREATE INDEX idx_deletion_history_type ON deletion_history(deletion_type);
 
 ### UI: Deletion History Groupbox
 
-The History groupbox is at the bottom of the Current Choice tab. Clicking a history entry loads its details in the A vs B groupbox at the top. See the [Current Choice Tab Layout](#ui-current-choice-tab-layout) mockup above.
+The History groupbox is at the bottom of the Current Choice tab. Clicking a history entry loads its details in the A vs B groupbox at the top. For **procedural deletions (T0-T2)**, the display shows the deleted file alongside the file that superseded/replaced it (Q44) — e.g., for a superseded file, the old revision is shown on the left and the newer revision that replaced it is shown on the right. If no replacement file exists (e.g., it was also deleted later), the right side shows "[File no longer present]". For **A vs B deletions**, the display shows both files as they were at the time of the choice. See the [Current Choice Tab Layout](#ui-current-choice-tab-layout) mockup above.
 
 ### History Features
 
@@ -1421,7 +1422,8 @@ public:
     // Record a deletion (prunes oldest entry if count > MAX_ENTRIES)
     void recordDeletion(int lid, int tier, const QString &reason,
                         double learnedScore, const QString &deletionType,
-                        qint64 spaceBefore, qint64 spaceAfter);
+                        qint64 spaceBefore, qint64 spaceAfter,
+                        int replacedByLid = -1);  // Q44: lid of replacement file for procedural deletions
 
     // Query history
     QList<DeletionHistoryEntry> allEntries(int limit = 100, int offset = 0) const;
@@ -1448,6 +1450,7 @@ struct DeletionHistoryEntry {
     int lid;
     int aid;
     int eid;
+    int replacedByLid;             // lid of the file that replaced this one (procedural); -1 if not applicable
     QString filePath;
     QString animeName;
     QString episodeLabel;
@@ -1482,7 +1485,7 @@ struct DeletionHistoryEntry {
 | Q12 | "Highest-rated file" criteria for locks | **Option C (full composite score) with language as top priority**: subtitles first, then audio, then full composite score. Language always trumps quality. Subtitle and audio language matches are ranked by the user's configured preference order from settings (Q39). See Q16 for detailed sort order. |
 | Q13 | Cross-anime gap protection depth | **Full chain, both directions**: gap protection spans the entire prequel→sequel chain, checking both prequels and sequels. All chain boundaries are checked bidirectionally. |
 | Q14 | Weight reset scope | **Full clean slate**: reset all weights to 0 AND clear the A vs B choice history (`deletion_choices` table). Double warning required. |
-| Q16 | "Highest-rated" sort criteria — language priority | **Subtitles first, then audio, language always trumps quality**: `sortByRatingCriteria()` sorts by (1) subtitle match ranked by the user's configured preference order from settings (Q39) — e.g., if settings have "english,japanese", English sub ranks above Japanese sub, (2) audio match ranked by the same settings order, (3) composite quality score. A file matching both sub+audio ranks above sub-only, sub-only ranks above audio-only, audio-only ranks above no match. Within each language tier, composite quality breaks ties. |
+| Q16 | "Highest-rated" sort criteria — language priority | **Subtitles first, then audio, language always trumps quality**: `sortByRatingCriteria()` sorts by (1) subtitle match ranked by the user's configured preference order from settings (Q39) — only the single most-preferred subtitle track in the file is scored (Q43), e.g., if settings have "english,japanese", English sub ranks above Japanese sub, (2) audio match ranked by the same settings order, (3) composite quality score. A file matching both sub+audio ranks above sub-only, sub-only ranks above audio-only, audio-only ranks above no match. Within each language tier, composite quality breaks ties. |
 | Q17 | A vs B with only one Tier 3 candidate | **Show in A vs B groupbox**: pit candidate against a locked peer file from any anime (Q34) for context (if one exists); otherwise show as single-file confirmation ("Delete this? [Yes] [Skip]"). The locked peer is shown read-only (cannot be deleted via this prompt). |
 | Q18 | Queue behavior when space is sufficient | **Always show ranked list**: the queue always shows what WOULD be deleted, even when space is below threshold. Users can still make A vs B choices to train weights proactively. |
 | Q19 | Cross-anime gap — chain direction | **Both directions**: check prequels AND sequels. Checking only one direction WILL create gaps. |
@@ -1507,33 +1510,43 @@ struct DeletionHistoryEntry {
 | Q38 | Unlock from A vs B groupbox — refresh behavior | **Option B (stay showing same file)**: after unlocking, the file remains displayed in the A vs B groupbox as a candidate alongside the original candidate. No automatic refresh or return to top pair — the user can see the newly-unlocked file in its new candidate state and make a choice if they want. |
 | Q39 | "Highest-rated file" for lock — subtitle language preference order | **Use order from settings**: the existing `preferredSubtitleLanguages` and `preferredAudioLanguages` settings (comma-separated, order = priority) already define language priority. `sortByRatingCriteria()` ranks subtitle matches by their position in the configured list (earlier = higher priority), then audio matches by their position, then composite quality. No new settings needed — the existing language preference order is reused. |
 | Q40 | Learning from procedural deletions | **Only store the history**: procedural deletions (T0-T2) are recorded in `deletion_history` with their tier, reason, and deletion_type but do NOT record factor values and do NOT adjust weights. The history entry provides the audit trail; the learning system only learns from user A vs B choices (Tier 3). |
+| Q41 | Lazy cache invalidation — detection point | **Option A (WatchSessionManager hooks)**: `invalidateNormCache(aid)` is called in `WatchSessionManager` after `addFile()` and `removeFile()` calls. These are the natural points where local file set changes. No database triggers needed. |
+| Q42 | Cross-anime chain distance — multiple active sessions | **1 session per chain**: only one active watch session exists per relation chain, not per anime. If the user plays an episode in Shippuden, that session covers the entire Naruto→Shippuden chain. Distance is always calculated relative to the chain session's current position. `view_percentage` uses the chain session's watched/total counts. |
+| Q43 | sortByRatingCriteria — multiple subtitle tracks | **Only score the most preferred language**: when a file has multiple subtitle tracks (e.g., English + Japanese + Spanish), only the single most-preferred track (highest position in the user's configured preference list) is used for ranking. Additional tracks do not serve as tiebreakers. |
+| Q44 | Procedural history entries — display in A vs B groupbox | **Option B (show alongside replacement)**: when a procedural deletion history entry is clicked, the A vs B groupbox shows the deleted file alongside the file that superseded/replaced it. If the replacement file no longer exists, the right side shows "[File no longer present]". `deletion_history` stores `replaced_by_lid` for this purpose. |
+| Q45 | Cross-anime chain distance — chain with many anime | **No cap**: per-series normalization (Q31) already handles this — `maxInSeries` is the largest `abs(distance) × sizeBytes` within the chain, so even thousands of episodes are normalized to 0.0–1.0. Very distant files simply score near 0.0 (most deletable), which is the correct behavior. |
 
 ---
 
 ## Follow-Up Questions
 
-All previous questions (Q1-Q40) have been resolved. See the Resolved Design Decisions table above for the full list.
+All previous questions (Q1-Q45) have been resolved. See the Resolved Design Decisions table above for the full list.
 
-### Q41: Lazy cache invalidation — detection point
-`invalidateNormCache(aid)` should be called when files change. Where in the existing code is the best hook? Options:
-- **A**: In `WatchSessionManager` after `addFile()`/`removeFile()` calls
-- **B**: Via a database trigger on the mylist table
+### Q46: Per-chain session — session start behavior
+When the user starts playing an episode in anime B (part of a chain), and a session already exists for anime A in the same chain, should the system:
+- **A**: Move the existing chain session's "current position" to the new anime (since there's only 1 session per chain)
+- **B**: Start a new chain session (replacing the old one), losing the old session's episode count
+
+### Q47: Per-chain session — view_percentage calculation
+With 1 session per chain, how is `total episodes` calculated for `view_percentage = watched / total`?
+- **A**: Sum of total episodes across ALL anime in the chain (e.g., Naruto 220 + Shippuden 500 = 720 total)
+- **B**: Only the total episodes of anime the user has actually played at least once
 - **C**: Something else?
 
-### Q42: Cross-anime chain distance — multiple active sessions
-If the user has active sessions in both Naruto (ep 100) and Shippuden (ep 80), which session's position is the "current" one for distance calculation? Options:
-- **A**: Use the most recently active session's position (last played)
-- **B**: Use the nearest session position to the file (minimizes distance for the file)
+### Q48: Per-chain session — existing session migration
+The current codebase has per-anime sessions (`SessionInfo` stores `animeId`). When implementing per-chain sessions, how should existing per-anime sessions be migrated?
+- **A**: Merge all per-anime sessions for the same chain into one chain session (sum watched counts)
+- **B**: Keep only the most recent per-anime session per chain
 - **C**: Something else?
 
-### Q43: sortByRatingCriteria — multiple subtitle tracks in a single file
-A single file can have multiple subtitle tracks (e.g., English + Japanese + Spanish). When ranking by subtitle language preference order from settings, should a file with the top-priority subtitle anywhere in its tracks rank the same as a file with ONLY the top-priority subtitle? Or should multiple matching tracks be a tiebreaker?
-
-### Q44: Procedural history entries — display in A vs B groupbox
-When a history entry for a procedural deletion (T0-T2) is selected, it's loaded in the A vs B groupbox for viewing. Since there was no "A vs B" choice for procedural deletions, should the display show:
-- **A**: Just the deleted file (single-file view, no comparison)
-- **B**: The deleted file alongside the file that superseded/replaced it (if applicable)
+### Q49: History entry click — A vs B groupbox read-only mode
+When viewing a history entry in the A vs B groupbox, the files are already deleted. Should the groupbox:
+- **A**: Show the entry in read-only mode (no [Delete A], [Delete B], [Skip] buttons — just [Back to queue])
+- **B**: Show with a different set of actions (e.g., [Undo] if file is in recycle bin)
 - **C**: Something else?
 
-### Q45: Cross-anime chain distance — chain with many anime
-For a very long chain (e.g., 10+ sequels), the episode distance between the first and last anime could be thousands of episodes. Should there be a cap on cross-anime distance to prevent extremely distant files from having disproportionate size-weighted distance values? Or does per-series normalization (Q31) already handle this?
+### Q50: WatchSessionManager hooks — which specific methods?
+For Q41, the hooks go in WatchSessionManager. The existing code has several file-change paths. Should `invalidateNormCache()` be called from:
+- **A**: Only `addFile()` and `removeFile()`
+- **B**: Also `rehashFile()` and any method that changes file metadata (codec, resolution info updates from AniDB)
+- **C**: Something else?
