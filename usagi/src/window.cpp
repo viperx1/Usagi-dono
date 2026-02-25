@@ -321,20 +321,20 @@ void ExternalDeletionWorker::doWork()
         result.size = 0;
         
         // Look up the local_files entry by path, then join to mylist
-        QSqlQuery q(threadDb);
-        q.prepare("SELECT m.lid, m.aid, m.fid, f.size, f.ed2k "
+        QSqlQuery lookupQuery(threadDb);
+        lookupQuery.prepare("SELECT m.lid, m.aid, m.fid, f.size, f.ed2k "
                   "FROM local_files lf "
                   "INNER JOIN mylist m ON m.local_file = lf.id "
                   "LEFT JOIN file f ON m.fid = f.fid "
                   "WHERE lf.path = ?");
-        q.addBindValue(path);
+        lookupQuery.addBindValue(path);
         
-        if (q.exec() && q.next()) {
-            result.lid = q.value(0).toInt();
-            result.aid = q.value(1).toInt();
-            result.fid = q.value(2).toInt();
-            result.size = q.value(3).toLongLong();
-            result.ed2k = q.value(4).toString();
+        if (lookupQuery.exec() && lookupQuery.next()) {
+            result.lid = lookupQuery.value(0).toInt();
+            result.aid = lookupQuery.value(1).toInt();
+            result.fid = lookupQuery.value(2).toInt();
+            result.size = lookupQuery.value(3).toLongLong();
+            result.ed2k = lookupQuery.value(4).toString();
             
             LOG(QString("[ExternalDeletionWorker] Found mylist entry for deleted file: lid=%1, aid=%2, path=%3")
                 .arg(result.lid).arg(result.aid).arg(path));
@@ -343,20 +343,26 @@ void ExternalDeletionWorker::doWork()
             QSqlQuery delLocal(threadDb);
             delLocal.prepare("DELETE FROM local_files WHERE path = ?");
             delLocal.addBindValue(path);
-            delLocal.exec();
+            if (!delLocal.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to delete from local_files: %1").arg(delLocal.lastError().text()));
+            }
             
             // Update mylist state to deleted and clear local_file reference
             QSqlQuery updateMylist(threadDb);
             updateMylist.prepare("UPDATE mylist SET state = ?, local_file = NULL WHERE lid = ?");
             updateMylist.addBindValue(MylistState::DELETED);
             updateMylist.addBindValue(result.lid);
-            updateMylist.exec();
+            if (!updateMylist.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to update mylist state: %1").arg(updateMylist.lastError().text()));
+            }
             
             // Clear watch chunks
             QSqlQuery delChunks(threadDb);
             delChunks.prepare("DELETE FROM watch_chunks WHERE lid = ?");
             delChunks.addBindValue(result.lid);
-            delChunks.exec();
+            if (!delChunks.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to delete watch_chunks: %1").arg(delChunks.lastError().text()));
+            }
             
             result.success = true;
         } else {
@@ -365,7 +371,9 @@ void ExternalDeletionWorker::doWork()
             QSqlQuery delLocal(threadDb);
             delLocal.prepare("DELETE FROM local_files WHERE path = ?");
             delLocal.addBindValue(path);
-            delLocal.exec();
+            if (!delLocal.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to delete from local_files: %1").arg(delLocal.lastError().text()));
+            }
         }
         
         results.append(result);
