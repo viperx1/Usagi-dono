@@ -421,10 +421,11 @@ QString CurrentChoiceWidget::formatFileDetails(const DeletionCandidate &c) const
 QString CurrentChoiceWidget::formatTier(int tier) const
 {
     switch (tier) {
-    case DeletionTier::SUPERSEDED_REVISION:   return "T0 Superseded";
-    case DeletionTier::LOW_QUALITY_DUPLICATE: return "T1 Low-quality dup";
-    case DeletionTier::LANGUAGE_MISMATCH:     return "T2 Lang mismatch";
-    case DeletionTier::LEARNED_PREFERENCE:    return "T3 Learned";
+    case DeletionTier::HIDDEN_ANIME:          return "T0 Hidden anime";
+    case DeletionTier::SUPERSEDED_REVISION:   return "T1 Superseded";
+    case DeletionTier::LOW_QUALITY_DUPLICATE: return "T2 Low-quality dup";
+    case DeletionTier::LANGUAGE_MISMATCH:     return "T3 Lang mismatch";
+    case DeletionTier::LEARNED_PREFERENCE:    return "T4 Learned";
     case DeletionTier::PROTECTED:             return "Protected";
     default:                                   return "?";
     }

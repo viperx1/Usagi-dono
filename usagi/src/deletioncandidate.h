@@ -11,10 +11,11 @@
  * PROTECTED is a sentinel that keeps the file from being deleted.
  */
 namespace DeletionTier {
-    constexpr int SUPERSEDED_REVISION       = 0;
-    constexpr int LOW_QUALITY_DUPLICATE     = 1;
-    constexpr int LANGUAGE_MISMATCH         = 2;
-    constexpr int LEARNED_PREFERENCE        = 3;
+    constexpr int HIDDEN_ANIME              = 0;
+    constexpr int SUPERSEDED_REVISION       = 1;
+    constexpr int LOW_QUALITY_DUPLICATE     = 2;
+    constexpr int LANGUAGE_MISMATCH         = 3;
+    constexpr int LEARNED_PREFERENCE        = 4;
     constexpr int PROTECTED                 = 999;
 }
 

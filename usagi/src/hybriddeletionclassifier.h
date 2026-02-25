@@ -37,6 +37,7 @@ public:
     QMap<QString, double> normalizeFactors(int lid) const;
 
 private:
+    DeletionCandidate classifyHiddenAnime(int lid) const;
     DeletionCandidate classifyTier0(int lid) const;
     DeletionCandidate classifyTier1(int lid) const;
     DeletionCandidate classifyTier2(int lid) const;

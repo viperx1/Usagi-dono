@@ -63,28 +63,35 @@ DeletionCandidate HybridDeletionClassifier::classify(int lid) const
     // Gap protection delegated to WatchSessionManager's existing wouldCreateGap logic
     // (called externally by DeletionQueue before acting on a candidate)
 
-    // ── Tier 0: superseded revision ──
+    // ── Tier 0: hidden anime ──
+    DeletionCandidate th = classifyHiddenAnime(lid);
+    if (th.tier == DeletionTier::HIDDEN_ANIME) {
+        th.aid = c.aid; th.eid = c.eid; th.filePath = c.filePath; th.animeName = c.animeName;
+        return th;
+    }
+
+    // ── Tier 1: superseded revision ──
     DeletionCandidate t0 = classifyTier0(lid);
     if (t0.tier == DeletionTier::SUPERSEDED_REVISION) {
         t0.aid = c.aid; t0.eid = c.eid; t0.filePath = c.filePath; t0.animeName = c.animeName;
         return t0;
     }
 
-    // ── Tier 1: low-quality duplicate ──
+    // ── Tier 2: low-quality duplicate ──
     DeletionCandidate t1 = classifyTier1(lid);
     if (t1.tier == DeletionTier::LOW_QUALITY_DUPLICATE) {
         t1.aid = c.aid; t1.eid = c.eid; t1.filePath = c.filePath; t1.animeName = c.animeName;
         return t1;
     }
 
-    // ── Tier 2: language mismatch ──
+    // ── Tier 3: language mismatch ──
     DeletionCandidate t2 = classifyTier2(lid);
     if (t2.tier == DeletionTier::LANGUAGE_MISMATCH) {
         t2.aid = c.aid; t2.eid = c.eid; t2.filePath = c.filePath; t2.animeName = c.animeName;
         return t2;
     }
 
-    // ── Tier 3: learned preference ──
+    // ── Tier 4: learned preference ──
     if (isEligibleForDeletion(lid)) {
         DeletionCandidate t3 = classifyTier3(lid);
         t3.aid = c.aid; t3.eid = c.eid; t3.filePath = c.filePath; t3.animeName = c.animeName;
@@ -144,7 +151,28 @@ QMap<QString, double> HybridDeletionClassifier::normalizeFactors(int lid) const
 }
 
 // ---------------------------------------------------------------------------
-// Tier 0: superseded revision
+// Tier 0: hidden anime
+// ---------------------------------------------------------------------------
+
+DeletionCandidate HybridDeletionClassifier::classifyHiddenAnime(int lid) const
+{
+    DeletionCandidate c;
+    c.lid = lid;
+
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    q.prepare("SELECT a.hidden FROM mylist m JOIN anime a ON a.aid = m.aid WHERE m.lid = :lid");
+    q.bindValue(":lid", lid);
+    if (q.exec() && q.next() && q.value(0).toInt() == 1) {
+        c.tier = DeletionTier::HIDDEN_ANIME;
+        c.learnedScore = 0.0;
+        c.reason = "Hidden anime";
+    }
+    return c;
+}
+
+// ---------------------------------------------------------------------------
+// Tier 1: superseded revision
 // ---------------------------------------------------------------------------
 
 DeletionCandidate HybridDeletionClassifier::classifyTier0(int lid) const
@@ -192,7 +220,7 @@ DeletionCandidate HybridDeletionClassifier::classifyTier0(int lid) const
 }
 
 // ---------------------------------------------------------------------------
-// Tier 1: low-quality duplicate
+// Tier 2: low-quality duplicate
 // ---------------------------------------------------------------------------
 
 DeletionCandidate HybridDeletionClassifier::classifyTier1(int lid) const
@@ -235,7 +263,7 @@ DeletionCandidate HybridDeletionClassifier::classifyTier1(int lid) const
 }
 
 // ---------------------------------------------------------------------------
-// Tier 2: language mismatch
+// Tier 3: language mismatch
 // ---------------------------------------------------------------------------
 
 DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
@@ -296,7 +324,7 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
 }
 
 // ---------------------------------------------------------------------------
-// Tier 3: learned preference
+// Tier 4: learned preference
 // ---------------------------------------------------------------------------
 
 DeletionCandidate HybridDeletionClassifier::classifyTier3(int lid) const
