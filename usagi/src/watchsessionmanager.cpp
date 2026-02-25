@@ -1015,10 +1015,10 @@ bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
 {
     QString audioLang = getFileAudioLanguage(lid);
     if (audioLang.isEmpty()) {
-        return false;  // No audio language info
+        LOG(QString("[LangMatch] lid=%1 audio: (empty) → no match").arg(lid));
+        return false;
     }
     
-    // Get preferred languages from global settings
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         return false;
@@ -1027,26 +1027,27 @@ bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
     QSqlQuery q(db);
     q.prepare("SELECT value FROM settings WHERE name = 'preferredAudioLanguages'");
     if (!q.exec() || !q.next()) {
-        return false;  // No preference set
+        LOG(QString("[LangMatch] lid=%1 audio: '%2' vs (no pref set) → no match").arg(lid, audioLang));
+        return false;
     }
     
     QString preferredLangs = q.value(0).toString().toLower();
     QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
     
-    // Normalize and check if file's audio language matches any preferred language
-    // Use word boundary matching to avoid false positives (e.g., 'eng' in 'bengali')
     QString normalizedAudioLang = audioLang.toLower().trimmed();
     for (const QString& lang : langList) {
         QString trimmedLang = lang.trimmed();
-        // Check for exact match or word boundary match
         if (normalizedAudioLang == trimmedLang || 
             normalizedAudioLang.startsWith(trimmedLang + " ") ||
             normalizedAudioLang.endsWith(" " + trimmedLang) ||
             normalizedAudioLang.contains(" " + trimmedLang + " ")) {
+            LOG(QString("[LangMatch] lid=%1 audio: '%2' vs pref [%3] → MATCH on '%4'")
+                .arg(lid).arg(audioLang, preferredLangs, trimmedLang));
             return true;
         }
     }
     
+    LOG(QString("[LangMatch] lid=%1 audio: '%2' vs pref [%3] → no match").arg(lid).arg(audioLang, preferredLangs));
     return false;
 }
 
@@ -1054,10 +1055,10 @@ bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
 {
     QString subLang = getFileSubtitleLanguage(lid);
     if (subLang.isEmpty()) {
-        return false;  // No subtitle language info
+        LOG(QString("[LangMatch] lid=%1 sub: (empty) → no match").arg(lid));
+        return false;
     }
     
-    // Get preferred languages from global settings
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
         return false;
@@ -1066,26 +1067,27 @@ bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
     QSqlQuery q(db);
     q.prepare("SELECT value FROM settings WHERE name = 'preferredSubtitleLanguages'");
     if (!q.exec() || !q.next()) {
-        return false;  // No preference set
+        LOG(QString("[LangMatch] lid=%1 sub: '%2' vs (no pref set) → no match").arg(lid, subLang));
+        return false;
     }
     
     QString preferredLangs = q.value(0).toString().toLower();
     QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
     
-    // Normalize and check if file's subtitle language matches any preferred language
-    // Use word boundary matching to avoid false positives (e.g., 'eng' in 'bengali')
     QString normalizedSubLang = subLang.toLower().trimmed();
     for (const QString& lang : langList) {
         QString trimmedLang = lang.trimmed();
-        // Check for exact match or word boundary match
         if (normalizedSubLang == trimmedLang || 
             normalizedSubLang.startsWith(trimmedLang + " ") ||
             normalizedSubLang.endsWith(" " + trimmedLang) ||
             normalizedSubLang.contains(" " + trimmedLang + " ")) {
+            LOG(QString("[LangMatch] lid=%1 sub: '%2' vs pref [%3] → MATCH on '%4'")
+                .arg(lid).arg(subLang, preferredLangs, trimmedLang));
             return true;
         }
     }
     
+    LOG(QString("[LangMatch] lid=%1 sub: '%2' vs pref [%3] → no match").arg(lid).arg(subLang, preferredLangs));
     return false;
 }
 

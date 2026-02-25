@@ -252,6 +252,9 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
     QString myAudio = m_sessionManager.getFileAudioLanguage(lid);
     QString mySub   = m_sessionManager.getFileSubtitleLanguage(lid);
 
+    LOG(QString("[T2] lid=%1 audioMatch=%2 subMatch=%3 dub='%4' sub='%5'")
+        .arg(lid).arg(audioMatch).arg(subMatch).arg(myAudio, mySub));
+
     // Check if a better-matching alternative exists for the same episode
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
