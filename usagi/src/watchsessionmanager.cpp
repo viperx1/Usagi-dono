@@ -1027,7 +1027,7 @@ bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
     QSqlQuery q(db);
     q.prepare("SELECT value FROM settings WHERE name = 'preferredAudioLanguages'");
     if (!q.exec() || !q.next()) {
-        LOG(QString("[LangMatch] lid=%1 audio: '%2' vs (no pref set) → no match").arg(lid, audioLang));
+        LOG(QString("[LangMatch] lid=%1 audio: '%2' vs (no pref set) → no match").arg(lid).arg(audioLang));
         return false;
     }
     
@@ -1067,7 +1067,7 @@ bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
     QSqlQuery q(db);
     q.prepare("SELECT value FROM settings WHERE name = 'preferredSubtitleLanguages'");
     if (!q.exec() || !q.next()) {
-        LOG(QString("[LangMatch] lid=%1 sub: '%2' vs (no pref set) → no match").arg(lid, subLang));
+        LOG(QString("[LangMatch] lid=%1 sub: '%2' vs (no pref set) → no match").arg(lid).arg(subLang));
         return false;
     }
     
