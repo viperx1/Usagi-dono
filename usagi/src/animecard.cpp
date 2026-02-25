@@ -281,9 +281,6 @@ void AnimeCard::setupUI()
                 
                 contextMenu.addSeparator();
                 
-
-                contextMenu.addSeparator();
-                
                 // Destructive action - delete file completely
                 QAction *deleteFileAction = contextMenu.addAction("Delete file...");
                 connect(deleteFileAction, &QAction::triggered, this, [this, lid]() {

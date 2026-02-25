@@ -150,21 +150,19 @@ void TestBitratePreferences::testCalculateBitrateScoreVariousDistances()
 {
     api->setPreferredBitrate(3.5);
     
-    // Test 20% difference (10-30% range) - should get -10 penalty
+    // With all SCORE_* constants zeroed (design Phase 5), calculateBitrateScore
+    // always returns 0. HybridDeletionClassifier handles bitrate comparison.
     double score1 = watchManager->calculateBitrateScore(4200, "1080p", "H.264", 2);
-    QCOMPARE(score1, -10.0);
+    QCOMPARE(score1, 0.0);
     
-    // Test 40% difference (30-50% range) - should get -25 penalty
     double score2 = watchManager->calculateBitrateScore(4900, "1080p", "H.264", 2);
-    QCOMPARE(score2, -25.0);
+    QCOMPARE(score2, 0.0);
     
-    // Test 60% difference (50%+ range) - should get -40 penalty
     double score3 = watchManager->calculateBitrateScore(5600, "1080p", "H.264", 2);
-    QCOMPARE(score3, -40.0);
+    QCOMPARE(score3, 0.0);
     
-    // Test with very low bitrate (60% below expected)
     double score4 = watchManager->calculateBitrateScore(1400, "1080p", "H.264", 2);
-    QCOMPARE(score4, -40.0);
+    QCOMPARE(score4, 0.0);
 }
 
 QTEST_MAIN(TestBitratePreferences)

@@ -329,16 +329,16 @@ void TestWatchSessionManager::testCalculateDeletionScore()
     // Start session and calculate scores
     manager->startSession(1, 3);
     
-    // Current episode should have high score
+    // With all SCORE_* constants zeroed (design Phase 5), every file scores 0.
+    // The legacy scoring method is superseded by HybridDeletionClassifier.
     int score3 = manager->calculateDeletionScore(1003); // Episode 3
     int score4 = manager->calculateDeletionScore(1004); // Episode 4 (ahead)
     int score1 = manager->calculateDeletionScore(1001); // Episode 1 (behind)
     
-    // Episodes ahead should have higher scores than those behind
-    QVERIFY(score4 > score1);
-    
-    // Active session should add points
-    QVERIFY(score3 > 0);
+    // All scores equal 0 because SCORE_* constants are zeroed
+    QCOMPARE(score3, 0);
+    QCOMPARE(score4, 0);
+    QCOMPARE(score1, 0);
 }
 
 // ========== Settings Tests ==========
@@ -505,16 +505,15 @@ void TestWatchSessionManager::testFileVersionScoring()
     manager->startSession(1, 1);
     
     // Get scores for both files (same episode, different versions)
-    // v1 has 1 local file with higher version (v2), so gets -1000 penalty
-    // v2 has 0 local files with higher version, so no penalty
+    // With all SCORE_* constants zeroed (design Phase 5), revision penalties
+    // are no longer applied by the legacy scoring method.
+    // HybridDeletionClassifier handles version comparison via Tier 0.
     int scoreV1 = manager->calculateDeletionScore(1001);  // v1 (older)
     int scoreV2 = manager->calculateDeletionScore(1100);  // v2 (newer)
     
-    // The older version (v1) should have a lower score (more eligible for deletion)
-    // than the newer version (v2)
-    QVERIFY2(scoreV1 < scoreV2, 
-             QString("Older version (score=%1) should have lower score than newer version (score=%2)")
-             .arg(scoreV1).arg(scoreV2).toLatin1().constData());
+    // Both scores equal 0 because SCORE_* constants are zeroed
+    QCOMPARE(scoreV1, 0);
+    QCOMPARE(scoreV2, 0);
 }
 
 void TestWatchSessionManager::testPerformInitialScanWithDeletionEnabled()

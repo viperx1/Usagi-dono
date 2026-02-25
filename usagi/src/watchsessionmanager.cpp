@@ -483,8 +483,8 @@ int WatchSessionManager::findPrequelAid(int aid, const QString& relationType) co
 
 int WatchSessionManager::calculateDeletionScore(int lid) const
 {
-    // Base score - all files start with this
-    int score = 50;  // Middle-of-the-road score
+    // Base score - all files start at 0 (no bias; HybridDeletionClassifier is the decision maker)
+    int score = 0;
     
     int aid = getAnimeIdForFile(lid);
     int episodeNumber = getEpisodeNumber(lid);

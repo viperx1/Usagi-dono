@@ -423,22 +423,24 @@ private:
     static const int RELATION_SEQUEL = 1;
     static const int RELATION_PREQUEL = 2;
     
-    // Score calculation constants
-    static const int SCORE_HIDDEN_CARD = -50;
-    static const int SCORE_ACTIVE_SESSION = 100;  // Factor for being in active watching session
-    static const int SCORE_IN_AHEAD_BUFFER = 75;
-    static const int SCORE_ALREADY_WATCHED = -5;
-    static const int SCORE_NOT_WATCHED = 50;
-    static const int SCORE_DISTANCE_FACTOR = -1;  // Per episode away from current
-    static const int SCORE_OLDER_REVISION = -1000;  // Per local file with higher version (older revisions more deletable)
-    static const int SCORE_PREFERRED_AUDIO = 30;  // Bonus for matching preferred audio language
-    static const int SCORE_PREFERRED_SUBTITLE = 20;  // Bonus for matching preferred subtitle language
-    static const int SCORE_NOT_PREFERRED_AUDIO = -40;  // Penalty for not matching preferred audio language
-    static const int SCORE_NOT_PREFERRED_SUBTITLE = -20;  // Penalty for not matching preferred subtitle language
-    static const int SCORE_HIGHER_QUALITY = 25;  // Bonus for higher quality/resolution
-    static const int SCORE_LOWER_QUALITY = -35;  // Penalty for lower quality/resolution
-    static const int SCORE_HIGH_RATING = 15;  // Bonus for highly rated anime (rating >= 800)
-    static const int SCORE_LOW_RATING = -15;  // Penalty for poorly rated anime (rating < 600)
+    // Score calculation constants — all initialized to 0 per design doc Phase 5.
+    // HybridDeletionClassifier + FactorWeightLearner is the sole deletion decision maker;
+    // these legacy constants are retained only for backward compatibility during migration.
+    static const int SCORE_HIDDEN_CARD = 0;
+    static const int SCORE_ACTIVE_SESSION = 0;
+    static const int SCORE_IN_AHEAD_BUFFER = 0;
+    static const int SCORE_ALREADY_WATCHED = 0;
+    static const int SCORE_NOT_WATCHED = 0;
+    static const int SCORE_DISTANCE_FACTOR = 0;
+    static const int SCORE_OLDER_REVISION = 0;
+    static const int SCORE_PREFERRED_AUDIO = 0;
+    static const int SCORE_PREFERRED_SUBTITLE = 0;
+    static const int SCORE_NOT_PREFERRED_AUDIO = 0;
+    static const int SCORE_NOT_PREFERRED_SUBTITLE = 0;
+    static const int SCORE_HIGHER_QUALITY = 0;
+    static const int SCORE_LOWER_QUALITY = 0;
+    static const int SCORE_HIGH_RATING = 0;
+    static const int SCORE_LOW_RATING = 0;
     
     // Quality thresholds for scoring (based on AniDB quality field)
     static constexpr int QUALITY_HIGH_THRESHOLD = 60;  // Quality score above this is considered high (e.g., "high", "very high")
@@ -449,19 +451,19 @@ private:
     static constexpr int RATING_LOW_THRESHOLD = 600;   // 6.0/10 - below average anime
     
     // Group status scores
-    static const int SCORE_ACTIVE_GROUP = 20;      // Bonus for files from active groups
-    static const int SCORE_STALLED_GROUP = -10;    // Penalty for files from stalled groups
-    static const int SCORE_DISBANDED_GROUP = -25;  // Penalty for files from disbanded groups
+    static const int SCORE_ACTIVE_GROUP = 0;
+    static const int SCORE_STALLED_GROUP = 0;
+    static const int SCORE_DISBANDED_GROUP = 0;
     
     // Bitrate distance penalties (only apply when fileCount > 1)
-    static const int SCORE_BITRATE_CLOSE = -10;       // 10-30% from expected bitrate
-    static const int SCORE_BITRATE_MODERATE = -25;    // 30-50% from expected bitrate
-    static const int SCORE_BITRATE_FAR = -40;         // 50%+ from expected bitrate
+    static const int SCORE_BITRATE_CLOSE = 0;
+    static const int SCORE_BITRATE_MODERATE = 0;
+    static const int SCORE_BITRATE_FAR = 0;
     
     // Codec quality tier bonuses
-    static const int SCORE_MODERN_CODEC = 10;         // Bonus for modern efficient codecs (H.265, AV1)
-    static const int SCORE_OLD_CODEC = -15;           // Penalty for old inefficient codecs (MPEG-4, XviD)
-    static const int SCORE_ANCIENT_CODEC = -30;       // Penalty for very old codecs (MPEG-2, H.263)
+    static const int SCORE_MODERN_CODEC = 0;
+    static const int SCORE_OLD_CODEC = 0;
+    static const int SCORE_ANCIENT_CODEC = 0;
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;
