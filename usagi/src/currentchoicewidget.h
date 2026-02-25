@@ -73,7 +73,7 @@ private slots:
 
 private:
     void setupUI();
-    void setupHeaderBar();
+    void setupHeaderBar(QVBoxLayout *targetLayout);
     void setupAvsBGroupBox();
     void setupWeightsGroupBox();
     void setupQueueGroupBox();

@@ -80,10 +80,20 @@ void CurrentChoiceWidget::setPreviewMode(bool preview)
 
 void CurrentChoiceWidget::setupUI()
 {
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(6, 6, 6, 6);
+    QVBoxLayout *outerLayout = new QVBoxLayout(this);
+    outerLayout->setContentsMargins(0, 0, 0, 0);
 
-    setupHeaderBar();
+    QScrollArea *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    outerLayout->addWidget(scroll);
+
+    QWidget *content = new QWidget;
+    QVBoxLayout *mainLayout = new QVBoxLayout(content);
+    mainLayout->setContentsMargins(6, 6, 6, 6);
+    scroll->setWidget(content);
+
+    setupHeaderBar(mainLayout);
 
     // Top row: A vs B + Weights side by side
     QHBoxLayout *topRow = new QHBoxLayout;
@@ -100,7 +110,7 @@ void CurrentChoiceWidget::setupUI()
     mainLayout->addWidget(m_historyGroupBox);
 }
 
-void CurrentChoiceWidget::setupHeaderBar()
+void CurrentChoiceWidget::setupHeaderBar(QVBoxLayout *targetLayout)
 {
     QHBoxLayout *header = new QHBoxLayout;
 
@@ -125,7 +135,7 @@ void CurrentChoiceWidget::setupHeaderBar()
     connect(m_pauseButton, &QPushButton::clicked, this, &CurrentChoiceWidget::onPauseClicked);
     header->addWidget(m_pauseButton);
 
-    static_cast<QVBoxLayout*>(layout())->addLayout(header);
+    targetLayout->addLayout(header);
 }
 
 void CurrentChoiceWidget::setupAvsBGroupBox()
@@ -534,6 +544,8 @@ void CurrentChoiceWidget::showCardForSide(int aid, QVBoxLayout *container, Anime
     AnimeCard *card = m_cardManager.createStandaloneCard(aid, this);
     if (!card) return;
     cardSlot = card;
+    // Scale down to fit within A vs B columns without overlapping
+    card->setFixedSize(400, 300);
     // Insert card before the info label (which is always the last widget)
     container->insertWidget(0, card);
 }
