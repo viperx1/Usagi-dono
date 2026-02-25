@@ -99,6 +99,14 @@ public:
      * @return Pointer to QSystemTrayIcon
      */
     QSystemTrayIcon* getTrayIcon() const { return m_trayIcon; }
+    
+    /**
+     * @brief Show or hide the red ❗ exclamation mark overlay on the tray icon.
+     *
+     * Shown when disk usage hits threshold and user action is required (A vs B pending).
+     * Hidden when space drops below threshold.
+     */
+    void setDeletionAlertVisible(bool visible);
 
 signals:
     /**
@@ -149,6 +157,8 @@ private:
     bool m_minimizeToTrayEnabled;
     bool m_closeToTrayEnabled;
     bool m_startMinimizedEnabled;
+    bool m_deletionAlertVisible;
+    QIcon m_baseIcon;  // Original icon without overlay
 };
 
 #endif // TRAYICONMANAGER_H

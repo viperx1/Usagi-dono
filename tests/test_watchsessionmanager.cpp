@@ -23,8 +23,7 @@ private slots:
     void testMarkEpisodeWatched();
     void testSessionPersistence();
     
-    // File scoring tests
-    void testCalculateDeletionScore();
+    // File scoring tests — removed (calculateDeletionScore was removed in Phase 5)
     
     // Settings tests
     void testAheadBuffer();
@@ -38,8 +37,7 @@ private slots:
     // Auto-start session tests
     void testAutoStartSessionsForExistingAnime();
     
-    // File version tests
-    void testFileVersionScoring();
+    // File version tests — removed (calculateDeletionScore was removed in Phase 5)
     
     // Startup deletion tests
     void testPerformInitialScanWithDeletionEnabled();
@@ -322,24 +320,7 @@ void TestWatchSessionManager::testSessionPersistence()
     QCOMPARE(manager->getCurrentSessionEpisode(1), 3);
 }
 
-// ========== File Scoring Tests ==========
-
-void TestWatchSessionManager::testCalculateDeletionScore()
-{
-    // Start session and calculate scores
-    manager->startSession(1, 3);
-    
-    // Current episode should have high score
-    int score3 = manager->calculateDeletionScore(1003); // Episode 3
-    int score4 = manager->calculateDeletionScore(1004); // Episode 4 (ahead)
-    int score1 = manager->calculateDeletionScore(1001); // Episode 1 (behind)
-    
-    // Episodes ahead should have higher scores than those behind
-    QVERIFY(score4 > score1);
-    
-    // Active session should add points
-    QVERIFY(score3 > 0);
-}
+// ========== File Scoring Tests — removed (calculateDeletionScore removed in Phase 5) ==========
 
 // ========== Settings Tests ==========
 
@@ -455,108 +436,34 @@ void TestWatchSessionManager::testAutoStartSessionsForExistingAnime()
     QCOMPARE(manager->getCurrentSessionEpisode(1), 1);
 }
 
-void TestWatchSessionManager::testFileVersionScoring()
-{
-    // Test that files with older revisions get lower scores
-    // This test verifies the file version scoring feature
-    // When multiple local files exist for same episode, older versions get penalties
-    // based on count of local files with higher versions
-    
-    // State field encoding per AniDB API:
-    //   Bit 0 (1): FILE_CRCOK
-    //   Bit 1 (2): FILE_CRCERR
-    //   Bit 2 (4): FILE_ISV2 - version 2
-    //   Bit 3 (8): FILE_ISV3 - version 3
-    //   Bit 4 (16): FILE_ISV4 - version 4
-    //   Bit 5 (32): FILE_ISV5 - version 5
-    // No version bits set = version 1
-    
-    QSqlDatabase db = QSqlDatabase::database();
-    QSqlQuery q(db);
-    
-    // Create a second file for the same episode (ep 1) with a different version
-    // First, add local_file entry
-    q.prepare("INSERT INTO local_files (path, filename) VALUES (?, ?)");
-    q.addBindValue("/test/anime1/episode1_v2.mkv");
-    q.addBindValue("episode1_v2.mkv");
-    q.exec();
-    int localFileId2 = q.lastInsertId().toInt();
-    
-    // Create file entry with state = 4 (FILE_ISV2 bit set = v2) for newer file
-    int fid2 = 5100;
-    q.prepare("INSERT INTO file (fid, aid, eid, size, filename, state) VALUES (?, 1, 101, ?, ?, 4)");
-    q.addBindValue(fid2);
-    q.addBindValue(qint64(500) * 1024 * 1024);
-    q.addBindValue("episode1_v2.mkv");
-    q.exec();
-    
-    // Update original file to have state = 1 (FILE_CRCOK, no version bits = v1)
-    q.exec("UPDATE file SET state = 1 WHERE fid = 5001");
-    
-    // Create mylist entry for the new file (lid 1100)
-    q.prepare("INSERT INTO mylist (lid, fid, aid, eid, local_watched, local_file) VALUES (1100, ?, 1, 101, 0, ?)");
-    q.addBindValue(fid2);
-    q.addBindValue(localFileId2);
-    q.exec();
-    
-    // Reload manager to pick up new data
-    delete manager;
-    manager = new WatchSessionManager();
-    manager->startSession(1, 1);
-    
-    // Get scores for both files (same episode, different versions)
-    // v1 has 1 local file with higher version (v2), so gets -1000 penalty
-    // v2 has 0 local files with higher version, so no penalty
-    int scoreV1 = manager->calculateDeletionScore(1001);  // v1 (older)
-    int scoreV2 = manager->calculateDeletionScore(1100);  // v2 (newer)
-    
-    // The older version (v1) should have a lower score (more eligible for deletion)
-    // than the newer version (v2)
-    QVERIFY2(scoreV1 < scoreV2, 
-             QString("Older version (score=%1) should have lower score than newer version (score=%2)")
-             .arg(scoreV1).arg(scoreV2).toLatin1().constData());
-}
+// testFileVersionScoring — removed (calculateDeletionScore removed in Phase 5)
 
 void TestWatchSessionManager::testPerformInitialScanWithDeletionEnabled()
 {
-    // Test that performInitialScan properly triggers deletion when both settings are enabled
-    // This test verifies the fix for the bug where deletion didn't happen on startup
-    
-    // Very high threshold to ensure deletion is triggered (want isDeletionNeeded() to return true)
+    // Test that performInitialScan emits deletionCycleRequested when both settings are enabled
     constexpr double HIGH_THRESHOLD_GB = 999999.0;
     
-    // Create a signal spy to monitor deletion requests
-    QSignalSpy deletionSpy(manager, &WatchSessionManager::deleteFileRequested);
+    QSignalSpy cycleSpy(manager, &WatchSessionManager::deletionCycleRequested);
     
-    // Enable both auto-mark deletion and actual deletion
     manager->setAutoMarkDeletionEnabled(true);
     manager->setActualDeletionEnabled(true);
-    
-    // Set a very high threshold to ensure deletion is triggered
     manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
     manager->setDeletionThresholdValue(HIGH_THRESHOLD_GB);
     
-    // Verify settings are saved
     QVERIFY(manager->isAutoMarkDeletionEnabled());
     QVERIFY(manager->isActualDeletionEnabled());
     
-    // Now call performInitialScan - this should trigger deletion if space is below threshold
+    // Now call performInitialScan - this should emit deletionCycleRequested
     manager->performInitialScan();
     
-    // Note: The actual deletion may or may not happen depending on disk space,
-    // but the important thing is that autoMarkFilesForDeletion() is called
-    // when m_enableActualDeletion is true
-    
-    // This test mainly verifies that the code path is correct
-    // In a real scenario with low disk space, deletionSpy would have signals
+    // Since space is always below 999999 GB, deletionCycleRequested should be emitted
+    QVERIFY(cycleSpy.count() >= 1);
 }
 
 void TestWatchSessionManager::testContinuousDeletionUntilThresholdMet()
 {
-    // Test that deletion continues after successful deletion if space is still below threshold
-    // This verifies the fix for the issue where only one file was deleted instead of continuing
+    // Test that onFileDeletionResult emits deletionCycleRequested when space is still low
     
-    // Enable both auto-mark deletion and actual deletion
     manager->setAutoMarkDeletionEnabled(true);
     manager->setActualDeletionEnabled(true);
     
@@ -564,153 +471,59 @@ void TestWatchSessionManager::testContinuousDeletionUntilThresholdMet()
     QVERIFY(manager->isAutoMarkDeletionEnabled());
     QVERIFY(manager->isActualDeletionEnabled());
     
-    // Create a signal spy to count deletion requests
-    QSignalSpy deletionSpy(manager, &WatchSessionManager::deleteFileRequested);
+    QSignalSpy cycleSpy(manager, &WatchSessionManager::deletionCycleRequested);
     
-    // Simulate successful deletion by calling onFileDeletionResult
-    // In a real scenario with low disk space and multiple eligible files,
-    // this should trigger additional deletions until the threshold is met
+    // Set high threshold so isDeletionNeeded() returns true
+    manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
+    manager->setDeletionThresholdValue(999999.0);
     
-    // Note: Since isDeletionNeeded() depends on actual disk space,
-    // this test verifies the code logic is correct but may not trigger
-    // actual deletions unless disk space is genuinely low
+    // Simulate successful deletion — should emit deletionCycleRequested
+    manager->onFileDeletionResult(1001, 1, true);
     
-    // The key change is that onFileDeletionResult now checks isDeletionNeeded()
-    // after a successful deletion and continues if needed
+    // Since space is always below 999999 GB, cycle should be requested again
+    QVERIFY(cycleSpy.count() >= 1);
 }
 
 void TestWatchSessionManager::testSequentialDeletionWithApiConfirmation()
 {
-    // Test that deletion waits for API confirmation before deleting next file
-    // This verifies the fix to ensure files are deleted one at a time,
-    // waiting for MYLISTADD API response before triggering the next deletion
+    // Test that onFileDeletionResult emits deletionCycleRequested (not deleteFileRequested)
+    // Window handles the cycle by using DeletionQueue
     
-    // Enable actual deletion
+    manager->setAutoMarkDeletionEnabled(true);
     manager->setActualDeletionEnabled(true);
-    
-    // Set a very high threshold to ensure deletion is needed
     manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
     manager->setDeletionThresholdValue(999999.0);
     
-    // Create signal spies
-    QSignalSpy deletionRequestSpy(manager, &WatchSessionManager::deleteFileRequested);
+    QSignalSpy cycleSpy(manager, &WatchSessionManager::deletionCycleRequested);
     QSignalSpy deletionCompleteSpy(manager, &WatchSessionManager::fileDeleted);
     
-    // Trigger first deletion (this would be automatic in real scenario)
-    bool firstDeleted = manager->deleteNextEligibleFile(true);
+    // Simulate successful file deletion
+    manager->onFileDeletionResult(1001, 1, true);
     
-    if (firstDeleted) {
-        // Verify that deleteFileRequested was emitted once
-        QCOMPARE(deletionRequestSpy.count(), 1);
-        
-        // At this point, no second deletion should have been triggered yet
-        // because we haven't received API confirmation
-        
-        // Simulate the file I/O and database operations completing
-        // but API confirmation NOT yet received
-        int lid = deletionRequestSpy.at(0).at(0).toInt();
-        
-        // Call onFileDeletionResult to simulate file I/O completion
-        // In the fixed implementation, this should NOT trigger the next deletion
-        // until we receive the API confirmation via notifyMylistAdd signal
-        manager->onFileDeletionResult(lid, 1, true);
-        
-        // The fileDeleted signal should be emitted
-        QCOMPARE(deletionCompleteSpy.count(), 1);
-        
-        // But deleteFileRequested should still only have been called once
-        // (The second deletion will only happen after API confirms via notifyMylistAdd)
-        QCOMPARE(deletionRequestSpy.count(), 1);
-        
-        // This test documents the expected behavior:
-        // 1. First file deletion is triggered
-        // 2. File I/O completes and onFileDeletionResult is called
-        // 3. fileDeleted signal is emitted
-        // 4. But the NEXT deletion does NOT happen yet
-        // 5. Only after receiving the MYLISTADD API response (code 311)
-        //    should the next deletion be triggered
-    }
+    // fileDeleted should be emitted
+    QCOMPARE(deletionCompleteSpy.count(), 1);
+    
+    // deletionCycleRequested should be emitted (space is below 999999 GB)
+    QVERIFY(cycleSpy.count() >= 1);
 }
 
 void TestWatchSessionManager::testMissingDuplicateFileDoesNotBypassGapProtection()
 {
-    QSqlDatabase db = QSqlDatabase::database();
-    QSqlQuery q(db);
-    
-    // Reset baseline fixture for this focused scenario
-    q.exec("DELETE FROM mylist");
-    q.exec("DELETE FROM episode");
-    q.exec("DELETE FROM anime");
-    q.exec("DELETE FROM local_files");
-    q.exec("DELETE FROM file");
-    
-    // Minimal anime + episodes
-    // Populate both columns because test schema preserves legacy name_romaji while
-    // deletion query reads production-style nameromaji.
-    QVERIFY(q.exec("INSERT INTO anime (aid, name_romaji, nameromaji) VALUES (10, 'Gap Test', 'Gap Test')"));
-    QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1001, '1')"));
-    QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1002, '2')"));
-    QVERIFY(q.exec("INSERT INTO episode (eid, epno) VALUES (1003, '3')"));
-    
-    QTemporaryFile ep1File;
-    QTemporaryFile ep2File;
-    QTemporaryFile ep3File;
-    QVERIFY(ep1File.open());
-    QVERIFY(ep2File.open());
-    QVERIFY(ep3File.open());
-    
-    // Episode 1 local file
-    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (1, ?, 'ep1.mkv')");
-    q.addBindValue(ep1File.fileName());
-    QVERIFY(q.exec());
-    
-    // Episode 2 real local file (deletion candidate)
-    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (2, ?, 'ep2.mkv')");
-    q.addBindValue(ep2File.fileName());
-    QVERIFY(q.exec());
-    
-    // Episode 2 duplicate entry points to a missing file
-    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (3, ?, 'ep2_missing.mkv')");
-    q.addBindValue(QDir::tempPath() + "/usagi_missing_duplicate_file.mkv");
-    QVERIFY(q.exec());
-    
-    // Episode 3 local file
-    q.prepare("INSERT INTO local_files (id, path, filename) VALUES (4, ?, 'ep3.mkv')");
-    q.addBindValue(ep3File.fileName());
-    QVERIFY(q.exec());
-    
-    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8001, 10, 1001, 1000, 'ep1.mkv')"));
-    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8002, 10, 1002, 1000, 'ep2.mkv')"));
-    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8003, 10, 1002, 1000, 'ep2_missing.mkv')"));
-    QVERIFY(q.exec("INSERT INTO file (fid, aid, eid, size, filename) VALUES (8004, 10, 1003, 1000, 'ep3.mkv')"));
-    
-    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7001, 8001, 10, 1001, 0, 0, 1)"));
-    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7002, 8002, 10, 1002, 0, 1, 2)"));
-    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7003, 8003, 10, 1002, 0, 0, 3)"));
-    QVERIFY(q.exec("INSERT INTO mylist (lid, fid, aid, eid, viewed, local_watched, local_file) VALUES (7004, 8004, 10, 1003, 0, 0, 4)"));
+    // Gap protection is now handled by DeletionQueue + HybridDeletionClassifier.
+    // This test verifies that autoMarkFilesForDeletion emits deletionCycleRequested
+    // rather than directly deleting files, so DeletionQueue can apply gap protection.
     
     manager->setAutoMarkDeletionEnabled(true);
+    manager->setActualDeletionEnabled(true);
     manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
     manager->setDeletionThresholdValue(999999.0);
     
-    QSignalSpy deletionSpy(manager, &WatchSessionManager::deleteFileRequested);
+    QSignalSpy cycleSpy(manager, &WatchSessionManager::deletionCycleRequested);
     
-    bool deleted = manager->deleteNextEligibleFile(true);
-    QVERIFY(deleted);
-    QVERIFY(deletionSpy.count() >= 1);
+    manager->autoMarkFilesForDeletion();
     
-    bool requestedDeletionFor7002 = false;
-    for (int i = 0; i < deletionSpy.count(); ++i) {
-        QList<QVariant> signalArgs = deletionSpy.at(i);
-        int requestedLid = signalArgs.at(0).toInt();
-        bool deleteFromDisk = signalArgs.at(1).toBool();
-        if (requestedLid == 7002 && deleteFromDisk) {
-            requestedDeletionFor7002 = true;
-            break;
-        }
-    }
-    
-    QVERIFY(!requestedDeletionFor7002);
+    // Should emit deletionCycleRequested (not directly delete files)
+    QVERIFY(cycleSpy.count() >= 1);
 }
 
 void TestWatchSessionManager::testFileRatingWithoutRating()

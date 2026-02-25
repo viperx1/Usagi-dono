@@ -378,12 +378,15 @@ Window::Window()
     pageLog = new QBoxLayout(QBoxLayout::TopToBottom, pageLogParent);
 	pageApiTesterParent = new QWidget;
 	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
+	pageCurrentChoiceParent = new QWidget;
+	pageCurrentChoice = new QBoxLayout(QBoxLayout::TopToBottom, pageCurrentChoiceParent);
 
     layout->addWidget(tabwidget, 1);
 
 	// tabs - Mylist first as default tab
     tabwidget->addTab(pageMylistParent, "Anime");
     tabwidget->addTab(pageHasherParent, "Hasher");
+    tabwidget->addTab(pageCurrentChoiceParent, "Deletion");
     tabwidget->addTab(pageNotifyParent, "Notify");
     tabwidget->addTab(pageSettingsParent, "Settings");
     tabwidget->addTab(pageLogParent, "Log");
@@ -579,6 +582,43 @@ Window::Window()
                     adbapi->UpdateFile(size, ed2khash, viewed, state, storage);
                 }
             }
+        }
+    });
+    
+    // Connect lock/unlock signals from card manager to deletion lock manager
+    connect(cardManager, &MyListCardManager::lockAnimeRequested, this, [this](int aid) {
+        if (deletionLockManager) {
+            deletionLockManager->lockAnime(aid);
+            // Update card UI
+            if (cardManager) {
+                QMutexLocker locker(&filterOperationsMutex);
+                AnimeCard *card = cardManager->getCard(aid);
+                if (card) card->setAnimeLocked(true);
+            }
+            if (deletionQueue) deletionQueue->rebuild();
+        }
+    });
+    connect(cardManager, &MyListCardManager::unlockAnimeRequested, this, [this](int aid) {
+        if (deletionLockManager) {
+            deletionLockManager->unlockAnime(aid);
+            if (cardManager) {
+                QMutexLocker locker(&filterOperationsMutex);
+                AnimeCard *card = cardManager->getCard(aid);
+                if (card) card->setAnimeLocked(false);
+            }
+            if (deletionQueue) deletionQueue->rebuild();
+        }
+    });
+    connect(cardManager, &MyListCardManager::lockEpisodeRequested, this, [this](int eid) {
+        if (deletionLockManager) {
+            deletionLockManager->lockEpisode(eid);
+            if (deletionQueue) deletionQueue->rebuild();
+        }
+    });
+    connect(cardManager, &MyListCardManager::unlockEpisodeRequested, this, [this](int eid) {
+        if (deletionLockManager) {
+            deletionLockManager->unlockEpisode(eid);
+            if (deletionQueue) deletionQueue->rebuild();
         }
     });
     
@@ -1024,85 +1064,164 @@ Window::Window()
     sessionEnableAutoDeletionCheckbox->blockSignals(false);
     sessionForceDeletePermissionsCheckbox->blockSignals(false);
     
+    // Initialize deletion management infrastructure
+    deletionLockManager = new DeletionLockManager(this);
+    deletionLockManager->ensureTablesExist();
+    
+    factorWeightLearner = new FactorWeightLearner(this);
+    factorWeightLearner->ensureTablesExist();
+    
+    hybridDeletionClassifier = new HybridDeletionClassifier(
+        *deletionLockManager, *factorWeightLearner, *watchSessionManager, this);
+    
+    deletionQueue = new DeletionQueue(
+        *hybridDeletionClassifier, *deletionLockManager, *factorWeightLearner, this);
+    
+    deletionHistoryManager = new DeletionHistoryManager(this);
+    deletionHistoryManager->ensureTablesExist();
+    
+    // Create Current Choice widget and add to tab page
+    currentChoiceWidget = new CurrentChoiceWidget(
+        *deletionQueue, *deletionHistoryManager, *factorWeightLearner,
+        *deletionLockManager, *cardManager, pageCurrentChoiceParent);
+    pageCurrentChoice->addWidget(currentChoiceWidget);
+    
+    // Wire Current Choice delete requests to the same deletion pipeline
+    connect(currentChoiceWidget, &CurrentChoiceWidget::deleteFileRequested,
+            this, [this](int lid) {
+        if (!watchSessionManager) return;
+        // Store candidate info from the queue for history recording
+        for (const DeletionCandidate &c : deletionQueue->candidates()) {
+            if (c.lid == lid) {
+                DeletionCandidate info = c;
+                info.reason = info.reason.isEmpty() ? "user_avsb" : info.reason;
+                m_pendingDeletionInfo[lid] = info;
+                break;
+            }
+        }
+        watchSessionManager->deleteFile(lid, watchSessionManager->isActualDeletionEnabled());
+    });
+    
+    connect(currentChoiceWidget, &CurrentChoiceWidget::runNowRequested,
+            this, [this]() {
+        if (deletionQueue) {
+            deletionQueue->rebuild();
+            currentChoiceWidget->refresh();
+        }
+    });
+    
+    // Refresh Current Choice tab when queue changes
+    connect(deletionQueue, &DeletionQueue::queueRebuilt, this, [this]() {
+        if (currentChoiceWidget) currentChoiceWidget->refresh();
+    });
+    
+    // Wire tray icon ❗ to deletion queue choice needed
+    connect(deletionQueue, &DeletionQueue::choiceNeeded, this, [this]() {
+        if (trayIconManager) {
+            trayIconManager->setDeletionAlertVisible(true);
+        }
+    });
+    
+    // Clear tray ❗ when space drops below threshold (checked after file deletion)
+    // Also record deletion in history for the Deletion tab.
+    connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
+        Q_UNUSED(aid);
+        // Record deletion history if we have candidate info
+        if (deletionHistoryManager && m_pendingDeletionInfo.contains(lid)) {
+            const DeletionCandidate &info = m_pendingDeletionInfo[lid];
+            QString deletionType = (info.tier < DeletionTier::LEARNED_PREFERENCE) ? "procedural"
+                                 : (factorWeightLearner && factorWeightLearner->isTrained()) ? "learned_auto"
+                                 : "user_avsb";
+            deletionHistoryManager->recordDeletion(
+                lid, info.aid, info.eid, info.filePath, info.animeName,
+                info.episodeLabel, 0 /*fileSize*/, info.tier, info.reason,
+                info.learnedScore, deletionType, 0 /*spaceBefore*/, 0 /*spaceAfter*/,
+                info.replacementLid);
+            m_pendingDeletionInfo.remove(lid);
+        }
+
+        if (trayIconManager && watchSessionManager && !watchSessionManager->isDeletionNeeded()) {
+            trayIconManager->setDeletionAlertVisible(false);
+        }
+        if (currentChoiceWidget && watchSessionManager) {
+            currentChoiceWidget->setPreviewMode(!watchSessionManager->isDeletionNeeded());
+        }
+        if (deletionQueue) {
+            deletionQueue->rebuild();
+        }
+    });
+    
+    // Handle deletion cycle requests from WatchSessionManager.
+    // DeletionQueue picks the best candidate using HybridDeletionClassifier.
+    connect(watchSessionManager, &WatchSessionManager::deletionCycleRequested, this, [this]() {
+        if (!deletionQueue || !watchSessionManager) return;
+        
+        deletionQueue->rebuild();
+        
+        const DeletionCandidate *candidate = deletionQueue->next();
+        if (!candidate) return;
+        
+        // Procedural tiers (0-3) are auto-deleted without user interaction
+        if (candidate->tier < DeletionTier::LEARNED_PREFERENCE) {
+            LOG(QString("[Deletion] Auto-delete T%1 lid=%2").arg(candidate->tier).arg(candidate->lid));
+            m_pendingDeletionInfo[candidate->lid] = *candidate;
+            watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
+            return;
+        }
+        
+        // Tier 4 (learned preference): show A vs B if untrained/low-confidence
+        if (deletionQueue->needsUserChoice()) {
+            if (trayIconManager) trayIconManager->setDeletionAlertVisible(true);
+            return;
+        }
+        
+        // Trained and confident — auto-delete the top candidate
+        LOG(QString("[Deletion] Auto-delete T4 lid=%1 score=%2").arg(candidate->lid).arg(candidate->learnedScore));
+        m_pendingDeletionInfo[candidate->lid] = *candidate;
+        watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
+    });
+    
     
     // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion in background thread
     connect(watchSessionManager, &WatchSessionManager::deleteFileRequested, this, [this](int lid, bool deleteFromDisk) {
-        // Log main thread ID for comparison
-        Qt::HANDLE mainThreadId = QThread::currentThreadId();
-        LOG(QString("[Window] Delete file requested for lid=%1, deleteFromDisk=%2 - starting background thread (Main ThreadID: %3)")
-            .arg(lid).arg(deleteFromDisk).arg((quintptr)mainThreadId, 0, 16));
+        LOG(QString("[Deletion] Deleting lid=%1, fromDisk=%2").arg(lid).arg(deleteFromDisk));
         
         if (adbapi) {
-            // Get database name before starting thread
             QSqlDatabase db = QSqlDatabase::database();
             QString dbName = db.databaseName();
             
-            // Create worker and thread for file I/O operations
             QThread *deletionThread = new QThread(this);
             FileDeletionWorker *worker = new FileDeletionWorker(dbName, lid, deleteFromDisk);
             worker->moveToThread(deletionThread);
             
-            // Connect signals
             connect(deletionThread, &QThread::started, worker, &FileDeletionWorker::doWork);
             connect(worker, &FileDeletionWorker::finished, this, [this](const FileDeletionResult &result) {
-                // Log thread ID to show we're back on main thread
-                Qt::HANDLE mainThreadId = QThread::currentThreadId();
-                LOG(QString("[Window] File deletion completed for lid=%1, aid=%2, success=%3 (Main ThreadID: %4)")
-                    .arg(result.lid).arg(result.aid).arg(result.success).arg((quintptr)mainThreadId, 0, 16));
-                
-                // Database updates were done in background thread
-                // Now only handle API call on main thread (API class is not thread-safe)
                 if (result.success && adbapi) {
-                    // Send MYLISTADD to mark as deleted in AniDB API
-                    // The 'true' parameter means we're updating an existing mylist entry (edit=1)
-                    // Check for valid fid and ed2k hash - size can be 0 for empty files
                     if (result.fid > 0 && !result.ed2k.isEmpty()) {
                         QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
-                        LOG(QString("[Window] Sent MYLISTADD with state=DELETED for lid=%1, tag=%2 - awaiting API confirmation")
-                            .arg(result.lid).arg(tag));
-                        
-                        // Store pending deletion to process when API confirms
-                        // This ensures sequential deletion - next file won't be deleted
-                        // until this one receives API confirmation (code 311)
+                        LOG(QString("[Deletion] MYLISTADD state=DELETED lid=%1 tag=%2").arg(result.lid).arg(tag));
                         m_pendingDeletions[tag] = QPair<int, int>(result.lid, result.aid);
                     } else {
-                        LOG(QString("[Window] Cannot update AniDB API - missing fid or ed2k for lid=%1")
-                            .arg(result.lid));
-                        
-                        // If we can't send API request, notify WatchSessionManager with failure
-                        // This allows it to try the next file or handle the error appropriately
+                        LOG(QString("[Deletion] Cannot update AniDB API - missing fid/ed2k for lid=%1").arg(result.lid));
                         if (watchSessionManager) {
                             watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                         }
                     }
                 } else if (!result.success && watchSessionManager) {
-                    // If file deletion failed, notify WatchSessionManager immediately
-                    // This allows it to handle the failure and potentially try the next file
                     watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                 }
-                
-                // NOTE: For SUCCESSFUL deletions with valid API data:
-                // We do NOT call watchSessionManager->onFileDeletionResult() here
-                // Instead, we wait for the API response (code 311) in getNotifyMylistAdd()
-                // This ensures sequential deletion: one file at a time, waiting for API confirmation
-                // Only for FAILED deletions or missing API data do we notify immediately
             });
             connect(worker, &FileDeletionWorker::finished, deletionThread, &QThread::quit);
             connect(deletionThread, &QThread::finished, worker, &QObject::deleteLater);
             connect(deletionThread, &QThread::finished, deletionThread, &QObject::deleteLater);
             
-            // Start the thread
             deletionThread->start();
-            
-            LOG(QString("[Window] File deletion thread started for lid=%1").arg(lid));
         }
     });
     
     // Connect WatchSessionManager fileDeleted signal to refresh UI
     connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
-        LOG(QString("[Window] File deleted: lid=%1, aid=%2 - refreshing card").arg(lid).arg(aid));
         Q_UNUSED(aid);
-        // Refresh only the card containing the deleted file
         if (cardManager) {
             QSet<int> lids;
             lids.insert(lid);
@@ -1493,12 +1612,6 @@ void Window::startupInitialization()
     // This slot is called 1 second after the window is constructed
     // to allow the UI to be fully initialized before loading data
     
-    // DEBUG: Print database info for specific lid values as requested in issue
-    LOG("DEBUG: Printing database information for requested lid values...");
-//    debugPrintDatabaseInfoForLid(424374769);
-//    debugPrintDatabaseInfoForLid(424184693);
-    LOG("DEBUG: Finished printing database information for requested lid values");
-    
     mylistStatusLabel->setText("MyList Status: Loading in background...");
     
     // Start background loading - this will offload heavy operations to worker threads
@@ -1721,6 +1834,13 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
         watchSessionManager->performInitialScan();
         LOG("[Window] Initial file marking scan triggered");
     }
+    
+    // Rebuild the deletion queue now that mylist + local_files data is available
+    if (deletionQueue) {
+        LOG("[Window] Mylist loaded, rebuilding deletion queue");
+        deletionQueue->rebuild();
+    }
+    
     LOG("[Window] onMylistLoadingFinished complete");
 }
 
@@ -1897,6 +2017,12 @@ void Window::hasherFinished()
 	
 	// Note: All UI updates are handled by HasherCoordinator::onHashingFinished()
 	// File identification happens immediately in HasherCoordinator::onFileHashed()
+	
+	// Rebuild deletion queue after hashing so newly identified files are classified
+	if (deletionQueue) {
+		LOG("[Window] Hashing finished, rebuilding deletion queue");
+		deletionQueue->rebuild();
+	}
 }
 
 // Note: processPendingHashedFiles method has been moved to HasherCoordinator class

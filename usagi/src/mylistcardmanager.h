@@ -152,6 +152,10 @@ public:
     // Create a card for an anime (data must be preloaded first via preloadCardCreationData)
     AnimeCard* createCard(int aid);
     
+    // Create a standalone card for display purposes (not tracked or added to layout).
+    // The caller owns the returned widget. No signals are connected.
+    AnimeCard* createStandaloneCard(int aid, QWidget *parent);
+    
     // Get cached anime data for filtering/sorting without needing card widgets
     // This is essential for virtual scrolling where cards don't exist until visible
     CachedAnimeData getCachedAnimeData(int aid) const;
@@ -183,6 +187,12 @@ signals:
     
     // Emitted to update progress status during data loading
     void progressUpdate(const QString& message);
+    
+    // Emitted when user requests anime lock/unlock via card context menu
+    void lockAnimeRequested(int aid);
+    void unlockAnimeRequested(int aid);
+    void lockEpisodeRequested(int eid);
+    void unlockEpisodeRequested(int eid);
     
 public slots:
     // Slot to handle episode updates from API

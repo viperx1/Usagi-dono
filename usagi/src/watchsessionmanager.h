@@ -39,6 +39,7 @@ class WatchSessionManager : public QObject
     // Allow test class to access private methods
     friend class TestBitratePreferences;
     friend class TestWatchSessionManager;
+    friend class HybridDeletionClassifier;
     
 public:
     explicit WatchSessionManager(QObject *parent = nullptr);
@@ -105,21 +106,6 @@ public:
     // ========== File Marking ==========
     
     /**
-     * @brief Calculate the deletion score for a file
-     * 
-     * Score factors:
-     * - Is card hidden (-50 = less priority)
-     * - Is session active (+100 for files in ahead buffer)
-     * - Is already watched in session (-30 = can be deleted)
-     * - Not yet watched (+50 = keep)
-     * - Distance from current position (closer = higher priority)
-     * 
-     * @param lid MyList ID
-     * @return Calculated score (higher = keep longer, lower = delete first)
-     */
-    int calculateDeletionScore(int lid) const;
-    
-    /**
      * @brief Actually delete a file that was marked for deletion
      * 
      * This performs the complete file deletion process:
@@ -135,22 +121,6 @@ public:
     bool deleteFile(int lid, bool deleteFromDisk = true);
     
     /**
-     * @brief Delete the next eligible file based on space threshold
-     * 
-     * Calculates which file should be deleted on-demand based on:
-     * - Current available disk space vs threshold
-     * - Deletion scores (lower score = delete first)
-     * - Gap protection (won't delete files that create gaps)
-     * 
-     * Deletes only one file at a time. Caller should wait for
-     * API confirmation before calling this again.
-     * 
-     * @param deleteFromDisk If true, delete the physical file from disk
-     * @return true if a file was deleted, false if no eligible files found
-     */
-    bool deleteNextEligibleFile(bool deleteFromDisk = true);
-    
-    /**
      * @brief Check if deletion is needed based on available space
      * 
      * Compares current available space with configured threshold.
@@ -160,10 +130,10 @@ public:
     bool isDeletionNeeded() const;
 
     /**
-     * @brief Trigger file deletion when space is low (simplified from marking system)
+     * @brief Trigger deletion cycle when space is low
      * 
-     * Checks if space is below threshold and triggers deleteNextEligibleFile() if needed.
-     * This replaces the complex marking logic with simple on-demand deletion triggering.
+     * Checks if space is below threshold and emits deletionCycleRequested()
+     * so that Window can use DeletionQueue to pick the best candidate.
      */
     void autoMarkFilesForDeletion();
     
@@ -335,6 +305,14 @@ signals:
      */
     void deleteFileRequested(int lid, bool deleteFromDisk);
     
+    /**
+     * @brief Emitted when space is below threshold and a deletion cycle should run
+     * 
+     * Window handles this by rebuilding DeletionQueue and processing the next candidate.
+     * Procedural tiers (0-2) are auto-deleted; tier 3 may need user choice.
+     */
+    void deletionCycleRequested();
+    
 private:
     // Static regex for episode number extraction (shared across functions)
     static const QRegularExpression s_epnoNumericRegex;
@@ -392,7 +370,6 @@ private:
     QString getFileCodec(int lid) const;  // Get video codec for this file (e.g., "H.264", "H.265", "AV1")
     double getCodecEfficiency(const QString& codec) const;  // Get codec compression efficiency (H.264=1.0, H.265=0.5, AV1=0.35)
     double calculateExpectedBitrate(const QString& resolution, const QString& codec) const;  // Calculate expected bitrate for resolution and codec
-    double calculateBitrateScore(double actualBitrate, const QString& resolution, const QString& codec, int fileCount) const;  // Calculate bitrate distance penalty
     
     // Gap detection and series continuity helpers
     bool wouldCreateGap(int lid, const QSet<int>& deletedEpisodes) const;  // Check if deleting this file would create an episode gap
@@ -422,45 +399,13 @@ private:
     static const int RELATION_SEQUEL = 1;
     static const int RELATION_PREQUEL = 2;
     
-    // Score calculation constants
-    static const int SCORE_HIDDEN_CARD = -50;
-    static const int SCORE_ACTIVE_SESSION = 100;  // Factor for being in active watching session
-    static const int SCORE_IN_AHEAD_BUFFER = 75;
-    static const int SCORE_ALREADY_WATCHED = -5;
-    static const int SCORE_NOT_WATCHED = 50;
-    static const int SCORE_DISTANCE_FACTOR = -1;  // Per episode away from current
-    static const int SCORE_OLDER_REVISION = -1000;  // Per local file with higher version (older revisions more deletable)
-    static const int SCORE_PREFERRED_AUDIO = 30;  // Bonus for matching preferred audio language
-    static const int SCORE_PREFERRED_SUBTITLE = 20;  // Bonus for matching preferred subtitle language
-    static const int SCORE_NOT_PREFERRED_AUDIO = -40;  // Penalty for not matching preferred audio language
-    static const int SCORE_NOT_PREFERRED_SUBTITLE = -20;  // Penalty for not matching preferred subtitle language
-    static const int SCORE_HIGHER_QUALITY = 25;  // Bonus for higher quality/resolution
-    static const int SCORE_LOWER_QUALITY = -35;  // Penalty for lower quality/resolution
-    static const int SCORE_HIGH_RATING = 15;  // Bonus for highly rated anime (rating >= 800)
-    static const int SCORE_LOW_RATING = -15;  // Penalty for poorly rated anime (rating < 600)
-    
-    // Quality thresholds for scoring (based on AniDB quality field)
-    static constexpr int QUALITY_HIGH_THRESHOLD = 60;  // Quality score above this is considered high (e.g., "high", "very high")
-    static constexpr int QUALITY_LOW_THRESHOLD = 40;   // Quality score below this is considered low (e.g., "low", "very low")
+    // Quality thresholds (based on AniDB quality field)
+    static constexpr int QUALITY_HIGH_THRESHOLD = 60;
+    static constexpr int QUALITY_LOW_THRESHOLD = 40;
     
     // Rating thresholds (on 0-1000 scale)
-    static constexpr int RATING_HIGH_THRESHOLD = 800;  // 8.0/10 - excellent anime
-    static constexpr int RATING_LOW_THRESHOLD = 600;   // 6.0/10 - below average anime
-    
-    // Group status scores
-    static const int SCORE_ACTIVE_GROUP = 20;      // Bonus for files from active groups
-    static const int SCORE_STALLED_GROUP = -10;    // Penalty for files from stalled groups
-    static const int SCORE_DISBANDED_GROUP = -25;  // Penalty for files from disbanded groups
-    
-    // Bitrate distance penalties (only apply when fileCount > 1)
-    static const int SCORE_BITRATE_CLOSE = -10;       // 10-30% from expected bitrate
-    static const int SCORE_BITRATE_MODERATE = -25;    // 30-50% from expected bitrate
-    static const int SCORE_BITRATE_FAR = -40;         // 50%+ from expected bitrate
-    
-    // Codec quality tier bonuses
-    static const int SCORE_MODERN_CODEC = 10;         // Bonus for modern efficient codecs (H.265, AV1)
-    static const int SCORE_OLD_CODEC = -15;           // Penalty for old inefficient codecs (MPEG-4, XviD)
-    static const int SCORE_ANCIENT_CODEC = -30;       // Penalty for very old codecs (MPEG-2, H.263)
+    static constexpr int RATING_HIGH_THRESHOLD = 800;
+    static constexpr int RATING_LOW_THRESHOLD = 600;
     
     // Default settings
     static constexpr int DEFAULT_AHEAD_BUFFER = 3;

@@ -32,6 +32,7 @@ AnimeCard::AnimeCard(QWidget *parent)
     , m_is18Restricted(false)
     , m_prequelAid(0)
     , m_sequelAid(0)
+    , m_isAnimeLocked(false)
     , m_posterOverlay(nullptr)
 {
     setupUI();
@@ -239,6 +240,24 @@ void AnimeCard::setupUI()
                 connect(markWatchedAction, &QAction::triggered, this, [this, eid]() {
                     emit markEpisodeWatchedRequested(eid);
                 });
+                
+                contextMenu.addSeparator();
+                
+                // Lock/unlock episode
+                bool isLocked = m_isAnimeLocked || m_lockedEpisodeIds.contains(eid);
+                if (isLocked && !m_isAnimeLocked) {
+                    QAction *unlockEpAction = contextMenu.addAction(
+                        QString::fromUtf8("\xF0\x9F\x94\x93 Unlock episode"));
+                    connect(unlockEpAction, &QAction::triggered, this, [this, eid]() {
+                        emit unlockEpisodeRequested(eid);
+                    });
+                } else if (!isLocked) {
+                    QAction *lockEpAction = contextMenu.addAction(
+                        QString::fromUtf8("\xF0\x9F\x94\x92 Lock episode (keep files)"));
+                    connect(lockEpAction, &QAction::triggered, this, [this, eid]() {
+                        emit lockEpisodeRequested(eid);
+                    });
+                }
             }
             
             if (!contextMenu.isEmpty()) {
@@ -260,9 +279,6 @@ void AnimeCard::setupUI()
                     emit markFileWatchedRequested(lid);
                 });
                 
-                contextMenu.addSeparator();
-                
-
                 contextMenu.addSeparator();
                 
                 // Destructive action - delete file completely
@@ -662,6 +678,22 @@ void AnimeCard::contextMenuEvent(QContextMenuEvent *event)
         emit hideCardRequested(m_animeId);
     });
     
+    contextMenu.addSeparator();
+    
+    if (m_isAnimeLocked) {
+        QAction *unlockAction = contextMenu.addAction(
+            QString::fromUtf8("\xF0\x9F\x94\x93 Unlock anime"));  // 🔓
+        connect(unlockAction, &QAction::triggered, this, [this]() {
+            emit unlockAnimeRequested(m_animeId);
+        });
+    } else {
+        QAction *lockAction = contextMenu.addAction(
+            QString::fromUtf8("\xF0\x9F\x94\x92 Lock anime (keep all)"));  // 🔒
+        connect(lockAction, &QAction::triggered, this, [this]() {
+            emit lockAnimeRequested(m_animeId);
+        });
+    }
+    
     contextMenu.exec(event->globalPos());
 }
 
@@ -885,6 +917,64 @@ void AnimeCard::setSeriesChainInfo(int prequelAid, int sequelAid)
 {
     m_prequelAid = prequelAid;
     m_sequelAid = sequelAid;
+}
+
+void AnimeCard::setAnimeLocked(bool locked)
+{
+    m_isAnimeLocked = locked;
+    // Update title label with/without lock icon
+    if (m_titleLabel) {
+        QString title = m_animeTitle;
+        if (locked) {
+            title = QString::fromUtf8("\xF0\x9F\x94\x92 ") + title;  // 🔒
+        }
+        m_titleLabel->setText(title);
+    }
+    // When anime is locked, mark all episode rows
+    if (m_episodeTree) {
+        for (int i = 0; i < m_episodeTree->topLevelItemCount(); ++i) {
+            QTreeWidgetItem *item = m_episodeTree->topLevelItem(i);
+            if (!item) continue;
+            QString text = item->text(2);
+            bool hasLock = text.startsWith(QString::fromUtf8("\xF0\x9F\x94\x92"));
+            if (locked && !hasLock) {
+                item->setText(2, QString::fromUtf8("\xF0\x9F\x94\x92 ") + text);
+            } else if (!locked && hasLock) {
+                // Remove lock icon only if episode is not individually locked
+                int eid = item->data(2, Qt::UserRole + 1).toInt();
+                if (!m_lockedEpisodeIds.contains(eid)) {
+                    item->setText(2, text.mid(3));  // Remove "🔒 " prefix
+                }
+            }
+        }
+    }
+}
+
+void AnimeCard::setEpisodeLocked(int eid, bool locked)
+{
+    if (locked) {
+        m_lockedEpisodeIds.insert(eid);
+    } else {
+        m_lockedEpisodeIds.remove(eid);
+    }
+    // Update the specific episode row in the tree
+    if (m_episodeTree) {
+        for (int i = 0; i < m_episodeTree->topLevelItemCount(); ++i) {
+            QTreeWidgetItem *item = m_episodeTree->topLevelItem(i);
+            if (!item) continue;
+            int itemEid = item->data(2, Qt::UserRole + 1).toInt();
+            if (itemEid != eid) continue;
+            QString text = item->text(2);
+            bool hasLock = text.startsWith(QString::fromUtf8("\xF0\x9F\x94\x92"));
+            bool shouldLock = locked || m_isAnimeLocked;
+            if (shouldLock && !hasLock) {
+                item->setText(2, QString::fromUtf8("\xF0\x9F\x94\x92 ") + text);
+            } else if (!shouldLock && hasLock) {
+                item->setText(2, text.mid(3));
+            }
+            break;
+        }
+    }
 }
 
 QPoint AnimeCard::getLeftConnectionPoint() const

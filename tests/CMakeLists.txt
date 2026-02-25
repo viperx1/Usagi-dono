@@ -2605,3 +2605,53 @@ if(WIN32)
 endif()
 
 add_test(NAME test_missing_anime_data_request COMMAND test_missing_anime_data_request -v2)
+
+# Test: Deletion Candidate Display infrastructure
+set(DELETION_CANDIDATE_DISPLAY_TEST_SOURCES
+    test_deletion_candidate_display.cpp
+    ../usagi/src/deletionlockmanager.cpp
+    ../usagi/src/factorweightlearner.cpp
+    ../usagi/src/deletionhistorymanager.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(DELETION_CANDIDATE_DISPLAY_TEST_HEADERS
+    ../usagi/src/deletionlockmanager.h
+    ../usagi/src/factorweightlearner.h
+    ../usagi/src/deletionhistorymanager.h
+    ../usagi/src/deletionlock.h
+    ../usagi/src/deletionhistoryentry.h
+    ../usagi/src/logger.h
+)
+
+add_executable(test_deletion_candidate_display ${DELETION_CANDIDATE_DISPLAY_TEST_SOURCES} ${DELETION_CANDIDATE_DISPLAY_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_deletion_candidate_display)
+
+target_link_libraries(test_deletion_candidate_display PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+target_include_directories(test_deletion_candidate_display PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_deletion_candidate_display PRIVATE
+        "-Wl,--subsystem,console"
+    )
+
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        qt_import_plugins(test_deletion_candidate_display
+            INCLUDE
+                Qt::QWindowsIntegrationPlugin
+                Qt::QWindowsVistaStylePlugin
+                Qt::QSQLiteDriverPlugin
+        )
+    endif()
+endif()
+
+add_test(NAME test_deletion_candidate_display COMMAND test_deletion_candidate_display -v2)

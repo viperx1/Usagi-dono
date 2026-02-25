@@ -9,6 +9,7 @@
 #include <QTreeWidget>
 #include <QPushButton>
 #include <QPixmap>
+#include <QSet>
 #include "epno.h"
 #include "aired.h"
 #include "taginfo.h"
@@ -92,6 +93,8 @@ public slots:
     void setHidden(bool hidden);  // Set card hidden state
     void setIs18Restricted(bool restricted);  // Set 18+ restriction status
     void setSeriesChainInfo(int prequelAid, int sequelAid);  // Set prequel/sequel AIDs for arrow connections
+    void setAnimeLocked(bool locked);  // Set anime-level lock state (shows 🔒 in title)
+    void setEpisodeLocked(int eid, bool locked);  // Set episode-level lock state (shows 🔒 on episode row)
     
 signals:
     void episodeClicked(int lid);
@@ -105,6 +108,10 @@ signals:
     void markFileWatchedRequested(int lid);  // Mark file as watched
     void startSessionFromEpisodeRequested(int lid);  // Start session from specific episode/file
     void deleteFileRequested(int lid);  // Delete file completely (from disk and mylist)
+    void lockAnimeRequested(int aid);       // Lock anime against auto-deletion
+    void unlockAnimeRequested(int aid);     // Unlock anime
+    void lockEpisodeRequested(int eid);     // Lock episode against auto-deletion
+    void unlockEpisodeRequested(int eid);   // Unlock episode
     
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -139,6 +146,8 @@ private:
     int m_prequelAid;  // Prequel anime ID (for arrow connection), 0 if none
     int m_sequelAid;  // Sequel anime ID (for arrow connection), 0 if none
     QPixmap m_originalPoster;  // Store original poster for overlay
+    bool m_isAnimeLocked;  // Whether the anime is locked against auto-deletion
+    QSet<int> m_lockedEpisodeIds;  // Set of eid values that are episode-locked
     
     // UI elements
     QLabel *m_posterLabel;
