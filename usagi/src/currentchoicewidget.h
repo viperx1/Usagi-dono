@@ -83,6 +83,7 @@ private:
     void populateQueue();
     void populateHistory();
     void clearAvsB();
+    void showCandidateInAvsB(const DeletionCandidate &c, bool isLocked);
 
     QString formatFileDetails(const DeletionCandidate &c) const;
     QString formatTier(int tier) const;

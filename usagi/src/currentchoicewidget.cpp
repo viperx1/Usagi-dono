@@ -417,6 +417,32 @@ QString CurrentChoiceWidget::formatTier(int tier) const
 }
 
 // ---------------------------------------------------------------------------
+// Queue inspection (read-only A vs B)
+// ---------------------------------------------------------------------------
+
+void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool isLocked)
+{
+    m_currentALid = -1;
+    m_currentBLid = -1;
+    m_readOnlyMode = true;
+
+    if (isLocked) {
+        m_avsbStatusLabel->setText(QString::fromUtf8("\xF0\x9F\x94\x92 Locked file"));
+    } else {
+        m_avsbStatusLabel->setText(QString("Queue item #%1 — %2").arg(c.lid).arg(formatTier(c.tier)));
+    }
+
+    m_fileALabel->setText(QString("%1\n%2").arg(c.filePath, formatFileDetails(c)));
+    m_fileBLabel->setText("");
+
+    m_deleteAButton->setVisible(false);
+    m_deleteBButton->setVisible(false);
+    m_skipButton->setVisible(false);
+    m_backToQueueButton->setVisible(true);
+    m_backToQueueButton->setText("Back to queue");
+}
+
+// ---------------------------------------------------------------------------
 // Slots
 // ---------------------------------------------------------------------------
 
@@ -484,28 +510,16 @@ void CurrentChoiceWidget::onQueueItemClicked(QTreeWidgetItem *item, int /*column
     bool isLocked = item->data(0, Qt::UserRole + 1).toBool();
 
     if (isLocked) {
-        // Show locked file in A vs B with unlock buttons
-        // Find the candidate data from the queue
         for (const DeletionCandidate &c : m_queue.lockedFiles()) {
             if (c.lid == lid) {
-                m_currentALid = lid;
-                m_currentBLid = -1;
-                m_readOnlyMode = false;
-
-                m_avsbStatusLabel->setText(QString::fromUtf8("\xF0\x9F\x94\x92 Locked file selected from queue"));
-                m_fileALabel->setText(QString("[A] %1\n%2\n%3 Locked (%4)")
-                    .arg(c.filePath, formatFileDetails(c),
-                         QString::fromUtf8("\xF0\x9F\x94\x92"),
-                         c.reason));
-                m_fileBLabel->setText("");
-
-                m_deleteAButton->setVisible(false);
-                m_deleteBButton->setVisible(false);
-                m_skipButton->setVisible(false);
-
-                // Show unlock buttons instead
-                m_backToQueueButton->setVisible(true);
-                m_backToQueueButton->setText("Back to queue");
+                showCandidateInAvsB(c, true);
+                break;
+            }
+        }
+    } else {
+        for (const DeletionCandidate &c : m_queue.candidates()) {
+            if (c.lid == lid) {
+                showCandidateInAvsB(c, false);
                 break;
             }
         }
