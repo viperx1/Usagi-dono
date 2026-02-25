@@ -519,7 +519,7 @@ Window::Window()
         }
     });
     
-    connect(cardManager, &MyListCardManager::cardCreated, this, [this](int /*aid*/, AnimeCard *card) {
+    connect(cardManager, &MyListCardManager::cardCreated, this, [this](int aid, AnimeCard *card) {
         // Connect individual card signals
         connect(card, &AnimeCard::cardClicked, this, &Window::onCardClicked);
         connect(card, &AnimeCard::episodeClicked, this, &Window::onCardEpisodeClicked);
@@ -553,6 +553,16 @@ Window::Window()
                 }
             }
         });
+        
+        // Apply deletion lock state from database on card creation
+        if (deletionLockManager) {
+            if (deletionLockManager->isAnimeLocked(aid)) {
+                card->setAnimeLocked(true);
+            }
+            for (int eid : deletionLockManager->lockedEpisodeIds()) {
+                card->setEpisodeLocked(eid, true);
+            }
+        }
     });
     
     connect(cardManager, &MyListCardManager::cardUpdated, this, [](int) {
