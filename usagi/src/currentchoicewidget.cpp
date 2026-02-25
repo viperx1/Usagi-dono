@@ -11,6 +11,8 @@
 #include <QDateTime>
 #include <QScrollArea>
 #include <QFrame>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <cmath>
 
 // ---------------------------------------------------------------------------
@@ -437,7 +439,6 @@ void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool i
     m_fileALabel->setText(QString("[A] %1\n%2").arg(c.filePath, formatFileDetails(c)));
 
     if (isLocked) {
-        // Locked items are read-only — no action buttons
         m_currentALid = -1;
         m_currentBLid = -1;
         m_readOnlyMode = true;
@@ -448,29 +449,52 @@ void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool i
         m_skipButton->setVisible(false);
         m_backToQueueButton->setVisible(true);
     } else {
-        // Non-locked items are actionable — show Delete/Skip buttons
         m_currentALid = c.lid;
+        m_currentBLid = -1;
         m_readOnlyMode = false;
         m_avsbStatusLabel->setText(QString("Queue item \u2014 %1").arg(formatTier(c.tier)));
-
-        if (c.replacementLid > 0) {
-            m_currentBLid = c.replacementLid;
-            m_fileBLabel->setText(QString("[B] Keeps: %1").arg(
-                c.replacementPath.isEmpty()
-                    ? QString("lid %1").arg(c.replacementLid)
-                    : c.replacementPath));
-            m_deleteBButton->setVisible(true);
-        } else {
-            m_currentBLid = -1;
-            m_fileBLabel->setText("");
-            m_deleteBButton->setVisible(false);
-        }
-
+        m_fileBLabel->setText("");
         m_deleteAButton->setVisible(true);
         m_deleteAButton->setText("Delete A");
+        m_deleteBButton->setVisible(false);
         m_skipButton->setVisible(true);
         m_backToQueueButton->setVisible(true);
     }
+}
+
+void CurrentChoiceWidget::showCandidatePair(const DeletionCandidate &a, const DeletionCandidate &b)
+{
+    m_currentALid = a.lid;
+    m_currentBLid = b.lid;
+    m_readOnlyMode = false;
+
+    m_avsbStatusLabel->setText(QString("Queue item \u2014 %1").arg(formatTier(a.tier)));
+    m_fileALabel->setText(QString("[A] %1\n%2").arg(a.filePath, formatFileDetails(a)));
+    m_fileBLabel->setText(QString("[B] %1\n%2").arg(b.filePath, formatFileDetails(b)));
+
+    m_deleteAButton->setVisible(true);
+    m_deleteAButton->setText("Delete A");
+    m_deleteBButton->setVisible(true);
+    m_skipButton->setVisible(true);
+    m_backToQueueButton->setVisible(true);
+}
+
+DeletionCandidate CurrentChoiceWidget::queryFileDetails(int lid) const
+{
+    DeletionCandidate c;
+    c.lid = lid;
+    QSqlDatabase db = QSqlDatabase::database();
+    QSqlQuery q(db);
+    q.prepare("SELECT lf.path, a.nameromaji FROM mylist m "
+              "LEFT JOIN local_files lf ON lf.id = m.local_file "
+              "LEFT JOIN anime a ON a.aid = m.aid "
+              "WHERE m.lid = :lid");
+    q.bindValue(":lid", lid);
+    if (q.exec() && q.next()) {
+        c.filePath  = q.value(0).toString();
+        c.animeName = q.value(1).toString();
+    }
+    return c;
 }
 
 // ---------------------------------------------------------------------------
@@ -540,6 +564,8 @@ void CurrentChoiceWidget::onQueueItemClicked(QTreeWidgetItem *item, int /*column
     int lid = item->data(0, Qt::UserRole).toInt();
     bool isLocked = item->data(0, Qt::UserRole + 1).toBool();
 
+    LOG(QString("[Queue] Click lid=%1 locked=%2").arg(lid).arg(isLocked));
+
     if (isLocked) {
         for (const DeletionCandidate &c : m_queue.lockedFiles()) {
             if (c.lid == lid) {
@@ -547,13 +573,31 @@ void CurrentChoiceWidget::onQueueItemClicked(QTreeWidgetItem *item, int /*column
                 break;
             }
         }
-    } else {
-        for (const DeletionCandidate &c : m_queue.candidates()) {
-            if (c.lid == lid) {
-                showCandidateInAvsB(c, false);
-                break;
-            }
+        return;
+    }
+
+    const auto &candidates = m_queue.candidates();
+    for (int i = 0; i < candidates.size(); ++i) {
+        if (candidates[i].lid != lid) continue;
+        const DeletionCandidate &c = candidates[i];
+
+        LOG(QString("[Queue] Found candidate lid=%1 tier=%2 replacementLid=%3")
+            .arg(c.lid).arg(c.tier).arg(c.replacementLid));
+
+        if (c.replacementLid > 0) {
+            // Tiers 0-2: pair with the replacement (kept) file
+            DeletionCandidate replacement = queryFileDetails(c.replacementLid);
+            replacement.tier = DeletionTier::PROTECTED;
+            replacement.reason = "Better alternative (kept)";
+            showCandidatePair(c, replacement);
+        } else if (i + 1 < candidates.size()) {
+            // Tier 3 or no replacement: pair with next candidate
+            showCandidatePair(c, candidates[i + 1]);
+        } else {
+            // Last item in queue, no pair available
+            showCandidateInAvsB(c, false);
         }
+        break;
     }
 }
 

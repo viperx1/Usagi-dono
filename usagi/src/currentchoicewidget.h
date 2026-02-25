@@ -84,6 +84,8 @@ private:
     void populateHistory();
     void clearAvsB();
     void showCandidateInAvsB(const DeletionCandidate &c, bool isLocked);
+    void showCandidatePair(const DeletionCandidate &a, const DeletionCandidate &b);
+    DeletionCandidate queryFileDetails(int lid) const;
 
     QString formatFileDetails(const DeletionCandidate &c) const;
     QString formatTier(int tier) const;
