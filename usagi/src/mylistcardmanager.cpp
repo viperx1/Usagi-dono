@@ -1484,6 +1484,12 @@ AnimeCard* MyListCardManager::createCard(int aid)
     // Connect mark file watched signal
     connect(card, &AnimeCard::markFileWatchedRequested, this, &MyListCardManager::onMarkFileWatchedRequested);
     
+    // Connect lock/unlock signals (relay to Window/DeletionLockManager)
+    connect(card, &AnimeCard::lockAnimeRequested, this, &MyListCardManager::lockAnimeRequested);
+    connect(card, &AnimeCard::unlockAnimeRequested, this, &MyListCardManager::unlockAnimeRequested);
+    connect(card, &AnimeCard::lockEpisodeRequested, this, &MyListCardManager::lockEpisodeRequested);
+    connect(card, &AnimeCard::unlockEpisodeRequested, this, &MyListCardManager::unlockEpisodeRequested);
+    
     // Show warning indicator if metadata or poster is missing (instead of auto-fetching)
     if (m_animeNeedingMetadata.contains(aid) || m_animeNeedingPoster.contains(aid)) {
         card->setNeedsFetch(true);

@@ -184,6 +184,12 @@ signals:
     // Emitted to update progress status during data loading
     void progressUpdate(const QString& message);
     
+    // Emitted when user requests anime lock/unlock via card context menu
+    void lockAnimeRequested(int aid);
+    void unlockAnimeRequested(int aid);
+    void lockEpisodeRequested(int eid);
+    void unlockEpisodeRequested(int eid);
+    
 public slots:
     // Slot to handle episode updates from API
     void onEpisodeUpdated(int eid, int aid);

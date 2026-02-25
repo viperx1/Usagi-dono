@@ -585,6 +585,43 @@ Window::Window()
         }
     });
     
+    // Connect lock/unlock signals from card manager to deletion lock manager
+    connect(cardManager, &MyListCardManager::lockAnimeRequested, this, [this](int aid) {
+        if (deletionLockManager) {
+            deletionLockManager->lockAnime(aid);
+            // Update card UI
+            if (cardManager) {
+                QMutexLocker locker(&filterOperationsMutex);
+                AnimeCard *card = cardManager->getCard(aid);
+                if (card) card->setAnimeLocked(true);
+            }
+            if (deletionQueue) deletionQueue->rebuild();
+        }
+    });
+    connect(cardManager, &MyListCardManager::unlockAnimeRequested, this, [this](int aid) {
+        if (deletionLockManager) {
+            deletionLockManager->unlockAnime(aid);
+            if (cardManager) {
+                QMutexLocker locker(&filterOperationsMutex);
+                AnimeCard *card = cardManager->getCard(aid);
+                if (card) card->setAnimeLocked(false);
+            }
+            if (deletionQueue) deletionQueue->rebuild();
+        }
+    });
+    connect(cardManager, &MyListCardManager::lockEpisodeRequested, this, [this](int eid) {
+        if (deletionLockManager) {
+            deletionLockManager->lockEpisode(eid);
+            if (deletionQueue) deletionQueue->rebuild();
+        }
+    });
+    connect(cardManager, &MyListCardManager::unlockEpisodeRequested, this, [this](int eid) {
+        if (deletionLockManager) {
+            deletionLockManager->unlockEpisode(eid);
+            if (deletionQueue) deletionQueue->rebuild();
+        }
+    });
+    
     // Create horizontal layout for sidebar and card view
     QHBoxLayout *mylistContentLayout = new QHBoxLayout();
     
@@ -1068,6 +1105,24 @@ Window::Window()
     // Refresh Current Choice tab when queue changes
     connect(deletionQueue, &DeletionQueue::queueRebuilt, this, [this]() {
         if (currentChoiceWidget) currentChoiceWidget->refresh();
+    });
+    
+    // Wire tray icon ❗ to deletion queue choice needed
+    connect(deletionQueue, &DeletionQueue::choiceNeeded, this, [this]() {
+        if (trayIconManager) {
+            trayIconManager->setDeletionAlertVisible(true);
+        }
+    });
+    
+    // Clear tray ❗ when space drops below threshold (checked after file deletion)
+    connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int /*lid*/, int /*aid*/) {
+        if (trayIconManager && watchSessionManager && !watchSessionManager->isDeletionNeeded()) {
+            trayIconManager->setDeletionAlertVisible(false);
+        }
+        // Also update preview mode on the Current Choice widget
+        if (currentChoiceWidget && watchSessionManager) {
+            currentChoiceWidget->setPreviewMode(!watchSessionManager->isDeletionNeeded());
+        }
     });
     
     

@@ -226,11 +226,14 @@ void FactorWeightLearner::adjustWeight(const QString &factor, double delta)
 
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
-    q.prepare("INSERT INTO deletion_factor_weights (factor, weight, total_adjustments) "
-              "VALUES (:f, :d, 1) "
-              "ON CONFLICT(factor) DO UPDATE SET weight = weight + :d2, total_adjustments = total_adjustments + 1");
+    q.prepare("INSERT OR REPLACE INTO deletion_factor_weights (factor, weight, total_adjustments) "
+              "VALUES (:f, "
+              "  COALESCE((SELECT weight FROM deletion_factor_weights WHERE factor = :f2), 0.0) + :d, "
+              "  COALESCE((SELECT total_adjustments FROM deletion_factor_weights WHERE factor = :f3), 0) + 1"
+              ")");
     q.bindValue(":f",  factor);
+    q.bindValue(":f2", factor);
+    q.bindValue(":f3", factor);
     q.bindValue(":d",  delta);
-    q.bindValue(":d2", delta);
     q.exec();
 }

@@ -10,6 +10,7 @@
 #include <QMessageBox>
 #include <QDateTime>
 #include <QScrollArea>
+#include <QFrame>
 #include <cmath>
 
 // ---------------------------------------------------------------------------
