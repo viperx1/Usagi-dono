@@ -20,6 +20,7 @@ private slots:
     void testInvalidDirectory();
     void testProcessedFilesTracking();
     void testDatabaseStatusFiltering();
+    void testFileDeletionDetection();
 };
 
 void TestDirectoryWatcher::testInitialization()
@@ -226,6 +227,50 @@ void TestDirectoryWatcher::testDatabaseStatusFiltering()
     // Clean up
     db.close();
     QSqlDatabase::removeDatabase("test_connection");
+}
+
+void TestDirectoryWatcher::testFileDeletionDetection()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    
+    DirectoryWatcher watcher;
+    QSignalSpy newSpy(&watcher, &DirectoryWatcher::newFilesDetected);
+    QSignalSpy deleteSpy(&watcher, &DirectoryWatcher::filesDeleted);
+    
+    // Create a file before starting watcher
+    QString testFilePath = tempDir.path() + "/deleteme.mkv";
+    QFile testFile(testFilePath);
+    QVERIFY(testFile.open(QIODevice::WriteOnly));
+    testFile.write("test content for deletion");
+    testFile.close();
+    
+    // Start watching - initial scan should detect the file
+    watcher.startWatching(tempDir.path());
+    QTest::qWait(3000);
+    
+    // Verify file was detected
+    QVERIFY(newSpy.count() >= 1);
+    QStringList detectedFiles;
+    for (int i = 0; i < newSpy.count(); ++i) {
+        detectedFiles.append(newSpy.at(i).first().toStringList());
+    }
+    QVERIFY(detectedFiles.contains(testFilePath));
+    
+    // Now delete the file
+    newSpy.clear();
+    QFile::remove(testFilePath);
+    
+    // Wait for the debounce timer and scan
+    QTest::qWait(4000);
+    
+    // Verify deletion was detected
+    QVERIFY(deleteSpy.count() >= 1);
+    QStringList deletedFiles;
+    for (int i = 0; i < deleteSpy.count(); ++i) {
+        deletedFiles.append(deleteSpy.at(i).first().toStringList());
+    }
+    QVERIFY(deletedFiles.contains(testFilePath));
 }
 
 QTEST_MAIN(TestDirectoryWatcher)

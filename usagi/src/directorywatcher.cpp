@@ -11,30 +11,33 @@
 #include <QElapsedTimer>
 
 // DirectoryScanWorker implementation
-DirectoryScanWorker::DirectoryScanWorker(const QString &directory, const QSet<QString> &processedFiles, QObject *parent)
+DirectoryScanWorker::DirectoryScanWorker(const QString &directory, const QSet<QString> &processedFiles,
+                                         const QSet<QString> &knownFiles, QObject *parent)
     : QObject(parent)
     , m_directory(directory)
     , m_processedFiles(processedFiles)
+    , m_knownFiles(knownFiles)
 {
 }
 
 void DirectoryScanWorker::scan()
 {
     QStringList newFiles;
+    QStringList deletedFiles;
     
     if (m_directory.isEmpty() || !QDir(m_directory).exists()) {
-        emit scanComplete(newFiles);
+        emit scanComplete(newFiles, deletedFiles);
         return;
     }
     
     // Scan for all files in the directory (no extension filtering - let API decide)
+    QSet<QString> currentFiles;
     QDirIterator it(m_directory, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
     
-    int totalFilesScanned = 0;
     while (it.hasNext()) {
         QString filePath = it.next();
         QFileInfo fileInfo(filePath);
-        totalFilesScanned++;
+        currentFiles.insert(filePath);
         
         // Skip if already processed
         if (m_processedFiles.contains(filePath)) {
@@ -49,7 +52,14 @@ void DirectoryScanWorker::scan()
         newFiles.append(filePath);
     }
     
-    emit scanComplete(newFiles);
+    // Detect deleted files: known files that no longer exist on disk
+    for (const QString &knownFile : m_knownFiles) {
+        if (!currentFiles.contains(knownFile)) {
+            deletedFiles.append(knownFile);
+        }
+    }
+    
+    emit scanComplete(newFiles, deletedFiles);
 }
 
 // DirectoryWatcher implementation
@@ -191,9 +201,11 @@ void DirectoryWatcher::scanDirectory()
     
     // Copy data under mutex protection
     QSet<QString> processedFilesCopy;
+    QSet<QString> knownFilesCopy;
     {
         QMutexLocker locker(&m_mutex);
         processedFilesCopy = m_processedFiles;
+        knownFilesCopy = m_knownFiles;
     }
     
     // Clean up old thread if it exists
@@ -207,14 +219,14 @@ void DirectoryWatcher::scanDirectory()
     
     // Create new thread and worker
     m_scanThread = new QThread(this);
-    DirectoryScanWorker *worker = new DirectoryScanWorker(m_watchedDirectory, processedFilesCopy);
+    DirectoryScanWorker *worker = new DirectoryScanWorker(m_watchedDirectory, processedFilesCopy, knownFilesCopy);
     worker->moveToThread(m_scanThread);
     
     // Connect signals
     connect(m_scanThread, &QThread::started, worker, &DirectoryScanWorker::scan);
-    connect(worker, &DirectoryScanWorker::scanComplete, this, [this](const QStringList &newFiles) {
+    connect(worker, &DirectoryScanWorker::scanComplete, this, [this](const QStringList &newFiles, const QStringList &deletedFiles) {
         m_scanInProgress = false;
-        onScanComplete(newFiles);
+        onScanComplete(newFiles, deletedFiles);
     });
     connect(worker, &DirectoryScanWorker::scanComplete, m_scanThread, &QThread::quit);
     connect(m_scanThread, &QThread::finished, worker, &QObject::deleteLater);
@@ -223,21 +235,46 @@ void DirectoryWatcher::scanDirectory()
     m_scanThread->start();
 }
 
-void DirectoryWatcher::onScanComplete(const QStringList &newFiles)
+void DirectoryWatcher::onScanComplete(const QStringList &newFiles, const QStringList &deletedFiles)
 {
+    // Handle deleted files
+    if (!deletedFiles.isEmpty()) {
+        LOG(QString("DirectoryWatcher: Detected %1 deleted file(s)").arg(deletedFiles.size()));
+        
+        {
+            QMutexLocker locker(&m_mutex);
+            for (const QString &filePath : deletedFiles) {
+                m_knownFiles.remove(filePath);
+                m_processedFiles.remove(filePath);
+            }
+        }
+        
+        // Remove deleted files from file watcher
+        for (const QString &filePath : deletedFiles) {
+            if (m_watcher->files().contains(filePath)) {
+                m_watcher->removePath(filePath);
+            }
+        }
+        
+        emit filesDeleted(deletedFiles);
+    }
+    
     if (newFiles.isEmpty()) {
-        LOG("DirectoryWatcher: No new files detected");
+        if (deletedFiles.isEmpty()) {
+            LOG("DirectoryWatcher: No new or deleted files detected");
+        }
         return;
     }
     
     LOG(QString("DirectoryWatcher: Detected %1 new file(s)").arg(newFiles.size()));
     
-    // Mark files as processed
+    // Mark files as processed and add to known files
     LOG("DirectoryWatcher: Starting to add files to m_processedFiles set");
     {
         QMutexLocker locker(&m_mutex);
         for (const QString &filePath : newFiles) {
             m_processedFiles.insert(filePath);
+            m_knownFiles.insert(filePath);
         }
     }
     LOG("DirectoryWatcher: Finished adding files to m_processedFiles set");
@@ -305,6 +342,26 @@ void DirectoryWatcher::loadProcessedFiles()
         QString filePath = query.value(0).toString();
         if (!filePath.isEmpty()) {
             m_processedFiles.insert(filePath);
+            m_knownFiles.insert(filePath);
+        }
+    }
+    
+    // Also load all other known files (any status) for deletion tracking
+    // Status 0=not hashed, 1=hashed but not checked by API
+    // These files are known to exist but not yet fully processed
+    QSqlQuery knownQuery(db);
+    bool knownQuerySuccess = knownQuery.exec("SELECT path FROM local_files WHERE status < 2");
+    
+    if (!knownQuerySuccess) {
+        LOG(QString("DirectoryWatcher: Failed to query known files: %1")
+                    .arg(knownQuery.lastError().text()));
+        return;
+    }
+    
+    while (knownQuery.next()) {
+        QString filePath = knownQuery.value(0).toString();
+        if (!filePath.isEmpty()) {
+            m_knownFiles.insert(filePath);
         }
     }
 }

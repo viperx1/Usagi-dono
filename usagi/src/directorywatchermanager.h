@@ -44,6 +44,7 @@ public:
 
 signals:
     void newFilesDetected(const QStringList &filePaths);
+    void filesDeleted(const QStringList &filePaths);
 
 public slots:
     void onWatcherEnabledChanged(Qt::CheckState state);

@@ -32,6 +32,8 @@ DirectoryWatcherManager::DirectoryWatcherManager(AniDBApi *api, QObject *parent)
             this, &DirectoryWatcherManager::onWatcherBrowseClicked);
     connect(m_directoryWatcher, &DirectoryWatcher::newFilesDetected,
             this, &DirectoryWatcherManager::newFilesDetected);
+    connect(m_directoryWatcher, &DirectoryWatcher::filesDeleted,
+            this, &DirectoryWatcherManager::filesDeleted);
 }
 
 DirectoryWatcherManager::~DirectoryWatcherManager() = default;

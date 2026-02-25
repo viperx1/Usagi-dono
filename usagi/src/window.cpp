@@ -295,12 +295,103 @@ void FileDeletionWorker::doWork()
     emit finished(result);
 }
 
+// ExternalDeletionWorker implementation
+void ExternalDeletionWorker::doWork()
+{
+    QList<FileDeletionResult> results;
+    
+    QString connectionName = QString("ExternalDeletion_%1").arg((quintptr)QThread::currentThreadId());
+    QSqlDatabase threadDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+    threadDb.setDatabaseName(m_dbName);
+    
+    if (!threadDb.open()) {
+        LOG("[ExternalDeletionWorker] Failed to open database connection");
+        QSqlDatabase::removeDatabase(connectionName);
+        emit finished(results);
+        return;
+    }
+    
+    for (const QString &path : m_deletedPaths) {
+        FileDeletionResult result;
+        result.filePath = path;
+        result.success = false;
+        result.lid = 0;
+        result.aid = 0;
+        result.fid = 0;
+        result.size = 0;
+        
+        // Look up the local_files entry by path, then join to mylist
+        QSqlQuery lookupQuery(threadDb);
+        lookupQuery.prepare("SELECT m.lid, m.aid, m.fid, f.size, f.ed2k "
+                  "FROM local_files lf "
+                  "INNER JOIN mylist m ON m.local_file = lf.id "
+                  "LEFT JOIN file f ON m.fid = f.fid "
+                  "WHERE lf.path = ?");
+        lookupQuery.addBindValue(path);
+        
+        if (lookupQuery.exec() && lookupQuery.next()) {
+            result.lid = lookupQuery.value(0).toInt();
+            result.aid = lookupQuery.value(1).toInt();
+            result.fid = lookupQuery.value(2).toInt();
+            result.size = lookupQuery.value(3).toLongLong();
+            result.ed2k = lookupQuery.value(4).toString();
+            
+            LOG(QString("[ExternalDeletionWorker] Found mylist entry for deleted file: lid=%1, aid=%2, path=%3")
+                .arg(result.lid).arg(result.aid).arg(path));
+            
+            // Remove from local_files
+            QSqlQuery delLocal(threadDb);
+            delLocal.prepare("DELETE FROM local_files WHERE path = ?");
+            delLocal.addBindValue(path);
+            if (!delLocal.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to delete from local_files: %1").arg(delLocal.lastError().text()));
+            }
+            
+            // Update mylist state to deleted and clear local_file reference
+            QSqlQuery updateMylist(threadDb);
+            updateMylist.prepare("UPDATE mylist SET state = ?, local_file = NULL WHERE lid = ?");
+            updateMylist.addBindValue(MylistState::DELETED);
+            updateMylist.addBindValue(result.lid);
+            if (!updateMylist.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to update mylist state: %1").arg(updateMylist.lastError().text()));
+            }
+            
+            // Clear watch chunks
+            QSqlQuery delChunks(threadDb);
+            delChunks.prepare("DELETE FROM watch_chunks WHERE lid = ?");
+            delChunks.addBindValue(result.lid);
+            if (!delChunks.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to delete watch_chunks: %1").arg(delChunks.lastError().text()));
+            }
+            
+            result.success = true;
+        } else {
+            // No mylist entry found - just clean up local_files if it exists
+            LOG(QString("[ExternalDeletionWorker] No mylist entry for deleted file, cleaning local_files: %1").arg(path));
+            QSqlQuery delLocal(threadDb);
+            delLocal.prepare("DELETE FROM local_files WHERE path = ?");
+            delLocal.addBindValue(path);
+            if (!delLocal.exec()) {
+                LOG(QString("[ExternalDeletionWorker] Failed to delete from local_files: %1").arg(delLocal.lastError().text()));
+            }
+        }
+        
+        results.append(result);
+    }
+    
+    threadDb.close();
+    QSqlDatabase::removeDatabase(connectionName);
+    
+    emit finished(results);
+}
+
 
 Window::Window()
 {
 	qRegisterMetaType<ed2k::ed2kfilestruct>("ed2k::ed2kfilestruct");
 	qRegisterMetaType<Qt::HANDLE>("Qt::HANDLE");
 	qRegisterMetaType<FileDeletionResult>("FileDeletionResult");
+	qRegisterMetaType<QList<FileDeletionResult>>("QList<FileDeletionResult>");
 	
 	// Initialize global hasher thread pool
 	hasherThreadPool = new HasherThreadPool();
@@ -960,6 +1051,8 @@ Window::Window()
     connect(mediaPlayerBrowseButton, SIGNAL(clicked()), this, SLOT(onMediaPlayerBrowseClicked()));
     connect(directoryWatcherManager, &DirectoryWatcherManager::newFilesDetected,
             this, &Window::onWatcherNewFilesDetected);
+    connect(directoryWatcherManager, &DirectoryWatcherManager::filesDeleted,
+            this, &Window::onWatcherFilesDeleted);
     
     // Session manager settings signals - update WatchSessionManager when settings change
     connect(sessionAheadBufferSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int value) {
@@ -3402,6 +3495,60 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 	// Log total time for the entire function
 	qint64 totalTime = overallTimer.elapsed();
 	LOG(QString("[TIMING] onWatcherNewFilesDetected() TOTAL: %1 ms [window.cpp]").arg(totalTime));
+}
+
+void Window::onWatcherFilesDeleted(const QStringList &filePaths)
+{
+	LOG(QString("Window::onWatcherFilesDeleted() called with %1 file(s)").arg(filePaths.size()));
+	
+	if (filePaths.isEmpty()) {
+		return;
+	}
+	
+	QSqlDatabase db = QSqlDatabase::database();
+	QString dbName = db.databaseName();
+	
+	QThread *thread = new QThread(this);
+	ExternalDeletionWorker *worker = new ExternalDeletionWorker(dbName, filePaths);
+	worker->moveToThread(thread);
+	
+	connect(thread, &QThread::started, worker, &ExternalDeletionWorker::doWork);
+	connect(worker, &ExternalDeletionWorker::finished, this, [this](const QList<FileDeletionResult> &results) {
+		QSet<int> affectedLids;
+		
+		for (const FileDeletionResult &result : results) {
+			if (!result.success || result.lid == 0) {
+				continue;
+			}
+			
+			affectedLids.insert(result.lid);
+			
+			// Send API call to mark as deleted in AniDB
+			if (adbapi && result.fid > 0 && !result.ed2k.isEmpty()) {
+				QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
+				LOG(QString("[ExternalDeletion] MYLISTADD state=DELETED lid=%1 tag=%2").arg(result.lid).arg(tag));
+				m_pendingDeletions[tag] = QPair<int, int>(result.lid, result.aid);
+			}
+			
+			LOG(QString("[ExternalDeletion] Updated records for externally deleted file: lid=%1, aid=%2, path=%3")
+				.arg(result.lid).arg(result.aid).arg(result.filePath));
+		}
+		
+		// Refresh anime cards for all affected lids
+		if (cardManager && !affectedLids.isEmpty()) {
+			cardManager->refreshCardsForLids(affectedLids);
+		}
+		
+		// Rebuild deletion queue if available
+		if (deletionQueue) {
+			deletionQueue->rebuild();
+		}
+	});
+	connect(worker, &ExternalDeletionWorker::finished, thread, &QThread::quit);
+	connect(thread, &QThread::finished, worker, &QObject::deleteLater);
+	connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+	
+	thread->start();
 }
 
 // Playback slot implementations

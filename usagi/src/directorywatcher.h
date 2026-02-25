@@ -16,17 +16,19 @@ class DirectoryScanWorker : public QObject
     Q_OBJECT
     
 public:
-    DirectoryScanWorker(const QString &directory, const QSet<QString> &processedFiles, QObject *parent = nullptr);
+    DirectoryScanWorker(const QString &directory, const QSet<QString> &processedFiles,
+                        const QSet<QString> &knownFiles, QObject *parent = nullptr);
     
 public slots:
     void scan();
     
 signals:
-    void scanComplete(const QStringList &newFiles);
+    void scanComplete(const QStringList &newFiles, const QStringList &deletedFiles);
     
 private:
     QString m_directory;
     QSet<QString> m_processedFiles;
+    QSet<QString> m_knownFiles;
 };
 
 class DirectoryWatcher : public QObject
@@ -48,17 +50,20 @@ public:
 signals:
     // Emitted when new files are detected and ready to be hashed
     void newFilesDetected(const QStringList &filePaths);
+    // Emitted when previously known files are deleted from the watched directory
+    void filesDeleted(const QStringList &filePaths);
     
 private slots:
     void onDirectoryChanged(const QString &path);
     void onFileChanged(const QString &path);
     void checkForNewFiles();
-    void onScanComplete(const QStringList &newFiles);
+    void onScanComplete(const QStringList &newFiles, const QStringList &deletedFiles);
     
 private:
     QFileSystemWatcher *m_watcher;
     QString m_watchedDirectory;
     QSet<QString> m_processedFiles;
+    QSet<QString> m_knownFiles;
     QTimer *m_debounceTimer;
     QTimer *m_initialScanTimer;
     bool m_isWatching;
