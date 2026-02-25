@@ -11,6 +11,8 @@
 #include <QHBoxLayout>
 #include <QProgressBar>
 
+class AnimeCard;
+class MyListCardManager;
 class DeletionQueue;
 class DeletionHistoryManager;
 class FactorWeightLearner;
@@ -19,7 +21,7 @@ struct DeletionCandidate;
 struct DeletionHistoryEntry;
 
 /**
- * @brief The "Current Choice" tab — central workspace for understanding
+ * @brief The "Deletion" tab — central workspace for understanding
  *        and controlling the hybrid deletion system.
  *
  * Layout (vertical groupboxes, no sub-tabs):
@@ -37,6 +39,7 @@ public:
                                  DeletionHistoryManager &history,
                                  FactorWeightLearner &learner,
                                  DeletionLockManager &lockManager,
+                                 MyListCardManager &cardManager,
                                  QWidget *parent = nullptr);
 
     /// Refresh all sub-widgets from the current queue/history state.
@@ -87,6 +90,9 @@ private:
     void showCandidatePair(const DeletionCandidate &a, const DeletionCandidate &b);
     DeletionCandidate queryFileDetails(int lid) const;
 
+    void clearCards();
+    void showCardForSide(int aid, QVBoxLayout *container, AnimeCard *&cardSlot);
+
     QString formatFileDetails(const DeletionCandidate &c) const;
     QString formatTier(int tier) const;
 
@@ -95,6 +101,7 @@ private:
     DeletionHistoryManager &m_history;
     FactorWeightLearner &m_learner;
     DeletionLockManager &m_lockManager;
+    MyListCardManager &m_cardManager;
 
     // ── State ──
     int m_currentALid = -1;
@@ -111,8 +118,12 @@ private:
     // ── A vs B ──
     QGroupBox *m_avsbGroupBox;
     QLabel *m_avsbStatusLabel;
-    QLabel *m_fileALabel;
-    QLabel *m_fileBLabel;
+    QVBoxLayout *m_sideALayout;    ///< Container for card A + info label
+    QVBoxLayout *m_sideBLayout;    ///< Container for card B + info label
+    AnimeCard *m_cardA = nullptr;  ///< Standalone card for side A (owned)
+    AnimeCard *m_cardB = nullptr;  ///< Standalone card for side B (owned)
+    QLabel *m_infoALabel;          ///< Deletion info below card A
+    QLabel *m_infoBLabel;          ///< Deletion info below card B
     QPushButton *m_deleteAButton;
     QPushButton *m_deleteBButton;
     QPushButton *m_skipButton;

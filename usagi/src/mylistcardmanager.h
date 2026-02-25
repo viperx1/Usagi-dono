@@ -152,6 +152,10 @@ public:
     // Create a card for an anime (data must be preloaded first via preloadCardCreationData)
     AnimeCard* createCard(int aid);
     
+    // Create a standalone card for display purposes (not tracked or added to layout).
+    // The caller owns the returned widget. No signals are connected.
+    AnimeCard* createStandaloneCard(int aid, QWidget *parent);
+    
     // Get cached anime data for filtering/sorting without needing card widgets
     // This is essential for virtual scrolling where cards don't exist until visible
     CachedAnimeData getCachedAnimeData(int aid) const;

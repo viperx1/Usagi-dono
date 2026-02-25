@@ -1,4 +1,6 @@
 #include "currentchoicewidget.h"
+#include "animecard.h"
+#include "mylistcardmanager.h"
 #include "deletionqueue.h"
 #include "deletionhistorymanager.h"
 #include "factorweightlearner.h"
@@ -23,12 +25,14 @@ CurrentChoiceWidget::CurrentChoiceWidget(DeletionQueue &queue,
                                          DeletionHistoryManager &history,
                                          FactorWeightLearner &learner,
                                          DeletionLockManager &lockManager,
+                                         MyListCardManager &cardManager,
                                          QWidget *parent)
     : QWidget(parent)
     , m_queue(queue)
     , m_history(history)
     , m_learner(learner)
     , m_lockManager(lockManager)
+    , m_cardManager(cardManager)
 {
     setupUI();
 }
@@ -133,16 +137,29 @@ void CurrentChoiceWidget::setupAvsBGroupBox()
     m_avsbStatusLabel->setStyleSheet("font-weight: bold;");
     lay->addWidget(m_avsbStatusLabel);
 
-    // Two file detail labels side by side
+    // Two side-by-side columns: each has a card slot + info label
     QHBoxLayout *filesRow = new QHBoxLayout;
-    m_fileALabel = new QLabel;
-    m_fileALabel->setWordWrap(true);
-    m_fileALabel->setFrameShape(QFrame::StyledPanel);
-    m_fileBLabel = new QLabel;
-    m_fileBLabel->setWordWrap(true);
-    m_fileBLabel->setFrameShape(QFrame::StyledPanel);
-    filesRow->addWidget(m_fileALabel, 1);
-    filesRow->addWidget(m_fileBLabel, 1);
+
+    // Side A
+    QWidget *sideAWidget = new QWidget;
+    m_sideALayout = new QVBoxLayout(sideAWidget);
+    m_sideALayout->setContentsMargins(0, 0, 0, 0);
+    m_infoALabel = new QLabel;
+    m_infoALabel->setWordWrap(true);
+    m_infoALabel->setFrameShape(QFrame::StyledPanel);
+    m_sideALayout->addWidget(m_infoALabel);
+
+    // Side B
+    QWidget *sideBWidget = new QWidget;
+    m_sideBLayout = new QVBoxLayout(sideBWidget);
+    m_sideBLayout->setContentsMargins(0, 0, 0, 0);
+    m_infoBLabel = new QLabel;
+    m_infoBLabel->setWordWrap(true);
+    m_infoBLabel->setFrameShape(QFrame::StyledPanel);
+    m_sideBLayout->addWidget(m_infoBLabel);
+
+    filesRow->addWidget(sideAWidget, 1);
+    filesRow->addWidget(sideBWidget, 1);
     lay->addLayout(filesRow);
 
     // Action buttons
@@ -253,13 +270,16 @@ void CurrentChoiceWidget::setupHistoryGroupBox()
 
 void CurrentChoiceWidget::populateAvsB(const DeletionCandidate &a, const DeletionCandidate &b)
 {
+    clearCards();
     m_currentALid = a.lid;
     m_currentBLid = b.lid;
     m_readOnlyMode = false;
 
     m_avsbStatusLabel->setText(QString::fromUtf8("\u26A1 Choice needed"));  // ⚡
-    m_fileALabel->setText(QString("[A] %1\n%2").arg(a.filePath, formatFileDetails(a)));
-    m_fileBLabel->setText(QString("[B] %1\n%2").arg(b.filePath, formatFileDetails(b)));
+    showCardForSide(a.aid, m_sideALayout, m_cardA);
+    m_infoALabel->setText(QString("[A] %1\n%2").arg(a.filePath, formatFileDetails(a)));
+    showCardForSide(b.aid, m_sideBLayout, m_cardB);
+    m_infoBLabel->setText(QString("[B] %1\n%2").arg(b.filePath, formatFileDetails(b)));
 
     m_deleteAButton->setVisible(true);
     m_deleteBButton->setVisible(true);
@@ -269,13 +289,15 @@ void CurrentChoiceWidget::populateAvsB(const DeletionCandidate &a, const Deletio
 
 void CurrentChoiceWidget::populateAvsBSingleConfirmation(const DeletionCandidate &candidate)
 {
+    clearCards();
     m_currentALid = candidate.lid;
     m_currentBLid = -1;
     m_readOnlyMode = false;
 
     m_avsbStatusLabel->setText("Delete this file?");
-    m_fileALabel->setText(QString("%1\n%2").arg(candidate.filePath, formatFileDetails(candidate)));
-    m_fileBLabel->setText("");
+    showCardForSide(candidate.aid, m_sideALayout, m_cardA);
+    m_infoALabel->setText(QString("%1\n%2").arg(candidate.filePath, formatFileDetails(candidate)));
+    m_infoBLabel->setText("");
 
     m_deleteAButton->setVisible(true);
     m_deleteAButton->setText("Yes");
@@ -286,14 +308,16 @@ void CurrentChoiceWidget::populateAvsBSingleConfirmation(const DeletionCandidate
 
 void CurrentChoiceWidget::populateAvsBReadOnly(const DeletionHistoryEntry &entry)
 {
+    clearCards();
     m_readOnlyMode = true;
     m_currentALid = -1;
     m_currentBLid = -1;
 
     m_avsbStatusLabel->setText("History entry (read-only)");
-    m_fileALabel->setText(QString("%1\n%2\nTier: %3\n%4")
+    showCardForSide(entry.aid, m_sideALayout, m_cardA);
+    m_infoALabel->setText(QString("%1\n%2\nTier: %3\n%4")
                           .arg(entry.filePath, entry.animeName, formatTier(entry.tier), entry.reason));
-    m_fileBLabel->setText(entry.replacedByLid > 0
+    m_infoBLabel->setText(entry.replacedByLid > 0
                           ? QString("Replaced by lid %1").arg(entry.replacedByLid)
                           : "[File no longer present]");
 
@@ -305,11 +329,12 @@ void CurrentChoiceWidget::populateAvsBReadOnly(const DeletionHistoryEntry &entry
 
 void CurrentChoiceWidget::clearAvsB()
 {
+    clearCards();
     m_currentALid = -1;
     m_currentBLid = -1;
     m_avsbStatusLabel->setText("No pending choice");
-    m_fileALabel->setText("");
-    m_fileBLabel->setText("");
+    m_infoALabel->setText("");
+    m_infoBLabel->setText("");
     m_deleteAButton->setVisible(false);
     m_deleteAButton->setText("Delete A");
     m_deleteBButton->setVisible(false);
@@ -437,14 +462,16 @@ QString CurrentChoiceWidget::formatTier(int tier) const
 
 void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool isLocked)
 {
-    m_fileALabel->setText(QString("[A] %1\n%2").arg(c.filePath, formatFileDetails(c)));
+    clearCards();
+    showCardForSide(c.aid, m_sideALayout, m_cardA);
+    m_infoALabel->setText(QString("[A] %1\n%2").arg(c.filePath, formatFileDetails(c)));
 
     if (isLocked) {
         m_currentALid = -1;
         m_currentBLid = -1;
         m_readOnlyMode = true;
         m_avsbStatusLabel->setText(QString::fromUtf8("\xF0\x9F\x94\x92 Locked file"));
-        m_fileBLabel->setText("");
+        m_infoBLabel->setText("");
         m_deleteAButton->setVisible(false);
         m_deleteBButton->setVisible(false);
         m_skipButton->setVisible(false);
@@ -454,7 +481,7 @@ void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool i
         m_currentBLid = -1;
         m_readOnlyMode = false;
         m_avsbStatusLabel->setText(QString("Queue item \u2014 %1").arg(formatTier(c.tier)));
-        m_fileBLabel->setText("");
+        m_infoBLabel->setText("");
         m_deleteAButton->setVisible(true);
         m_deleteAButton->setText("Delete A");
         m_deleteBButton->setVisible(false);
@@ -465,13 +492,16 @@ void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool i
 
 void CurrentChoiceWidget::showCandidatePair(const DeletionCandidate &a, const DeletionCandidate &b)
 {
+    clearCards();
     m_currentALid = a.lid;
     m_currentBLid = b.lid;
     m_readOnlyMode = false;
 
     m_avsbStatusLabel->setText(QString("Queue item \u2014 %1").arg(formatTier(a.tier)));
-    m_fileALabel->setText(QString("[A] %1\n%2").arg(a.filePath, formatFileDetails(a)));
-    m_fileBLabel->setText(QString("[B] %1\n%2").arg(b.filePath, formatFileDetails(b)));
+    showCardForSide(a.aid, m_sideALayout, m_cardA);
+    m_infoALabel->setText(QString("[A] %1\n%2").arg(a.filePath, formatFileDetails(a)));
+    showCardForSide(b.aid, m_sideBLayout, m_cardB);
+    m_infoBLabel->setText(QString("[B] %1\n%2").arg(b.filePath, formatFileDetails(b)));
 
     m_deleteAButton->setVisible(true);
     m_deleteAButton->setText("Delete A");
@@ -480,13 +510,41 @@ void CurrentChoiceWidget::showCandidatePair(const DeletionCandidate &a, const De
     m_backToQueueButton->setVisible(true);
 }
 
+// ---------------------------------------------------------------------------
+// Card helpers
+// ---------------------------------------------------------------------------
+
+void CurrentChoiceWidget::clearCards()
+{
+    if (m_cardA) {
+        m_sideALayout->removeWidget(m_cardA);
+        delete m_cardA;
+        m_cardA = nullptr;
+    }
+    if (m_cardB) {
+        m_sideBLayout->removeWidget(m_cardB);
+        delete m_cardB;
+        m_cardB = nullptr;
+    }
+}
+
+void CurrentChoiceWidget::showCardForSide(int aid, QVBoxLayout *container, AnimeCard *&cardSlot)
+{
+    if (aid <= 0) return;
+    AnimeCard *card = m_cardManager.createStandaloneCard(aid, this);
+    if (!card) return;
+    cardSlot = card;
+    // Insert card before the info label (which is always the last widget)
+    container->insertWidget(0, card);
+}
+
 DeletionCandidate CurrentChoiceWidget::queryFileDetails(int lid) const
 {
     DeletionCandidate c;
     c.lid = lid;
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
-    q.prepare("SELECT lf.path, a.nameromaji FROM mylist m "
+    q.prepare("SELECT lf.path, a.nameromaji, m.aid FROM mylist m "
               "LEFT JOIN local_files lf ON lf.id = m.local_file "
               "LEFT JOIN anime a ON a.aid = m.aid "
               "WHERE m.lid = :lid");
@@ -494,6 +552,7 @@ DeletionCandidate CurrentChoiceWidget::queryFileDetails(int lid) const
     if (q.exec() && q.next()) {
         c.filePath  = q.value(0).toString();
         c.animeName = q.value(1).toString();
+        c.aid       = q.value(2).toInt();
     }
     return c;
 }

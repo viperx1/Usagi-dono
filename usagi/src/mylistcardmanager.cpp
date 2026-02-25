@@ -1500,6 +1500,53 @@ AnimeCard* MyListCardManager::createCard(int aid)
     return card;
 }
 
+AnimeCard* MyListCardManager::createStandaloneCard(int aid, QWidget *parent)
+{
+    if (!m_cardCreationDataCache.contains(aid)) {
+        LOG(QString("[MyListCardManager] No cached data for standalone card aid=%1").arg(aid));
+        return nullptr;
+    }
+
+    const CardCreationData &data = m_cardCreationDataCache[aid];
+    QString animeName = determineAnimeName(data.nameRomaji, data.nameEnglish, data.animeTitle, aid);
+    if (animeName.isEmpty())
+        animeName = QString("Anime %1").arg(aid);
+
+    AnimeCard *card = new AnimeCard(parent);
+    card->setAnimeId(aid);
+    card->setAnimeTitle(animeName);
+    card->setHidden(data.isHidden);
+    card->setIs18Restricted(data.is18Restricted);
+
+    if (!data.typeName.isEmpty())
+        card->setAnimeType(data.typeName);
+
+    updateCardAiredDates(card, data.startDate, data.endDate);
+
+    QList<AnimeCard::TagInfo> tags = getTagsOrCategoryFallback(
+        data.tagNameList, data.tagIdList, data.tagWeightList, data.category);
+    if (!tags.isEmpty())
+        card->setTags(tags);
+
+    if (!data.rating.isEmpty())
+        card->setRating(data.rating);
+
+    if (!data.posterData.isEmpty()) {
+        QPixmap poster;
+        if (poster.loadFromData(data.posterData))
+            card->setPoster(poster);
+    }
+
+    if (!data.episodes.isEmpty())
+        loadEpisodesForCardFromCache(card, aid, data.episodes);
+
+    int totalNormal = data.eptotal > 0 ? data.eptotal : data.stats.normalEpisodes();
+    card->setStatistics(data.stats.normalEpisodes(), totalNormal,
+                        data.stats.normalViewed(), data.stats.otherEpisodes(), data.stats.otherViewed());
+
+    return card;
+}
+
 void MyListCardManager::updateCardFromDatabase(int aid)
 {
     QMutexLocker locker(&m_mutex);

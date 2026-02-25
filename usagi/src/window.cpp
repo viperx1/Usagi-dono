@@ -1083,15 +1083,23 @@ Window::Window()
     // Create Current Choice widget and add to tab page
     currentChoiceWidget = new CurrentChoiceWidget(
         *deletionQueue, *deletionHistoryManager, *factorWeightLearner,
-        *deletionLockManager, pageCurrentChoiceParent);
+        *deletionLockManager, *cardManager, pageCurrentChoiceParent);
     pageCurrentChoice->addWidget(currentChoiceWidget);
     
     // Wire Current Choice delete requests to the same deletion pipeline
     connect(currentChoiceWidget, &CurrentChoiceWidget::deleteFileRequested,
             this, [this](int lid) {
-        if (watchSessionManager) {
-            watchSessionManager->deleteFile(lid, watchSessionManager->isActualDeletionEnabled());
+        if (!watchSessionManager) return;
+        // Store candidate info from the queue for history recording
+        for (const DeletionCandidate &c : deletionQueue->candidates()) {
+            if (c.lid == lid) {
+                DeletionCandidate info = c;
+                info.reason = info.reason.isEmpty() ? "user_avsb" : info.reason;
+                m_pendingDeletionInfo[lid] = info;
+                break;
+            }
         }
+        watchSessionManager->deleteFile(lid, watchSessionManager->isActualDeletionEnabled());
     });
     
     connect(currentChoiceWidget, &CurrentChoiceWidget::runNowRequested,
@@ -1115,15 +1123,29 @@ Window::Window()
     });
     
     // Clear tray ❗ when space drops below threshold (checked after file deletion)
-    connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int /*lid*/, int /*aid*/) {
+    // Also record deletion in history for the Deletion tab.
+    connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
+        Q_UNUSED(aid);
+        // Record deletion history if we have candidate info
+        if (deletionHistoryManager && m_pendingDeletionInfo.contains(lid)) {
+            const DeletionCandidate &info = m_pendingDeletionInfo[lid];
+            QString deletionType = (info.tier < DeletionTier::LEARNED_PREFERENCE) ? "procedural"
+                                 : (factorWeightLearner && factorWeightLearner->isTrained()) ? "learned_auto"
+                                 : "user_avsb";
+            deletionHistoryManager->recordDeletion(
+                lid, info.aid, info.eid, info.filePath, info.animeName,
+                info.episodeLabel, 0 /*fileSize*/, info.tier, info.reason,
+                info.learnedScore, deletionType, 0 /*spaceBefore*/, 0 /*spaceAfter*/,
+                info.replacementLid);
+            m_pendingDeletionInfo.remove(lid);
+        }
+
         if (trayIconManager && watchSessionManager && !watchSessionManager->isDeletionNeeded()) {
             trayIconManager->setDeletionAlertVisible(false);
         }
-        // Also update preview mode on the Current Choice widget
         if (currentChoiceWidget && watchSessionManager) {
             currentChoiceWidget->setPreviewMode(!watchSessionManager->isDeletionNeeded());
         }
-        // Rebuild the queue after a file was deleted so the list stays current
         if (deletionQueue) {
             deletionQueue->rebuild();
         }
@@ -1139,21 +1161,23 @@ Window::Window()
         const DeletionCandidate *candidate = deletionQueue->next();
         if (!candidate) return;
         
-        // Procedural tiers (0-2) are auto-deleted without user interaction
+        // Procedural tiers (0-3) are auto-deleted without user interaction
         if (candidate->tier < DeletionTier::LEARNED_PREFERENCE) {
             LOG(QString("[Deletion] Auto-delete T%1 lid=%2").arg(candidate->tier).arg(candidate->lid));
+            m_pendingDeletionInfo[candidate->lid] = *candidate;
             watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
             return;
         }
         
-        // Tier 3 (learned preference): show A vs B if untrained/low-confidence
+        // Tier 4 (learned preference): show A vs B if untrained/low-confidence
         if (deletionQueue->needsUserChoice()) {
             if (trayIconManager) trayIconManager->setDeletionAlertVisible(true);
             return;
         }
         
         // Trained and confident — auto-delete the top candidate
-        LOG(QString("[Deletion] Auto-delete T3 lid=%1 score=%2").arg(candidate->lid).arg(candidate->learnedScore));
+        LOG(QString("[Deletion] Auto-delete T4 lid=%1 score=%2").arg(candidate->lid).arg(candidate->learnedScore));
+        m_pendingDeletionInfo[candidate->lid] = *candidate;
         watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
     });
     

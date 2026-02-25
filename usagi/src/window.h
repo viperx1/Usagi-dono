@@ -353,6 +353,9 @@ private:
 	// Track pending file deletions awaiting API confirmation
 	// Maps API tag -> (lid, aid) to ensure sequential deletion
 	QMap<QString, QPair<int, int>> m_pendingDeletions;
+
+	// Track deletion candidate info for history recording (lid -> candidate snapshot)
+	QHash<int, DeletionCandidate> m_pendingDeletionInfo;
 	
 	// System tray manager
 	TrayIconManager *trayIconManager;
