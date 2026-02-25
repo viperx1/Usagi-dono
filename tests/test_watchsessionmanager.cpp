@@ -489,6 +489,7 @@ void TestWatchSessionManager::testSequentialDeletionWithApiConfirmation()
     // Test that onFileDeletionResult emits deletionCycleRequested (not deleteFileRequested)
     // Window handles the cycle by using DeletionQueue
     
+    manager->setAutoMarkDeletionEnabled(true);
     manager->setActualDeletionEnabled(true);
     manager->setDeletionThresholdType(DeletionThresholdType::FixedGB);
     manager->setDeletionThresholdValue(999999.0);
