@@ -315,6 +315,8 @@ The current system calculates distance as episode count: "this file is 47 episod
 - File size and episode distance combine naturally into a single metric — no need for separate "distance" and "size" factors.
 - This captures the user's intuition: "deleting a 4K episode of a show I'm far from is a better trade-off than deleting a small 480p episode of something I'm about to watch."
 
+**Normalization (Q31)**: Per-series maximum. For each anime (or relation chain), `maxInSeries = max(abs(distance) × sizeBytes)` across all files in that series. Then `normalized = 1.0 - rawValue / maxInSeries`. This means a 480p 12-episode show is normalized independently from a 4K 291-episode show — the biggest file×distance product within each series always maps to 0.0 (most deletable), and the smallest maps close to 1.0 (least deletable). Cross-anime distance applies only within the same relation chain (Q35) — unrelated anime each use their own session distance.
+
 ---
 
 ## Pairwise Comparison Learning System (A vs B)
@@ -392,12 +394,12 @@ These are the factors whose weights are learned through A vs B choices. Each fac
 | Factor | How it's computed | Range | Higher = |
 |--------|------------------|-------|----------|
 | `anime_rating` | AniDB rating × 100 (integer 0–1000, e.g., 875 = 8.75) / 1000 | 0.0 – 1.0 | Better rated |
-| `size_weighted_distance` | 1.0 - normalize(abs(distance) × sizeBytes) | 0.0 – 1.0 | Closer to current AND/OR smaller file. Combines episode distance with file size: a 4K file far away gets a low value (highly deletable), a small file close by gets a high value (worth keeping). See "Episode Distance: Episode Count vs. File Size" section. |
+| `size_weighted_distance` | 1.0 - (abs(distance) × sizeBytes) / maxInSeries | 0.0 – 1.0 | Closer to current AND/OR smaller file. Normalized per-series: `maxInSeries = max(abs(distance) × sizeBytes)` across all files **within the same anime** (or relation chain if cross-anime). A 4K file far away gets a low value (highly deletable), a small file close by gets a high value (worth keeping). See "Episode Distance: Episode Count vs. File Size" section and Q31 for math explanation. |
 | `group_status` | active=1.0, stalled=0.5, disbanded=0.0 | 0.0 – 1.0 | More active group |
 | `watch_recency` | days since last watched, normalized | 0.0 – 1.0 | Watched more recently |
 | `view_percentage` | watched episodes / total episodes for the anime's session | 0.0 – 1.0 | More of the anime has been watched |
 
-Note: `episode_distance` and `file_size` are no longer separate factors — they are combined into `size_weighted_distance`. This captures the insight that a 4GB 4K episode frees 20× more space than a 200MB 480p episode, so bitrate/size naturally factors into the distance metric. Technical factors (codec, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
+Note: `episode_distance` and `file_size` are no longer separate factors — they are combined into `size_weighted_distance`. This captures the insight that a 4GB 4K episode frees 20× more space than a 200MB 480p episode, so bitrate/size naturally factors into the distance metric. Normalization is **per-series** (Q31): `maxInSeries` is the largest `abs(distance) × sizeBytes` value among all files in the same anime (or relation chain for cross-anime distance within the chain). Technical factors (codec, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
 
 **Why `view_percentage` instead of `session_active`**: A binary "has active session" flag is unreliable because sessions are started automatically when any episode is played — even briefly to check quality. A user who watched 1 of 500 episodes is very different from a user who watched 480 of 500. The view percentage (watched/total in the session) captures actual engagement: a session at 95% means the user is nearly done and those files are dispensable; a session at 2% means the user just started (or just checked) and the files should be treated with lower confidence.
 
@@ -564,7 +566,7 @@ All A vs B interaction happens **inside the Current Choice tab only** — no pop
                            ▲ active
 
 ┌──────────────────────────────────────────────────────────────────┐
-│ Deletion Management              [PREVIEW] Space: 42 / 500 GB  │
+│ Deletion Management              [PREVIEW]  Space: 42 / 500 GB │
 │ Threshold: 50 GB │ Mode: Auto │ [▶ Run Now] [⏸ Pause]          │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
@@ -625,7 +627,7 @@ All A vs B interaction happens **inside the Current Choice tab only** — no pop
 
 **Tray icon behavior**: When disk usage hits the deletion threshold and user action is required (A vs B choice pending), the tray icon shows a red exclamation mark (❗) on its right half. The ❗ disappears when space drops below the threshold (deletions freed enough space). No popups, no notifications, no toasts — the user opens the Current Choice tab when convenient. If space pressure is critical and no choice has been made, the system **waits indefinitely** — it never auto-deletes Tier 3 files without user input, regardless of how long the choice has been pending (Q25).
 
-**Preview mode** (Q27): When space is below the threshold (no space pressure), the queue still shows all ranked candidates (Q18/Q24). A **[PREVIEW]** label is shown inside the Current Choice tab header area (next to the space indicator) to indicate that no urgent deletions are needed. The tray icon also shows the ❗ when in active deletion mode (threshold exceeded). When in preview mode, the ❗ is absent and the [PREVIEW] label is visible. No other visual distinction is needed. If the user makes an A vs B choice in preview mode, the **file is actually deleted** — the user explicitly chose to delete it, and the system honors that choice. Weight adjustments are recorded as usual (Q22).
+**Preview mode** (Q27/Q33): When space is below the threshold (no space pressure), the queue still shows all ranked candidates (Q18/Q24). A static **[PREVIEW]** label (no dynamic text — just the word "PREVIEW", Q33) is shown inside the Current Choice tab header area to indicate that no urgent deletions are needed. The space indicator (e.g., "Space: 42 / 500 GB") is a separate element. The tray icon shows the ❗ when in active deletion mode (threshold exceeded). When in preview mode, the ❗ is absent and the [PREVIEW] label is visible. No other visual distinction is needed. If the user makes an A vs B choice in preview mode, the **file is actually deleted** — the user explicitly chose to delete it, and the system honors that choice. Weight adjustments are recorded as usual (Q22).
 
 ### Integration with Procedural Tiers and Locks
 
@@ -965,10 +967,10 @@ function handleDeletionNeeded():
     // Q17: Single Tier 3 candidate — show in A vs B, optionally pit against locked peer.
     // Note: procedural candidates (tier 0-2) are auto-deleted above, so by this point
     // only Tier 3 candidates remain. If only one Tier 3 candidate exists, pit it against
-    // a locked peer for context, or show as single-file confirmation.
+    // a locked peer for context (from any anime, Q34), or show as single-file confirmation.
     tier3Candidates = candidates.filter(c => c.tier == 3)
     if tier3Candidates.length == 1:
-        lockedPeer = findLockedPeerForContext(candidates[0])
+        lockedPeer = findLockedPeerForContext(candidates[0])  // searches all locked files, any anime (Q34)
         if lockedPeer:
             queueAvsBChoice(candidates[0], lockedPeer, peerIsLocked: true)
         else:
@@ -1246,7 +1248,7 @@ public:
 
     // Compute learned score for a file
     double computeScore(int lid) const;
-    QMap<QString, double> normalizeFactors(int lid) const;
+    QMap<QString, double> normalizeFactors(int lid) const;  // size_weighted_distance uses per-series max (Q31)
 
     // Process a user A vs B choice
     void recordChoice(int keptLid, int deletedLid);
@@ -1475,7 +1477,7 @@ struct DeletionHistoryEntry {
 | Q13 | Cross-anime gap protection depth | **Full chain, both directions**: gap protection spans the entire prequel→sequel chain, checking both prequels and sequels. All chain boundaries are checked bidirectionally. |
 | Q14 | Weight reset scope | **Full clean slate**: reset all weights to 0 AND clear the A vs B choice history (`deletion_choices` table). Double warning required. |
 | Q16 | "Highest-rated" sort criteria — language priority | **Subtitles first, then audio, language always trumps quality**: `sortByRatingCriteria()` sorts by (1) subtitle match (yes/no), (2) audio match (yes/no), (3) composite quality score. A file matching both sub+audio ranks above sub-only, sub-only ranks above audio-only, audio-only ranks above no match. Within each language tier, composite quality breaks ties. |
-| Q17 | A vs B with only one Tier 3 candidate | **Show in A vs B groupbox**: pit candidate against a locked peer file for context (if one exists); otherwise show as single-file confirmation ("Delete this? [Yes] [Skip]"). The locked peer is shown read-only (cannot be deleted via this prompt). |
+| Q17 | A vs B with only one Tier 3 candidate | **Show in A vs B groupbox**: pit candidate against a locked peer file from any anime (Q34) for context (if one exists); otherwise show as single-file confirmation ("Delete this? [Yes] [Skip]"). The locked peer is shown read-only (cannot be deleted via this prompt). |
 | Q18 | Queue behavior when space is sufficient | **Always show ranked list**: the queue always shows what WOULD be deleted, even when space is below threshold. Users can still make A vs B choices to train weights proactively. |
 | Q19 | Cross-anime gap — chain direction | **Both directions**: check prequels AND sequels. Checking only one direction WILL create gaps. |
 | Q20 | Red ❗ clear condition | **Threshold-based**: ❗ appears when threshold is hit and user action is required; disappears when space is freed below threshold (deletions cleared enough space). |
@@ -1488,31 +1490,39 @@ struct DeletionHistoryEntry {
 | Q27 | Preview mode — visual distinction | **[PREVIEW] label inside the Current Choice tab** + tray ❗ absent. Nothing more — no badges, no color changes, just the label and the absence of the tray exclamation mark. |
 | Q28 | Cross-anime gap — missing intermediate anime | **Missing intermediate = gap exists**: if Inuyasha and Yashahime have local files but Final Act does not, the missing intermediate is treated as a gap. Boundary episodes of neighboring anime with local files are protected to avoid widening the gap. Chain is walked by relation data regardless of which anime have local files. |
 | Q29 | Queue sorting — locked files position | **Natural position**: locked files are sorted by what their tier/score would be if they weren't locked. They are NOT shown in A vs B as long as other unlocked candidates exist. |
-| Q30 | Weight learning — factor value normalization | **Bitrate factored into distance**: `size_weighted_distance = abs(distance) × sizeBytes`. Replaces separate `episode_distance` and `file_size` factors. 4K episodes free 20× more space than 480p episodes, so they have higher deletion impact. Normalization method deferred to Q31. |
+| Q30 | Weight learning — factor value normalization | **Bitrate factored into distance**: `size_weighted_distance = abs(distance) × sizeBytes`. Replaces separate `episode_distance` and `file_size` factors. 4K episodes free 20× more space than 480p episodes, so they have higher deletion impact. Normalization: per-series max (see Q31). |
+| Q31 | Size-weighted distance normalization | **Per-series max**: `maxInSeries = max(abs(distance) × sizeBytes)` across all files within the same anime (or relation chain). Each anime/chain is normalized independently — a 480p 12-ep show is not affected by a 4K 291-ep show in a different collection. Math: `normalized = 1.0 - (abs(distance) × sizeBytes) / maxInSeries`. This ensures the most-deletable file within each series scores 0.0 and the least-deletable scores close to 1.0. |
+| Q32 | Locked file unlock from A vs B — immediate queue rebuild? | **No rebuild needed**: the file is already in the queue (in its natural sort position per Q29). Unlocking just transitions it from locked to candidate status — a status flag change, not a structural rebuild. |
+| Q33 | Preview mode label — dynamic or static text? | **Static**: just "[PREVIEW]" — no dynamic info, no space display, no additional text. |
+| Q34 | A vs B locked peer selection — same anime or any anime? | **Any anime**: the locked peer can be from any anime in the locked list, not just the same anime. This ensures a locked peer is always available for context when one exists. |
+| Q35 | Size-weighted distance — cross-anime distance | **No cross-anime distance for unrelated anime**: Naruto and Dragon Ball Z have NO prequel/sequel relation, so they each use their own session's current position for distance calculation. Cross-anime distance only applies within the same relation chain (e.g., Naruto → Shippuden). For unrelated anime without a session, distance defaults to max (most distant = most deletable). |
 
 ---
 
 ## Follow-Up Questions
 
-All previous questions (Q1-Q30) have been resolved. See the Resolved Design Decisions table above for the full list.
+All previous questions (Q1-Q35) have been resolved. See the Resolved Design Decisions table above for the full list.
 
-### Q31: Size-weighted distance normalization — global vs per-collection
-The `size_weighted_distance` factor is `abs(distance) × sizeBytes`. To normalize to 0-1 range, we need a maximum value. Should this be:
-- **A**: Global maximum across all files: `max(abs(distance) × sizeBytes)` in the current collection. Changes as collection grows.
-- **B**: Fixed assumed maximum (e.g., 500 eps × 10 GB = 5 TB·eps). Stable but arbitrary.
-Which approach? If A, should the normalization recalculate every time the collection changes?
+### Q36: Per-series normalization — recalculation frequency
+The per-series `maxInSeries` value changes when files are added or removed. Should it recalculate:
+- **A**: On every queue rebuild (accurate but potentially expensive for large series)
+- **B**: Lazily — cache per anime and invalidate when files for that anime change
+- **C**: On a fixed interval (e.g., once per deletion cycle)
 
-### Q32: Locked file unlock from A vs B — immediate queue rebuild?
-When the user unlocks a file/anime from the A vs B groupbox (Q26), should the queue immediately rebuild to reflect the newly unlocked files entering the candidate list? Or should the rebuild be deferred to the next deletion cycle?
-
-### Q33: Preview mode label — dynamic or static text?
-The [PREVIEW] label appears when space is below threshold. Should it show any additional info (e.g., "PREVIEW — 8 GB free" or "PREVIEW — no action needed") or just the bare "[PREVIEW]" text?
-
-### Q34: A vs B locked peer selection — same anime or any anime?
-When a single Tier 3 candidate is pitted against a locked peer (Q17), should the locked peer be from the **same anime** (if one exists), or can it be from **any anime** in the locked list? Same-anime is more contextual but may not always exist.
-
-### Q35: Size-weighted distance — cross-anime distance calculation
-For cross-anime distance, how should the episode position be calculated? For example, if the user is at episode 80 of Naruto (167 eps) and has Dragon Ball Z episode 45 (291 eps), should the distance be:
-- **A**: Just the DBZ episode's distance from its own current position (if the user has a DBZ session)
-- **B**: A large value (e.g., max distance) since it's a different anime entirely
+### Q37: Cross-anime distance within a chain — episode numbering
+For anime in the same relation chain (e.g., Naruto → Shippuden), how should episode distance be calculated across chain boundaries? For example, if the user is at Shippuden ep 80 and the file is Naruto ep 100 (of 220), should the distance be:
+- **A**: `(220 - 100) + 80 = 200` (remaining Naruto eps + Shippuden eps from start)
+- **B**: Use each anime's own session distance independently (simpler but ignores chain proximity)
 - **C**: Something else?
+
+### Q38: Unlock from A vs B groupbox — refresh behavior
+When a locked file is unlocked from the A vs B groupbox (Q26/Q32), the file transitions from locked to candidate. Should the A vs B groupbox immediately:
+- **A**: Refresh to show a different pair (since the unlocked file may change the queue order)
+- **B**: Stay showing the same file (now as a candidate) alongside the original candidate
+- **C**: Return to the normal A vs B pair (top two candidates)
+
+### Q39: "Highest-rated file" for lock — subtitle language preference order
+Lock protection keeps the 1 highest-rated file per episode (Q10/Q12). The rating uses subtitles first (Q16). If the user knows multiple languages, should there be a configured **subtitle language priority list** (e.g., English > Japanese > Spanish), or is it just "has preferred subtitles: yes/no"?
+
+### Q40: Learning from procedural deletions
+When a procedural deletion happens (T0-T2, no A vs B), should the system record the factor values of the deleted file in the choice history (for statistical analysis) or only store the history entry? The data could help visualize patterns even though no weight adjustment occurs.
