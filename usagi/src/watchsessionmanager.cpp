@@ -1032,18 +1032,18 @@ bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
     }
     
     QString preferredLangs = q.value(0).toString().toLower();
-    QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
+    QStringList prefList = preferredLangs.split(',', Qt::SkipEmptyParts);
     
-    QString normalizedAudioLang = audioLang.toLower().trimmed();
-    for (const QString& lang : langList) {
-        QString trimmedLang = lang.trimmed();
-        if (normalizedAudioLang == trimmedLang || 
-            normalizedAudioLang.startsWith(trimmedLang + " ") ||
-            normalizedAudioLang.endsWith(" " + trimmedLang) ||
-            normalizedAudioLang.contains(" " + trimmedLang + " ")) {
-            LOG(QString("[LangMatch] lid=%1 audio: '%2' vs pref [%3] → MATCH on '%4'")
-                .arg(lid).arg(audioLang, preferredLangs, trimmedLang));
-            return true;
+    // lang_dub uses ' as delimiter (e.g. "japanese'english")
+    QStringList fileLangs = audioLang.toLower().trimmed().split('\'', Qt::SkipEmptyParts);
+    for (const QString &fileLang : fileLangs) {
+        QString trimmedFileLang = fileLang.trimmed();
+        for (const QString &pref : prefList) {
+            if (trimmedFileLang == pref.trimmed()) {
+                LOG(QString("[LangMatch] lid=%1 audio: '%2' vs pref [%3] → MATCH ('%4'='%5')")
+                    .arg(lid).arg(audioLang, preferredLangs, trimmedFileLang, pref.trimmed()));
+                return true;
+            }
         }
     }
     
@@ -1072,18 +1072,18 @@ bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
     }
     
     QString preferredLangs = q.value(0).toString().toLower();
-    QStringList langList = preferredLangs.split(',', Qt::SkipEmptyParts);
+    QStringList prefList = preferredLangs.split(',', Qt::SkipEmptyParts);
     
-    QString normalizedSubLang = subLang.toLower().trimmed();
-    for (const QString& lang : langList) {
-        QString trimmedLang = lang.trimmed();
-        if (normalizedSubLang == trimmedLang || 
-            normalizedSubLang.startsWith(trimmedLang + " ") ||
-            normalizedSubLang.endsWith(" " + trimmedLang) ||
-            normalizedSubLang.contains(" " + trimmedLang + " ")) {
-            LOG(QString("[LangMatch] lid=%1 sub: '%2' vs pref [%3] → MATCH on '%4'")
-                .arg(lid).arg(subLang, preferredLangs, trimmedLang));
-            return true;
+    // lang_sub uses ' as delimiter (e.g. "english'japanese")
+    QStringList fileLangs = subLang.toLower().trimmed().split('\'', Qt::SkipEmptyParts);
+    for (const QString &fileLang : fileLangs) {
+        QString trimmedFileLang = fileLang.trimmed();
+        for (const QString &pref : prefList) {
+            if (trimmedFileLang == pref.trimmed()) {
+                LOG(QString("[LangMatch] lid=%1 sub: '%2' vs pref [%3] → MATCH ('%4'='%5')")
+                    .arg(lid).arg(subLang, preferredLangs, trimmedFileLang, pref.trimmed()));
+                return true;
+            }
         }
     }
     
