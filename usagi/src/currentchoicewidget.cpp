@@ -434,32 +434,43 @@ QString CurrentChoiceWidget::formatTier(int tier) const
 
 void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool isLocked)
 {
-    m_currentALid = -1;
-    m_currentBLid = -1;
-    m_readOnlyMode = true;
-
-    if (isLocked) {
-        m_avsbStatusLabel->setText(QString::fromUtf8("\xF0\x9F\x94\x92 Locked file"));
-    } else {
-        m_avsbStatusLabel->setText(QString("Queue item — %1").arg(formatTier(c.tier)));
-    }
-
     m_fileALabel->setText(QString("[A] %1\n%2").arg(c.filePath, formatFileDetails(c)));
 
-    if (c.replacementLid > 0) {
-        m_fileBLabel->setText(QString("[B] Keeps: %1").arg(
-            c.replacementPath.isEmpty()
-                ? QString("lid %1").arg(c.replacementLid)
-                : c.replacementPath));
-    } else {
+    if (isLocked) {
+        // Locked items are read-only — no action buttons
+        m_currentALid = -1;
+        m_currentBLid = -1;
+        m_readOnlyMode = true;
+        m_avsbStatusLabel->setText(QString::fromUtf8("\xF0\x9F\x94\x92 Locked file"));
         m_fileBLabel->setText("");
-    }
+        m_deleteAButton->setVisible(false);
+        m_deleteBButton->setVisible(false);
+        m_skipButton->setVisible(false);
+        m_backToQueueButton->setVisible(true);
+    } else {
+        // Non-locked items are actionable — show Delete/Skip buttons
+        m_currentALid = c.lid;
+        m_readOnlyMode = false;
+        m_avsbStatusLabel->setText(QString("Queue item \u2014 %1").arg(formatTier(c.tier)));
 
-    m_deleteAButton->setVisible(false);
-    m_deleteBButton->setVisible(false);
-    m_skipButton->setVisible(false);
-    m_backToQueueButton->setVisible(true);
-    m_backToQueueButton->setText("Back to queue");
+        if (c.replacementLid > 0) {
+            m_currentBLid = c.replacementLid;
+            m_fileBLabel->setText(QString("[B] Keeps: %1").arg(
+                c.replacementPath.isEmpty()
+                    ? QString("lid %1").arg(c.replacementLid)
+                    : c.replacementPath));
+            m_deleteBButton->setVisible(true);
+        } else {
+            m_currentBLid = -1;
+            m_fileBLabel->setText("");
+            m_deleteBButton->setVisible(false);
+        }
+
+        m_deleteAButton->setVisible(true);
+        m_deleteAButton->setText("Delete A");
+        m_skipButton->setVisible(true);
+        m_backToQueueButton->setVisible(true);
+    }
 }
 
 // ---------------------------------------------------------------------------
