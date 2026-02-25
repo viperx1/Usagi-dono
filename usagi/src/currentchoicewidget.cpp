@@ -194,6 +194,10 @@ void CurrentChoiceWidget::setupQueueGroupBox()
     m_queueGroupBox = new QGroupBox("Deletion Queue");
     QVBoxLayout *lay = new QVBoxLayout(m_queueGroupBox);
 
+    m_queueSummaryLabel = new QLabel;
+    m_queueSummaryLabel->setStyleSheet("color: #888;");
+    lay->addWidget(m_queueSummaryLabel);
+
     m_queueTree = new QTreeWidget;
     m_queueTree->setHeaderLabels({"#", "File", "Anime", "Tier", "Reason"});
     m_queueTree->setColumnCount(5);
@@ -336,6 +340,14 @@ void CurrentChoiceWidget::populateWeights()
 void CurrentChoiceWidget::populateQueue()
 {
     m_queueTree->clear();
+
+    m_queueSummaryLabel->setText(
+        QString("%1 candidates \u2022 %2 protected \u2022 %3 locked \u2014 %4 local files classified")
+            .arg(m_queue.candidates().size())
+            .arg(m_queue.protectedCount())
+            .arg(m_queue.lockedFiles().size())
+            .arg(m_queue.totalClassified()));
+
     int rank = 0;
 
     for (const DeletionCandidate &c : m_queue.candidates()) {
@@ -429,11 +441,19 @@ void CurrentChoiceWidget::showCandidateInAvsB(const DeletionCandidate &c, bool i
     if (isLocked) {
         m_avsbStatusLabel->setText(QString::fromUtf8("\xF0\x9F\x94\x92 Locked file"));
     } else {
-        m_avsbStatusLabel->setText(QString("Queue item #%1 — %2").arg(c.lid).arg(formatTier(c.tier)));
+        m_avsbStatusLabel->setText(QString("Queue item — %1").arg(formatTier(c.tier)));
     }
 
-    m_fileALabel->setText(QString("%1\n%2").arg(c.filePath, formatFileDetails(c)));
-    m_fileBLabel->setText("");
+    m_fileALabel->setText(QString("[A] %1\n%2").arg(c.filePath, formatFileDetails(c)));
+
+    if (c.replacementLid > 0) {
+        m_fileBLabel->setText(QString("[B] Keeps: %1").arg(
+            c.replacementPath.isEmpty()
+                ? QString("lid %1").arg(c.replacementLid)
+                : c.replacementPath));
+    } else {
+        m_fileBLabel->setText("");
+    }
 
     m_deleteAButton->setVisible(false);
     m_deleteBButton->setVisible(false);

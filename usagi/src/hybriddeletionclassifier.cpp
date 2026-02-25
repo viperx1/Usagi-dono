@@ -147,33 +147,34 @@ QMap<QString, double> HybridDeletionClassifier::normalizeFactors(int lid) const
 // Tier 0: superseded revision
 // ---------------------------------------------------------------------------
 
-bool HybridDeletionClassifier::hasNewerLocalRevision(int lid) const
+DeletionCandidate HybridDeletionClassifier::classifyTier0(int lid) const
 {
+    DeletionCandidate c;
+    c.lid = lid;
+
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
-    // Get this file's episode (eid) and version
     q.prepare("SELECT m.eid, f.state FROM mylist m JOIN file f ON f.fid = m.fid WHERE m.lid = :lid");
     q.bindValue(":lid", lid);
-    if (!q.exec() || !q.next()) return false;
+    if (!q.exec() || !q.next()) return c;
     int eid = q.value(0).toInt();
     int state = q.value(1).toInt();
 
-    // Extract version from state bits (bits 2-5: v2=4, v3=8, v4=16, v5=32; none=v1)
     int version = 1;
     if (state & 32) version = 5;
     else if (state & 16) version = 4;
     else if (state & 8) version = 3;
     else if (state & 4) version = 2;
 
-    // Check for local files with same episode and higher version
-    q.prepare("SELECT COUNT(*) FROM mylist m2 "
+    q.prepare("SELECT m2.lid, lf.path FROM mylist m2 "
               "JOIN file f2 ON f2.fid = m2.fid "
               "JOIN local_files lf ON lf.id = m2.local_file "
               "WHERE m2.eid = :eid AND m2.lid != :lid AND lf.path IS NOT NULL "
               "AND ((f2.state & 32) > 0 AND :v < 5 "
               "  OR (f2.state & 16) > 0 AND :v2 < 4 "
               "  OR (f2.state & 8) > 0  AND :v3 < 3 "
-              "  OR (f2.state & 4) > 0  AND :v4 < 2)");
+              "  OR (f2.state & 4) > 0  AND :v4 < 2) "
+              "LIMIT 1");
     q.bindValue(":eid", eid);
     q.bindValue(":lid", lid);
     q.bindValue(":v", version);
@@ -181,17 +182,9 @@ bool HybridDeletionClassifier::hasNewerLocalRevision(int lid) const
     q.bindValue(":v3", version);
     q.bindValue(":v4", version);
     if (q.exec() && q.next()) {
-        return q.value(0).toInt() > 0;
-    }
-    return false;
-}
-
-DeletionCandidate HybridDeletionClassifier::classifyTier0(int lid) const
-{
-    DeletionCandidate c;
-    c.lid = lid;
-    if (hasNewerLocalRevision(lid)) {
         c.tier = DeletionTier::SUPERSEDED_REVISION;
+        c.replacementLid  = q.value(0).toInt();
+        c.replacementPath = q.value(1).toString();
         c.reason = "Superseded by newer local revision";
         c.learnedScore = 0.0;
     }
@@ -222,16 +215,19 @@ DeletionCandidate HybridDeletionClassifier::classifyTier1(int lid) const
     if (viewed > 0) return c;  // Watched files don't qualify for T1
 
     // Check for higher-quality local file for the same episode
-    q.prepare("SELECT m2.lid FROM mylist m2 "
+    q.prepare("SELECT m2.lid, lf.path FROM mylist m2 "
               "JOIN file f2 ON f2.fid = m2.fid "
               "JOIN local_files lf ON lf.id = m2.local_file "
               "WHERE m2.eid = :eid AND m2.lid != :lid AND lf.path IS NOT NULL "
-              "AND f2.quality > :q");
+              "AND f2.quality > :q "
+              "LIMIT 1");
     q.bindValue(":eid", eid);
     q.bindValue(":lid", lid);
     q.bindValue(":q", quality);
     if (q.exec() && q.next()) {
         c.tier = DeletionTier::LOW_QUALITY_DUPLICATE;
+        c.replacementLid  = q.value(0).toInt();
+        c.replacementPath = q.value(1).toString();
         c.reason = QString("Lower quality duplicate (quality: %1)").arg(quality);
         c.learnedScore = 0.0;
     }
@@ -248,16 +244,18 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
     c.lid = lid;
 
     // Check if file doesn't match audio/subtitle preferences AND a better alternative exists.
-    // Uses WatchSessionManager's existing language matching helpers.
     bool audioMatch = m_sessionManager.matchesPreferredAudioLanguage(lid);
     bool subMatch   = m_sessionManager.matchesPreferredSubtitleLanguage(lid);
 
     if (audioMatch && subMatch) return c;
 
+    QString myAudio = m_sessionManager.getFileAudioLanguage(lid);
+    QString mySub   = m_sessionManager.getFileSubtitleLanguage(lid);
+
     // Check if a better-matching alternative exists for the same episode
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
-    q.prepare("SELECT m2.lid FROM mylist m2 "
+    q.prepare("SELECT m2.lid, lf.path FROM mylist m2 "
               "JOIN local_files lf ON lf.id = m2.local_file "
               "WHERE m2.eid = (SELECT eid FROM mylist WHERE lid = :lid) "
               "AND m2.lid != :lid2 AND lf.path IS NOT NULL");
@@ -273,14 +271,21 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
         if ((altAudio || !audioMatch) && (altSub || !subMatch)
             && (altAudio > audioMatch || altSub > subMatch)) {
             c.tier = DeletionTier::LANGUAGE_MISMATCH;
-            QString parts;
-            if (!audioMatch) parts += "audio mismatch";
-            if (!subMatch) {
-                if (!parts.isEmpty()) parts += ", ";
-                parts += "subtitle mismatch";
-            }
-            c.reason = QString("Language mismatch (%1); better alternative exists").arg(parts);
+            c.replacementLid  = altLid;
+            c.replacementPath = q.value(1).toString();
             c.learnedScore = 0.0;
+
+            QString altAudioLang = m_sessionManager.getFileAudioLanguage(altLid);
+            QString altSubLang   = m_sessionManager.getFileSubtitleLanguage(altLid);
+
+            QStringList parts;
+            if (!audioMatch)
+                parts << QString("dub: %1 → %2").arg(myAudio.isEmpty() ? "none" : myAudio,
+                                                       altAudioLang.isEmpty() ? "none" : altAudioLang);
+            if (!subMatch)
+                parts << QString("sub: %1 → %2").arg(mySub.isEmpty() ? "none" : mySub,
+                                                       altSubLang.isEmpty() ? "none" : altSubLang);
+            c.reason = QString("Language mismatch (%1)").arg(parts.join(", "));
             return c;
         }
     }

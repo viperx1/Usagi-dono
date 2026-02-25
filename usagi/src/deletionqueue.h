@@ -42,6 +42,12 @@ public:
     /// Only locked files.
     const QList<DeletionCandidate> &lockedFiles() const { return m_lockedFiles; }
 
+    /// Number of files classified as protected (not shown in candidates or locked lists).
+    int protectedCount() const { return m_protectedCount; }
+
+    /// Total number of local files classified in the last rebuild.
+    int totalClassified() const { return m_totalClassified; }
+
     /// True if the top candidate requires user input (A vs B).
     bool needsUserChoice() const;
 
@@ -64,6 +70,8 @@ signals:
 private:
     QList<DeletionCandidate> m_candidates;
     QList<DeletionCandidate> m_lockedFiles;
+    int m_protectedCount  = 0;
+    int m_totalClassified = 0;
     HybridDeletionClassifier &m_classifier;
     DeletionLockManager &m_lockManager;
     FactorWeightLearner &m_learner;

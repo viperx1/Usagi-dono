@@ -124,6 +124,7 @@ private:
 
     // ── Queue ──
     QGroupBox *m_queueGroupBox;
+    QLabel *m_queueSummaryLabel;
     QTreeWidget *m_queueTree;
 
     // ── History ──

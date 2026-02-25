@@ -37,7 +37,6 @@ public:
     QMap<QString, double> normalizeFactors(int lid) const;
 
 private:
-    bool hasNewerLocalRevision(int lid) const;
     DeletionCandidate classifyTier0(int lid) const;
     DeletionCandidate classifyTier1(int lid) const;
     DeletionCandidate classifyTier2(int lid) const;
