@@ -386,7 +386,7 @@ Window::Window()
 	// tabs - Mylist first as default tab
     tabwidget->addTab(pageMylistParent, "Anime");
     tabwidget->addTab(pageHasherParent, "Hasher");
-    tabwidget->addTab(pageCurrentChoiceParent, "Current Choice");
+    tabwidget->addTab(pageCurrentChoiceParent, "Deletion");
     tabwidget->addTab(pageNotifyParent, "Notify");
     tabwidget->addTab(pageSettingsParent, "Settings");
     tabwidget->addTab(pageLogParent, "Log");
@@ -1822,6 +1822,13 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
         watchSessionManager->performInitialScan();
         LOG("[Window] Initial file marking scan triggered");
     }
+    
+    // Rebuild the deletion queue now that mylist + local_files data is available
+    if (deletionQueue) {
+        LOG("[Window] Mylist loaded, rebuilding deletion queue");
+        deletionQueue->rebuild();
+    }
+    
     LOG("[Window] onMylistLoadingFinished complete");
 }
 
@@ -1998,6 +2005,12 @@ void Window::hasherFinished()
 	
 	// Note: All UI updates are handled by HasherCoordinator::onHashingFinished()
 	// File identification happens immediately in HasherCoordinator::onFileHashed()
+	
+	// Rebuild deletion queue after hashing so newly identified files are classified
+	if (deletionQueue) {
+		LOG("[Window] Hashing finished, rebuilding deletion queue");
+		deletionQueue->rebuild();
+	}
 }
 
 // Note: processPendingHashedFiles method has been moved to HasherCoordinator class

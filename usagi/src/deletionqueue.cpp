@@ -31,8 +31,8 @@ void DeletionQueue::rebuild()
     QSqlQuery q(db);
     // Fetch all local files with non-null paths (i.e. files that exist on disk)
     q.exec("SELECT m.lid FROM mylist m "
-           "JOIN local_files lf ON lf.lid = m.lid "
-           "WHERE lf.file_path IS NOT NULL AND m.state != 3");
+           "JOIN local_files lf ON lf.id = m.local_file "
+           "WHERE lf.path IS NOT NULL AND m.state != 3");
     QList<int> lids;
     while (q.next()) {
         lids.append(q.value(0).toInt());

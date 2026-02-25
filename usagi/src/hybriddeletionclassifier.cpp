@@ -32,9 +32,9 @@ DeletionCandidate HybridDeletionClassifier::classify(int lid) const
     // Fetch basic metadata once
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
-    q.prepare("SELECT m.aid, m.eid, lf.file_path, a.romaji_name "
+    q.prepare("SELECT m.aid, m.eid, lf.path, a.romaji_name "
               "FROM mylist m "
-              "LEFT JOIN local_files lf ON lf.lid = m.lid "
+              "LEFT JOIN local_files lf ON lf.id = m.local_file "
               "LEFT JOIN anime a ON a.aid = m.aid "
               "WHERE m.lid = :lid");
     q.bindValue(":lid", lid);
@@ -166,8 +166,8 @@ bool HybridDeletionClassifier::hasNewerLocalRevision(int lid) const
     // Check for local files with same episode and higher version
     q.prepare("SELECT COUNT(*) FROM mylist m2 "
               "JOIN file f2 ON f2.fid = m2.fid "
-              "JOIN local_files lf ON lf.lid = m2.lid "
-              "WHERE m2.eid = :eid AND m2.lid != :lid AND lf.file_path IS NOT NULL "
+              "JOIN local_files lf ON lf.id = m2.local_file "
+              "WHERE m2.eid = :eid AND m2.lid != :lid AND lf.path IS NOT NULL "
               "AND ((f2.state & 32) > 0 AND :v < 5 "
               "  OR (f2.state & 16) > 0 AND :v2 < 4 "
               "  OR (f2.state & 8) > 0  AND :v3 < 3 "
@@ -222,8 +222,8 @@ DeletionCandidate HybridDeletionClassifier::classifyTier1(int lid) const
     // Check for higher-quality local file for the same episode
     q.prepare("SELECT m2.lid FROM mylist m2 "
               "JOIN file f2 ON f2.fid = m2.fid "
-              "JOIN local_files lf ON lf.lid = m2.lid "
-              "WHERE m2.eid = :eid AND m2.lid != :lid AND lf.file_path IS NOT NULL "
+              "JOIN local_files lf ON lf.id = m2.local_file "
+              "WHERE m2.eid = :eid AND m2.lid != :lid AND lf.path IS NOT NULL "
               "AND f2.quality > :q");
     q.bindValue(":eid", eid);
     q.bindValue(":lid", lid);
@@ -256,9 +256,9 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
     q.prepare("SELECT m2.lid FROM mylist m2 "
-              "JOIN local_files lf ON lf.lid = m2.lid "
+              "JOIN local_files lf ON lf.id = m2.local_file "
               "WHERE m2.eid = (SELECT eid FROM mylist WHERE lid = :lid) "
-              "AND m2.lid != :lid2 AND lf.file_path IS NOT NULL");
+              "AND m2.lid != :lid2 AND lf.path IS NOT NULL");
     q.bindValue(":lid", lid);
     q.bindValue(":lid2", lid);
     if (!q.exec()) return c;
