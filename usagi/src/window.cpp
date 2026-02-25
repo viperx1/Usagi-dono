@@ -378,12 +378,15 @@ Window::Window()
     pageLog = new QBoxLayout(QBoxLayout::TopToBottom, pageLogParent);
 	pageApiTesterParent = new QWidget;
 	pageApiTester = new QBoxLayout(QBoxLayout::TopToBottom, pageApiTesterParent);
+	pageCurrentChoiceParent = new QWidget;
+	pageCurrentChoice = new QBoxLayout(QBoxLayout::TopToBottom, pageCurrentChoiceParent);
 
     layout->addWidget(tabwidget, 1);
 
 	// tabs - Mylist first as default tab
     tabwidget->addTab(pageMylistParent, "Anime");
     tabwidget->addTab(pageHasherParent, "Hasher");
+    tabwidget->addTab(pageCurrentChoiceParent, "Current Choice");
     tabwidget->addTab(pageNotifyParent, "Notify");
     tabwidget->addTab(pageSettingsParent, "Settings");
     tabwidget->addTab(pageLogParent, "Log");
@@ -1023,6 +1026,49 @@ Window::Window()
     sessionAutoMarkDeletionCheckbox->blockSignals(false);
     sessionEnableAutoDeletionCheckbox->blockSignals(false);
     sessionForceDeletePermissionsCheckbox->blockSignals(false);
+    
+    // Initialize deletion management infrastructure
+    deletionLockManager = new DeletionLockManager(this);
+    deletionLockManager->ensureTablesExist();
+    
+    factorWeightLearner = new FactorWeightLearner(this);
+    factorWeightLearner->ensureTablesExist();
+    
+    hybridDeletionClassifier = new HybridDeletionClassifier(
+        *deletionLockManager, *factorWeightLearner, *watchSessionManager, this);
+    
+    deletionQueue = new DeletionQueue(
+        *hybridDeletionClassifier, *deletionLockManager, *factorWeightLearner, this);
+    
+    deletionHistoryManager = new DeletionHistoryManager(this);
+    deletionHistoryManager->ensureTablesExist();
+    
+    // Create Current Choice widget and add to tab page
+    currentChoiceWidget = new CurrentChoiceWidget(
+        *deletionQueue, *deletionHistoryManager, *factorWeightLearner,
+        *deletionLockManager, pageCurrentChoiceParent);
+    pageCurrentChoice->addWidget(currentChoiceWidget);
+    
+    // Wire Current Choice delete requests to the same deletion pipeline
+    connect(currentChoiceWidget, &CurrentChoiceWidget::deleteFileRequested,
+            this, [this](int lid) {
+        if (watchSessionManager) {
+            watchSessionManager->deleteFile(lid, watchSessionManager->isActualDeletionEnabled());
+        }
+    });
+    
+    connect(currentChoiceWidget, &CurrentChoiceWidget::runNowRequested,
+            this, [this]() {
+        if (deletionQueue) {
+            deletionQueue->rebuild();
+            currentChoiceWidget->refresh();
+        }
+    });
+    
+    // Refresh Current Choice tab when queue changes
+    connect(deletionQueue, &DeletionQueue::queueRebuilt, this, [this]() {
+        if (currentChoiceWidget) currentChoiceWidget->refresh();
+    });
     
     
     // Connect WatchSessionManager deleteFileRequested signal to perform actual deletion in background thread

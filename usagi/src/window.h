@@ -60,6 +60,12 @@
 #include "hashercoordinator.h"
 #include "trayiconmanager.h"
 #include "unknownfilesmanager.h"
+#include "currentchoicewidget.h"
+#include "deletionlockmanager.h"
+#include "factorweightlearner.h"
+#include "hybriddeletionclassifier.h"
+#include "deletionqueue.h"
+#include "deletionhistorymanager.h"
 //#include "hasherthread.h"
 
 // Forward declarations
@@ -72,6 +78,12 @@ class UnknownFilesManager;
 class DirectoryWatcherManager;
 class AutoFetchManager;
 class TraySettingsManager;
+class DeletionLockManager;
+class FactorWeightLearner;
+class HybridDeletionClassifier;
+class DeletionQueue;
+class DeletionHistoryManager;
+class CurrentChoiceWidget;
 class Window;  // Forward declaration for friend access
 
 class hashes_ : public QTableWidget
@@ -344,6 +356,16 @@ private:
 	
 	// System tray manager
 	TrayIconManager *trayIconManager;
+	
+	// Deletion management (hybrid: locks + learning + UI)
+	DeletionLockManager *deletionLockManager;
+	FactorWeightLearner *factorWeightLearner;
+	HybridDeletionClassifier *hybridDeletionClassifier;
+	DeletionQueue *deletionQueue;
+	DeletionHistoryManager *deletionHistoryManager;
+	CurrentChoiceWidget *currentChoiceWidget;
+	QWidget *pageCurrentChoiceParent;
+	QBoxLayout *pageCurrentChoice;
 	
 	// Window state before hiding to tray
 	bool exitingFromTray;  // Flag to indicate exit was triggered from tray menu

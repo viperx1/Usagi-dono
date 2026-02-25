@@ -70,6 +70,12 @@ set(SOURCES
     src/autofetchmanager.cpp
     src/directorywatchermanager.cpp
     src/traysettingsmanager.cpp
+    src/deletionlockmanager.cpp
+    src/factorweightlearner.cpp
+    src/hybriddeletionclassifier.cpp
+    src/deletionqueue.cpp
+    src/deletionhistorymanager.cpp
+    src/currentchoicewidget.cpp
 )
 
 # Header files
@@ -126,6 +132,15 @@ set(HEADERS
     src/autofetchmanager.h
     src/directorywatchermanager.h
     src/traysettingsmanager.h
+    src/deletionlock.h
+    src/deletioncandidate.h
+    src/deletionhistoryentry.h
+    src/deletionlockmanager.h
+    src/factorweightlearner.h
+    src/hybriddeletionclassifier.h
+    src/deletionqueue.h
+    src/deletionhistorymanager.h
+    src/currentchoicewidget.h
 )
 
 # Create executable

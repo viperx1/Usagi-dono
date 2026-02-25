@@ -1,6 +1,7 @@
 #include "trayiconmanager.h"
 #include <QAction>
 #include <QApplication>
+#include <QPainter>
 
 TrayIconManager::TrayIconManager(const QIcon &icon, QObject *parent)
     : QObject(parent)
@@ -9,6 +10,8 @@ TrayIconManager::TrayIconManager(const QIcon &icon, QObject *parent)
     , m_minimizeToTrayEnabled(false)
     , m_closeToTrayEnabled(false)
     , m_startMinimizedEnabled(false)
+    , m_deletionAlertVisible(false)
+    , m_baseIcon(icon)
 {
     // Create tray icon if system tray is available
     if (QSystemTrayIcon::isSystemTrayAvailable()) {
@@ -128,4 +131,43 @@ void TrayIconManager::onShowHideAction()
 void TrayIconManager::onExitAction()
 {
     emit exitRequested();
+}
+
+void TrayIconManager::setDeletionAlertVisible(bool visible)
+{
+    if (m_deletionAlertVisible == visible) return;
+    m_deletionAlertVisible = visible;
+
+    if (!m_trayIcon) return;
+
+    if (!visible) {
+        m_trayIcon->setIcon(m_baseIcon);
+        m_trayIcon->setToolTip("Usagi-dono");
+        return;
+    }
+
+    // Draw ❗ overlay on the right half of the icon
+    QPixmap base = m_baseIcon.pixmap(64, 64);
+    QPainter painter(&base);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    // Red circle on the right half
+    int dotSize = 20;
+    int x = base.width() - dotSize - 2;
+    int y = 2;
+    painter.setBrush(QBrush(Qt::red));
+    painter.setPen(Qt::NoPen);
+    painter.drawEllipse(x, y, dotSize, dotSize);
+
+    // White "!" in the circle
+    painter.setPen(Qt::white);
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPixelSize(14);
+    painter.setFont(font);
+    painter.drawText(QRect(x, y, dotSize, dotSize), Qt::AlignCenter, "!");
+    painter.end();
+
+    m_trayIcon->setIcon(QIcon(base));
+    m_trayIcon->setToolTip("Usagi-dono — Deletion choice needed");
 }
