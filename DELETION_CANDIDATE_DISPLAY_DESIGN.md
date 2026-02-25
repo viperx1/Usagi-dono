@@ -397,11 +397,11 @@ These are the factors whose weights are learned through A vs B choices. Each fac
 | `size_weighted_distance` | 1.0 - (abs(distance) × sizeBytes) / maxInSeries | 0.0 – 1.0 | Closer to current AND/OR smaller file. Normalized per-series: `maxInSeries = max(abs(distance) × sizeBytes)` across all files **within the same anime** (or relation chain if cross-anime). A 4K file far away gets a low value (highly deletable), a small file close by gets a high value (worth keeping). For anime in the same relation chain (Q37), distance is calculated by summing remaining episodes across chain boundaries (e.g., Naruto ep 100/220 to Shippuden ep 80: `(220-100) + 80 = 200`). `maxInSeries` is cached and recalculated lazily (Q36). See "Episode Distance: Episode Count vs. File Size" section and Q31 for math explanation. |
 | `group_status` | active=1.0, stalled=0.5, disbanded=0.0 | 0.0 – 1.0 | More active group |
 | `watch_recency` | days since last watched, normalized | 0.0 – 1.0 | Watched more recently |
-| `view_percentage` | watched episodes / total episodes for the chain's session (Q42: 1 session per chain) | 0.0 – 1.0 | More of the anime/chain has been watched |
+| `view_percentage` | watched episodes / sum of total episodes across ALL anime in the chain (Q42, Q47). 1 session per chain; session moves to new anime when user plays from a different anime in the chain (Q46). | 0.0 – 1.0 | More of the anime/chain has been watched |
 
 Note: `episode_distance` and `file_size` are no longer separate factors — they are combined into `size_weighted_distance`. This captures the insight that a 4GB 4K episode frees 20× more space than a 200MB 480p episode, so bitrate/size naturally factors into the distance metric. Normalization is **per-series** (Q31): `maxInSeries` is the largest `abs(distance) × sizeBytes` value among all files in the same anime (or relation chain for cross-anime distance within the chain). `maxInSeries` is cached per chain and invalidated lazily when files for any anime in the chain change (Q36). For cross-anime distance within a chain (Q37), episode distance is calculated by summing remaining episodes across chain boundaries: `remainingEpsInPredecessor + episodeOffsetInSuccessor`. Technical factors (codec, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
 
-**Why `view_percentage` instead of `session_active`**: A binary "has active session" flag is unreliable because sessions are started automatically when any episode is played — even briefly to check quality. A user who watched 1 of 500 episodes is very different from a user who watched 480 of 500. The view percentage (watched/total in the session) captures actual engagement: a session at 95% means the user is nearly done and those files are dispensable; a session at 2% means the user just started (or just checked) and the files should be treated with lower confidence. Sessions are tracked **per chain** (Q42), not per anime — if the user has watched episodes in both Naruto and Shippuden, there is one session for the entire chain.
+**Why `view_percentage` instead of `session_active`**: A binary "has active session" flag is unreliable because sessions are started automatically when any episode is played — even briefly to check quality. A user who watched 1 of 500 episodes is very different from a user who watched 480 of 500. The view percentage (watched/total in the session) captures actual engagement: a session at 95% means the user is nearly done and those files are dispensable; a session at 2% means the user just started (or just checked) and the files should be treated with lower confidence. Sessions are tracked **per chain** (Q42), not per anime — if the user has watched episodes in both Naruto and Shippuden, there is one session for the entire chain. `total episodes` is the sum across ALL anime in the chain (Q47): e.g., Naruto (220) + Shippuden (500) = 720 total. When the user plays an episode from a different anime in the same chain, the session **moves** to the new anime (Q46) — the session's current position updates but the watched count is preserved.
 
 **Handling anime with no session** (never played any episode):
 
@@ -892,7 +892,7 @@ function classifyFile(file):
 function isEligibleForDeletion(file):
     // File must be in a position where deletion makes sense
     isWatched = file.viewed > 0 OR file.localWatched > 0
-    session = findActiveWatchSession(file.chainId)  // Q42: 1 session per chain, not per anime
+    session = findActiveWatchSession(file.chainId)  // Q42: 1 session per chain. Q46: moves to new anime when user plays from different anime in chain.
     distance = NO_SESSION
     if session:
         distance = file.totalEpisodePosition - session.currentTotalPosition
@@ -1342,7 +1342,7 @@ struct DeletionCandidate {
 
 2. **Phase 2 — A vs B learning infrastructure**: Add `deletion_factor_weights` and `deletion_choices` tables. Implement `FactorWeightLearner`. All weights start at 0.
 
-3. **Phase 3 — Hybrid classifier**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. Procedural tiers (0-2) handle deterministic cases. Tier 3 uses learned weights. When too few choices have been made, always present A vs B. `deleteNextEligibleFile()` delegates to `HybridDeletionClassifier`.
+3. **Phase 3 — Hybrid classifier + session migration**: Implement `HybridDeletionClassifier` alongside existing `calculateDeletionScore()`. Procedural tiers (0-2) handle deterministic cases. Tier 3 uses learned weights. When too few choices have been made, always present A vs B. `deleteNextEligibleFile()` delegates to `HybridDeletionClassifier`. **Migrate existing per-anime sessions to per-chain sessions** (Q48): for each relation chain, keep only the most recent per-anime session and discard older ones.
 
 4. **Phase 4 — UI integration**: Wire Current Choice tab with A vs B prompt, learned weights display, deletion queue, and deletion history. Add 🔒 lock icons to anime cards (title + episode rows) when locks are active. Lock/unlock accessible via context menus on card headers and episode rows.
 
@@ -1399,7 +1399,7 @@ CREATE INDEX idx_deletion_history_type ON deletion_history(deletion_type);
 
 ### UI: Deletion History Groupbox
 
-The History groupbox is at the bottom of the Current Choice tab. Clicking a history entry loads its details in the A vs B groupbox at the top. For **procedural deletions (T0-T2)**, the display shows the deleted file alongside the file that superseded/replaced it (Q44) — e.g., for a superseded file, the old revision is shown on the left and the newer revision that replaced it is shown on the right. If no replacement file exists (e.g., it was also deleted later), the right side shows "[File no longer present]". For **A vs B deletions**, the display shows both files as they were at the time of the choice. See the [Current Choice Tab Layout](#ui-current-choice-tab-layout) mockup above.
+The History groupbox is at the bottom of the Current Choice tab. Clicking a history entry loads its details in the A vs B groupbox at the top **in read-only mode** (Q49) — no [Delete A], [Delete B], or [Skip] buttons; just [Back to queue] to return to the live queue. For **procedural deletions (T0-T2)**, the display shows the deleted file alongside the file that superseded/replaced it (Q44) — e.g., for a superseded file, the old revision is shown on the left and the newer revision that replaced it is shown on the right. If no replacement file exists (e.g., it was also deleted later), the right side shows "[File no longer present]". For **A vs B deletions**, the display shows both files as they were at the time of the choice. See the [Current Choice Tab Layout](#ui-current-choice-tab-layout) mockup above.
 
 ### History Features
 
@@ -1510,43 +1510,34 @@ struct DeletionHistoryEntry {
 | Q38 | Unlock from A vs B groupbox — refresh behavior | **Option B (stay showing same file)**: after unlocking, the file remains displayed in the A vs B groupbox as a candidate alongside the original candidate. No automatic refresh or return to top pair — the user can see the newly-unlocked file in its new candidate state and make a choice if they want. |
 | Q39 | "Highest-rated file" for lock — subtitle language preference order | **Use order from settings**: the existing `preferredSubtitleLanguages` and `preferredAudioLanguages` settings (comma-separated, order = priority) already define language priority. `sortByRatingCriteria()` ranks subtitle matches by their position in the configured list (earlier = higher priority), then audio matches by their position, then composite quality. No new settings needed — the existing language preference order is reused. |
 | Q40 | Learning from procedural deletions | **Only store the history**: procedural deletions (T0-T2) are recorded in `deletion_history` with their tier, reason, and deletion_type but do NOT record factor values and do NOT adjust weights. The history entry provides the audit trail; the learning system only learns from user A vs B choices (Tier 3). |
-| Q41 | Lazy cache invalidation — detection point | **Option A (WatchSessionManager hooks)**: `invalidateNormCache(aid)` is called in `WatchSessionManager` after `addFile()` and `removeFile()` calls. These are the natural points where local file set changes. No database triggers needed. |
-| Q42 | Cross-anime chain distance — multiple active sessions | **1 session per chain**: only one active watch session exists per relation chain, not per anime. If the user plays an episode in Shippuden, that session covers the entire Naruto→Shippuden chain. Distance is always calculated relative to the chain session's current position. `view_percentage` uses the chain session's watched/total counts. |
+| Q41 | Lazy cache invalidation — detection point | **WatchSessionManager hooks**: `invalidateNormCache(aid)` is called in `WatchSessionManager` after `addFile()`, `removeFile()`, `rehashFile()`, and any method that changes file metadata (codec, resolution info updates from AniDB) (Q50). These are the natural points where local file set or file properties change. No database triggers needed. |
+| Q42 | Cross-anime chain distance — multiple active sessions | **1 session per chain**: only one active watch session exists per relation chain, not per anime. If the user plays an episode in Shippuden, that session covers the entire Naruto→Shippuden chain. Distance is always calculated relative to the chain session's current position. `view_percentage` uses the chain session's watched/total counts. Session moves to the new anime when the user plays from a different anime in the chain (Q46). `total episodes` is the sum across ALL anime in the chain (Q47). |
 | Q43 | sortByRatingCriteria — multiple subtitle tracks | **Only score the most preferred language**: when a file has multiple subtitle tracks (e.g., English + Japanese + Spanish), only the single most-preferred track (highest position in the user's configured preference list) is used for ranking. Additional tracks do not serve as tiebreakers. |
 | Q44 | Procedural history entries — display in A vs B groupbox | **Option B (show alongside replacement)**: when a procedural deletion history entry is clicked, the A vs B groupbox shows the deleted file alongside the file that superseded/replaced it. If the replacement file no longer exists, the right side shows "[File no longer present]". `deletion_history` stores `replaced_by_lid` for this purpose. |
 | Q45 | Cross-anime chain distance — chain with many anime | **No cap**: per-series normalization (Q31) already handles this — `maxInSeries` is the largest `abs(distance) × sizeBytes` within the chain, so even thousands of episodes are normalized to 0.0–1.0. Very distant files simply score near 0.0 (most deletable), which is the correct behavior. |
+| Q46 | Per-chain session — session start behavior | **Move session to new anime**: when the user plays an episode from a different anime in the same chain, the existing chain session's current position moves to the new anime. The session is not recreated — watched count is preserved, only the "current anime" and "current episode" pointers update. |
+| Q47 | Per-chain session — view_percentage calculation | **Sum of total episodes across ALL anime in the chain**: e.g., Naruto (220) + Shippuden (500) = 720 total. `view_percentage = watchedEpisodes / 720`. This treats the chain as one continuous body of content. |
+| Q48 | Per-chain session — existing session migration | **Keep only the most recent per-anime session per chain**: when migrating from per-anime to per-chain sessions, for each relation chain, the most recent session (by last activity timestamp) is kept and all others are discarded. This avoids complex merge logic and respects the user's most recent viewing activity. |
+| Q49 | History entry click — A vs B groupbox read-only mode | **Read-only**: when viewing a history entry, the A vs B groupbox shows no action buttons ([Delete A], [Delete B], [Skip] are hidden). Only [Back to queue] is shown, to return to the live queue. |
+| Q50 | WatchSessionManager hooks — which specific methods | **Also `rehashFile()` and metadata change methods**: `invalidateNormCache(aid)` is called from `addFile()`, `removeFile()`, `rehashFile()`, and any method that updates file metadata (codec, resolution info from AniDB). This ensures the normalization cache stays accurate when file properties change, not just when files are added/removed. |
 
 ---
 
 ## Follow-Up Questions
 
-All previous questions (Q1-Q45) have been resolved. See the Resolved Design Decisions table above for the full list.
+All previous questions (Q1-Q50) have been resolved. See the Resolved Design Decisions table above for the full list.
 
-### Q46: Per-chain session — session start behavior
-When the user starts playing an episode in anime B (part of a chain), and a session already exists for anime A in the same chain, should the system:
-- **A**: Move the existing chain session's "current position" to the new anime (since there's only 1 session per chain)
-- **B**: Start a new chain session (replacing the old one), losing the old session's episode count
+### Q51: Per-chain session — watched count preservation on move
+When the chain session moves from anime A to anime B (Q46), the watched count is preserved. But should re-watching an already-counted episode in anime A (now that the session has moved to anime B) increment the watched count again, or is each episode counted only once?
 
-### Q47: Per-chain session — view_percentage calculation
-With 1 session per chain, how is `total episodes` calculated for `view_percentage = watched / total`?
-- **A**: Sum of total episodes across ALL anime in the chain (e.g., Naruto 220 + Shippuden 500 = 720 total)
-- **B**: Only the total episodes of anime the user has actually played at least once
-- **C**: Something else?
+### Q52: Per-chain session — view_percentage edge cases
+With `total episodes = sum across all anime in chain` (Q47), a chain like Dragon Ball (153) + DBZ (291) + DBGT (64) + DBS (131) = 639 total. If the user has only watched 10 episodes of Dragon Ball, `view_percentage = 10/639 = 0.016`. This is extremely low even though the user is actively watching. Is this the desired behavior, or should total only count anime the user has started?
 
-### Q48: Per-chain session — existing session migration
-The current codebase has per-anime sessions (`SessionInfo` stores `animeId`). When implementing per-chain sessions, how should existing per-anime sessions be migrated?
-- **A**: Merge all per-anime sessions for the same chain into one chain session (sum watched counts)
-- **B**: Keep only the most recent per-anime session per chain
-- **C**: Something else?
+### Q53: Session migration — orphaned watched episodes
+When migrating (Q48), the kept session's watched count may not include episodes watched in the discarded sessions. Should the migration sum up all watched episode counts from all sessions being merged, or just use the most recent session's count?
 
-### Q49: History entry click — A vs B groupbox read-only mode
-When viewing a history entry in the A vs B groupbox, the files are already deleted. Should the groupbox:
-- **A**: Show the entry in read-only mode (no [Delete A], [Delete B], [Skip] buttons — just [Back to queue])
-- **B**: Show with a different set of actions (e.g., [Undo] if file is in recycle bin)
-- **C**: Something else?
+### Q54: Read-only history — undo capability
+Q49 makes history viewing read-only. Should there be an undo/restore mechanism for deletions at all (e.g., if the file was moved to a recycle bin), or is deletion always permanent with no undo path?
 
-### Q50: WatchSessionManager hooks — which specific methods?
-For Q41, the hooks go in WatchSessionManager. The existing code has several file-change paths. Should `invalidateNormCache()` be called from:
-- **A**: Only `addFile()` and `removeFile()`
-- **B**: Also `rehashFile()` and any method that changes file metadata (codec, resolution info updates from AniDB)
-- **C**: Something else?
+### Q55: Metadata change invalidation — which metadata fields?
+Q50 says to invalidate on metadata changes. Should this include ALL AniDB metadata updates (episode count changes, rating changes, group status changes), or only file-level metadata (codec, resolution, bitrate)?
