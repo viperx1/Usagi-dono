@@ -853,9 +853,14 @@ void HasherCoordinator::processPendingHashedFiles()
                 // Status will be updated when MylistAdd completes (via UpdateLocalPath)
             } else {
                 m_hashes->item(task.rowIndex(), 6)->setText("0");
-                // File already in mylist - no API call needed
-                // Update status to 2 (in anidb) to prevent re-detection
-                m_adbapi->UpdateLocalFileStatus(task.filePath(), 2);
+                // File already in mylist - link the local_file and update status
+                int lid = m_adbapi->LinkLocalFileToMylist(task.fileSize(), task.hash(), task.filePath());
+                if (lid > 0) {
+                    LOG(QString("Already-hashed file linked to mylist, emitting signal for lid=%1").arg(lid));
+                    emit fileLinkedToMylist(lid);
+                } else {
+                    m_adbapi->UpdateLocalFileStatus(task.filePath(), 2);
+                }
             }
         } else {
             LOG(QString("Skipping API processing for already-hashed file: %1 (addToMylist=false)").arg(task.filename()));

@@ -734,7 +734,8 @@ AnimeCard* MyListCardManager::createCardForIndex(int index)
     
     // Wait for ALL data to be ready before creating cards
     while (!m_dataReady) {
-        LOG("[MyListCardManager] createCardForIndex: Waiting for data to be ready...");
+        LOG(QString("[MyListCardManager] createCardForIndex: index=%1 waiting for data (chainsBuilt=%2, chainBuildInProgress=%3)")
+            .arg(index).arg(m_chainsBuilt).arg(m_chainBuildInProgress));
         m_dataReadyCondition.wait(&m_mutex);
     }
     
@@ -760,6 +761,7 @@ void MyListCardManager::clearAllCards()
     QMutexLocker locker(&m_mutex);
     
     // Reset data ready flag when clearing
+    LOG(QString("[MyListCardManager] clearAllCards: setting m_dataReady=false (was %1)").arg(m_dataReady));
     m_dataReady = false;
     
     // Clear virtual layout if used
@@ -1039,9 +1041,27 @@ void MyListCardManager::updateOrAddMylistEntry(int lid)
     // Check if card exists
     QMutexLocker locker(&m_mutex);
     bool isNewAnime = !m_cards.contains(aid);
+    bool dataReady = m_dataReady;
+    bool chainsBuilt = m_chainsBuilt;
     locker.unlock();
     
+    LOG(QString("[MyListCardManager] updateOrAddMylistEntry: lid=%1 aid=%2 isNewAnime=%3 dataReady=%4 chainsBuilt=%5")
+        .arg(lid).arg(aid).arg(isNewAnime).arg(dataReady).arg(chainsBuilt));
+    
     if (isNewAnime) {
+        // If the initial data load hasn't completed yet (m_dataReady=false and
+        // chains not built), skip card creation.  createCard() blocks on
+        // m_dataReadyCondition which would deadlock the main thread because
+        // the initial load that sets m_dataReady=true also runs on the main
+        // thread.  The anime will be picked up by the initial load when it
+        // completes.
+        if (!dataReady && !chainsBuilt) {
+            LOG(QString("[MyListCardManager] updateOrAddMylistEntry: initial load not complete "
+                        "(dataReady=%1, chainsBuilt=%2), deferring card creation for aid=%3")
+                .arg(dataReady).arg(chainsBuilt).arg(aid));
+            return;
+        }
+        
         // Card doesn't exist, create it
         // First, preload the card creation data to avoid race conditions
         QList<int> aidList{aid};
@@ -1360,6 +1380,8 @@ AnimeCard* MyListCardManager::createCard(int aid)
     // Wait for ALL data to be ready before creating cards
     {
         QMutexLocker locker(&m_mutex);
+        LOG(QString("[MyListCardManager] createCard: aid=%1 m_dataReady=%2 chainsBuilt=%3 chainBuildInProgress=%4")
+            .arg(aid).arg(m_dataReady).arg(m_chainsBuilt).arg(m_chainBuildInProgress));
         while (!m_dataReady) {
             LOG("[MyListCardManager] createCard: Waiting for data to be ready...");
             m_dataReadyCondition.wait(&m_mutex);
@@ -1975,6 +1997,8 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
     // Mark data as NOT ready at start of preload
     {
         QMutexLocker locker(&m_mutex);
+        LOG(QString("[MyListCardManager] preloadCardCreationData: setting m_dataReady=false (was %1, chainsBuilt=%2, chainBuildInProgress=%3)")
+            .arg(m_dataReady).arg(m_chainsBuilt).arg(m_chainBuildInProgress));
         m_dataReady = false;
     }
     
@@ -2252,6 +2276,10 @@ void MyListCardManager::preloadCardCreationData(const QList<int>& aids)
             LOG("[MyListCardManager] Chains already built, marking data ready after preload");
             m_dataReady = true;
             m_dataReadyCondition.wakeAll();
+        } else if (!m_dataReady) {
+            LOG(QString("[MyListCardManager] preloadCardCreationData finished but m_dataReady still false "
+                        "(chainsBuilt=%1, chainBuildInProgress=%2) — caller must call buildChainsFromCache() or set m_dataReady")
+                .arg(m_chainsBuilt).arg(m_chainBuildInProgress));
         }
     }
 }

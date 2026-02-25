@@ -544,8 +544,7 @@ void CurrentChoiceWidget::showCardForSide(int aid, QVBoxLayout *container, Anime
     AnimeCard *card = m_cardManager.createStandaloneCard(aid, this);
     if (!card) return;
     cardSlot = card;
-    // Scale down to fit within A vs B columns without overlapping
-    card->setFixedSize(400, 300);
+    card->setFixedSize(AnimeCard::getCardSize());
     // Insert card before the info label (which is always the last widget)
     container->insertWidget(0, card);
 }
