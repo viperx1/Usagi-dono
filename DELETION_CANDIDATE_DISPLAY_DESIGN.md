@@ -306,7 +306,7 @@ The current system calculates distance as episode count: "this file is 47 episod
 | Metric | Formula | Behavior |
 |--------|---------|----------|
 | **Episode distance** | `abs(fileEp - currentEp)` | Treats a 200MB episode the same as a 4GB episode. Optimizes for "content I'm unlikely to watch." |
-| **Size-weighted distance** | `abs(fileEp - currentEp) * file.sizeBytes` | Prioritizes freeing space from large files that are also far away. A 4GB 4K file 10 eps away ranks higher than a 200MB 480p file 30 eps away. Deleting the 4K file has much higher impact on free space. |
+| **Size-weighted distance** | `abs(fileEp - currentEp) * file.sizeBytes` | Prioritizes freeing space from large files that are also far away. A 4GB 4K file 10 eps away ranks higher than a 200MB 480p file 30 eps away. Deleting the 4K file has much higher impact on free space. The product (distance × size) is measured in byte-episodes — e.g., 40 GB·eps means "40 GB of content-distance impact." |
 | **Pure size** | `file.sizeBytes` | Ignores content position entirely. Maximizes space reclaimed per deletion but may delete nearby files. |
 
 **Recommendation**: Use **size-weighted distance** as the learnable factor. This means:
@@ -1152,8 +1152,8 @@ When a queue or history entry is selected, its details appear in the A vs B grou
 │                                                                │
 │ Factor contributions:                                          │
 │   anime_rating:           +0.18  (8.76 → 0.88, w: +0.42)     │
-│   size_weighted_distance: +0.05  (30 eps × 420 MB → 0.47,    │
-│                                   w: +0.31)                    │
+│   size_weighted_distance: +0.15  (30 eps × 420 MB = 12.3     │
+│                            GB·eps → 0.47 normalized, w: +0.31)│
 │   group_status:           +0.04  (active → 1.0, w: +0.08)    │
 │   view_percentage:        +0.00  (96% → 0.96, w: -0.05)      │
 │                                                                │
@@ -1488,7 +1488,7 @@ struct DeletionHistoryEntry {
 | Q27 | Preview mode — visual distinction | **[PREVIEW] label inside the Current Choice tab** + tray ❗ absent. Nothing more — no badges, no color changes, just the label and the absence of the tray exclamation mark. |
 | Q28 | Cross-anime gap — missing intermediate anime | **Missing intermediate = gap exists**: if Inuyasha and Yashahime have local files but Final Act does not, the missing intermediate is treated as a gap. Boundary episodes of neighboring anime with local files are protected to avoid widening the gap. Chain is walked by relation data regardless of which anime have local files. |
 | Q29 | Queue sorting — locked files position | **Natural position**: locked files are sorted by what their tier/score would be if they weren't locked. They are NOT shown in A vs B as long as other unlocked candidates exist. |
-| Q30 | Weight learning — factor value normalization | **Bitrate factored into distance**: `size_weighted_distance = abs(distance) × sizeBytes`. Replaces separate `episode_distance` and `file_size` factors. 4K episodes free 20× more space than 480p episodes, so they have higher deletion impact. Normalized to 0-1 globally across all files. |
+| Q30 | Weight learning — factor value normalization | **Bitrate factored into distance**: `size_weighted_distance = abs(distance) × sizeBytes`. Replaces separate `episode_distance` and `file_size` factors. 4K episodes free 20× more space than 480p episodes, so they have higher deletion impact. Normalization method deferred to Q31. |
 
 ---
 
