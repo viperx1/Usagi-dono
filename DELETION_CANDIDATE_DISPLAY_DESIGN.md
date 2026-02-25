@@ -315,7 +315,7 @@ The current system calculates distance as episode count: "this file is 47 episod
 - File size and episode distance combine naturally into a single metric — no need for separate "distance" and "size" factors.
 - This captures the user's intuition: "deleting a 4K episode of a show I'm far from is a better trade-off than deleting a small 480p episode of something I'm about to watch."
 
-**Normalization (Q31)**: Per-series maximum. For each anime (or relation chain), `maxInSeries = max(abs(distance) × sizeBytes)` across all files in that series. Then `normalized = 1.0 - rawValue / maxInSeries`. This means a 480p 12-episode show is normalized independently from a 4K 291-episode show — the biggest file×distance product within each series always maps to 0.0 (most deletable), and the smallest maps close to 1.0 (least deletable). Cross-anime distance applies only within the same relation chain (Q35) — unrelated anime each use their own session distance.
+**Normalization (Q31)**: Per-series maximum. For each anime (or relation chain), `maxInSeries = max(abs(distance) × sizeBytes)` across all files in that series. Then `normalized = 1.0 - rawValue / maxInSeries`. This means a 480p 12-episode show is normalized independently from a 4K 291-episode show — the biggest file×distance product within each series always maps to 0.0 (most deletable), and the smallest (the file at the current episode, distance=0) maps to 1.0 (least deletable). Cross-anime distance applies only within the same relation chain (Q35) — unrelated anime each use their own session distance.
 
 ---
 
@@ -566,7 +566,7 @@ All A vs B interaction happens **inside the Current Choice tab only** — no pop
                            ▲ active
 
 ┌──────────────────────────────────────────────────────────────────┐
-│ Deletion Management              [PREVIEW]  Space: 42 / 500 GB │
+│ Deletion Management             [PREVIEW] Space: 42 / 500 GB  │
 │ Threshold: 50 GB │ Mode: Auto │ [▶ Run Now] [⏸ Pause]          │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
