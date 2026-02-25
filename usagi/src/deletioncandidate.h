@@ -35,6 +35,7 @@ struct DeletionCandidate {
     QString episodeLabel;        ///< e.g. "Ep 30 - Title"
     int replacementLid  = -1;    ///< Lid of the better alternative (tiers 0-2)
     QString replacementPath;     ///< File path of the replacement
+    qint64 fileSize     = 0;     ///< Size of the file in bytes (captured before deletion)
     bool gapProtected = false;
     bool locked       = false;   ///< True if anime or episode is locked
 

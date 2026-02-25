@@ -31,6 +31,7 @@
 #include <functional>
 #include <memory>
 #include <QDirIterator>
+#include <QFileInfo>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -468,6 +469,9 @@ Window::Window()
     connect(hasherCoordinator, &HasherCoordinator::fileLinkedToMylist, this, [this](int lid) {
         LOG(QString("HasherCoordinator: File linked to mylist, updating anime card for lid=%1").arg(lid));
         updateOrAddMylistEntry(lid);
+        if (deletionQueue) {
+            deletionQueue->rebuild();
+        }
     });
     
     // Connect UnknownFilesManager signals
@@ -1095,6 +1099,9 @@ Window::Window()
             if (c.lid == lid) {
                 DeletionCandidate info = c;
                 info.reason = info.reason.isEmpty() ? "user_avsb" : info.reason;
+                // Capture file size now before the file is deleted
+                QFileInfo fi(info.filePath);
+                info.fileSize = fi.exists() ? fi.size() : 0;
                 m_pendingDeletionInfo[lid] = info;
                 break;
             }
@@ -1134,7 +1141,7 @@ Window::Window()
                                  : "user_avsb";
             deletionHistoryManager->recordDeletion(
                 lid, info.aid, info.eid, info.filePath, info.animeName,
-                info.episodeLabel, 0 /*fileSize*/, info.tier, info.reason,
+                info.episodeLabel, info.fileSize, info.tier, info.reason,
                 info.learnedScore, deletionType, 0 /*spaceBefore*/, 0 /*spaceAfter*/,
                 info.replacementLid);
             m_pendingDeletionInfo.remove(lid);
@@ -1164,7 +1171,10 @@ Window::Window()
         // Procedural tiers (0-3) are auto-deleted without user interaction
         if (candidate->tier < DeletionTier::LEARNED_PREFERENCE) {
             LOG(QString("[Deletion] Auto-delete T%1 lid=%2").arg(candidate->tier).arg(candidate->lid));
-            m_pendingDeletionInfo[candidate->lid] = *candidate;
+            DeletionCandidate info = *candidate;
+            QFileInfo fi(info.filePath);
+            info.fileSize = fi.exists() ? fi.size() : 0;
+            m_pendingDeletionInfo[candidate->lid] = info;
             watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
             return;
         }
@@ -1177,7 +1187,10 @@ Window::Window()
         
         // Trained and confident — auto-delete the top candidate
         LOG(QString("[Deletion] Auto-delete T4 lid=%1 score=%2").arg(candidate->lid).arg(candidate->learnedScore));
-        m_pendingDeletionInfo[candidate->lid] = *candidate;
+        DeletionCandidate info = *candidate;
+        QFileInfo fi(info.filePath);
+        info.fileSize = fi.exists() ? fi.size() : 0;
+        m_pendingDeletionInfo[candidate->lid] = info;
         watchSessionManager->deleteFile(candidate->lid, watchSessionManager->isActualDeletionEnabled());
     });
     
