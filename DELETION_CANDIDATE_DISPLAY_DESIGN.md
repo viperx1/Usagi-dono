@@ -315,7 +315,7 @@ The current system calculates distance as episode count: "this file is 47 episod
 - File size and episode distance combine naturally into a single metric — no need for separate "distance" and "size" factors.
 - This captures the user's intuition: "deleting a 4K episode of a show I'm far from is a better trade-off than deleting a small 480p episode of something I'm about to watch."
 
-**Normalization (Q31)**: Per-series maximum. For each anime (or relation chain), `maxInSeries = max(abs(distance) × sizeBytes)` across all files in that series. Then `normalized = 1.0 - rawValue / maxInSeries`. This means a 480p 12-episode show is normalized independently from a 4K 291-episode show — the biggest file×distance product within each series always maps to 0.0 (most deletable), and the smallest (the file at the current episode, distance=0) maps to 1.0 (least deletable). Cross-anime distance applies only within the same relation chain (Q35) — unrelated anime each use their own session distance.
+**Normalization (Q31)**: Per-series maximum. For each anime (or relation chain), `maxInSeries = max(abs(distance) × sizeBytes)` across all files in that series. Then `normalized = 1.0 - rawValue / maxInSeries`. This means a 480p 12-episode show is normalized independently from a 4K 291-episode show — the biggest file×distance product within each series always maps to 0.0 (most deletable), and the smallest (the file at the current episode, distance=0) maps to 1.0 (least deletable). Cross-anime distance applies only within the same relation chain (Q35) — unrelated anime each use their own session distance. Recalculation is **lazy** (Q36): `maxInSeries` is cached per anime/chain and invalidated when files for that anime change (add/remove/hash).
 
 ---
 
@@ -394,12 +394,12 @@ These are the factors whose weights are learned through A vs B choices. Each fac
 | Factor | How it's computed | Range | Higher = |
 |--------|------------------|-------|----------|
 | `anime_rating` | AniDB rating × 100 (integer 0–1000, e.g., 875 = 8.75) / 1000 | 0.0 – 1.0 | Better rated |
-| `size_weighted_distance` | 1.0 - (abs(distance) × sizeBytes) / maxInSeries | 0.0 – 1.0 | Closer to current AND/OR smaller file. Normalized per-series: `maxInSeries = max(abs(distance) × sizeBytes)` across all files **within the same anime** (or relation chain if cross-anime). A 4K file far away gets a low value (highly deletable), a small file close by gets a high value (worth keeping). See "Episode Distance: Episode Count vs. File Size" section and Q31 for math explanation. |
+| `size_weighted_distance` | 1.0 - (abs(distance) × sizeBytes) / maxInSeries | 0.0 – 1.0 | Closer to current AND/OR smaller file. Normalized per-series: `maxInSeries = max(abs(distance) × sizeBytes)` across all files **within the same anime** (or relation chain if cross-anime). A 4K file far away gets a low value (highly deletable), a small file close by gets a high value (worth keeping). For anime in the same relation chain (Q37), distance is calculated by summing remaining episodes across chain boundaries (e.g., Naruto ep 100/220 to Shippuden ep 80: `(220-100) + 80 = 200`). `maxInSeries` is cached and recalculated lazily (Q36). See "Episode Distance: Episode Count vs. File Size" section and Q31 for math explanation. |
 | `group_status` | active=1.0, stalled=0.5, disbanded=0.0 | 0.0 – 1.0 | More active group |
 | `watch_recency` | days since last watched, normalized | 0.0 – 1.0 | Watched more recently |
 | `view_percentage` | watched episodes / total episodes for the anime's session | 0.0 – 1.0 | More of the anime has been watched |
 
-Note: `episode_distance` and `file_size` are no longer separate factors — they are combined into `size_weighted_distance`. This captures the insight that a 4GB 4K episode frees 20× more space than a 200MB 480p episode, so bitrate/size naturally factors into the distance metric. Normalization is **per-series** (Q31): `maxInSeries` is the largest `abs(distance) × sizeBytes` value among all files in the same anime (or relation chain for cross-anime distance within the chain). Technical factors (codec, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
+Note: `episode_distance` and `file_size` are no longer separate factors — they are combined into `size_weighted_distance`. This captures the insight that a 4GB 4K episode frees 20× more space than a 200MB 480p episode, so bitrate/size naturally factors into the distance metric. Normalization is **per-series** (Q31): `maxInSeries` is the largest `abs(distance) × sizeBytes` value among all files in the same anime (or relation chain for cross-anime distance within the chain). `maxInSeries` is cached per anime/chain and invalidated lazily when files change (Q36). For cross-anime distance within a chain (Q37), episode distance is calculated by summing remaining episodes across chain boundaries: `remainingEpsInPredecessor + episodeOffsetInSuccessor`. Technical factors (codec, resolution) and language factors are NOT in this list — they are handled procedurally. Only subjective, elastic factors are learned.
 
 **Why `view_percentage` instead of `session_active`**: A binary "has active session" flag is unreliable because sessions are started automatically when any episode is played — even briefly to check quality. A user who watched 1 of 500 episodes is very different from a user who watched 480 of 500. The view percentage (watched/total in the session) captures actual engagement: a session at 95% means the user is nearly done and those files are dispensable; a session at 2% means the user just started (or just checked) and the files should be treated with lower confidence.
 
@@ -1057,7 +1057,7 @@ function isHighestRatedFileForEpisode(lid, eid):
     files = getLocalFilesForEpisode(eid)
     if files.isEmpty():
         return false
-    bestFile = files.sortByRatingCriteria(DESC).first()  // Q12+Q16: language match first (sub > audio), then full composite score
+    bestFile = files.sortByRatingCriteria(DESC).first()  // Q12+Q16+Q39: subtitle match ranked by settings order, then audio match by settings order, then composite quality score
     return bestFile.lid == lid
 
 function lockReason(file):
@@ -1248,7 +1248,7 @@ public:
 
     // Compute learned score for a file
     double computeScore(int lid) const;
-    QMap<QString, double> normalizeFactors(int lid) const;  // size_weighted_distance uses per-series max (Q31)
+    QMap<QString, double> normalizeFactors(int lid) const;  // size_weighted_distance uses per-series max (Q31), cached lazily (Q36)
 
     // Process a user A vs B choice
     void recordChoice(int keptLid, int deletedLid);
@@ -1260,12 +1260,16 @@ public:
     // Confidence: how far apart are the top two candidates' scores
     double scoreDifference(int lid1, int lid2) const;
 
+    // Cache invalidation (Q36): called when files for an anime change
+    void invalidateNormCache(int aid);
+
 signals:
     void weightsUpdated();
 
 private:
     void adjustWeight(const QString &factor, double delta);
     QMap<QString, double> m_weights;   // Loaded from deletion_factor_weights
+    QMap<int, double> m_maxInSeriesCache;  // aid → cached maxInSeries; invalidated lazily (Q36)
     double m_learningRate = 0.1;
 };
 ```
@@ -1473,10 +1477,10 @@ struct DeletionHistoryEntry {
 | Q9 | Procedural deletion notifications | **No notifications**: history is the record. No popups, no toasts, no system notifications (user has notifications silenced). |
 | Q10 | Lock + new files | **Lock keeps 1 highest-rated file per episode**: new files for locked episodes are covered by the lock, but only the highest-rated file is protected. Duplicates of locked episodes are still eligible for deletion. |
 | Q11 | No-session anime default | **Approach B (default to 0.5)**: neutral midpoint, so no-session anime is neither favored nor penalized by view_percentage |
-| Q12 | "Highest-rated file" criteria for locks | **Option C (full composite score) with language as top priority**: subtitles first, then audio, then full composite score. Language always trumps quality. See Q16 for detailed sort order. |
+| Q12 | "Highest-rated file" criteria for locks | **Option C (full composite score) with language as top priority**: subtitles first, then audio, then full composite score. Language always trumps quality. Subtitle and audio language matches are ranked by the user's configured preference order from settings (Q39). See Q16 for detailed sort order. |
 | Q13 | Cross-anime gap protection depth | **Full chain, both directions**: gap protection spans the entire prequel→sequel chain, checking both prequels and sequels. All chain boundaries are checked bidirectionally. |
 | Q14 | Weight reset scope | **Full clean slate**: reset all weights to 0 AND clear the A vs B choice history (`deletion_choices` table). Double warning required. |
-| Q16 | "Highest-rated" sort criteria — language priority | **Subtitles first, then audio, language always trumps quality**: `sortByRatingCriteria()` sorts by (1) subtitle match (yes/no), (2) audio match (yes/no), (3) composite quality score. A file matching both sub+audio ranks above sub-only, sub-only ranks above audio-only, audio-only ranks above no match. Within each language tier, composite quality breaks ties. |
+| Q16 | "Highest-rated" sort criteria — language priority | **Subtitles first, then audio, language always trumps quality**: `sortByRatingCriteria()` sorts by (1) subtitle match ranked by the user's configured preference order from settings (Q39) — e.g., if settings have "english,japanese", English sub ranks above Japanese sub, (2) audio match ranked by the same settings order, (3) composite quality score. A file matching both sub+audio ranks above sub-only, sub-only ranks above audio-only, audio-only ranks above no match. Within each language tier, composite quality breaks ties. |
 | Q17 | A vs B with only one Tier 3 candidate | **Show in A vs B groupbox**: pit candidate against a locked peer file from any anime (Q34) for context (if one exists); otherwise show as single-file confirmation ("Delete this? [Yes] [Skip]"). The locked peer is shown read-only (cannot be deleted via this prompt). |
 | Q18 | Queue behavior when space is sufficient | **Always show ranked list**: the queue always shows what WOULD be deleted, even when space is below threshold. Users can still make A vs B choices to train weights proactively. |
 | Q19 | Cross-anime gap — chain direction | **Both directions**: check prequels AND sequels. Checking only one direction WILL create gaps. |
@@ -1495,34 +1499,36 @@ struct DeletionHistoryEntry {
 | Q32 | Locked file unlock from A vs B — immediate queue rebuild? | **No rebuild needed**: the file is already in the queue (in its natural sort position per Q29). Unlocking just transitions it from locked to candidate status — a status flag change, not a structural rebuild. |
 | Q33 | Preview mode label — dynamic or static text? | **Static**: just "[PREVIEW]" — no dynamic info, no space display, no additional text. |
 | Q34 | A vs B locked peer selection — same anime or any anime? | **Any anime**: the locked peer can be from any anime in the locked list, not just the same anime. This ensures a locked peer is always available for context when one exists. |
-| Q35 | Size-weighted distance — cross-anime distance | **No cross-anime distance for unrelated anime**: Naruto and Dragon Ball Z have NO prequel/sequel relation, so they each use their own session's current position for distance calculation. Cross-anime distance only applies within the same relation chain (e.g., Naruto → Shippuden). For unrelated anime without a session, distance defaults to max (most distant = most deletable). |
+| Q35 | Size-weighted distance — cross-anime distance | **No cross-anime distance for unrelated anime**: Naruto and Dragon Ball Z have NO prequel/sequel relation, so they each use their own session's current position for distance calculation. Cross-anime distance only applies within the same relation chain (e.g., Naruto → Shippuden). Within a chain, episode distance is calculated by summing remaining episodes across boundaries (Q37): e.g., file at Naruto ep 100/220 to user at Shippuden ep 80 = `(220-100) + 80 = 200` episodes. For unrelated anime without a session, distance defaults to max (most distant = most deletable). |
+| Q36 | Per-series normalization — recalculation frequency | **Lazy**: `maxInSeries` is cached per anime/chain and invalidated when files for that anime change (add/remove/hash). No fixed interval, no rebuild-triggered recalculation. `FactorWeightLearner::invalidateNormCache(aid)` is called when file changes are detected. |
+| Q37 | Cross-anime distance within a chain — episode numbering | **Option A (sum remaining eps)**: for anime in the same relation chain, distance is calculated by summing remaining episodes across chain boundaries. Example: file at Naruto ep 100/220 to user at Shippuden ep 80 → `(220 - 100) + 80 = 200` episodes. This treats the chain as a continuous episode sequence and correctly reflects content proximity across series boundaries. |
+| Q38 | Unlock from A vs B groupbox — refresh behavior | **Option B (stay showing same file)**: after unlocking, the file remains displayed in the A vs B groupbox as a candidate alongside the original candidate. No automatic refresh or return to top pair — the user can see the newly-unlocked file in its new candidate state and make a choice if they want. |
+| Q39 | "Highest-rated file" for lock — subtitle language preference order | **Use order from settings**: the existing `preferredSubtitleLanguages` and `preferredAudioLanguages` settings (comma-separated, order = priority) already define language priority. `sortByRatingCriteria()` ranks subtitle matches by their position in the configured list (earlier = higher priority), then audio matches by their position, then composite quality. No new settings needed — the existing language preference order is reused. |
+| Q40 | Learning from procedural deletions | **Only store the history**: procedural deletions (T0-T2) are recorded in `deletion_history` with their tier, reason, and deletion_type but do NOT record factor values and do NOT adjust weights. The history entry provides the audit trail; the learning system only learns from user A vs B choices (Tier 3). |
 
 ---
 
 ## Follow-Up Questions
 
-All previous questions (Q1-Q35) have been resolved. See the Resolved Design Decisions table above for the full list.
+All previous questions (Q1-Q40) have been resolved. See the Resolved Design Decisions table above for the full list.
 
-### Q36: Per-series normalization — recalculation frequency
-The per-series `maxInSeries` value changes when files are added or removed. Should it recalculate:
-- **A**: On every queue rebuild (accurate but potentially expensive for large series)
-- **B**: Lazily — cache per anime and invalidate when files for that anime change
-- **C**: On a fixed interval (e.g., once per deletion cycle)
+### Q41: Lazy cache invalidation — trigger mechanism
+When `invalidateNormCache(aid)` is called due to a file change, should it also invalidate all anime in the same relation chain? For example, if a Naruto file is added, should the cache for Shippuden (same chain) also be invalidated?
 
-### Q37: Cross-anime distance within a chain — episode numbering
-For anime in the same relation chain (e.g., Naruto → Shippuden), how should episode distance be calculated across chain boundaries? For example, if the user is at Shippuden ep 80 and the file is Naruto ep 100 (of 220), should the distance be:
-- **A**: `(220 - 100) + 80 = 200` (remaining Naruto eps + Shippuden eps from start)
-- **B**: Use each anime's own session distance independently (simpler but ignores chain proximity)
+### Q42: Cross-anime chain distance — multiple active sessions
+If the user has active sessions in both Naruto (ep 100) and Shippuden (ep 80), which session's position is the "current" one for distance calculation? Options:
+- **A**: Use the most recently active session's position (last played)
+- **B**: Use the nearest session position to the file (minimizes distance for the file)
 - **C**: Something else?
 
-### Q38: Unlock from A vs B groupbox — refresh behavior
-When a locked file is unlocked from the A vs B groupbox (Q26/Q32), the file transitions from locked to candidate. Should the A vs B groupbox immediately:
-- **A**: Refresh to show a different pair (since the unlocked file may change the queue order)
-- **B**: Stay showing the same file (now as a candidate) alongside the original candidate
-- **C**: Return to the normal A vs B pair (top two candidates)
+### Q43: sortByRatingCriteria — multiple subtitle tracks in a single file
+A single file can have multiple subtitle tracks (e.g., English + Japanese + Spanish). When ranking by subtitle language preference order from settings, should a file with the top-priority subtitle anywhere in its tracks rank the same as a file with ONLY the top-priority subtitle? Or should multiple matching tracks be a tiebreaker?
 
-### Q39: "Highest-rated file" for lock — subtitle language preference order
-Lock protection keeps the 1 highest-rated file per episode (Q10/Q12). The rating uses subtitles first (Q16). If the user knows multiple languages, should there be a configured **subtitle language priority list** (e.g., English > Japanese > Spanish), or is it just "has preferred subtitles: yes/no"?
+### Q44: Procedural history entries — display in A vs B groupbox
+When a history entry for a procedural deletion (T0-T2) is selected, it's loaded in the A vs B groupbox for viewing. Since there was no "A vs B" choice for procedural deletions, should the display show:
+- **A**: Just the deleted file (single-file view, no comparison)
+- **B**: The deleted file alongside the file that superseded/replaced it (if applicable)
+- **C**: Something else?
 
-### Q40: Learning from procedural deletions
-When a procedural deletion happens (T0-T2, no A vs B), should the system record the factor values of the deleted file in the choice history (for statistical analysis) or only store the history entry? The data could help visualize patterns even though no weight adjustment occurs.
+### Q45: Cross-anime chain distance — chain with many anime
+For a very long chain (e.g., 10+ sequels), the episode distance between the first and last anime could be thousands of episodes. Should there be a cap on cross-anime distance to prevent extremely distant files from having disproportionate size-weighted distance values? Or does per-series normalization (Q31) already handle this?
