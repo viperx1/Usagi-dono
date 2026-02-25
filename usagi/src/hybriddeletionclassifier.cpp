@@ -32,13 +32,15 @@ DeletionCandidate HybridDeletionClassifier::classify(int lid) const
     // Fetch basic metadata once
     QSqlDatabase db = QSqlDatabase::database();
     QSqlQuery q(db);
-    q.prepare("SELECT m.aid, m.eid, lf.path, a.romaji_name "
+    q.prepare("SELECT m.aid, m.eid, lf.path, a.nameromaji "
               "FROM mylist m "
               "LEFT JOIN local_files lf ON lf.id = m.local_file "
               "LEFT JOIN anime a ON a.aid = m.aid "
               "WHERE m.lid = :lid");
     q.bindValue(":lid", lid);
     if (!q.exec() || !q.next()) {
+        LOG(QString("HybridDeletionClassifier: classify query failed for lid=%1: %2")
+            .arg(lid).arg(q.lastError().text()));
         c.tier = DeletionTier::PROTECTED;
         c.reason = "File not found in database";
         return c;

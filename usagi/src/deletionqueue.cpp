@@ -38,20 +38,25 @@ void DeletionQueue::rebuild()
         lids.append(q.value(0).toInt());
     }
 
+    LOG(QString("DeletionQueue: found %1 local file(s) for classification").arg(lids.size()));
+
+    int protectedCount = 0;
     for (int lid : lids) {
         DeletionCandidate c = m_classifier.classify(lid);
         if (c.locked) {
             m_lockedFiles.append(c);
         } else if (c.tier != DeletionTier::PROTECTED) {
             m_candidates.append(c);
+        } else {
+            ++protectedCount;
         }
     }
 
     std::sort(m_candidates.begin(), m_candidates.end());
     std::sort(m_lockedFiles.begin(), m_lockedFiles.end());
 
-    LOG(QString("DeletionQueue: rebuilt — %1 candidates, %2 locked")
-        .arg(m_candidates.size()).arg(m_lockedFiles.size()));
+    LOG(QString("DeletionQueue: rebuilt — %1 candidates, %2 locked, %3 protected")
+        .arg(m_candidates.size()).arg(m_lockedFiles.size()).arg(protectedCount));
     emit queueRebuilt();
 
     if (needsUserChoice()) {
