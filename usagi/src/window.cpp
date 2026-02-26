@@ -563,7 +563,7 @@ Window::Window()
         LOG(QString("HasherCoordinator: File linked to mylist, updating anime card for lid=%1").arg(lid));
         updateOrAddMylistEntry(lid);
         if (deletionQueue) {
-            deletionQueue->rebuild();
+            deletionQueue->scheduleRebuild();
         }
     });
     
@@ -702,7 +702,7 @@ Window::Window()
                 AnimeCard *card = cardManager->getCard(aid);
                 if (card) card->setAnimeLocked(true);
             }
-            if (deletionQueue) deletionQueue->rebuild();
+            if (deletionQueue) deletionQueue->scheduleRebuild();
         }
     });
     connect(cardManager, &MyListCardManager::unlockAnimeRequested, this, [this](int aid) {
@@ -713,19 +713,19 @@ Window::Window()
                 AnimeCard *card = cardManager->getCard(aid);
                 if (card) card->setAnimeLocked(false);
             }
-            if (deletionQueue) deletionQueue->rebuild();
+            if (deletionQueue) deletionQueue->scheduleRebuild();
         }
     });
     connect(cardManager, &MyListCardManager::lockEpisodeRequested, this, [this](int eid) {
         if (deletionLockManager) {
             deletionLockManager->lockEpisode(eid);
-            if (deletionQueue) deletionQueue->rebuild();
+            if (deletionQueue) deletionQueue->scheduleRebuild();
         }
     });
     connect(cardManager, &MyListCardManager::unlockEpisodeRequested, this, [this](int eid) {
         if (deletionLockManager) {
             deletionLockManager->unlockEpisode(eid);
-            if (deletionQueue) deletionQueue->rebuild();
+            if (deletionQueue) deletionQueue->scheduleRebuild();
         }
     });
     
@@ -1259,7 +1259,7 @@ Window::Window()
             currentChoiceWidget->setPreviewMode(!watchSessionManager->isDeletionNeeded());
         }
         if (deletionQueue) {
-            deletionQueue->rebuild();
+            deletionQueue->scheduleRebuild();
         }
     });
     
@@ -1973,8 +1973,8 @@ void Window::onMylistLoadingFinished(const QList<int> &aids)
     
     // Rebuild the deletion queue now that mylist + local_files data is available
     if (deletionQueue) {
-        LOG("[Window] Mylist loaded, rebuilding deletion queue");
-        deletionQueue->rebuild();
+        LOG("[Window] Mylist loaded, scheduling deletion queue rebuild");
+        deletionQueue->scheduleRebuild();
     }
     
     LOG("[Window] onMylistLoadingFinished complete");
@@ -2156,8 +2156,8 @@ void Window::hasherFinished()
 	
 	// Rebuild deletion queue after hashing so newly identified files are classified
 	if (deletionQueue) {
-		LOG("[Window] Hashing finished, rebuilding deletion queue");
-		deletionQueue->rebuild();
+		LOG("[Window] Hashing finished, scheduling deletion queue rebuild");
+		deletionQueue->scheduleRebuild();
 	}
 }
 
@@ -3578,8 +3578,8 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 		
 		// Rebuild deletion queue if available
 		if (deletionQueue) {
-			LOG(QString("[ExternalDeletion] Rebuilding deletion queue"));
-			deletionQueue->rebuild();
+			LOG(QString("[ExternalDeletion] Scheduling deletion queue rebuild"));
+			deletionQueue->scheduleRebuild();
 		} else {
 			LOG(QString("[ExternalDeletion] WARNING: deletionQueue is null, cannot rebuild"));
 		}

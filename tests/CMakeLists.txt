@@ -2655,3 +2655,58 @@ if(WIN32)
 endif()
 
 add_test(NAME test_deletion_candidate_display COMMAND test_deletion_candidate_display -v2)
+
+# Test: DeletionQueue debounce
+set(DELETION_QUEUE_DEBOUNCE_TEST_SOURCES
+    test_deletion_queue_debounce.cpp
+    ../usagi/src/deletionqueue.cpp
+    ../usagi/src/hybriddeletionclassifier.cpp
+    ../usagi/src/deletionlockmanager.cpp
+    ../usagi/src/factorweightlearner.cpp
+    ../usagi/src/watchsessionmanager.cpp
+    ../usagi/src/sessioninfo.cpp
+    ../usagi/src/logger.cpp
+)
+
+set(DELETION_QUEUE_DEBOUNCE_TEST_HEADERS
+    ../usagi/src/deletionqueue.h
+    ../usagi/src/hybriddeletionclassifier.h
+    ../usagi/src/deletionlockmanager.h
+    ../usagi/src/factorweightlearner.h
+    ../usagi/src/watchsessionmanager.h
+    ../usagi/src/sessioninfo.h
+    ../usagi/src/logger.h
+    ../usagi/src/deletioncandidate.h
+)
+
+add_executable(test_deletion_queue_debounce ${DELETION_QUEUE_DEBOUNCE_TEST_SOURCES} ${DELETION_QUEUE_DEBOUNCE_TEST_HEADERS})
+skip_automoc_for_usagi_sources(test_deletion_queue_debounce)
+
+target_link_libraries(test_deletion_queue_debounce PRIVATE
+    Qt6::Core
+    Qt6::Test
+    Qt6::Sql
+)
+
+target_include_directories(test_deletion_queue_debounce PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../usagi/src
+)
+
+# Windows console subsystem
+if(WIN32)
+    target_link_options(test_deletion_queue_debounce PRIVATE
+        "-Wl,--subsystem,console"
+    )
+
+    get_target_property(qt_core_type Qt6::Core TYPE)
+    if(qt_core_type STREQUAL "STATIC_LIBRARY")
+        qt_import_plugins(test_deletion_queue_debounce
+            INCLUDE
+                Qt::QWindowsIntegrationPlugin
+                Qt::QWindowsVistaStylePlugin
+                Qt::QSQLiteDriverPlugin
+        )
+    endif()
+endif()
+
+add_test(NAME test_deletion_queue_debounce COMMAND test_deletion_queue_debounce -v2)

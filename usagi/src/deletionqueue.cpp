@@ -18,6 +18,9 @@ DeletionQueue::DeletionQueue(HybridDeletionClassifier &classifier,
     , m_lockManager(lockManager)
     , m_learner(learner)
 {
+    m_rebuildTimer.setSingleShot(true);
+    m_rebuildTimer.setInterval(DEBOUNCE_MS);
+    connect(&m_rebuildTimer, &QTimer::timeout, this, &DeletionQueue::rebuild);
 }
 
 // ---------------------------------------------------------------------------
@@ -26,6 +29,8 @@ DeletionQueue::DeletionQueue(HybridDeletionClassifier &classifier,
 
 void DeletionQueue::rebuild()
 {
+    m_rebuildTimer.stop();
+
     LOG(QString("DeletionQueue::rebuild() entered, thread=%1")
         .arg((quintptr)QThread::currentThreadId()));
 
@@ -102,6 +107,15 @@ void DeletionQueue::rebuild()
 }
 
 // ---------------------------------------------------------------------------
+// scheduleRebuild  (debounced)
+// ---------------------------------------------------------------------------
+
+void DeletionQueue::scheduleRebuild()
+{
+    m_rebuildTimer.start();
+}
+
+// ---------------------------------------------------------------------------
 // Accessors
 // ---------------------------------------------------------------------------
 
@@ -159,25 +173,25 @@ QPair<DeletionCandidate, DeletionCandidate> DeletionQueue::getAvsBPair() const
 void DeletionQueue::lockAnime(int aid)
 {
     m_lockManager.lockAnime(aid);
-    rebuild();
+    scheduleRebuild();
 }
 
 void DeletionQueue::unlockAnime(int aid)
 {
     m_lockManager.unlockAnime(aid);
-    rebuild();
+    scheduleRebuild();
 }
 
 void DeletionQueue::lockEpisode(int eid)
 {
     m_lockManager.lockEpisode(eid);
-    rebuild();
+    scheduleRebuild();
 }
 
 void DeletionQueue::unlockEpisode(int eid)
 {
     m_lockManager.unlockEpisode(eid);
-    rebuild();
+    scheduleRebuild();
 }
 
 // ---------------------------------------------------------------------------
@@ -191,5 +205,5 @@ void DeletionQueue::recordChoice(int keptLid, int deletedLid)
     QMap<QString, double> deletedFactors = m_classifier.normalizeFactors(deletedLid);
 
     m_learner.recordChoice(keptLid, deletedLid, keptFactors, deletedFactors);
-    rebuild();
+    scheduleRebuild();
 }
