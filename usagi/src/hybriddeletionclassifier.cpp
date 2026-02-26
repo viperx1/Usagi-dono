@@ -298,6 +298,11 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
 
     // Check if a better-matching alternative exists for the same episode
     QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid() || !db.isOpen()) {
+        LOG(QString("[T2] lid=%1 ERROR: db not available (valid=%2 open=%3)")
+            .arg(lid).arg(db.isValid()).arg(db.isOpen()));
+        return c;
+    }
     QSqlQuery q(db);
     q.prepare("SELECT m2.lid, lf.path FROM mylist m2 "
               "JOIN local_files lf ON lf.id = m2.local_file "
@@ -305,7 +310,10 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
               "AND m2.lid != :lid2 AND lf.path IS NOT NULL");
     q.bindValue(":lid", lid);
     q.bindValue(":lid2", lid);
-    if (!q.exec()) return c;
+    if (!q.exec()) {
+        LOG(QString("[T2] lid=%1 alternative query failed: %2").arg(lid).arg(q.lastError().text()));
+        return c;
+    }
 
     while (q.next()) {
         int altLid = q.value(0).toInt();

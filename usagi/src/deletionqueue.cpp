@@ -6,6 +6,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QThread>
 #include <algorithm>
 
 DeletionQueue::DeletionQueue(HybridDeletionClassifier &classifier,
@@ -25,7 +26,8 @@ DeletionQueue::DeletionQueue(HybridDeletionClassifier &classifier,
 
 void DeletionQueue::rebuild()
 {
-    LOG(QString("DeletionQueue::rebuild() entered"));
+    LOG(QString("DeletionQueue::rebuild() entered, thread=%1")
+        .arg((quintptr)QThread::currentThreadId()));
 
     m_candidates.clear();
     m_lockedFiles.clear();
@@ -39,6 +41,9 @@ void DeletionQueue::rebuild()
         LOG(QString("DeletionQueue::rebuild() ERROR: default database connection is NOT OPEN"));
         return;
     }
+
+    LOG(QString("DeletionQueue::rebuild() db connection='%1' driver='%2'")
+        .arg(db.connectionName(), db.driverName()));
 
     QSqlQuery q(db);
     // Fetch all local files with non-null paths (i.e. files that exist on disk)
@@ -57,7 +62,10 @@ void DeletionQueue::rebuild()
 
     m_protectedCount  = 0;
     m_totalClassified = lids.size();
+    int classifiedCount = 0;
+    int lastReportedLid = 0;
     for (int lid : lids) {
+        lastReportedLid = lid;
         DeletionCandidate c = m_classifier.classify(lid);
         if (c.locked) {
             m_lockedFiles.append(c);
@@ -66,6 +74,17 @@ void DeletionQueue::rebuild()
         } else {
             ++m_protectedCount;
         }
+        ++classifiedCount;
+        if (classifiedCount % 50 == 0) {
+            LOG(QString("DeletionQueue: classified %1/%2 (last lid=%3, candidates=%4, locked=%5, protected=%6)")
+                .arg(classifiedCount).arg(lids.size()).arg(lid)
+                .arg(m_candidates.size()).arg(m_lockedFiles.size()).arg(m_protectedCount));
+        }
+    }
+    if (classifiedCount % 50 != 0) {
+        LOG(QString("DeletionQueue: classified %1/%2 (last lid=%3, candidates=%4, locked=%5, protected=%6)")
+            .arg(classifiedCount).arg(lids.size()).arg(lastReportedLid)
+            .arg(m_candidates.size()).arg(m_lockedFiles.size()).arg(m_protectedCount));
     }
 
     std::sort(m_candidates.begin(), m_candidates.end());
