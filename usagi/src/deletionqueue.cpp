@@ -63,12 +63,10 @@ void DeletionQueue::rebuild()
     m_protectedCount  = 0;
     m_totalClassified = lids.size();
     int classifiedCount = 0;
+    int lastReportedLid = 0;
     for (int lid : lids) {
-        LOG(QString("DeletionQueue: classifying lid=%1 (%2/%3)")
-            .arg(lid).arg(classifiedCount + 1).arg(lids.size()));
+        lastReportedLid = lid;
         DeletionCandidate c = m_classifier.classify(lid);
-        LOG(QString("DeletionQueue: classified lid=%1 tier=%2 locked=%3 reason='%4'")
-            .arg(lid).arg(c.tier).arg(c.locked).arg(c.reason));
         if (c.locked) {
             m_lockedFiles.append(c);
         } else if (c.tier != DeletionTier::PROTECTED) {
@@ -77,10 +75,17 @@ void DeletionQueue::rebuild()
             ++m_protectedCount;
         }
         ++classifiedCount;
+        if (classifiedCount % 50 == 0) {
+            LOG(QString("DeletionQueue: classified %1/%2 (last lid=%3, candidates=%4, locked=%5, protected=%6)")
+                .arg(classifiedCount).arg(lids.size()).arg(lid)
+                .arg(m_candidates.size()).arg(m_lockedFiles.size()).arg(m_protectedCount));
+        }
     }
-
-    LOG(QString("DeletionQueue: classification complete, sorting %1 candidates and %2 locked")
-        .arg(m_candidates.size()).arg(m_lockedFiles.size()));
+    if (classifiedCount % 50 != 0) {
+        LOG(QString("DeletionQueue: classified %1/%2 (last lid=%3, candidates=%4, locked=%5, protected=%6)")
+            .arg(classifiedCount).arg(lids.size()).arg(lastReportedLid)
+            .arg(m_candidates.size()).arg(m_lockedFiles.size()).arg(m_protectedCount));
+    }
 
     std::sort(m_candidates.begin(), m_candidates.end());
     std::sort(m_lockedFiles.begin(), m_lockedFiles.end());

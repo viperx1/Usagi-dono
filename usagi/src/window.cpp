@@ -1355,14 +1355,11 @@ Window::Window()
     
     // Connect WatchSessionManager fileDeleted signal to refresh UI
     connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
-        LOG(QString("[Window] fileDeleted signal received: lid=%1, aid=%2, thread=%3")
-            .arg(lid).arg(aid).arg((quintptr)QThread::currentThreadId()));
+        LOG(QString("[Window] fileDeleted signal received: lid=%1, aid=%2").arg(lid).arg(aid));
         if (cardManager) {
             QSet<int> lids;
             lids.insert(lid);
-            LOG(QString("[Window] fileDeleted: calling refreshCardsForLids for lid=%1").arg(lid));
             cardManager->refreshCardsForLids(lids);
-            LOG(QString("[Window] fileDeleted: refreshCardsForLids completed for lid=%1").arg(lid));
         } else {
             LOG(QString("[Window] WARNING: cardManager is null, cannot refresh cards for lid=%1").arg(lid));
         }
@@ -3545,8 +3542,7 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 	
 	connect(thread, &QThread::started, worker, &ExternalDeletionWorker::doWork);
 	connect(worker, &ExternalDeletionWorker::finished, this, [this](const QList<FileDeletionResult> &results) {
-		LOG(QString("[ExternalDeletion] Worker finished with %1 result(s), thread=%2")
-			.arg(results.size()).arg((quintptr)QThread::currentThreadId()));
+		LOG(QString("[ExternalDeletion] Worker finished with %1 result(s)").arg(results.size()));
 		QSet<int> affectedLids;
 		
 		for (const FileDeletionResult &result : results) {
@@ -3576,7 +3572,6 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 		if (cardManager && !affectedLids.isEmpty()) {
 			LOG(QString("[ExternalDeletion] Refreshing %1 affected card(s)").arg(affectedLids.size()));
 			cardManager->refreshCardsForLids(affectedLids);
-			LOG(QString("[ExternalDeletion] Card refresh completed"));
 		} else if (!cardManager) {
 			LOG(QString("[ExternalDeletion] WARNING: cardManager is null, cannot refresh cards"));
 		}
@@ -3585,7 +3580,6 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 		if (deletionQueue) {
 			LOG(QString("[ExternalDeletion] Rebuilding deletion queue"));
 			deletionQueue->rebuild();
-			LOG(QString("[ExternalDeletion] Deletion queue rebuild completed"));
 		} else {
 			LOG(QString("[ExternalDeletion] WARNING: deletionQueue is null, cannot rebuild"));
 		}

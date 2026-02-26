@@ -969,18 +969,14 @@ void MyListCardManager::refreshCardsForLids(const QSet<int>& lids)
     for (int aid : aidsToRefresh) {
         if (m_cards.contains(aid)) {
             // Remove the old card
-            LOG(QString("[MyListCardManager] refreshCardsForLids: removing old card for aid=%1").arg(aid));
             AnimeCard* oldCard = m_cards.take(aid);
             if (oldCard) {
                 oldCard->deleteLater();
             }
             // Recreate with updated data
-            LOG(QString("[MyListCardManager] refreshCardsForLids: recreating card for aid=%1").arg(aid));
             AnimeCard* newCard = createCard(aid);
             if (!newCard) {
                 LOG(QString("[MyListCardManager] WARNING: createCard returned null for aid=%1 during refresh").arg(aid));
-            } else {
-                LOG(QString("[MyListCardManager] refreshCardsForLids: card recreated for aid=%1").arg(aid));
             }
         }
     }
