@@ -1020,13 +1020,16 @@ int WatchSessionManager::getHigherVersionFileCount(int lid) const
 // Helper methods for new marking criteria
 bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
 {
+    LOG(QString("[WatchSessionManager] matchesPreferredAudioLanguage() enter: lid=%1").arg(lid));
     QString audioLang = getFileAudioLanguage(lid);
     if (audioLang.isEmpty()) {
+        LOG(QString("[WatchSessionManager] matchesPreferredAudioLanguage: lid=%1 audioLang is empty, returning false").arg(lid));
         return false;
     }
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG(QString("[WatchSessionManager] matchesPreferredAudioLanguage: lid=%1 db not open, returning false").arg(lid));
         return false;
     }
     
@@ -1055,13 +1058,16 @@ bool WatchSessionManager::matchesPreferredAudioLanguage(int lid) const
 
 bool WatchSessionManager::matchesPreferredSubtitleLanguage(int lid) const
 {
+    LOG(QString("[WatchSessionManager] matchesPreferredSubtitleLanguage() enter: lid=%1").arg(lid));
     QString subLang = getFileSubtitleLanguage(lid);
     if (subLang.isEmpty()) {
+        LOG(QString("[WatchSessionManager] matchesPreferredSubtitleLanguage: lid=%1 subLang is empty, returning false").arg(lid));
         return false;
     }
     
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG(QString("[WatchSessionManager] matchesPreferredSubtitleLanguage: lid=%1 db not open, returning false").arg(lid));
         return false;
     }
     
@@ -1127,6 +1133,7 @@ QString WatchSessionManager::getFileAudioLanguage(int lid) const
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG(QString("[WatchSessionManager] getFileAudioLanguage: lid=%1 db not open").arg(lid));
         return QString();
     }
     
@@ -1135,9 +1142,13 @@ QString WatchSessionManager::getFileAudioLanguage(int lid) const
     q.addBindValue(lid);
     
     if (q.exec() && q.next()) {
-        return q.value(0).toString();
+        QString result = q.value(0).toString();
+        LOG(QString("[WatchSessionManager] getFileAudioLanguage: lid=%1 result='%2'").arg(lid).arg(result));
+        return result;
     }
     
+    LOG(QString("[WatchSessionManager] getFileAudioLanguage: lid=%1 query failed or no result: %2")
+        .arg(lid).arg(q.lastError().text()));
     return QString();
 }
 
@@ -1145,6 +1156,7 @@ QString WatchSessionManager::getFileSubtitleLanguage(int lid) const
 {
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isOpen()) {
+        LOG(QString("[WatchSessionManager] getFileSubtitleLanguage: lid=%1 db not open").arg(lid));
         return QString();
     }
     
@@ -1153,9 +1165,13 @@ QString WatchSessionManager::getFileSubtitleLanguage(int lid) const
     q.addBindValue(lid);
     
     if (q.exec() && q.next()) {
-        return q.value(0).toString();
+        QString result = q.value(0).toString();
+        LOG(QString("[WatchSessionManager] getFileSubtitleLanguage: lid=%1 result='%2'").arg(lid).arg(result));
+        return result;
     }
     
+    LOG(QString("[WatchSessionManager] getFileSubtitleLanguage: lid=%1 query failed or no result: %2")
+        .arg(lid).arg(q.lastError().text()));
     return QString();
 }
 

@@ -6,6 +6,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QThread>
 #include <cmath>
 
 HybridDeletionClassifier::HybridDeletionClassifier(
@@ -26,6 +27,9 @@ HybridDeletionClassifier::HybridDeletionClassifier(
 
 DeletionCandidate HybridDeletionClassifier::classify(int lid) const
 {
+    LOG(QString("[Classifier] classify() enter: lid=%1 thread=%2")
+        .arg(lid).arg(reinterpret_cast<quintptr>(QThread::currentThreadId())));
+
     DeletionCandidate c;
     c.lid = lid;
 
@@ -70,6 +74,7 @@ DeletionCandidate HybridDeletionClassifier::classify(int lid) const
         c.reason = m_lockManager.isAnimeLocked(c.aid)
                    ? "Anime locked (highest rated kept)"
                    : "Episode locked (highest rated kept)";
+        LOG(QString("[Classifier] lid=%1 is locked, reason='%2'").arg(lid).arg(c.reason));
         return c;
     }
 
@@ -77,43 +82,55 @@ DeletionCandidate HybridDeletionClassifier::classify(int lid) const
     // (called externally by DeletionQueue before acting on a candidate)
 
     // ── Tier 0: hidden anime ──
+    LOG(QString("[Classifier] lid=%1 checking hidden anime").arg(lid));
     DeletionCandidate th = classifyHiddenAnime(lid);
     if (th.tier == DeletionTier::HIDDEN_ANIME) {
         th.aid = c.aid; th.eid = c.eid; th.filePath = c.filePath; th.animeName = c.animeName;
+        LOG(QString("[Classifier] lid=%1 classified as HIDDEN_ANIME").arg(lid));
         return th;
     }
 
     // ── Tier 1: superseded revision ──
+    LOG(QString("[Classifier] lid=%1 checking superseded revision").arg(lid));
     DeletionCandidate t0 = classifyTier0(lid);
     if (t0.tier == DeletionTier::SUPERSEDED_REVISION) {
         t0.aid = c.aid; t0.eid = c.eid; t0.filePath = c.filePath; t0.animeName = c.animeName;
+        LOG(QString("[Classifier] lid=%1 classified as SUPERSEDED_REVISION").arg(lid));
         return t0;
     }
 
     // ── Tier 2: low-quality duplicate ──
+    LOG(QString("[Classifier] lid=%1 checking low-quality duplicate").arg(lid));
     DeletionCandidate t1 = classifyTier1(lid);
     if (t1.tier == DeletionTier::LOW_QUALITY_DUPLICATE) {
         t1.aid = c.aid; t1.eid = c.eid; t1.filePath = c.filePath; t1.animeName = c.animeName;
+        LOG(QString("[Classifier] lid=%1 classified as LOW_QUALITY_DUPLICATE").arg(lid));
         return t1;
     }
 
     // ── Tier 3: language mismatch ──
+    LOG(QString("[Classifier] lid=%1 checking language mismatch").arg(lid));
     DeletionCandidate t2 = classifyTier2(lid);
     if (t2.tier == DeletionTier::LANGUAGE_MISMATCH) {
         t2.aid = c.aid; t2.eid = c.eid; t2.filePath = c.filePath; t2.animeName = c.animeName;
+        LOG(QString("[Classifier] lid=%1 classified as LANGUAGE_MISMATCH").arg(lid));
         return t2;
     }
 
     // ── Tier 4: learned preference ──
+    LOG(QString("[Classifier] lid=%1 checking learned preference eligibility").arg(lid));
     if (isEligibleForDeletion(lid)) {
         DeletionCandidate t3 = classifyTier3(lid);
         t3.aid = c.aid; t3.eid = c.eid; t3.filePath = c.filePath; t3.animeName = c.animeName;
+        LOG(QString("[Classifier] lid=%1 classified as LEARNED_PREFERENCE score=%2")
+            .arg(lid).arg(t3.learnedScore));
         return t3;
     }
 
     // ── Protected ──
     c.tier   = DeletionTier::PROTECTED;
     c.reason = "Protected (not eligible for deletion)";
+    LOG(QString("[Classifier] lid=%1 classified as PROTECTED").arg(lid));
     return c;
 }
 
@@ -285,19 +302,29 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
     c.lid = lid;
 
     // Check if file doesn't match audio/subtitle preferences AND a better alternative exists.
+    LOG(QString("[T2] lid=%1 calling matchesPreferredAudioLanguage").arg(lid));
     bool audioMatch = m_sessionManager.matchesPreferredAudioLanguage(lid);
+    LOG(QString("[T2] lid=%1 calling matchesPreferredSubtitleLanguage").arg(lid));
     bool subMatch   = m_sessionManager.matchesPreferredSubtitleLanguage(lid);
 
     if (audioMatch && subMatch) return c;
 
+    LOG(QString("[T2] lid=%1 calling getFileAudioLanguage").arg(lid));
     QString myAudio = m_sessionManager.getFileAudioLanguage(lid);
+    LOG(QString("[T2] lid=%1 calling getFileSubtitleLanguage").arg(lid));
     QString mySub   = m_sessionManager.getFileSubtitleLanguage(lid);
 
     LOG(QString("[T2] lid=%1 audioMatch=%2 subMatch=%3 dub='%4' sub='%5'")
         .arg(lid).arg(audioMatch).arg(subMatch).arg(myAudio, mySub));
 
     // Check if a better-matching alternative exists for the same episode
+    LOG(QString("[T2] lid=%1 querying for better alternative").arg(lid));
     QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid() || !db.isOpen()) {
+        LOG(QString("[T2] lid=%1 ERROR: db not available (valid=%2 open=%3)")
+            .arg(lid).arg(db.isValid()).arg(db.isOpen()));
+        return c;
+    }
     QSqlQuery q(db);
     q.prepare("SELECT m2.lid, lf.path FROM mylist m2 "
               "JOIN local_files lf ON lf.id = m2.local_file "
@@ -305,12 +332,18 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
               "AND m2.lid != :lid2 AND lf.path IS NOT NULL");
     q.bindValue(":lid", lid);
     q.bindValue(":lid2", lid);
-    if (!q.exec()) return c;
+    if (!q.exec()) {
+        LOG(QString("[T2] lid=%1 alternative query failed: %2").arg(lid).arg(q.lastError().text()));
+        return c;
+    }
 
     while (q.next()) {
         int altLid = q.value(0).toInt();
+        LOG(QString("[T2] lid=%1 checking alternative altLid=%2").arg(lid).arg(altLid));
         bool altAudio = m_sessionManager.matchesPreferredAudioLanguage(altLid);
         bool altSub   = m_sessionManager.matchesPreferredSubtitleLanguage(altLid);
+        LOG(QString("[T2] lid=%1 altLid=%2 altAudio=%3 altSub=%4")
+            .arg(lid).arg(altLid).arg(altAudio).arg(altSub));
         // Alternative is better if it matches at least as well and better on at least one
         if ((altAudio || !audioMatch) && (altSub || !subMatch)
             && (altAudio > audioMatch || altSub > subMatch)) {
@@ -330,9 +363,11 @@ DeletionCandidate HybridDeletionClassifier::classifyTier2(int lid) const
                 parts << QString("sub: %1 → %2").arg(mySub.isEmpty() ? "none" : mySub,
                                                        altSubLang.isEmpty() ? "none" : altSubLang);
             c.reason = QString("Language mismatch (%1)").arg(parts.join(", "));
+            LOG(QString("[T2] lid=%1 LANGUAGE_MISMATCH: %2").arg(lid).arg(c.reason));
             return c;
         }
     }
+    LOG(QString("[T2] lid=%1 no language mismatch found").arg(lid));
     return c;
 }
 
