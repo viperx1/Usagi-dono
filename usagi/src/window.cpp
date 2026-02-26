@@ -1279,11 +1279,11 @@ Window::Window()
         }
         
         LOG(QString("[Deletion] Top candidate: lid=%1 tier=%2 score=%3 path='%4'")
-            .arg(candidate->lid).arg(static_cast<int>(candidate->tier)).arg(candidate->learnedScore).arg(candidate->filePath));
+            .arg(candidate->lid).arg(candidate->tier).arg(candidate->learnedScore).arg(candidate->filePath));
 
         // Procedural tiers (0-3) are auto-deleted without user interaction
         if (candidate->tier < DeletionTier::LEARNED_PREFERENCE) {
-            LOG(QString("[Deletion] Auto-delete T%1 lid=%2").arg(static_cast<int>(candidate->tier)).arg(candidate->lid));
+            LOG(QString("[Deletion] Auto-delete T%1 lid=%2").arg(candidate->tier).arg(candidate->lid));
             DeletionCandidate info = *candidate;
             QFileInfo fi(info.filePath);
             info.fileSize = fi.exists() ? fi.size() : 0;
