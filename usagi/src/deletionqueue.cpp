@@ -27,7 +27,7 @@ DeletionQueue::DeletionQueue(HybridDeletionClassifier &classifier,
 void DeletionQueue::rebuild()
 {
     LOG(QString("DeletionQueue::rebuild() entered, thread=%1")
-        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId())));
+        .arg((quintptr)QThread::currentThreadId()));
 
     m_candidates.clear();
     m_lockedFiles.clear();

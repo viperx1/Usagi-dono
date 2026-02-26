@@ -28,7 +28,7 @@ HybridDeletionClassifier::HybridDeletionClassifier(
 DeletionCandidate HybridDeletionClassifier::classify(int lid) const
 {
     LOG(QString("[Classifier] classify() enter: lid=%1 thread=%2")
-        .arg(lid).arg(reinterpret_cast<quintptr>(QThread::currentThreadId())));
+        .arg(lid).arg((quintptr)QThread::currentThreadId()));
 
     DeletionCandidate c;
     c.lid = lid;

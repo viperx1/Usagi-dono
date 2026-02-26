@@ -1356,7 +1356,7 @@ Window::Window()
     // Connect WatchSessionManager fileDeleted signal to refresh UI
     connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
         LOG(QString("[Window] fileDeleted signal received: lid=%1, aid=%2, thread=%3")
-            .arg(lid).arg(aid).arg(reinterpret_cast<quintptr>(QThread::currentThreadId())));
+            .arg(lid).arg(aid).arg((quintptr)QThread::currentThreadId()));
         if (cardManager) {
             QSet<int> lids;
             lids.insert(lid);
@@ -3546,7 +3546,7 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 	connect(thread, &QThread::started, worker, &ExternalDeletionWorker::doWork);
 	connect(worker, &ExternalDeletionWorker::finished, this, [this](const QList<FileDeletionResult> &results) {
 		LOG(QString("[ExternalDeletion] Worker finished with %1 result(s), thread=%2")
-			.arg(results.size()).arg(reinterpret_cast<quintptr>(QThread::currentThreadId())));
+			.arg(results.size()).arg((quintptr)QThread::currentThreadId()));
 		QSet<int> affectedLids;
 		
 		for (const FileDeletionResult &result : results) {
