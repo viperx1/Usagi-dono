@@ -380,8 +380,10 @@ void ExternalDeletionWorker::doWork()
     }
     
     threadDb.close();
+    LOG(QString("[ExternalDeletionWorker] Database closed, removing connection '%1'").arg(connectionName));
     QSqlDatabase::removeDatabase(connectionName);
     
+    LOG(QString("[ExternalDeletionWorker] Emitting finished with %1 result(s)").arg(results.size()));
     emit finished(results);
 }
 
@@ -1264,16 +1266,24 @@ Window::Window()
     // Handle deletion cycle requests from WatchSessionManager.
     // DeletionQueue picks the best candidate using HybridDeletionClassifier.
     connect(watchSessionManager, &WatchSessionManager::deletionCycleRequested, this, [this]() {
+        LOG(QString("[Deletion] deletionCycleRequested received: deletionQueue=%1 watchSessionManager=%2")
+            .arg(deletionQueue != nullptr).arg(watchSessionManager != nullptr));
         if (!deletionQueue || !watchSessionManager) return;
         
         deletionQueue->rebuild();
         
         const DeletionCandidate *candidate = deletionQueue->next();
-        if (!candidate) return;
+        if (!candidate) {
+            LOG(QString("[Deletion] No deletion candidate available after rebuild"));
+            return;
+        }
         
+        LOG(QString("[Deletion] Top candidate: lid=%1 tier=%2 score=%3 path='%4'")
+            .arg(candidate->lid).arg(static_cast<int>(candidate->tier)).arg(candidate->learnedScore).arg(candidate->filePath));
+
         // Procedural tiers (0-3) are auto-deleted without user interaction
         if (candidate->tier < DeletionTier::LEARNED_PREFERENCE) {
-            LOG(QString("[Deletion] Auto-delete T%1 lid=%2").arg(candidate->tier).arg(candidate->lid));
+            LOG(QString("[Deletion] Auto-delete T%1 lid=%2").arg(static_cast<int>(candidate->tier)).arg(candidate->lid));
             DeletionCandidate info = *candidate;
             QFileInfo fi(info.filePath);
             info.fileSize = fi.exists() ? fi.size() : 0;
@@ -1284,6 +1294,7 @@ Window::Window()
         
         // Tier 4 (learned preference): show A vs B if untrained/low-confidence
         if (deletionQueue->needsUserChoice()) {
+            LOG(QString("[Deletion] User choice needed for lid=%1").arg(candidate->lid));
             if (trayIconManager) trayIconManager->setDeletionAlertVisible(true);
             return;
         }
@@ -1312,6 +1323,8 @@ Window::Window()
             
             connect(deletionThread, &QThread::started, worker, &FileDeletionWorker::doWork);
             connect(worker, &FileDeletionWorker::finished, this, [this](const FileDeletionResult &result) {
+                LOG(QString("[Deletion] FileDeletionWorker finished: lid=%1 success=%2 fid=%3 ed2k='%4'")
+                    .arg(result.lid).arg(result.success).arg(result.fid).arg(result.ed2k));
                 if (result.success && adbapi) {
                     if (result.fid > 0 && !result.ed2k.isEmpty()) {
                         QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
@@ -1323,8 +1336,11 @@ Window::Window()
                             watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
                         }
                     }
-                } else if (!result.success && watchSessionManager) {
-                    watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
+                } else if (!result.success) {
+                    LOG(QString("[Deletion] File deletion failed for lid=%1: %2").arg(result.lid).arg(result.errorMessage));
+                    if (watchSessionManager) {
+                        watchSessionManager->onFileDeletionResult(result.lid, result.aid, false);
+                    }
                 }
             });
             connect(worker, &FileDeletionWorker::finished, deletionThread, &QThread::quit);
@@ -1332,16 +1348,20 @@ Window::Window()
             connect(deletionThread, &QThread::finished, deletionThread, &QObject::deleteLater);
             
             deletionThread->start();
+        } else {
+            LOG(QString("[Deletion] ERROR: adbapi is null, cannot delete lid=%1").arg(lid));
         }
     });
     
     // Connect WatchSessionManager fileDeleted signal to refresh UI
     connect(watchSessionManager, &WatchSessionManager::fileDeleted, this, [this](int lid, int aid) {
-        Q_UNUSED(aid);
+        LOG(QString("[Window] fileDeleted signal received: lid=%1, aid=%2").arg(lid).arg(aid));
         if (cardManager) {
             QSet<int> lids;
             lids.insert(lid);
             cardManager->refreshCardsForLids(lids);
+        } else {
+            LOG(QString("[Window] WARNING: cardManager is null, cannot refresh cards for lid=%1").arg(lid));
         }
     });
     
@@ -2552,8 +2572,8 @@ void Window::apitesterProcess()
 
 void Window::getNotifyMylistAdd(QString tag, int code)
 {
-    QString logMsg = QString(__FILE__) + " " + QString::number(__LINE__) + " getNotifyMylistAdd() tag=" + tag + " code=" + QString::number(code);
-    LOG(logMsg);
+    LOG(QString("[Window] getNotifyMylistAdd() tag=%1 code=%2 pendingDeletions=%3")
+        .arg(tag).arg(code).arg(m_pendingDeletions.size()));
     
     // Check if this is a pending file deletion awaiting API confirmation
     if (code == 311 && m_pendingDeletions.contains(tag)) {
@@ -2568,6 +2588,8 @@ void Window::getNotifyMylistAdd(QString tag, int code)
         // This will trigger the next deletion if space is still below threshold
         if (watchSessionManager) {
             watchSessionManager->onFileDeletionResult(lid, aid, true);
+        } else {
+            LOG(QString("[Window] WARNING: watchSessionManager is null, cannot report deletion result for lid=%1").arg(lid));
         }
         
         // Don't process this tag further - it was for a deletion, not a regular mylist add
@@ -3499,14 +3521,20 @@ void Window::onWatcherNewFilesDetected(const QStringList &filePaths)
 
 void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 {
-	LOG(QString("Window::onWatcherFilesDeleted() called with %1 file(s)").arg(filePaths.size()));
+	LOG(QString("[ExternalDeletion] onWatcherFilesDeleted() called with %1 file(s)").arg(filePaths.size()));
 	
 	if (filePaths.isEmpty()) {
 		return;
 	}
 	
 	QSqlDatabase db = QSqlDatabase::database();
+	if (!db.isValid() || !db.isOpen()) {
+		LOG(QString("[ExternalDeletion] ERROR: database not available (valid=%1, open=%2), cannot process deleted files")
+			.arg(db.isValid()).arg(db.isOpen()));
+		return;
+	}
 	QString dbName = db.databaseName();
+	LOG(QString("[ExternalDeletion] Starting worker thread for %1 file(s), dbName='%2'").arg(filePaths.size()).arg(dbName));
 	
 	QThread *thread = new QThread(this);
 	ExternalDeletionWorker *worker = new ExternalDeletionWorker(dbName, filePaths);
@@ -3514,10 +3542,13 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 	
 	connect(thread, &QThread::started, worker, &ExternalDeletionWorker::doWork);
 	connect(worker, &ExternalDeletionWorker::finished, this, [this](const QList<FileDeletionResult> &results) {
+		LOG(QString("[ExternalDeletion] Worker finished with %1 result(s)").arg(results.size()));
 		QSet<int> affectedLids;
 		
 		for (const FileDeletionResult &result : results) {
 			if (!result.success || result.lid == 0) {
+				LOG(QString("[ExternalDeletion] Skipping result: success=%1, lid=%2, path=%3")
+					.arg(result.success).arg(result.lid).arg(result.filePath));
 				continue;
 			}
 			
@@ -3528,6 +3559,9 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 				QString tag = adbapi->MylistAdd(result.size, result.ed2k, 0, MylistState::DELETED, "", true);
 				LOG(QString("[ExternalDeletion] MYLISTADD state=DELETED lid=%1 tag=%2").arg(result.lid).arg(tag));
 				m_pendingDeletions[tag] = QPair<int, int>(result.lid, result.aid);
+			} else {
+				LOG(QString("[ExternalDeletion] Cannot send MYLISTADD for lid=%1: adbapi=%2 fid=%3 ed2k='%4'")
+					.arg(result.lid).arg(adbapi != nullptr).arg(result.fid).arg(result.ed2k));
 			}
 			
 			LOG(QString("[ExternalDeletion] Updated records for externally deleted file: lid=%1, aid=%2, path=%3")
@@ -3536,13 +3570,20 @@ void Window::onWatcherFilesDeleted(const QStringList &filePaths)
 		
 		// Refresh anime cards for all affected lids
 		if (cardManager && !affectedLids.isEmpty()) {
+			LOG(QString("[ExternalDeletion] Refreshing %1 affected card(s)").arg(affectedLids.size()));
 			cardManager->refreshCardsForLids(affectedLids);
+		} else if (!cardManager) {
+			LOG(QString("[ExternalDeletion] WARNING: cardManager is null, cannot refresh cards"));
 		}
 		
 		// Rebuild deletion queue if available
 		if (deletionQueue) {
+			LOG(QString("[ExternalDeletion] Rebuilding deletion queue"));
 			deletionQueue->rebuild();
+		} else {
+			LOG(QString("[ExternalDeletion] WARNING: deletionQueue is null, cannot rebuild"));
 		}
+		LOG(QString("[ExternalDeletion] Handler completed"));
 	});
 	connect(worker, &ExternalDeletionWorker::finished, thread, &QThread::quit);
 	connect(thread, &QThread::finished, worker, &QObject::deleteLater);

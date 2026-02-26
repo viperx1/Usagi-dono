@@ -31,6 +31,19 @@ DeletionCandidate HybridDeletionClassifier::classify(int lid) const
 
     // Fetch basic metadata once
     QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid()) {
+        LOG(QString("HybridDeletionClassifier::classify() ERROR: default db connection INVALID for lid=%1").arg(lid));
+        c.tier = DeletionTier::PROTECTED;
+        c.reason = "Database connection invalid";
+        return c;
+    }
+    if (!db.isOpen()) {
+        LOG(QString("HybridDeletionClassifier::classify() ERROR: default db connection NOT OPEN for lid=%1").arg(lid));
+        c.tier = DeletionTier::PROTECTED;
+        c.reason = "Database connection not open";
+        return c;
+    }
+
     QSqlQuery q(db);
     q.prepare("SELECT m.aid, m.eid, lf.path, a.nameromaji "
               "FROM mylist m "

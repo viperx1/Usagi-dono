@@ -5,6 +5,7 @@
 #include "logger.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <algorithm>
 
 DeletionQueue::DeletionQueue(HybridDeletionClassifier &classifier,
@@ -24,15 +25,29 @@ DeletionQueue::DeletionQueue(HybridDeletionClassifier &classifier,
 
 void DeletionQueue::rebuild()
 {
+    LOG(QString("DeletionQueue::rebuild() entered"));
+
     m_candidates.clear();
     m_lockedFiles.clear();
 
     QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid()) {
+        LOG(QString("DeletionQueue::rebuild() ERROR: default database connection is INVALID"));
+        return;
+    }
+    if (!db.isOpen()) {
+        LOG(QString("DeletionQueue::rebuild() ERROR: default database connection is NOT OPEN"));
+        return;
+    }
+
     QSqlQuery q(db);
     // Fetch all local files with non-null paths (i.e. files that exist on disk)
-    q.exec("SELECT m.lid FROM mylist m "
+    if (!q.exec("SELECT m.lid FROM mylist m "
            "JOIN local_files lf ON lf.id = m.local_file "
-           "WHERE lf.path IS NOT NULL AND m.state != 3");
+           "WHERE lf.path IS NOT NULL AND m.state != 3")) {
+        LOG(QString("DeletionQueue::rebuild() ERROR: query failed: %1").arg(q.lastError().text()));
+        return;
+    }
     QList<int> lids;
     while (q.next()) {
         lids.append(q.value(0).toInt());
@@ -58,6 +73,8 @@ void DeletionQueue::rebuild()
 
     LOG(QString("DeletionQueue: rebuilt — %1 candidates, %2 locked, %3 protected")
         .arg(m_candidates.size()).arg(m_lockedFiles.size()).arg(m_protectedCount));
+
+    LOG(QString("DeletionQueue::rebuild() completed"));
     emit queueRebuilt();
 
     if (needsUserChoice()) {
