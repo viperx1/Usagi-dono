@@ -974,7 +974,10 @@ void MyListCardManager::refreshCardsForLids(const QSet<int>& lids)
                 oldCard->deleteLater();
             }
             // Recreate with updated data
-            createCard(aid);
+            AnimeCard* newCard = createCard(aid);
+            if (!newCard) {
+                LOG(QString("[MyListCardManager] WARNING: createCard returned null for aid=%1 during refresh").arg(aid));
+            }
         }
     }
     

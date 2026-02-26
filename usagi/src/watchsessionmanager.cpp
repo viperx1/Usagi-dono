@@ -618,6 +618,9 @@ void WatchSessionManager::cleanupMissingFileStatus(int lid)
 
 void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
 {
+    LOG(QString("[WatchSessionManager] onFileDeletionResult lid=%1, aid=%2, success=%3, failedCount=%4")
+        .arg(lid).arg(aid).arg(success).arg(m_failedDeletions.size()));
+
     if (success) {
         LOG(QString("[WatchSessionManager] File deletion succeeded for lid=%1, aid=%2").arg(lid).arg(aid));
         m_failedDeletions.remove(lid);
@@ -627,6 +630,9 @@ void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
         if (m_enableActualDeletion && isDeletionNeeded()) {
             LOG("[WatchSessionManager] Space still below threshold after deletion, requesting next deletion cycle");
             emit deletionCycleRequested();
+        } else {
+            LOG(QString("[WatchSessionManager] No further deletion needed: enableActualDeletion=%1, deletionNeeded=%2")
+                .arg(m_enableActualDeletion).arg(isDeletionNeeded()));
         }
     } else {
         LOG(QString("[WatchSessionManager] File deletion failed for lid=%1, aid=%2").arg(lid).arg(aid));
@@ -637,6 +643,7 @@ void WatchSessionManager::onFileDeletionResult(int lid, int aid, bool success)
             emit deletionCycleRequested();
         }
     }
+    LOG(QString("[WatchSessionManager] onFileDeletionResult completed for lid=%1").arg(lid));
 }
 
 void WatchSessionManager::autoMarkFilesForDeletion()
