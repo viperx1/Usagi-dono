@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QList>
 #include <QPair>
+#include <QTimer>
 #include "deletioncandidate.h"
 
 class HybridDeletionClassifier;
@@ -16,6 +17,8 @@ class FactorWeightLearner;
  * rebuild() classifies ALL local files and populates two disjoint lists:
  *   m_candidates  – deletable files (T0-T3), sorted by tier + score
  *   m_lockedFiles – locked files shown for visibility
+ *
+ * scheduleRebuild() coalesces rapid requests into a single deferred rebuild.
  */
 class DeletionQueue : public QObject
 {
@@ -27,8 +30,11 @@ public:
                            FactorWeightLearner &learner,
                            QObject *parent = nullptr);
 
-    /// Re-classify every local file.
+    /// Re-classify every local file immediately.
     void rebuild();
+
+    /// Schedule a deferred rebuild, coalescing rapid successive calls.
+    void scheduleRebuild();
 
     /// Top candidate (nullptr if empty).
     const DeletionCandidate *next() const;
@@ -54,7 +60,7 @@ public:
     /// The A vs B pair (top two Tier-3 candidates).
     QPair<DeletionCandidate, DeletionCandidate> getAvsBPair() const;
 
-    // ── Lock actions (delegates + rebuilds) ──
+    // ── Lock actions (delegates + schedules rebuild) ──
     void lockAnime(int aid);
     void unlockAnime(int aid);
     void lockEpisode(int eid);
@@ -62,6 +68,9 @@ public:
 
     /// Process an A vs B user choice (deletes file + updates weights).
     void recordChoice(int keptLid, int deletedLid);
+
+    /// Debounce interval in milliseconds for scheduleRebuild().
+    static constexpr int DEBOUNCE_MS = 500;
 
 signals:
     void queueRebuilt();
@@ -75,6 +84,7 @@ private:
     HybridDeletionClassifier &m_classifier;
     DeletionLockManager &m_lockManager;
     FactorWeightLearner &m_learner;
+    QTimer m_rebuildTimer;
 };
 
 #endif // DELETIONQUEUE_H
